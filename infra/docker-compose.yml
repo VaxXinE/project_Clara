@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: clara_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: clara_user
+      POSTGRES_PASSWORD: clara_password_dev_only
+      POSTGRES_DB: clara_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - clara_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: clara_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+volumes:
+  clara_postgres_data:
