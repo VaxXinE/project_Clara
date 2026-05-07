@@ -33,3 +33,8 @@ class Conversation(Base):
         back_populates="conversation",
         cascade="all, delete-orphan",
     )
+    ai_extractions = relationship(
+        "AIExtraction",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+    )
