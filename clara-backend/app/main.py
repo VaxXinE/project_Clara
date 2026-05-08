@@ -1,12 +1,13 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes_ai import router as ai_router
 from app.api.routes_conversations import router as conversations_router
+from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_reply import router as reply_router
 from app.api.routes_upload import router as upload_router
 from app.db.session import Base, engine
 
-# Import models so SQLAlchemy knows them when creating tables.
 from app.models.ai_extraction import AIExtraction  # noqa: F401
 from app.models.approval_log import ApprovalLog  # noqa: F401
 from app.models.conversation import Conversation  # noqa: F401
@@ -17,10 +18,19 @@ from app.models.reply_suggestion import ReplySuggestion  # noqa: F401
 def create_app() -> FastAPI:
     app = FastAPI(title="Clara API", version="0.1.0")
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     app.include_router(upload_router)
     app.include_router(conversations_router)
     app.include_router(ai_router)
     app.include_router(reply_router)
+    app.include_router(dashboard_router)
 
     @app.get("/health")
     def health_check() -> dict[str, str]:
