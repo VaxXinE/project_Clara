@@ -10,12 +10,14 @@ type Props = {
   replySuggestionId: string;
   suggestedReplies: SuggestedReply[];
   approvalStatus: string;
+  hasBeenSent?: boolean;
 };
 
 export function ReplySuggestionActions({
   replySuggestionId,
   suggestedReplies,
   approvalStatus,
+  hasBeenSent = false,
 }: Props) {
   const router = useRouter();
   const [selectedText, setSelectedText] = useState(
@@ -24,9 +26,11 @@ export function ReplySuggestionActions({
   const [finalText, setFinalText] = useState(suggestedReplies[0]?.text ?? "");
   const [rejectReason, setRejectReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMarkingSent, setIsMarkingSent] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const isPending = approvalStatus === "pending";
+  const isApproved = approvalStatus === "approved";
 
   async function handleApprove() {
     setErrorMessage("");
@@ -75,12 +79,79 @@ export function ReplySuggestionActions({
     }
   }
 
-  if (!isPending) {
+  async function handleMarkSent() {
+    setErrorMessage("");
+    setIsMarkingSent(true);
+
+    try {
+      await apiFetch(`/reply-suggestions/${replySuggestionId}/mark-sent`, {
+        method: "POST",
+        body: {
+          sent_by_name: "Sales Dashboard",
+        },
+      });
+
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to mark as sent."
+      );
+    } finally {
+      setIsMarkingSent(false);
+    }
+  }
+
+  if (hasBeenSent) {
+    return (
+      <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+        <p className="text-sm font-semibold text-green-800">
+          Reply sudah ditandai terkirim.
+        </p>
+        <p className="mt-1 text-sm text-green-700">
+          Untuk MVP ini, status terkirim masih simulasi manual. Nanti bisa
+          diganti ke WhatsApp Cloud API.
+        </p>
+      </div>
+    );
+  }
+
+  if (!isPending && !isApproved) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm font-medium text-slate-700">
           Suggestion status: {approvalStatus}
         </p>
+      </div>
+    );
+  }
+
+  if (isApproved) {
+    return (
+      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-950">
+            Reply Approved
+          </h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Balasan sudah approved. Setelah sales mengirimnya ke WhatsApp,
+            tandai sebagai sent.
+          </p>
+        </div>
+
+        {errorMessage && (
+          <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+            {errorMessage}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={handleMarkSent}
+          disabled={isMarkingSent}
+          className="rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isMarkingSent ? "Marking..." : "Mark as Sent"}
+        </button>
       </div>
     );
   }

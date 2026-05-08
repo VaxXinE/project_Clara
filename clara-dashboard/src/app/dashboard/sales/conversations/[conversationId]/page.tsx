@@ -91,6 +91,7 @@ export default async function SalesConversationDetailPage({ params }: Props) {
                   {formatStatusLabel(suggestion.approval_status)}
                 </span>
               )}
+              
             </div>
           </div>
         </section>
@@ -217,11 +218,14 @@ export default async function SalesConversationDetailPage({ params }: Props) {
             </div>
 
             {suggestion ? (
-              <ReplySuggestionActions
+            <ReplySuggestionActions
                 replySuggestionId={suggestion.id}
                 suggestedReplies={suggestion.suggested_replies}
                 approvalStatus={suggestion.approval_status}
-              />
+                hasBeenSent={detail.sent_messages.some(
+                    (sentMessage) => sentMessage.reply_suggestion_id === suggestion.id
+                )}
+            />
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5">
                 <h2 className="text-lg font-semibold text-slate-950">
@@ -232,6 +236,32 @@ export default async function SalesConversationDetailPage({ params }: Props) {
                 </p>
               </div>
             )}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 className="text-lg font-semibold text-slate-950">Sent Messages</h2>
+
+                {detail.sent_messages.length > 0 ? (
+                    <div className="mt-4 space-y-3">
+                    {detail.sent_messages.map((sentMessage) => (
+                        <div
+                        key={sentMessage.id}
+                        className="rounded-xl bg-green-50 p-4 text-sm text-green-900"
+                        >
+                        <p className="font-semibold">
+                            Sent by {sentMessage.sent_by_name}
+                        </p>
+                        <p className="mt-1 text-xs text-green-700">
+                            {formatDateTime(sentMessage.sent_at)} • {sentMessage.send_mode}
+                        </p>
+                        <p className="mt-3 whitespace-pre-wrap">{sentMessage.message_text}</p>
+                        </div>
+                    ))}
+                    </div>
+                ) : (
+                    <p className="mt-3 text-sm text-slate-600">
+                    Belum ada message yang ditandai terkirim.
+                    </p>
+                )}
+            </div>
           </aside>
         </section>
       </div>

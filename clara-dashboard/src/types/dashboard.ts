@@ -47,6 +47,7 @@ export type SalesInboxItem = {
   latest_reply_suggestion: DashboardReplySuggestionSummary | null;
   ui_status: string;
   priority_score: number;
+  latest_sent_message: DashboardSentMessageSummary | null;
 };
 
 export type SalesConversationMessage = {
@@ -67,6 +68,7 @@ export type SalesConversationDetail = {
   messages: SalesConversationMessage[];
   latest_ai_extraction: DashboardAIExtractionSummary | null;
   latest_reply_suggestion: DashboardReplySuggestionSummary | null;
+  sent_messages: DashboardSentMessageSummary[];
 };
 
 export type MarketingInsightsPreview = {
@@ -84,4 +86,13 @@ export type UploadWhatsAppResponse = {
   conversation_id: string;
   message_count: number;
   status: string;
+};
+
+export type DashboardSentMessageSummary = {
+  id: string;
+  reply_suggestion_id: string | null;
+  send_mode: string;
+  message_text: string;
+  sent_by_name: string;
+  sent_at: string;
 };

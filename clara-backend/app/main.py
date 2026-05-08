@@ -6,6 +6,7 @@ from app.api.routes_conversations import router as conversations_router
 from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_reply import router as reply_router
 from app.api.routes_upload import router as upload_router
+from app.api.routes_sent_messages import router as sent_messages_router
 from app.db.session import Base, engine
 
 from app.models.ai_extraction import AIExtraction  # noqa: F401
@@ -13,7 +14,7 @@ from app.models.approval_log import ApprovalLog  # noqa: F401
 from app.models.conversation import Conversation  # noqa: F401
 from app.models.message import Message  # noqa: F401
 from app.models.reply_suggestion import ReplySuggestion  # noqa: F401
-
+from app.models.sent_message import SentMessage  # noqa: F401
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Clara API", version="0.1.0")
@@ -31,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_router)
     app.include_router(reply_router)
     app.include_router(dashboard_router)
+    app.include_router(sent_messages_router)
 
     @app.get("/health")
     def health_check() -> dict[str, str]:

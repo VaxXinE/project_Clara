@@ -8,10 +8,12 @@ from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.reply_suggestion import ReplySuggestion
+from app.models.sent_message import SentMessage
 from app.schemas.dashboard_schema import (
     DashboardAIExtractionSummary,
     DashboardLatestMessage,
     DashboardReplySuggestionSummary,
+    DashboardSentMessageSummary,
     MarketingInsightsPreview,
     MarketingObjectionInsight,
     SalesConversationDetail,
@@ -121,7 +123,11 @@ def calculate_priority_score(
 def determine_ui_status(
     extraction: AIExtraction | None,
     suggestion: ReplySuggestion | None,
+    sent_message: SentMessage | None,
 ) -> str:
+    if sent_message is not None:
+        return "reply_sent"
+
     if extraction is None:
         return "needs_analysis"
 
@@ -145,7 +151,6 @@ def determine_ui_status(
 
     return "unknown"
 
-
 def get_sales_inbox(db: Session) -> list[SalesInboxItem]:
     statement = (
         select(Conversation)
@@ -153,6 +158,7 @@ def get_sales_inbox(db: Session) -> list[SalesInboxItem]:
             selectinload(Conversation.messages),
             selectinload(Conversation.ai_extractions),
             selectinload(Conversation.reply_suggestions),
+            selectinload(Conversation.sent_messages),
         )
         .order_by(desc(Conversation.last_message_at))
     )
@@ -164,6 +170,7 @@ def get_sales_inbox(db: Session) -> list[SalesInboxItem]:
         latest_message = get_latest_message(conversation)
         latest_extraction = get_latest_extraction(conversation)
         latest_suggestion = get_latest_reply_suggestion(conversation)
+        latest_sent_message = get_latest_sent_message(conversation)
 
         latest_message_summary = None
         if latest_message is not None:
@@ -184,9 +191,14 @@ def get_sales_inbox(db: Session) -> list[SalesInboxItem]:
                 last_message_at=conversation.last_message_at,
                 created_at=conversation.created_at,
                 latest_message=latest_message_summary,
+                latest_sent_message=build_sent_message_summary(latest_sent_message),
                 latest_ai_extraction=build_ai_summary(latest_extraction),
                 latest_reply_suggestion=build_reply_summary(latest_suggestion),
-                ui_status=determine_ui_status(latest_extraction, latest_suggestion),
+                ui_status=determine_ui_status(
+                    latest_extraction,
+                    latest_suggestion,
+                    latest_sent_message,
+                ),
                 priority_score=calculate_priority_score(
                     latest_extraction,
                     latest_suggestion,
@@ -212,6 +224,7 @@ def get_sales_conversation_detail(
             selectinload(Conversation.messages),
             selectinload(Conversation.ai_extractions),
             selectinload(Conversation.reply_suggestions),
+            selectinload(Conversation.sent_messages),
         )
     )
 
@@ -227,6 +240,12 @@ def get_sales_conversation_detail(
         conversation.messages,
         key=lambda message: message.message_timestamp,
     )
+
+    sorted_sent_messages = sorted(
+    conversation.sent_messages,
+    key=lambda sent_message: sent_message.sent_at,
+    reverse=True,
+)
 
     return SalesConversationDetail(
         conversation_id=conversation.id,
@@ -247,6 +266,18 @@ def get_sales_conversation_detail(
         ],
         latest_ai_extraction=build_ai_summary(latest_extraction),
         latest_reply_suggestion=build_reply_summary(latest_suggestion),
+        sent_messages=[
+            {
+                "id": str(sent_message.id),
+                "reply_suggestion_id": str(sent_message.reply_suggestion_id) if sent_message.reply_suggestion_id else None,
+                "send_mode": sent_message.send_mode,
+                "message_text": sent_message.message_text,
+                "sent_by_name": sent_message.sent_by_name,
+                "sent_at": sent_message.sent_at.isoformat(),
+            }
+            for sent_message in sorted_sent_messages
+        ]
+    
     )
 
 
@@ -289,4 +320,30 @@ def get_marketing_insights_preview(db: Session) -> MarketingInsightsPreview:
         top_objections=top_objections,
         lead_temperature_breakdown=dict(lead_temperature_counter),
         risk_level_breakdown=dict(risk_level_counter),
+    )
+
+
+def build_sent_message_summary(
+    sent_message: SentMessage | None,
+) -> DashboardSentMessageSummary | None:
+    if sent_message is None:
+        return None
+
+    return DashboardSentMessageSummary(
+        id=sent_message.id,
+        reply_suggestion_id=sent_message.reply_suggestion_id,
+        send_mode=sent_message.send_mode,
+        message_text=sent_message.message_text,
+        sent_by_name=sent_message.sent_by_name,
+        sent_at=sent_message.sent_at,
+    )
+
+
+def get_latest_sent_message(conversation: Conversation) -> SentMessage | None:
+    if not conversation.sent_messages:
+        return None
+
+    return max(
+        conversation.sent_messages,
+        key=lambda sent_message: sent_message.sent_at,
     )

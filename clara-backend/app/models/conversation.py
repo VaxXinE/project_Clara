@@ -16,6 +16,9 @@ class Conversation(Base):
     source: Mapped[str] = mapped_column(String(50), nullable=False, default="whatsapp_txt")
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="uploaded")
 
+    current_stage: Mapped[str] = mapped_column(String(50), nullable=False, default="unknown")
+    lead_temperature: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown")
+
     raw_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -40,6 +43,12 @@ class Conversation(Base):
     )
     reply_suggestions = relationship(
         "ReplySuggestion",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+    )
+
+    sent_messages = relationship(
+        "SentMessage",
         back_populates="conversation",
         cascade="all, delete-orphan",
     )

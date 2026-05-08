@@ -67,6 +67,11 @@ export default async function SalesInboxPage() {
                         <h2 className="truncate text-lg font-semibold text-slate-950">
                           {item.title}
                         </h2>
+                            {item.latest_sent_message && (
+                                <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                                    SENT
+                                </span>
+                                )}
 
                         {extraction && (
                           <span
@@ -119,9 +124,11 @@ export default async function SalesInboxPage() {
                         Reply status
                       </p>
                       <p className="mt-2 text-sm font-medium text-slate-800">
-                        {suggestion
-                          ? formatStatusLabel(suggestion.approval_status)
-                          : "No suggestion"}
+                        {item.latest_sent_message
+                        ? "sent"
+                        : suggestion
+                            ? formatStatusLabel(suggestion.approval_status)
+                            : "No suggestion"}
                       </p>
                     </div>
                   </div>
