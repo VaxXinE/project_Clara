@@ -38,3 +38,8 @@ class Conversation(Base):
         back_populates="conversation",
         cascade="all, delete-orphan",
     )
+    reply_suggestions = relationship(
+        "ReplySuggestion",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+    )
