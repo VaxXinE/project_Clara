@@ -79,3 +79,9 @@ export type MarketingInsightsPreview = {
   lead_temperature_breakdown: Record<string, number>;
   risk_level_breakdown: Record<string, number>;
 };
+
+export type UploadWhatsAppResponse = {
+  conversation_id: string;
+  message_count: number;
+  status: string;
+};

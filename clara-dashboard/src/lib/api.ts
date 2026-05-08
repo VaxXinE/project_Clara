@@ -10,12 +10,29 @@ export async function apiFetch<T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
+  const isFormData =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+
+  let requestBody: BodyInit | null | undefined;
+
+  if (options.body === undefined) {
+    requestBody = undefined;
+  } else if (options.body === null) {
+    requestBody = null;
+  } else if (typeof FormData !== "undefined" && options.body instanceof FormData) {
+    requestBody = options.body;
+  } else {
+    requestBody = JSON.stringify(options.body);
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: isFormData
+      ? undefined
+      : {
+          "Content-Type": "application/json",
+        },
+    body: requestBody,
     cache: "no-store",
   });
 

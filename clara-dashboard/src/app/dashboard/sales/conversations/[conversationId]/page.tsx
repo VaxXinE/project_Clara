@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { ReplySuggestionActions } from "@/components/dashboard/ReplySuggestionActions";
 import { apiFetch } from "@/lib/api";
+import { ConversationAiActions } from "@/components/dashboard/ConversationAiActions";
 import {
   formatDateTime,
   formatStatusLabel,
@@ -144,6 +145,11 @@ export default async function SalesConversationDetailPage({ params }: Props) {
           </div>
 
           <aside className="space-y-6">
+            <ConversationAiActions
+                conversationId={detail.conversation_id}
+                hasAiExtraction={Boolean(extraction)}
+                hasReplySuggestion={Boolean(suggestion)}
+            />
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-semibold text-slate-950">
                 AI Analysis

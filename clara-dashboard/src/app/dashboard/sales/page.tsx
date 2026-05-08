@@ -19,15 +19,24 @@ export default async function SalesInboxPage() {
   return (
     <main className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section>
-          <p className="text-sm font-medium text-slate-500">Clara Dashboard</p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
+        <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+            <p className="text-sm font-medium text-slate-500">Clara Dashboard</p>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
             Sales Inbox
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-600">
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">
             Pantau conversation, hasil AI analysis, dan draft balasan sales dari
             satu tempat.
-          </p>
+            </p>
+        </div>
+
+        <Link
+            href="/dashboard/upload"
+            className="inline-flex w-fit rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+        >
+            Upload WhatsApp Chat
+        </Link>
         </section>
 
         <section className="grid gap-4">
