@@ -63,6 +63,11 @@ export async function apiFetch<T>(
       // Ignore JSON parse error.
     }
 
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.localStorage.removeItem("clara_access_token");
+      window.location.href = "/login";
+    }
+
     throw new Error(message);
   }
 

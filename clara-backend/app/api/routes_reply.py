@@ -1,15 +1,17 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+
 from app.core.security import require_roles
-from app.models.user import User
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.reply_suggestion_schema import (
     ApproveReplyRequest,
     RejectReplyRequest,
     ReplySuggestionResponse,
 )
+from app.services.audit_service import create_audit_log
 from app.services.reply_suggestion_service import (
     ReplySuggestionError,
     approve_reply_suggestion,
@@ -59,15 +61,27 @@ def list_reply_suggestions_endpoint(
 def approve_reply_suggestion_endpoint(
     reply_suggestion_id: UUID,
     payload: ApproveReplyRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("sales", "admin")),
 ):
     try:
-        return approve_reply_suggestion(
+        suggestion = approve_reply_suggestion(
             db=db,
             reply_suggestion_id=reply_suggestion_id,
             payload=payload,
         )
+
+        create_audit_log(
+            db=db,
+            action="reply_suggestion.approve",
+            resource_type="reply_suggestion",
+            resource_id=str(reply_suggestion_id),
+            current_user=current_user,
+            request=request,
+        )
+
+        return suggestion
     except ReplySuggestionError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -82,15 +96,28 @@ def approve_reply_suggestion_endpoint(
 def reject_reply_suggestion_endpoint(
     reply_suggestion_id: UUID,
     payload: RejectReplyRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("sales", "admin")),
 ):
     try:
-        return reject_reply_suggestion(
+        suggestion = reject_reply_suggestion(
             db=db,
             reply_suggestion_id=reply_suggestion_id,
             payload=payload,
         )
+
+        create_audit_log(
+            db=db,
+            action="reply_suggestion.reject",
+            resource_type="reply_suggestion",
+            resource_id=str(reply_suggestion_id),
+            current_user=current_user,
+            request=request,
+            metadata={"reason": payload.reason},
+        )
+
+        return suggestion
     except ReplySuggestionError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -14,6 +14,7 @@ from app.models.message import Message  # noqa: F401
 from app.models.reply_suggestion import ReplySuggestion  # noqa: F401
 from app.models.sent_message import SentMessage  # noqa: F401
 from app.models.user import User  # noqa: F401
+from app.models.audit_log import AuditLog  # noqa: F401
 
 config = context.config
 

@@ -9,6 +9,10 @@ from app.models.message import Message
 from app.services.whatsapp_parser import WhatsAppParseError, parse_whatsapp_txt
 from app.core.security import require_roles
 from app.models.user import User
+from fastapi import Request
+from app.models.user import User
+from app.core.security import require_roles
+from app.services.audit_service import create_audit_log
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
@@ -19,9 +23,10 @@ MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 @router.post("/whatsapp-txt", status_code=status.HTTP_201_CREATED)
 
 async def upload_whatsapp_txt(
+    request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("sales", "admin")),
 ) -> dict[str, UUID | int | str]:
     if not file.filename or not file.filename.endswith(".txt"):
         raise HTTPException(
@@ -84,6 +89,18 @@ async def upload_whatsapp_txt(
 
     db.commit()
     db.refresh(conversation)
+    create_audit_log(
+        db=db,
+        action="conversation.upload_whatsapp_txt",
+        resource_type="conversation",
+        resource_id=str(conversation.id),
+        current_user=current_user,
+        request=request,
+        metadata={
+            "filename": file.filename,
+            "message_count": len(parsed_messages),
+        },
+    )
 
     return {
         "conversation_id": conversation.id,

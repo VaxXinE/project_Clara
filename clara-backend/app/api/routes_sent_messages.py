@@ -1,14 +1,16 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+
 from app.core.security import require_roles
-from app.models.user import User
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.sent_message_schema import (
     MarkReplySentRequest,
     SentMessageResponse,
 )
+from app.services.audit_service import create_audit_log
 from app.services.sent_message_service import (
     SentMessageError,
     list_sent_messages,
@@ -26,15 +28,27 @@ router = APIRouter(tags=["sent-messages"])
 def mark_reply_sent_endpoint(
     reply_suggestion_id: UUID,
     payload: MarkReplySentRequest,
+    request: Request,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("sales", "admin")),
 ):
     try:
-        return mark_reply_suggestion_as_sent(
+        sent_message = mark_reply_suggestion_as_sent(
             db=db,
             reply_suggestion_id=reply_suggestion_id,
             payload=payload,
         )
+
+        create_audit_log(
+            db=db,
+            action="reply_suggestion.mark_sent",
+            resource_type="reply_suggestion",
+            resource_id=str(reply_suggestion_id),
+            current_user=current_user,
+            request=request,
+        )
+
+        return sent_message
     except SentMessageError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
