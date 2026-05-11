@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { apiFetch } from "@/lib/api";
@@ -9,15 +8,15 @@ type Props = {
   conversationId: string;
   hasAiExtraction: boolean;
   hasReplySuggestion: boolean;
+  onUpdated: () => Promise<void>;
 };
 
 export function ConversationAiActions({
   conversationId,
   hasAiExtraction,
   hasReplySuggestion,
+  onUpdated,
 }: Props) {
-  const router = useRouter();
-
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -31,7 +30,7 @@ export function ConversationAiActions({
         method: "POST",
       });
 
-      router.refresh();
+      await onUpdated();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Analyze failed."
@@ -50,7 +49,7 @@ export function ConversationAiActions({
         method: "POST",
       });
 
-      router.refresh();
+      await onUpdated();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Generate reply failed."

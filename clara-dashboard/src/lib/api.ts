@@ -6,32 +6,49 @@ type RequestOptions = {
   body?: unknown;
 };
 
+function buildRequestBody(body: unknown): BodyInit | undefined {
+  if (body === undefined || body === null) {
+    return undefined;
+  }
+
+  if (typeof FormData !== "undefined" && body instanceof FormData) {
+    return body;
+  }
+
+  return JSON.stringify(body);
+}
+
+function getAccessToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage.getItem("clara_access_token");
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
+  const requestBody = buildRequestBody(options.body);
   const isFormData =
-    typeof FormData !== "undefined" && options.body instanceof FormData;
+    typeof FormData !== "undefined" && requestBody instanceof FormData;
 
-  let requestBody: BodyInit | null | undefined;
+  const token = getAccessToken();
 
-  if (options.body === undefined) {
-    requestBody = undefined;
-  } else if (options.body === null) {
-    requestBody = null;
-  } else if (typeof FormData !== "undefined" && options.body instanceof FormData) {
-    requestBody = options.body;
-  } else {
-    requestBody = JSON.stringify(options.body);
+  const headers: Record<string, string> = {};
+
+  if (requestBody !== undefined && !isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? "GET",
-    headers: isFormData
-      ? undefined
-      : {
-          "Content-Type": "application/json",
-        },
+    headers,
     body: requestBody,
     cache: "no-store",
   });

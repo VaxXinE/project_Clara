@@ -2,7 +2,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
+from app.core.security import require_roles
+from app.models.user import User
 from app.db.session import get_db
 from app.schemas.sent_message_schema import (
     MarkReplySentRequest,
@@ -26,6 +27,7 @@ def mark_reply_sent_endpoint(
     reply_suggestion_id: UUID,
     payload: MarkReplySentRequest,
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "admin")),
 ):
     try:
         return mark_reply_suggestion_as_sent(
@@ -47,6 +49,7 @@ def mark_reply_sent_endpoint(
 def list_sent_messages_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "admin")),
 ):
     return list_sent_messages(
         db=db,

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { apiFetch } from "@/lib/api";
@@ -11,6 +10,7 @@ type Props = {
   suggestedReplies: SuggestedReply[];
   approvalStatus: string;
   hasBeenSent?: boolean;
+  onUpdated: () => Promise<void>;
 };
 
 export function ReplySuggestionActions({
@@ -18,8 +18,8 @@ export function ReplySuggestionActions({
   suggestedReplies,
   approvalStatus,
   hasBeenSent = false,
+  onUpdated,
 }: Props) {
-  const router = useRouter();
   const [selectedText, setSelectedText] = useState(
     suggestedReplies[0]?.text ?? ""
   );
@@ -46,7 +46,7 @@ export function ReplySuggestionActions({
         },
       });
 
-      router.refresh();
+      await onUpdated();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to approve reply."
@@ -69,7 +69,7 @@ export function ReplySuggestionActions({
         },
       });
 
-      router.refresh();
+      await onUpdated();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to reject reply."
@@ -91,7 +91,7 @@ export function ReplySuggestionActions({
         },
       });
 
-      router.refresh();
+      await onUpdated();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Failed to mark as sent."

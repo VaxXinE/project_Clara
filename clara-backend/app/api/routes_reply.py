@@ -2,7 +2,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
+from app.core.security import require_roles
+from app.models.user import User
 from app.db.session import get_db
 from app.schemas.reply_suggestion_schema import (
     ApproveReplyRequest,
@@ -28,6 +29,7 @@ router = APIRouter(tags=["reply-suggestions"])
 def create_reply_suggestion_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "admin")),
 ):
     try:
         return create_reply_suggestion(db=db, conversation_id=conversation_id)
@@ -45,6 +47,7 @@ def create_reply_suggestion_endpoint(
 def list_reply_suggestions_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "admin")),
 ):
     return list_reply_suggestions(db=db, conversation_id=conversation_id)
 
@@ -57,6 +60,7 @@ def approve_reply_suggestion_endpoint(
     reply_suggestion_id: UUID,
     payload: ApproveReplyRequest,
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "admin")),
 ):
     try:
         return approve_reply_suggestion(
@@ -79,6 +83,7 @@ def reject_reply_suggestion_endpoint(
     reply_suggestion_id: UUID,
     payload: RejectReplyRequest,
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "admin")),
 ):
     try:
         return reject_reply_suggestion(

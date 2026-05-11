@@ -2,7 +2,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-
+from app.core.security import require_roles
+from app.models.user import User
 from app.db.session import get_db
 from app.schemas.dashboard_schema import (
     MarketingInsightsPreview,
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("/sales/inbox", response_model=list[SalesInboxItem])
 def sales_inbox(
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "admin")),
 ):
     return get_sales_inbox(db=db)
 
@@ -32,6 +34,7 @@ def sales_inbox(
 def sales_conversation_detail(
     conversation_id: UUID,
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "admin")),
 ):
     detail = get_sales_conversation_detail(
         db=db,
@@ -50,5 +53,6 @@ def sales_conversation_detail(
 @router.get("/marketing/insights-preview", response_model=MarketingInsightsPreview)
 def marketing_insights_preview(
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("marketing", "admin")),
 ):
     return get_marketing_insights_preview(db=db)

@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.ai_extraction_schema import AIExtractionResponse
+from app.core.security import require_roles
+from app.models.user import User
 from app.services.ai_extraction_service import (
     AIExtractionError,
     analyze_conversation,
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/conversations", tags=["ai-extractions"])
 def analyze_conversation_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "admin")),
 ):
     try:
         return analyze_conversation(db=db, conversation_id=conversation_id)
@@ -32,5 +35,6 @@ def analyze_conversation_endpoint(
 def list_ai_extractions_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
+    _: User = Depends(require_roles("sales", "marketing", "admin")),
 ):
     return list_ai_extractions(db=db, conversation_id=conversation_id)
