@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -84,9 +84,58 @@ class MarketingObjectionInsight(BaseModel):
     count: int
 
 
+class MarketingBreakdownItem(BaseModel):
+    label: str
+    count: int
+
+
+class MarketingContentRecommendation(BaseModel):
+    title: str
+    rationale: str
+    suggested_format: str
+    priority: str
+
+
+class MarketingKpiSummary(BaseModel):
+    reply_sent_rate: float
+    analysis_coverage_rate: float
+    approved_reply_rate: float
+    high_risk_conversation_count: int
+
+
 class MarketingInsightsPreview(BaseModel):
     total_conversations: int
     total_analyzed_conversations: int
     top_objections: list[MarketingObjectionInsight]
     lead_temperature_breakdown: dict[str, int]
     risk_level_breakdown: dict[str, int]
+    buying_intent_breakdown: list[MarketingBreakdownItem]
+    sentiment_breakdown: list[MarketingBreakdownItem]
+    pipeline_stage_breakdown: list[MarketingBreakdownItem]
+    top_content_recommendations: list[MarketingContentRecommendation]
+    kpi_summary: MarketingKpiSummary
+    generated_at: datetime
+
+
+class MarketingInsightSnapshotComparison(BaseModel):
+    conversation_delta: int
+    analyzed_delta: int
+    reply_sent_rate_delta: float
+    approved_reply_rate_delta: float
+
+
+class MarketingInsightSnapshotResponse(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    scope_type: str
+    snapshot_type: str
+    period_start: datetime | date
+    period_end: datetime | date
+    total_conversations: int
+    total_analyzed_conversations: int
+    top_objections: list[dict]
+    top_content_recommendations: list[dict]
+    kpi_summary: MarketingKpiSummary
+    generated_at: datetime
+    created_at: datetime
+    comparison: MarketingInsightSnapshotComparison | None

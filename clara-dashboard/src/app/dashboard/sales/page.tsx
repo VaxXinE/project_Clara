@@ -53,6 +53,13 @@ export default function SalesInboxPage() {
 
           <div className="flex gap-2">
             <Link
+              href="/dashboard/marketing"
+              className="inline-flex w-fit rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            >
+              Marketing Insights
+            </Link>
+
+            <Link
               href="/dashboard/knowledge"
               className="inline-flex w-fit rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
             >

@@ -84,6 +84,66 @@ export type MarketingInsightsPreview = {
   }[];
   lead_temperature_breakdown: Record<string, number>;
   risk_level_breakdown: Record<string, number>;
+  buying_intent_breakdown: {
+    label: string;
+    count: number;
+  }[];
+  sentiment_breakdown: {
+    label: string;
+    count: number;
+  }[];
+  pipeline_stage_breakdown: {
+    label: string;
+    count: number;
+  }[];
+  top_content_recommendations: {
+    title: string;
+    rationale: string;
+    suggested_format: string;
+    priority: string;
+  }[];
+  kpi_summary: {
+    reply_sent_rate: number;
+    analysis_coverage_rate: number;
+    approved_reply_rate: number;
+    high_risk_conversation_count: number;
+  };
+  generated_at: string;
+};
+
+export type MarketingInsightSnapshot = {
+  id: string;
+  organization_id: string | null;
+  scope_type: string;
+  snapshot_type: string;
+  period_start: string;
+  period_end: string;
+  total_conversations: number;
+  total_analyzed_conversations: number;
+  top_objections: {
+    topic: string;
+    count: number;
+  }[];
+  top_content_recommendations: {
+    title: string;
+    rationale: string;
+    suggested_format: string;
+    priority: string;
+  }[];
+  kpi_summary: {
+    reply_sent_rate: number;
+    analysis_coverage_rate: number;
+    approved_reply_rate: number;
+    high_risk_conversation_count: number;
+  };
+  generated_at: string;
+  created_at: string;
+  comparison: {
+    conversation_delta: number;
+    analyzed_delta: number;
+    reply_sent_rate_delta: number;
+    approved_reply_rate_delta: number;
+  } | null;
 };
 
 export type UploadWhatsAppResponse = {

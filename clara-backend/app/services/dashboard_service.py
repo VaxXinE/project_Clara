@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import desc, func, select
@@ -15,7 +16,10 @@ from app.schemas.dashboard_schema import (
     DashboardLatestMessage,
     DashboardReplySuggestionSummary,
     DashboardSentMessageSummary,
+    MarketingBreakdownItem,
+    MarketingContentRecommendation,
     MarketingInsightsPreview,
+    MarketingKpiSummary,
     MarketingObjectionInsight,
     SalesConversationDetail,
     SalesInboxItem,
@@ -305,36 +309,52 @@ def get_marketing_insights_preview(
     db: Session,
     current_user: User,
 ) -> MarketingInsightsPreview:
-    if current_user.organization_id is None:
+    can_view_global = current_user.role == "owner"
+
+    if current_user.organization_id is None and not can_view_global:
         return MarketingInsightsPreview(
             total_conversations=0,
             total_analyzed_conversations=0,
             top_objections=[],
             lead_temperature_breakdown={},
             risk_level_breakdown={},
+            buying_intent_breakdown=[],
+            sentiment_breakdown=[],
+            pipeline_stage_breakdown=[],
+            top_content_recommendations=[],
+            kpi_summary=MarketingKpiSummary(
+                reply_sent_rate=0,
+                analysis_coverage_rate=0,
+                approved_reply_rate=0,
+                high_risk_conversation_count=0,
+            ),
+            generated_at=datetime.now(timezone.utc),
         )
 
-    total_conversations = (
-        db.scalar(
-            select(func.count(Conversation.id)).where(
-                Conversation.organization_id == current_user.organization_id
-            )
+    total_conversations_statement = select(func.count(Conversation.id))
+    if not can_view_global:
+        total_conversations_statement = total_conversations_statement.where(
+            Conversation.organization_id == current_user.organization_id
         )
-        or 0
-    )
+    total_conversations = db.scalar(total_conversations_statement) or 0
 
-    extractions = list(
-        db.scalars(
-            select(AIExtraction)
-            .join(Conversation, AIExtraction.conversation_id == Conversation.id)
-            .where(Conversation.organization_id == current_user.organization_id)
-            .order_by(desc(AIExtraction.created_at))
-        ).all()
+    extractions_statement = (
+        select(AIExtraction)
+        .join(Conversation, AIExtraction.conversation_id == Conversation.id)
+        .order_by(desc(AIExtraction.created_at))
     )
+    if not can_view_global:
+        extractions_statement = extractions_statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
+    extractions = list(db.scalars(extractions_statement).all())
 
     objection_counter: Counter[str] = Counter()
     lead_temperature_counter: Counter[str] = Counter()
     risk_level_counter: Counter[str] = Counter()
+    buying_intent_counter: Counter[str] = Counter()
+    sentiment_counter: Counter[str] = Counter()
+    pipeline_stage_counter: Counter[str] = Counter()
 
     latest_extraction_by_conversation: dict[UUID, AIExtraction] = {}
 
@@ -345,6 +365,9 @@ def get_marketing_insights_preview(
     for extraction in latest_extraction_by_conversation.values():
         lead_temperature_counter[extraction.lead_temperature] += 1
         risk_level_counter[extraction.risk_level] += 1
+        buying_intent_counter[extraction.buying_intent] += 1
+        sentiment_counter[extraction.sentiment] += 1
+        pipeline_stage_counter[extraction.pipeline_stage] += 1
 
         for objection in extraction.main_objections:
             normalized_objection = objection.strip().lower()
@@ -356,12 +379,64 @@ def get_marketing_insights_preview(
         for topic, count in objection_counter.most_common(10)
     ]
 
+    reply_sent_count_statement = (
+        select(func.count(SentMessage.id))
+        .join(Conversation, SentMessage.conversation_id == Conversation.id)
+    )
+    approved_reply_count_statement = (
+        select(func.count(ReplySuggestion.id))
+        .join(Conversation, ReplySuggestion.conversation_id == Conversation.id)
+        .where(ReplySuggestion.approval_status == "approved")
+    )
+    total_reply_suggestions_statement = (
+        select(func.count(ReplySuggestion.id))
+        .join(Conversation, ReplySuggestion.conversation_id == Conversation.id)
+    )
+
+    if not can_view_global:
+        reply_sent_count_statement = reply_sent_count_statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
+        approved_reply_count_statement = approved_reply_count_statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
+        total_reply_suggestions_statement = total_reply_suggestions_statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
+
+    reply_sent_count = db.scalar(reply_sent_count_statement) or 0
+    approved_reply_count = db.scalar(approved_reply_count_statement) or 0
+    total_reply_suggestions = db.scalar(total_reply_suggestions_statement) or 0
+
+    top_content_recommendations = build_content_recommendations(
+        objection_counter=objection_counter,
+        sentiment_counter=sentiment_counter,
+        risk_level_counter=risk_level_counter,
+    )
+
     return MarketingInsightsPreview(
         total_conversations=total_conversations,
         total_analyzed_conversations=len(latest_extraction_by_conversation),
         top_objections=top_objections,
         lead_temperature_breakdown=dict(lead_temperature_counter),
         risk_level_breakdown=dict(risk_level_counter),
+        buying_intent_breakdown=to_breakdown_items(buying_intent_counter),
+        sentiment_breakdown=to_breakdown_items(sentiment_counter),
+        pipeline_stage_breakdown=to_breakdown_items(pipeline_stage_counter),
+        top_content_recommendations=top_content_recommendations,
+        kpi_summary=MarketingKpiSummary(
+            reply_sent_rate=safe_ratio(reply_sent_count, total_conversations),
+            analysis_coverage_rate=safe_ratio(
+                len(latest_extraction_by_conversation),
+                total_conversations,
+            ),
+            approved_reply_rate=safe_ratio(
+                approved_reply_count,
+                total_reply_suggestions,
+            ),
+            high_risk_conversation_count=risk_level_counter.get("high", 0),
+        ),
+        generated_at=datetime.now(timezone.utc),
     )
 
 
@@ -389,3 +464,66 @@ def get_latest_sent_message(conversation: Conversation) -> SentMessage | None:
         conversation.sent_messages,
         key=lambda sent_message: sent_message.sent_at,
     )
+
+
+def to_breakdown_items(counter: Counter[str]) -> list[MarketingBreakdownItem]:
+    return [
+        MarketingBreakdownItem(label=label, count=count)
+        for label, count in counter.most_common()
+    ]
+
+
+def safe_ratio(numerator: int, denominator: int) -> float:
+    if denominator <= 0:
+        return 0
+
+    return round(numerator / denominator, 4)
+
+
+def build_content_recommendations(
+    objection_counter: Counter[str],
+    sentiment_counter: Counter[str],
+    risk_level_counter: Counter[str],
+) -> list[MarketingContentRecommendation]:
+    recommendations: list[MarketingContentRecommendation] = []
+
+    for topic, count in objection_counter.most_common(3):
+        recommendations.append(
+            MarketingContentRecommendation(
+                title=f"Konten edukasi untuk objection: {topic}",
+                rationale=(
+                    f"Topik ini muncul {count} kali di percakapan terbaru dan"
+                    " layak dijadikan bahan edukasi atau FAQ."
+                ),
+                suggested_format="carousel_instagram",
+                priority="high" if count >= 3 else "medium",
+            )
+        )
+
+    if sentiment_counter.get("cautious", 0) > 0:
+        recommendations.append(
+            MarketingContentRecommendation(
+                title="Konten trust-building dan social proof",
+                rationale=(
+                    "Ada customer dengan sentimen cautious. Fokuskan konten pada"
+                    " bukti, testimoni, dan transparansi proses."
+                ),
+                suggested_format="video_testimonial",
+                priority="high",
+            )
+        )
+
+    if risk_level_counter.get("high", 0) > 0:
+        recommendations.append(
+            MarketingContentRecommendation(
+                title="Playbook respons untuk isu berisiko tinggi",
+                rationale=(
+                    "Ada percakapan high risk. Marketing dan sales butuh asset"
+                    " resmi agar tidak menjawab secara improvisasi."
+                ),
+                suggested_format="internal_sales_enablement",
+                priority="high",
+            )
+        )
+
+    return recommendations[:5]

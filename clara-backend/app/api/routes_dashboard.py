@@ -6,15 +6,22 @@ from app.core.security import require_roles
 from app.models.user import User
 from app.db.session import get_db
 from app.schemas.dashboard_schema import (
+    MarketingInsightSnapshotResponse,
     MarketingInsightsPreview,
     SalesConversationDetail,
     SalesInboxItem,
 )
+from app.services.audit_service import create_audit_log
 from app.services.dashboard_service import (
     get_marketing_insights_preview,
     get_sales_conversation_detail,
     get_sales_inbox,
 )
+from app.services.marketing_snapshot_service import (
+    generate_marketing_snapshot,
+    list_marketing_snapshots,
+)
+from fastapi import Request
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -57,3 +64,41 @@ def marketing_insights_preview(
     current_user: User = Depends(require_roles("marketing", "admin")),
 ):
     return get_marketing_insights_preview(db=db, current_user=current_user)
+
+
+@router.post(
+    "/marketing/insight-snapshots/generate",
+    response_model=MarketingInsightSnapshotResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def generate_marketing_snapshot_endpoint(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+):
+    snapshot = generate_marketing_snapshot(db=db, current_user=current_user)
+    create_audit_log(
+        db=db,
+        action="marketing_insight_snapshot.generate",
+        resource_type="marketing_insight_snapshot",
+        resource_id=str(snapshot.id),
+        current_user=current_user,
+        request=request,
+        metadata={
+            "scope_type": snapshot.scope_type,
+            "period_start": str(snapshot.period_start),
+            "period_end": str(snapshot.period_end),
+        },
+    )
+    return snapshot
+
+
+@router.get(
+    "/marketing/insight-snapshots",
+    response_model=list[MarketingInsightSnapshotResponse],
+)
+def list_marketing_snapshots_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+):
+    return list_marketing_snapshots(db=db, current_user=current_user)

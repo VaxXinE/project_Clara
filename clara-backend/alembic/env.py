@@ -11,6 +11,7 @@ from app.models.ai_extraction import AIExtraction  # noqa: F401
 from app.models.approval_log import ApprovalLog  # noqa: F401
 from app.models.conversation import Conversation  # noqa: F401
 from app.models.message import Message  # noqa: F401
+from app.models.marketing_insight_snapshot import MarketingInsightSnapshot  # noqa: F401
 from app.models.reply_suggestion import ReplySuggestion  # noqa: F401
 from app.models.sent_message import SentMessage  # noqa: F401
 from app.models.user import User  # noqa: F401
