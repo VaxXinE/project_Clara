@@ -15,12 +15,14 @@ router = APIRouter(prefix="/audit-logs", tags=["audit-logs"])
 def list_audit_logs(
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("admin")),
 ):
-    statement = (
-        select(AuditLog)
-        .order_by(desc(AuditLog.created_at))
-        .limit(limit)
+    if current_user.organization_id is None:
+        return []
+
+    statement = select(AuditLog).where(
+        AuditLog.organization_id == str(current_user.organization_id)
     )
+    statement = statement.order_by(desc(AuditLog.created_at)).limit(limit)
 
     return list(db.scalars(statement).all())

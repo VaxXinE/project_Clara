@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 class AuditLogResponse(BaseModel):
     id: UUID
+    organization_id: str | None
     actor_user_id: str | None
     actor_email: str | None
     actor_role: str | None

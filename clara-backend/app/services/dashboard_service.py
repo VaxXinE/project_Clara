@@ -9,6 +9,7 @@ from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
+from app.models.user import User
 from app.schemas.dashboard_schema import (
     DashboardAIExtractionSummary,
     DashboardLatestMessage,
@@ -18,6 +19,10 @@ from app.schemas.dashboard_schema import (
     MarketingObjectionInsight,
     SalesConversationDetail,
     SalesInboxItem,
+)
+from app.services.access_control_service import (
+    can_access_all_conversations,
+    can_access_conversation,
 )
 
 
@@ -151,17 +156,25 @@ def determine_ui_status(
 
     return "unknown"
 
-def get_sales_inbox(db: Session) -> list[SalesInboxItem]:
-    statement = (
-        select(Conversation)
-        .options(
-            selectinload(Conversation.messages),
-            selectinload(Conversation.ai_extractions),
-            selectinload(Conversation.reply_suggestions),
-            selectinload(Conversation.sent_messages),
-        )
-        .order_by(desc(Conversation.last_message_at))
+
+def get_sales_inbox(db: Session, current_user: User) -> list[SalesInboxItem]:
+    if current_user.organization_id is None:
+        return []
+
+    statement = select(Conversation).options(
+        selectinload(Conversation.messages),
+        selectinload(Conversation.ai_extractions),
+        selectinload(Conversation.reply_suggestions),
+        selectinload(Conversation.sent_messages),
     )
+    statement = statement.where(
+        Conversation.organization_id == current_user.organization_id
+    )
+
+    if not can_access_all_conversations(current_user):
+        statement = statement.where(Conversation.sales_user_id == current_user.id)
+
+    statement = statement.order_by(desc(Conversation.last_message_at))
 
     conversations = list(db.scalars(statement).all())
     inbox_items: list[SalesInboxItem] = []
@@ -184,6 +197,7 @@ def get_sales_inbox(db: Session) -> list[SalesInboxItem]:
         inbox_items.append(
             SalesInboxItem(
                 conversation_id=conversation.id,
+                organization_id=conversation.organization_id,
                 title=conversation.title,
                 source=conversation.source,
                 status=conversation.status,
@@ -203,6 +217,7 @@ def get_sales_inbox(db: Session) -> list[SalesInboxItem]:
                     latest_extraction,
                     latest_suggestion,
                 ),
+                sales_user_id=conversation.sales_user_id,
             )
         )
 
@@ -216,6 +231,7 @@ def get_sales_inbox(db: Session) -> list[SalesInboxItem]:
 def get_sales_conversation_detail(
     db: Session,
     conversation_id: UUID,
+    current_user: User,
 ) -> SalesConversationDetail | None:
     statement = (
         select(Conversation)
@@ -233,6 +249,9 @@ def get_sales_conversation_detail(
     if conversation is None:
         return None
 
+    if not can_access_conversation(current_user, conversation):
+        return None
+
     latest_extraction = get_latest_extraction(conversation)
     latest_suggestion = get_latest_reply_suggestion(conversation)
 
@@ -242,13 +261,14 @@ def get_sales_conversation_detail(
     )
 
     sorted_sent_messages = sorted(
-    conversation.sent_messages,
-    key=lambda sent_message: sent_message.sent_at,
-    reverse=True,
-)
+        conversation.sent_messages,
+        key=lambda sent_message: sent_message.sent_at,
+        reverse=True,
+    )
 
     return SalesConversationDetail(
         conversation_id=conversation.id,
+        organization_id=conversation.organization_id,
         title=conversation.title,
         source=conversation.source,
         status=conversation.status,
@@ -276,17 +296,39 @@ def get_sales_conversation_detail(
                 "sent_at": sent_message.sent_at.isoformat(),
             }
             for sent_message in sorted_sent_messages
-        ]
-    
+        ],
+        sales_user_id=conversation.sales_user_id,
     )
 
 
-def get_marketing_insights_preview(db: Session) -> MarketingInsightsPreview:
-    total_conversations = db.scalar(select(func.count(Conversation.id))) or 0
+def get_marketing_insights_preview(
+    db: Session,
+    current_user: User,
+) -> MarketingInsightsPreview:
+    if current_user.organization_id is None:
+        return MarketingInsightsPreview(
+            total_conversations=0,
+            total_analyzed_conversations=0,
+            top_objections=[],
+            lead_temperature_breakdown={},
+            risk_level_breakdown={},
+        )
+
+    total_conversations = (
+        db.scalar(
+            select(func.count(Conversation.id)).where(
+                Conversation.organization_id == current_user.organization_id
+            )
+        )
+        or 0
+    )
 
     extractions = list(
         db.scalars(
-            select(AIExtraction).order_by(desc(AIExtraction.created_at))
+            select(AIExtraction)
+            .join(Conversation, AIExtraction.conversation_id == Conversation.id)
+            .where(Conversation.organization_id == current_user.organization_id)
+            .order_by(desc(AIExtraction.created_at))
         ).all()
     )
 

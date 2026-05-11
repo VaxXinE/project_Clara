@@ -19,6 +19,11 @@ from app.services.reply_suggestion_service import (
     list_reply_suggestions,
     reject_reply_suggestion,
 )
+from app.services.access_control_service import (
+    AccessDeniedError,
+    get_accessible_conversation_or_raise,
+    get_accessible_reply_suggestion_or_raise,
+)
 
 router = APIRouter(tags=["reply-suggestions"])
 
@@ -31,13 +36,24 @@ router = APIRouter(tags=["reply-suggestions"])
 def create_reply_suggestion_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("sales", "admin")),
 ):
     try:
+        get_accessible_conversation_or_raise(
+            db=db,
+            conversation_id=conversation_id,
+            current_user=current_user,
+        )
+
         return create_reply_suggestion(db=db, conversation_id=conversation_id)
     except ReplySuggestionError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except AccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
 
@@ -49,9 +65,22 @@ def create_reply_suggestion_endpoint(
 def list_reply_suggestions_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("sales", "admin")),
 ):
-    return list_reply_suggestions(db=db, conversation_id=conversation_id)
+    try:
+        get_accessible_conversation_or_raise(
+            db=db,
+            conversation_id=conversation_id,
+            current_user=current_user,
+        )
+        return list_reply_suggestions(db=db, conversation_id=conversation_id)
+    except AccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
 
 
 @router.post(
@@ -66,6 +95,11 @@ def approve_reply_suggestion_endpoint(
     current_user: User = Depends(require_roles("sales", "admin")),
 ):
     try:
+        get_accessible_reply_suggestion_or_raise(
+            db=db,
+            reply_suggestion_id=reply_suggestion_id,
+            current_user=current_user,
+        )
         suggestion = approve_reply_suggestion(
             db=db,
             reply_suggestion_id=reply_suggestion_id,
@@ -87,6 +121,11 @@ def approve_reply_suggestion_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+    except AccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post(
@@ -101,6 +140,11 @@ def reject_reply_suggestion_endpoint(
     current_user: User = Depends(require_roles("sales", "admin")),
 ):
     try:
+        get_accessible_reply_suggestion_or_raise(
+            db=db,
+            reply_suggestion_id=reply_suggestion_id,
+            current_user=current_user,
+        )
         suggestion = reject_reply_suggestion(
             db=db,
             reply_suggestion_id=reply_suggestion_id,
@@ -121,5 +165,10 @@ def reject_reply_suggestion_endpoint(
     except ReplySuggestionError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except AccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc

@@ -1,18 +1,15 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
+from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.conversation import Conversation
 from app.models.message import Message
-from app.services.whatsapp_parser import WhatsAppParseError, parse_whatsapp_txt
-from app.core.security import require_roles
 from app.models.user import User
-from fastapi import Request
-from app.models.user import User
-from app.core.security import require_roles
 from app.services.audit_service import create_audit_log
+from app.services.whatsapp_parser import WhatsAppParseError, parse_whatsapp_txt
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
@@ -21,13 +18,18 @@ MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 
 
 @router.post("/whatsapp-txt", status_code=status.HTTP_201_CREATED)
-
 async def upload_whatsapp_txt(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("sales", "admin")),
 ) -> dict[str, UUID | int | str]:
+    if current_user.organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User has no organization assigned.",
+        )
+
     if not file.filename or not file.filename.endswith(".txt"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -64,6 +66,8 @@ async def upload_whatsapp_txt(
     title = f"WhatsApp Chat {started_at.date().isoformat()}"
 
     conversation = Conversation(
+        organization_id=current_user.organization_id,
+        sales_user_id=current_user.id,
         title=title,
         source="whatsapp_txt",
         status="uploaded",

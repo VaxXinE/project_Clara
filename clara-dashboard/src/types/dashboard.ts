@@ -36,6 +36,7 @@ export type SuggestedReply = {
 
 export type SalesInboxItem = {
   conversation_id: string;
+  organization_id: string | null;
   title: string;
   source: string;
   status: string;
@@ -48,6 +49,7 @@ export type SalesInboxItem = {
   ui_status: string;
   priority_score: number;
   latest_sent_message: DashboardSentMessageSummary | null;
+  sales_user_id: string | null;
 };
 
 export type SalesConversationMessage = {
@@ -60,6 +62,7 @@ export type SalesConversationMessage = {
 
 export type SalesConversationDetail = {
   conversation_id: string;
+  organization_id: string | null;
   title: string;
   source: string;
   status: string;
@@ -69,6 +72,7 @@ export type SalesConversationDetail = {
   latest_ai_extraction: DashboardAIExtractionSummary | null;
   latest_reply_suggestion: DashboardReplySuggestionSummary | null;
   sent_messages: DashboardSentMessageSummary[];
+  sales_user_id: string | null;
 };
 
 export type MarketingInsightsPreview = {

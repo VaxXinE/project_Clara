@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.auth_schema import CreateUserRequest
+from app.models.organization import Organization
+
 
 
 password_hash = PasswordHash.recommended()
@@ -48,6 +50,9 @@ def create_access_token(user: User) -> str:
         "sub": str(user.id),
         "email": user.email,
         "role": user.role,
+        "organization_id": (
+            str(user.organization_id) if user.organization_id is not None else None
+        ),
         "exp": expires_at,
         "iat": datetime.now(timezone.utc),
     }
@@ -98,7 +103,14 @@ def create_user(db: Session, payload: CreateUserRequest) -> User:
     if existing_user is not None:
         raise AuthError("User with this email already exists.")
 
+    if payload.organization_id is not None:
+        organization = db.get(Organization, payload.organization_id)
+
+        if organization is None:
+            raise AuthError("Organization not found.")
+
     user = User(
+        organization_id=payload.organization_id,
         name=payload.name.strip(),
         email=normalized_email,
         hashed_password=hash_password(payload.password),

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from uuid import UUID
 
@@ -34,15 +36,25 @@ class DashboardReplySuggestionSummary(BaseModel):
     created_at: datetime
 
 
+class DashboardSentMessageSummary(BaseModel):
+    id: UUID
+    reply_suggestion_id: UUID | None
+    send_mode: str
+    message_text: str
+    sent_by_name: str
+    sent_at: datetime
+
+
 class SalesInboxItem(BaseModel):
     conversation_id: UUID
+    organization_id: UUID | None
     title: str
     source: str
     status: str
     started_at: datetime | None
     last_message_at: datetime | None
     created_at: datetime
-
+    sales_user_id: UUID | None
     latest_message: DashboardLatestMessage | None
     latest_ai_extraction: DashboardAIExtractionSummary | None
     latest_reply_suggestion: DashboardReplySuggestionSummary | None
@@ -51,18 +63,22 @@ class SalesInboxItem(BaseModel):
     ui_status: str
     priority_score: int
 
+
 class SalesConversationDetail(BaseModel):
     conversation_id: UUID
+    organization_id: UUID | None
     title: str
     source: str
     status: str
     started_at: datetime | None
     last_message_at: datetime | None
-
+    sales_user_id: UUID | None
     messages: list[dict]
     latest_ai_extraction: DashboardAIExtractionSummary | None
     latest_reply_suggestion: DashboardReplySuggestionSummary | None
     sent_messages: list[DashboardSentMessageSummary]
+
+
 class MarketingObjectionInsight(BaseModel):
     topic: str
     count: int
@@ -74,11 +90,3 @@ class MarketingInsightsPreview(BaseModel):
     top_objections: list[MarketingObjectionInsight]
     lead_temperature_breakdown: dict[str, int]
     risk_level_breakdown: dict[str, int]
-
-class DashboardSentMessageSummary(BaseModel):
-    id: UUID
-    reply_suggestion_id: UUID | None
-    send_mode: str
-    message_text: str
-    sent_by_name: str
-    sent_at: datetime

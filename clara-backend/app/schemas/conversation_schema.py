@@ -16,6 +16,8 @@ class MessageResponse(BaseModel):
 
 class ConversationListItem(BaseModel):
     id: UUID
+    organization_id: UUID | None
+    sales_user_id: UUID | None
     title: str
     source: str
     status: str

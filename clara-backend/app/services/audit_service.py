@@ -22,6 +22,11 @@ def create_audit_log(
         user_agent = request.headers.get("User-Agent")
 
     audit_log = AuditLog(
+        organization_id=(
+            str(current_user.organization_id)
+            if current_user and current_user.organization_id is not None
+            else None
+        ),
         actor_user_id=str(current_user.id) if current_user else None,
         actor_email=current_user.email if current_user else None,
         actor_role=current_user.role if current_user else None,

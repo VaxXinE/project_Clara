@@ -22,9 +22,9 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("/sales/inbox", response_model=list[SalesInboxItem])
 def sales_inbox(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("sales", "admin")),
 ):
-    return get_sales_inbox(db=db)
+    return get_sales_inbox(db=db, current_user=current_user)
 
 
 @router.get(
@@ -34,11 +34,12 @@ def sales_inbox(
 def sales_conversation_detail(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("sales", "admin")),
 ):
     detail = get_sales_conversation_detail(
         db=db,
         conversation_id=conversation_id,
+        current_user=current_user,
     )
 
     if detail is None:
@@ -53,6 +54,6 @@ def sales_conversation_detail(
 @router.get("/marketing/insights-preview", response_model=MarketingInsightsPreview)
 def marketing_insights_preview(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ):
-    return get_marketing_insights_preview(db=db)
+    return get_marketing_insights_preview(db=db, current_user=current_user)

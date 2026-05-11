@@ -12,6 +12,11 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    organization_id: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+        index=True,
+    )
 
     actor_user_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     actor_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
