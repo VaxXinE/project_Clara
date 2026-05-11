@@ -36,7 +36,7 @@ router = APIRouter(tags=["reply-suggestions"])
 def create_reply_suggestion_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ):
     try:
         get_accessible_conversation_or_raise(
@@ -65,7 +65,7 @@ def create_reply_suggestion_endpoint(
 def list_reply_suggestions_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ):
     try:
         get_accessible_conversation_or_raise(
@@ -92,7 +92,7 @@ def approve_reply_suggestion_endpoint(
     payload: ApproveReplyRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ):
     try:
         get_accessible_reply_suggestion_or_raise(
@@ -137,7 +137,7 @@ def reject_reply_suggestion_endpoint(
     payload: RejectReplyRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ):
     try:
         get_accessible_reply_suggestion_or_raise(

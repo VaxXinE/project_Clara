@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type {
+  CurrentUser,
   ProductKnowledgeCreateRequest,
   ProductKnowledgeItem,
   ProductKnowledgeListFilters,
@@ -21,6 +22,7 @@ const EMPTY_FORM: ProductKnowledgeCreateRequest = {
 
 export default function ProductKnowledgePage() {
   const [items, setItems] = useState<ProductKnowledgeItem[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [form, setForm] = useState<ProductKnowledgeCreateRequest>(EMPTY_FORM);
   const [filters, setFilters] = useState<ProductKnowledgeListFilters>({});
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -67,7 +69,18 @@ export default function ProductKnowledgePage() {
   }
 
   useEffect(() => {
-    void loadKnowledge();
+    async function bootstrap() {
+      try {
+        const me = await apiFetch<CurrentUser>("/auth/me");
+        setCurrentUser(me);
+      } catch {
+        // apiFetch will already handle auth redirect when needed
+      }
+
+      await loadKnowledge();
+    }
+
+    void bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -77,6 +90,13 @@ export default function ProductKnowledgePage() {
   }
 
   function startEdit(item: ProductKnowledgeItem) {
+    if (item.scope_type === "global" && currentUser?.role !== "owner") {
+      setErrorMessage(
+        "Knowledge global milik owner hanya bisa diedit oleh owner."
+      );
+      return;
+    }
+
     setForm({
       title: item.title,
       category: item.category,
@@ -125,6 +145,17 @@ export default function ProductKnowledgePage() {
   }
 
   async function handleDelete(knowledgeId: string) {
+    const targetItem = items.find((item) => item.id === knowledgeId);
+    if (
+      targetItem?.scope_type === "global" &&
+      currentUser?.role !== "owner"
+    ) {
+      setErrorMessage(
+        "Knowledge global milik owner hanya bisa dihapus oleh owner."
+      );
+      return;
+    }
+
     setDeletingId(knowledgeId);
     setErrorMessage("");
     setSuccessMessage("");
@@ -180,6 +211,10 @@ export default function ProductKnowledgePage() {
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
               Simpan fakta produk, legalitas, policy, dan guidance resmi agar AI
               reply tidak mengarang saat membalas customer.
+            </p>
+            <p className="mt-2 max-w-3xl text-xs text-slate-500">
+              Entry yang dibuat owner akan menjadi knowledge global: terlihat
+              oleh semua organization, tetapi hanya owner yang boleh mengubahnya.
             </p>
           </div>
         </section>
@@ -433,6 +468,15 @@ export default function ProductKnowledgePage() {
                         <h3 className="text-lg font-semibold text-slate-950">
                           {item.title}
                         </h3>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            item.scope_type === "global"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {item.scope_type}
+                        </span>
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                           {item.category}
                         </span>
@@ -454,25 +498,37 @@ export default function ProductKnowledgePage() {
                       <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
                         <span>Source: {item.source_type}</span>
                         <span>•</span>
+                        <span>Created by: {item.created_by_user_name ?? "-"}</span>
+                        <span>•</span>
                         <span>Updated: {formatDateTime(item.updated_at)}</span>
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => startEdit(item)}
-                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDelete(item.id)}
-                      disabled={deletingId === item.id}
-                      className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {deletingId === item.id ? "Deleting..." : "Delete"}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(item)}
+                        disabled={
+                          item.scope_type === "global" &&
+                          currentUser?.role !== "owner"
+                        }
+                        className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(item.id)}
+                        disabled={
+                          deletingId === item.id ||
+                          (item.scope_type === "global" &&
+                            currentUser?.role !== "owner")
+                        }
+                        className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {deletingId === item.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </div>
                 </article>
               ))}

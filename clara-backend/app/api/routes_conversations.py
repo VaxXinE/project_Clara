@@ -17,7 +17,7 @@ router = APIRouter(prefix="/conversations", tags=["conversations"])
 @router.get("", response_model=list[ConversationListItem])
 def list_conversations(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ) -> list[Conversation]:
     if current_user.organization_id is None:
         return []
@@ -39,7 +39,7 @@ def list_conversations(
 def get_conversation(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ) -> Conversation:
     if current_user.organization_id is None:
         raise HTTPException(

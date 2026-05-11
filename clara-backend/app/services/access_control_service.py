@@ -48,7 +48,7 @@ def can_access_conversation(user: User, conversation: Conversation) -> bool:
     if can_access_all_conversations(user):
         return True
 
-    if user.role != "sales":
+    if user.role != "marketing":
         return False
 
     return conversation.sales_user_id == user.id

@@ -6,8 +6,12 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.ai_extraction import AIExtraction
+from app.models.audit_log import AuditLog
 from app.models.conversation import Conversation
+from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
 from app.models.message import Message
+from app.models.organization import Organization
+from app.models.product_knowledge import ProductKnowledge
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
 from app.models.user import User
@@ -18,6 +22,14 @@ from app.schemas.dashboard_schema import (
     DashboardSentMessageSummary,
     MarketingBreakdownItem,
     MarketingContentRecommendation,
+    OpsAuditLogRow,
+    OpsConversationRow,
+    OpsDatabaseOverviewResponse,
+    OpsOrganizationRow,
+    OpsProductKnowledgeRow,
+    OpsSnapshotRow,
+    OpsTableCountItem,
+    OpsUserRow,
     MarketingInsightsPreview,
     MarketingKpiSummary,
     MarketingObjectionInsight,
@@ -437,6 +449,311 @@ def get_marketing_insights_preview(
             high_risk_conversation_count=risk_level_counter.get("high", 0),
         ),
         generated_at=datetime.now(timezone.utc),
+    )
+
+
+def get_ops_database_overview(
+    db: Session,
+    current_user: User,
+) -> OpsDatabaseOverviewResponse:
+    can_view_global = current_user.role == "owner"
+    organization_id = current_user.organization_id
+
+    if organization_id is None and not can_view_global:
+        return OpsDatabaseOverviewResponse(
+            scope_type="organization",
+            organization_id=None,
+            table_counts=[],
+            recent_users=[],
+            recent_organizations=[],
+            recent_conversations=[],
+            recent_audit_logs=[],
+            recent_product_knowledge=[],
+            recent_snapshots=[],
+        )
+
+    def organization_filtered_count(model: type[User] | type[Conversation]) -> int:
+        statement = select(func.count(model.id))
+        if not can_view_global:
+            statement = statement.where(model.organization_id == organization_id)
+        return db.scalar(statement) or 0
+
+    table_counts = [
+        OpsTableCountItem(
+            label="organizations",
+            count=(
+                db.scalar(select(func.count(Organization.id)))
+                if can_view_global
+                else (
+                    db.scalar(
+                        select(func.count(Organization.id)).where(
+                            Organization.id == organization_id
+                        )
+                    )
+                    or 0
+                )
+            )
+            or 0,
+        ),
+        OpsTableCountItem(
+            label="users",
+            count=organization_filtered_count(User),
+        ),
+        OpsTableCountItem(
+            label="conversations",
+            count=organization_filtered_count(Conversation),
+        ),
+        OpsTableCountItem(
+            label="ai_extractions",
+            count=(
+                db.scalar(select(func.count(AIExtraction.id)))
+                if can_view_global
+                else (
+                    db.scalar(
+                        select(func.count(AIExtraction.id))
+                        .join(
+                            Conversation,
+                            AIExtraction.conversation_id == Conversation.id,
+                        )
+                        .where(Conversation.organization_id == organization_id)
+                    )
+                    or 0
+                )
+            )
+            or 0,
+        ),
+        OpsTableCountItem(
+            label="reply_suggestions",
+            count=(
+                db.scalar(select(func.count(ReplySuggestion.id)))
+                if can_view_global
+                else (
+                    db.scalar(
+                        select(func.count(ReplySuggestion.id))
+                        .join(
+                            Conversation,
+                            ReplySuggestion.conversation_id == Conversation.id,
+                        )
+                        .where(Conversation.organization_id == organization_id)
+                    )
+                    or 0
+                )
+            )
+            or 0,
+        ),
+        OpsTableCountItem(
+            label="sent_messages",
+            count=(
+                db.scalar(select(func.count(SentMessage.id)))
+                if can_view_global
+                else (
+                    db.scalar(
+                        select(func.count(SentMessage.id))
+                        .join(
+                            Conversation,
+                            SentMessage.conversation_id == Conversation.id,
+                        )
+                        .where(Conversation.organization_id == organization_id)
+                    )
+                    or 0
+                )
+            )
+            or 0,
+        ),
+        OpsTableCountItem(
+            label="product_knowledge",
+            count=(
+                db.scalar(select(func.count(ProductKnowledge.id)))
+                if can_view_global
+                else (
+                    db.scalar(
+                        select(func.count(ProductKnowledge.id)).where(
+                            ProductKnowledge.organization_id == organization_id
+                        )
+                    )
+                    or 0
+                )
+            )
+            or 0,
+        ),
+        OpsTableCountItem(
+            label="audit_logs",
+            count=(
+                db.scalar(select(func.count(AuditLog.id)))
+                if can_view_global
+                else (
+                    db.scalar(
+                        select(func.count(AuditLog.id)).where(
+                            AuditLog.organization_id == str(organization_id)
+                        )
+                    )
+                    or 0
+                )
+            )
+            or 0,
+        ),
+        OpsTableCountItem(
+            label="marketing_snapshots",
+            count=(
+                db.scalar(select(func.count(MarketingInsightSnapshot.id)))
+                if can_view_global
+                else (
+                    db.scalar(
+                        select(func.count(MarketingInsightSnapshot.id)).where(
+                            MarketingInsightSnapshot.organization_id == organization_id
+                        )
+                    )
+                    or 0
+                )
+            )
+            or 0,
+        ),
+    ]
+
+    organizations_statement = select(Organization).order_by(
+        desc(Organization.created_at)
+    )
+    if not can_view_global:
+        organizations_statement = organizations_statement.where(
+            Organization.id == organization_id
+        )
+
+    users_statement = (
+        select(User)
+        .options(selectinload(User.created_by_user))
+        .order_by(desc(User.created_at))
+    )
+    if not can_view_global:
+        users_statement = users_statement.where(User.organization_id == organization_id)
+
+    conversations_statement = (
+        select(Conversation)
+        .options(selectinload(Conversation.sales_user))
+        .order_by(desc(Conversation.created_at))
+    )
+    if not can_view_global:
+        conversations_statement = conversations_statement.where(
+            Conversation.organization_id == organization_id
+        )
+
+    audit_logs_statement = select(AuditLog).order_by(desc(AuditLog.created_at))
+    if not can_view_global:
+        audit_logs_statement = audit_logs_statement.where(
+            AuditLog.organization_id == str(organization_id)
+        )
+
+    knowledge_statement = select(ProductKnowledge).order_by(
+        desc(ProductKnowledge.updated_at)
+    )
+    if not can_view_global:
+        knowledge_statement = knowledge_statement.where(
+            ProductKnowledge.organization_id == organization_id
+        )
+
+    snapshots_statement = select(MarketingInsightSnapshot).order_by(
+        desc(MarketingInsightSnapshot.created_at)
+    )
+    if not can_view_global:
+        snapshots_statement = snapshots_statement.where(
+            MarketingInsightSnapshot.organization_id == organization_id
+        )
+
+    recent_organizations = [
+        OpsOrganizationRow(
+            id=organization.id,
+            name=organization.name,
+            slug=organization.slug,
+            created_at=organization.created_at,
+        )
+        for organization in db.scalars(organizations_statement.limit(10)).all()
+    ]
+
+    recent_users = [
+        OpsUserRow(
+            id=user.id,
+            organization_id=user.organization_id,
+            created_by_user_id=user.created_by_user_id,
+            created_by_user_name=user.created_by_user.name if user.created_by_user else None,
+            name=user.name,
+            email=user.email,
+            role=user.role,
+            is_active=user.is_active,
+            created_at=user.created_at,
+        )
+        for user in db.scalars(users_statement.limit(12)).all()
+    ]
+
+    recent_conversations = [
+        OpsConversationRow(
+            id=conversation.id,
+            organization_id=conversation.organization_id,
+            sales_user_id=conversation.sales_user_id,
+            sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
+            title=conversation.title,
+            source=conversation.source,
+            status=conversation.status,
+            raw_filename=conversation.raw_filename,
+            last_message_at=conversation.last_message_at,
+            created_at=conversation.created_at,
+        )
+        for conversation in db.scalars(conversations_statement.limit(12)).all()
+    ]
+
+    recent_audit_logs = [
+        OpsAuditLogRow(
+            id=audit_log.id,
+            organization_id=audit_log.organization_id,
+            actor_email=audit_log.actor_email,
+            actor_role=audit_log.actor_role,
+            action=audit_log.action,
+            resource_type=audit_log.resource_type,
+            resource_id=audit_log.resource_id,
+            created_at=audit_log.created_at,
+        )
+        for audit_log in db.scalars(audit_logs_statement.limit(12)).all()
+    ]
+
+    recent_product_knowledge = [
+        OpsProductKnowledgeRow(
+            id=knowledge.id,
+            organization_id=knowledge.organization_id,
+            title=knowledge.title,
+            category=knowledge.category,
+            source_type=knowledge.source_type,
+            is_active=knowledge.is_active,
+            updated_at=knowledge.updated_at,
+        )
+        for knowledge in db.scalars(knowledge_statement.limit(12)).all()
+    ]
+
+    recent_snapshots = [
+        OpsSnapshotRow(
+            id=snapshot.id,
+            organization_id=snapshot.organization_id,
+            scope_type=snapshot.scope_type,
+            snapshot_type=snapshot.snapshot_type,
+            period_start=snapshot.period_start,
+            period_end=snapshot.period_end,
+            total_conversations=snapshot.metrics_json.get("total_conversations", 0),
+            total_analyzed_conversations=snapshot.metrics_json.get(
+                "total_analyzed_conversations",
+                0,
+            ),
+            created_at=snapshot.created_at,
+        )
+        for snapshot in db.scalars(snapshots_statement.limit(12)).all()
+    ]
+
+    return OpsDatabaseOverviewResponse(
+        scope_type="global" if can_view_global else "organization",
+        organization_id=organization_id,
+        table_counts=table_counts,
+        recent_users=recent_users,
+        recent_organizations=recent_organizations,
+        recent_conversations=recent_conversations,
+        recent_audit_logs=recent_audit_logs,
+        recent_product_knowledge=recent_product_knowledge,
+        recent_snapshots=recent_snapshots,
     )
 
 

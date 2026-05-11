@@ -22,7 +22,10 @@ class ProductKnowledgeUpdateRequest(BaseModel):
 
 class ProductKnowledgeResponse(BaseModel):
     id: UUID
-    organization_id: UUID
+    organization_id: UUID | None
+    scope_type: str
+    created_by_user_id: UUID | None
+    created_by_user_name: str | None
     title: str
     category: str
     content: str

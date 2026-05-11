@@ -10,18 +10,23 @@ import {
   getLeadBadgeClass,
   getRiskBadgeClass,
 } from "@/lib/format";
-import type { SalesInboxItem } from "@/types/dashboard";
+import type { CurrentUser, SalesInboxItem } from "@/types/dashboard";
 
 export default function SalesInboxPage() {
   const [inboxItems, setInboxItems] = useState<SalesInboxItem[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function loadInbox() {
       try {
-        const data = await apiFetch<SalesInboxItem[]>("/dashboard/sales/inbox");
+        const [data, me] = await Promise.all([
+          apiFetch<SalesInboxItem[]>("/dashboard/sales/inbox"),
+          apiFetch<CurrentUser>("/auth/me"),
+        ]);
         setInboxItems(data);
+        setCurrentUser(me);
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Failed to load inbox."
@@ -33,6 +38,14 @@ export default function SalesInboxPage() {
 
     loadInbox();
   }, []);
+
+  const canAccessMarketing =
+    currentUser !== null && ["owner", "admin"].includes(currentUser.role);
+  const canAccessKnowledge =
+    currentUser !== null &&
+    ["owner", "admin", "marketing"].includes(currentUser.role);
+  const canAccessAdminOps =
+    currentUser !== null && ["owner", "admin"].includes(currentUser.role);
 
   return (
     <main className="min-h-screen bg-slate-50 p-6">
@@ -52,19 +65,41 @@ export default function SalesInboxPage() {
           </div>
 
           <div className="flex gap-2">
-            <Link
-              href="/dashboard/marketing"
-              className="inline-flex w-fit rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
-            >
-              Marketing Insights
-            </Link>
+            {canAccessMarketing && (
+              <Link
+                href="/dashboard/marketing"
+                className="inline-flex w-fit rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              >
+                Marketing Insights
+              </Link>
+            )}
 
-            <Link
-              href="/dashboard/knowledge"
-              className="inline-flex w-fit rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
-            >
-              Product Knowledge
-            </Link>
+            {canAccessKnowledge && (
+              <Link
+                href="/dashboard/knowledge"
+                className="inline-flex w-fit rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              >
+                Product Knowledge
+              </Link>
+            )}
+
+            {canAccessAdminOps && (
+              <Link
+                href="/dashboard/admin/ops"
+                className="inline-flex w-fit rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              >
+                Admin Ops
+              </Link>
+            )}
+
+            {canAccessAdminOps && (
+              <Link
+                href="/dashboard/admin/access"
+                className="inline-flex w-fit rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              >
+                Manage Users
+              </Link>
+            )}
 
             <Link
               href="/dashboard/upload"

@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import desc, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.product_knowledge import ProductKnowledge
 from app.models.user import User
@@ -23,11 +23,22 @@ def list_product_knowledge(
     category: str | None = None,
     is_active: bool | None = None,
 ) -> list[ProductKnowledge]:
-    ensure_user_has_organization(current_user)
+    if current_user.role != "owner":
+        ensure_user_has_organization(current_user)
 
-    statement = select(ProductKnowledge).where(
-        ProductKnowledge.organization_id == current_user.organization_id
+    statement = select(ProductKnowledge).options(
+        selectinload(ProductKnowledge.created_by_user)
     )
+
+    if current_user.role == "owner":
+        pass
+    else:
+        statement = statement.where(
+            or_(
+                ProductKnowledge.organization_id == current_user.organization_id,
+                ProductKnowledge.organization_id.is_(None),
+            )
+        )
 
     if query:
         normalized_query = f"%{query.strip()}%"
@@ -59,10 +70,14 @@ def create_product_knowledge(
     payload: ProductKnowledgeCreateRequest,
     current_user: User,
 ) -> ProductKnowledge:
-    ensure_user_has_organization(current_user)
+    if current_user.role != "owner":
+        ensure_user_has_organization(current_user)
 
     entry = ProductKnowledge(
-        organization_id=current_user.organization_id,
+        organization_id=(
+            None if current_user.role == "owner" else current_user.organization_id
+        ),
+        created_by_user_id=current_user.id,
         title=payload.title.strip(),
         category=payload.category.strip().lower(),
         content=payload.content.strip(),
@@ -73,6 +88,14 @@ def create_product_knowledge(
     db.add(entry)
     db.commit()
     db.refresh(entry)
+    entry = (
+        db.scalars(
+            select(ProductKnowledge)
+            .options(selectinload(ProductKnowledge.created_by_user))
+            .where(ProductKnowledge.id == entry.id)
+        ).first()
+        or entry
+    )
 
     return entry
 
@@ -82,17 +105,50 @@ def get_product_knowledge_or_raise(
     knowledge_id: UUID,
     current_user: User,
 ) -> ProductKnowledge:
-    ensure_user_has_organization(current_user)
+    if current_user.role != "owner":
+        ensure_user_has_organization(current_user)
 
-    entry = db.get(ProductKnowledge, knowledge_id)
+    entry = (
+        db.scalars(
+            select(ProductKnowledge)
+            .options(selectinload(ProductKnowledge.created_by_user))
+            .where(ProductKnowledge.id == knowledge_id)
+        ).first()
+    )
 
     if entry is None:
         raise ProductKnowledgeError("Product knowledge entry not found.")
 
+    if current_user.role == "owner":
+        return entry
+
+    if (
+        entry.organization_id is not None
+        and entry.organization_id == current_user.organization_id
+    ):
+        return entry
+
+    if entry.organization_id is None:
+        return entry
+
+    raise AccessDeniedError("Product knowledge entry not found.")
+
+
+def ensure_can_modify_product_knowledge(
+    entry: ProductKnowledge,
+    current_user: User,
+) -> None:
+    if entry.organization_id is None and current_user.role != "owner":
+        raise AccessDeniedError(
+            "Global product knowledge can only be modified by owner."
+        )
+
+    if current_user.role == "owner":
+        return
+
     if entry.organization_id != current_user.organization_id:
         raise AccessDeniedError("Product knowledge entry not found.")
-
-    return entry
+    return
 
 
 def update_product_knowledge(
@@ -106,6 +162,7 @@ def update_product_knowledge(
         knowledge_id=knowledge_id,
         current_user=current_user,
     )
+    ensure_can_modify_product_knowledge(entry=entry, current_user=current_user)
 
     if payload.title is not None:
         entry.title = payload.title.strip()
@@ -120,6 +177,14 @@ def update_product_knowledge(
 
     db.commit()
     db.refresh(entry)
+    entry = (
+        db.scalars(
+            select(ProductKnowledge)
+            .options(selectinload(ProductKnowledge.created_by_user))
+            .where(ProductKnowledge.id == entry.id)
+        ).first()
+        or entry
+    )
 
     return entry
 
@@ -134,6 +199,7 @@ def delete_product_knowledge(
         knowledge_id=knowledge_id,
         current_user=current_user,
     )
+    ensure_can_modify_product_knowledge(entry=entry, current_user=current_user)
 
     db.delete(entry)
     db.commit()
@@ -144,12 +210,14 @@ def get_active_product_knowledge_for_organization(
     organization_id: UUID | None,
     limit: int = 20,
 ) -> list[ProductKnowledge]:
-    if organization_id is None:
-        return []
-
     statement = (
         select(ProductKnowledge)
-        .where(ProductKnowledge.organization_id == organization_id)
+        .where(
+            or_(
+                ProductKnowledge.organization_id == organization_id,
+                ProductKnowledge.organization_id.is_(None),
+            )
+        )
         .where(ProductKnowledge.is_active.is_(True))
         .order_by(desc(ProductKnowledge.updated_at))
         .limit(limit)

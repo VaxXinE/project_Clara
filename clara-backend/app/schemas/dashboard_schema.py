@@ -139,3 +139,85 @@ class MarketingInsightSnapshotResponse(BaseModel):
     generated_at: datetime
     created_at: datetime
     comparison: MarketingInsightSnapshotComparison | None
+
+
+class OpsTableCountItem(BaseModel):
+    label: str
+    count: int
+
+
+class OpsUserRow(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    created_by_user_id: UUID | None
+    created_by_user_name: str | None
+    name: str
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+
+class OpsOrganizationRow(BaseModel):
+    id: UUID
+    name: str
+    slug: str
+    created_at: datetime
+
+
+class OpsConversationRow(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    sales_user_id: UUID | None
+    sales_owner_name: str | None
+    title: str
+    source: str
+    status: str
+    raw_filename: str | None
+    last_message_at: datetime | None
+    created_at: datetime
+
+
+class OpsAuditLogRow(BaseModel):
+    id: UUID
+    organization_id: str | None
+    actor_email: str | None
+    actor_role: str | None
+    action: str
+    resource_type: str
+    resource_id: str | None
+    created_at: datetime
+
+
+class OpsProductKnowledgeRow(BaseModel):
+    id: UUID
+    organization_id: UUID
+    title: str
+    category: str
+    source_type: str
+    is_active: bool
+    updated_at: datetime
+
+
+class OpsSnapshotRow(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    scope_type: str
+    snapshot_type: str
+    period_start: date
+    period_end: date
+    total_conversations: int
+    total_analyzed_conversations: int
+    created_at: datetime
+
+
+class OpsDatabaseOverviewResponse(BaseModel):
+    scope_type: str
+    organization_id: UUID | None
+    table_counts: list[OpsTableCountItem]
+    recent_users: list[OpsUserRow]
+    recent_organizations: list[OpsOrganizationRow]
+    recent_conversations: list[OpsConversationRow]
+    recent_audit_logs: list[OpsAuditLogRow]
+    recent_product_knowledge: list[OpsProductKnowledgeRow]
+    recent_snapshots: list[OpsSnapshotRow]

@@ -8,12 +8,14 @@ from app.db.session import get_db
 from app.schemas.dashboard_schema import (
     MarketingInsightSnapshotResponse,
     MarketingInsightsPreview,
+    OpsDatabaseOverviewResponse,
     SalesConversationDetail,
     SalesInboxItem,
 )
 from app.services.audit_service import create_audit_log
 from app.services.dashboard_service import (
     get_marketing_insights_preview,
+    get_ops_database_overview,
     get_sales_conversation_detail,
     get_sales_inbox,
 )
@@ -29,7 +31,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("/sales/inbox", response_model=list[SalesInboxItem])
 def sales_inbox(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ):
     return get_sales_inbox(db=db, current_user=current_user)
 
@@ -41,7 +43,7 @@ def sales_inbox(
 def sales_conversation_detail(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ):
     detail = get_sales_conversation_detail(
         db=db,
@@ -61,7 +63,7 @@ def sales_conversation_detail(
 @router.get("/marketing/insights-preview", response_model=MarketingInsightsPreview)
 def marketing_insights_preview(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     return get_marketing_insights_preview(db=db, current_user=current_user)
 
@@ -74,7 +76,7 @@ def marketing_insights_preview(
 def generate_marketing_snapshot_endpoint(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     snapshot = generate_marketing_snapshot(db=db, current_user=current_user)
     create_audit_log(
@@ -99,6 +101,14 @@ def generate_marketing_snapshot_endpoint(
 )
 def list_marketing_snapshots_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("admin")),
 ):
     return list_marketing_snapshots(db=db, current_user=current_user)
+
+
+@router.get("/admin/ops-overview", response_model=OpsDatabaseOverviewResponse)
+def admin_ops_overview(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    return get_ops_database_overview(db=db, current_user=current_user)

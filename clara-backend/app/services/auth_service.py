@@ -4,11 +4,11 @@ from uuid import UUID
 import jwt
 from pwdlib import PasswordHash
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
 from app.models.user import User
-from app.schemas.auth_schema import CreateUserRequest
+from app.schemas.auth_schema import CreateUserRequest, UpdateUserRequest
 from app.models.organization import Organization
 
 
@@ -20,7 +20,7 @@ class AuthError(RuntimeError):
     pass
 
 
-ALLOWED_ROLES = {"owner", "admin", "sales", "marketing"}
+ALLOWED_ROLES = {"owner", "admin", "marketing"}
 
 
 def hash_password(password: str) -> str:
@@ -91,8 +91,11 @@ def authenticate_user(db: Session, email: str, password: str) -> User:
 
     return user
 
-
-def create_user(db: Session, payload: CreateUserRequest) -> User:
+def create_user(
+    db: Session,
+    payload: CreateUserRequest,
+    created_by_user: User | None = None,
+) -> User:
     normalized_email = payload.email.strip().lower()
 
     if payload.role not in ALLOWED_ROLES:
@@ -111,6 +114,7 @@ def create_user(db: Session, payload: CreateUserRequest) -> User:
 
     user = User(
         organization_id=payload.organization_id,
+        created_by_user_id=created_by_user.id if created_by_user is not None else None,
         name=payload.name.strip(),
         email=normalized_email,
         hashed_password=hash_password(payload.password),
@@ -122,4 +126,61 @@ def create_user(db: Session, payload: CreateUserRequest) -> User:
     db.commit()
     db.refresh(user)
 
+    return user
+
+
+def list_users(db: Session) -> list[User]:
+    return list(
+        db.scalars(
+            select(User)
+            .options(selectinload(User.created_by_user))
+            .order_by(User.created_at.desc())
+        ).all()
+    )
+
+
+def update_user(
+    db: Session,
+    user: User,
+    payload: UpdateUserRequest,
+) -> User:
+    if payload.role is not None and payload.role not in ALLOWED_ROLES:
+        raise AuthError(f"Invalid role. Allowed roles: {', '.join(sorted(ALLOWED_ROLES))}")
+
+    if payload.email is not None:
+        normalized_email = payload.email.strip().lower()
+        existing_user = get_user_by_email(db=db, email=normalized_email)
+        if existing_user is not None and existing_user.id != user.id:
+            raise AuthError("User with this email already exists.")
+        user.email = normalized_email
+
+    if payload.name is not None:
+        user.name = payload.name.strip()
+
+    if payload.role is not None:
+        user.role = payload.role
+
+    if payload.organization_id is not None:
+        organization = db.get(Organization, payload.organization_id)
+        if organization is None:
+            raise AuthError("Organization not found.")
+        user.organization_id = payload.organization_id
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+def set_user_active_status(
+    db: Session,
+    user: User,
+    *,
+    is_active: bool,
+) -> User:
+    user.is_active = is_active
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return user

@@ -4,11 +4,24 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { apiFetch } from "@/lib/api";
+import type { CurrentUser } from "@/types/dashboard";
 
 type LoginResponse = {
   access_token: string;
   token_type: string;
 };
+
+function getDashboardPathForRole(role: string): string {
+  switch (role) {
+    case "marketing":
+      return "/dashboard/sales";
+    case "owner":
+      return "/dashboard/marketing";
+    case "admin":
+    default:
+      return "/dashboard/sales";
+  }
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,7 +47,8 @@ export default function LoginPage() {
       });
 
       window.localStorage.setItem("clara_access_token", response.access_token);
-      router.push("/dashboard/sales");
+      const currentUser = await apiFetch<CurrentUser>("/auth/me");
+      router.push(getDashboardPathForRole(currentUser.role));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Login gagal.");
     } finally {
@@ -54,7 +68,7 @@ export default function LoginPage() {
             Login Dashboard
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            Masuk untuk mengakses sales inbox dan AI copilot.
+            Masuk untuk mengakses inbox operasional dan AI copilot.
           </p>
         </div>
 

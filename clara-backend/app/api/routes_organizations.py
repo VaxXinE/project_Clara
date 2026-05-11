@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import require_roles
 from app.db.session import get_db
+from app.models.organization import Organization
 from app.models.user import User
 from app.schemas.organization_schema import (
     CreateOrganizationRequest,
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/organizations", tags=["organizations"])
 def create_organization_endpoint(
     payload: CreateOrganizationRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("owner", "admin")),
+    _: User = Depends(require_roles("owner")),
 ):
     try:
         return create_organization(db=db, payload=payload)
@@ -39,6 +40,16 @@ def create_organization_endpoint(
 @router.get("", response_model=list[OrganizationResponse])
 def list_organizations_endpoint(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles("admin")),
 ):
-    return list_organizations(db=db)
+    if current_user.role == "owner":
+        return list_organizations(db=db)
+
+    if current_user.organization_id is None:
+        return []
+
+    organization = db.get(Organization, current_user.organization_id)
+    if organization is None:
+        return []
+
+    return [organization]

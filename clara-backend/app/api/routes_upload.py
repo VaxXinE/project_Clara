@@ -22,7 +22,7 @@ async def upload_whatsapp_txt(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "admin")),
+    current_user: User = Depends(require_roles("marketing", "admin")),
 ) -> dict[str, UUID | int | str]:
     if current_user.organization_id is None:
         raise HTTPException(

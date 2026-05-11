@@ -11,9 +11,14 @@ class ProductKnowledge(Base):
     __tablename__ = "product_knowledge"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    organization_id: Mapped[UUID] = mapped_column(
+    organization_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -38,3 +43,12 @@ class ProductKnowledge(Base):
     )
 
     organization = relationship("Organization")
+    created_by_user = relationship("User")
+
+    @property
+    def scope_type(self) -> str:
+        return "global" if self.organization_id is None else "organization"
+
+    @property
+    def created_by_user_name(self) -> str | None:
+        return self.created_by_user.name if self.created_by_user else None
