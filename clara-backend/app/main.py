@@ -14,6 +14,7 @@ from app.middleware.request_logging import request_logging_middleware
 from app.middleware.security_headers import security_headers_middleware
 from app.api.routes_audit_logs import router as audit_logs_router
 from app.api.routes_organizations import router as organizations_router
+from app.api.routes_product_knowledge import router as product_knowledge_router
 
 
 
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(organizations_router)
+    app.include_router(product_knowledge_router)
     app.include_router(upload_router)
     app.include_router(conversations_router)
     app.include_router(ai_router)
