@@ -100,3 +100,29 @@ export type DashboardSentMessageSummary = {
   sent_by_name: string;
   sent_at: string;
 };
+
+export type ProductKnowledgeItem = {
+  id: string;
+  organization_id: string;
+  title: string;
+  category: string;
+  content: string;
+  source_type: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProductKnowledgeCreateRequest = {
+  title: string;
+  category: string;
+  content: string;
+  source_type: string;
+  is_active: boolean;
+};
+
+export type ProductKnowledgeListFilters = {
+  q?: string;
+  category?: string;
+  is_active?: boolean;
+};

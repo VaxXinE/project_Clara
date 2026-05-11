@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.product_knowledge import ProductKnowledge
@@ -19,16 +19,37 @@ class ProductKnowledgeError(RuntimeError):
 def list_product_knowledge(
     db: Session,
     current_user: User,
+    query: str | None = None,
+    category: str | None = None,
+    is_active: bool | None = None,
 ) -> list[ProductKnowledge]:
     ensure_user_has_organization(current_user)
 
-    statement = (
-        select(ProductKnowledge)
-        .where(ProductKnowledge.organization_id == current_user.organization_id)
-        .order_by(
-            ProductKnowledge.is_active.desc(),
-            desc(ProductKnowledge.updated_at),
+    statement = select(ProductKnowledge).where(
+        ProductKnowledge.organization_id == current_user.organization_id
+    )
+
+    if query:
+        normalized_query = f"%{query.strip()}%"
+        statement = statement.where(
+            or_(
+                ProductKnowledge.title.ilike(normalized_query),
+                ProductKnowledge.category.ilike(normalized_query),
+                ProductKnowledge.content.ilike(normalized_query),
+            )
         )
+
+    if category:
+        statement = statement.where(
+            ProductKnowledge.category == category.strip().lower()
+        )
+
+    if is_active is not None:
+        statement = statement.where(ProductKnowledge.is_active.is_(is_active))
+
+    statement = statement.order_by(
+        ProductKnowledge.is_active.desc(),
+        desc(ProductKnowledge.updated_at),
     )
     return list(db.scalars(statement).all())
 
@@ -101,6 +122,21 @@ def update_product_knowledge(
     db.refresh(entry)
 
     return entry
+
+
+def delete_product_knowledge(
+    db: Session,
+    knowledge_id: UUID,
+    current_user: User,
+) -> None:
+    entry = get_product_knowledge_or_raise(
+        db=db,
+        knowledge_id=knowledge_id,
+        current_user=current_user,
+    )
+
+    db.delete(entry)
+    db.commit()
 
 
 def get_active_product_knowledge_for_organization(
