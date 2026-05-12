@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth_schema import (
+    ChangePasswordRequest,
     CreateUserRequest,
     CurrentUserResponse,
     LoginRequest,
@@ -20,6 +21,7 @@ from app.services.audit_service import create_audit_log
 from app.services.auth_service import (
     AuthError,
     authenticate_user,
+    change_user_password,
     create_access_token,
     create_user,
     get_user_by_id,
@@ -146,6 +148,37 @@ def logout(response: Response) -> Response:
     clear_auth_cookies(response)
     response.status_code = status.HTTP_204_NO_CONTENT
     return response
+
+
+@router.post("/change-password", response_model=CurrentUserResponse)
+def change_password_endpoint(
+    payload: ChangePasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        updated_user = change_user_password(
+            db=db,
+            user=current_user,
+            current_password=payload.current_password,
+            new_password=payload.new_password,
+        )
+        create_audit_log(
+            db=db,
+            action="auth.user.change_password_self",
+            resource_type="user",
+            resource_id=str(updated_user.id),
+            current_user=current_user,
+            request=request,
+            metadata={"email": updated_user.email},
+        )
+        return build_user_response(updated_user)
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post(

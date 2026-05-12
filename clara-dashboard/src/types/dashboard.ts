@@ -234,6 +234,11 @@ export type ResetUserPasswordRequest = {
   password: string;
 };
 
+export type ChangePasswordRequest = {
+  current_password: string;
+  new_password: string;
+};
+
 export type OpsDatabaseOverview = {
   scope_type: string;
   organization_id: string | null;

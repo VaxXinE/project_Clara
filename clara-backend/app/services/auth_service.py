@@ -197,3 +197,19 @@ def set_user_password(
     db.commit()
     db.refresh(user)
     return user
+
+
+def change_user_password(
+    db: Session,
+    user: User,
+    *,
+    current_password: str,
+    new_password: str,
+) -> User:
+    if not verify_password(current_password, user.hashed_password):
+        raise AuthError("Current password is incorrect.")
+
+    if current_password == new_password:
+        raise AuthError("New password must be different from the current password.")
+
+    return set_user_password(db=db, user=user, password=new_password)

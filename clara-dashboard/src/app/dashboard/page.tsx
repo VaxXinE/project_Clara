@@ -4,8 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import {
+  formatDateTime,
+  formatStatusLabel,
+  getPasswordStrength,
+} from "@/lib/format";
 import type {
+  ChangePasswordRequest,
   CurrentUser,
   MarketingInsightsPreview,
   SalesInboxItem,
@@ -23,6 +28,11 @@ const EMPTY_METRICS: OverviewMetrics = {
   analyzedCount: 0,
   insightConversationCount: 0,
   highRiskCount: 0,
+};
+
+const EMPTY_CHANGE_PASSWORD_FORM: ChangePasswordRequest = {
+  current_password: "",
+  new_password: "",
 };
 
 const roleCopy: Record<string, { title: string; summary: string }> = {
@@ -48,8 +58,12 @@ export default function DashboardHomePage() {
   const [metrics, setMetrics] = useState<OverviewMetrics>(EMPTY_METRICS);
   const [latestConversation, setLatestConversation] =
     useState<SalesInboxItem | null>(null);
+  const [changePasswordForm, setChangePasswordForm] =
+    useState<ChangePasswordRequest>(EMPTY_CHANGE_PASSWORD_FORM);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     async function loadDashboardHome() {
@@ -110,11 +124,36 @@ export default function DashboardHomePage() {
     }
   }
 
+  async function handleChangePassword(
+    event: React.FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault();
+    setErrorMessage("");
+    setSuccessMessage("");
+    setIsChangingPassword(true);
+
+    try {
+      await apiFetch<CurrentUser>("/auth/change-password", {
+        method: "POST",
+        body: changePasswordForm,
+      });
+      setSuccessMessage("Password akun berhasil diubah.");
+      setChangePasswordForm(EMPTY_CHANGE_PASSWORD_FORM);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal mengubah password akun."
+      );
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
+
   const roleLabel = currentUser ? roleCopy[currentUser.role] : null;
   const canAccessInsights =
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
   const canAccessAdmin =
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
+  const passwordStrength = getPasswordStrength(changePasswordForm.new_password);
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_40%,#ffffff_100%)] p-6">
@@ -173,6 +212,12 @@ export default function DashboardHomePage() {
         {errorMessage && (
           <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
             {errorMessage}
+          </section>
+        )}
+
+        {successMessage && (
+          <section className="rounded-2xl border border-green-200 bg-green-50 p-5 text-sm text-green-700">
+            {successMessage}
           </section>
         )}
 
@@ -296,6 +341,55 @@ export default function DashboardHomePage() {
                 </div>
               )}
             </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Account Security
+              </p>
+              <h2 className="mt-3 text-xl font-bold tracking-tight text-slate-950">
+                Ganti Password Akun
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Gunakan password baru yang cukup kuat agar sesi dashboard dan
+                akses data customer tidak mudah diambil alih.
+              </p>
+
+              <form onSubmit={handleChangePassword} className="mt-5 space-y-4">
+                <PasswordField
+                  label="Current Password"
+                  value={changePasswordForm.current_password}
+                  onChange={(value) =>
+                    setChangePasswordForm((current) => ({
+                      ...current,
+                      current_password: value,
+                    }))
+                  }
+                />
+                <PasswordField
+                  label="New Password"
+                  value={changePasswordForm.new_password}
+                  onChange={(value) =>
+                    setChangePasswordForm((current) => ({
+                      ...current,
+                      new_password: value,
+                    }))
+                  }
+                />
+
+                <PasswordStrengthHint
+                  password={changePasswordForm.new_password}
+                  strength={passwordStrength}
+                />
+
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isChangingPassword ? "Saving..." : "Update Password"}
+                </button>
+              </form>
+            </section>
           </div>
         </section>
       </div>
@@ -344,5 +438,73 @@ function ActionCard({
       </h3>
       <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
     </Link>
+  );
+}
+
+function PasswordField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="text-sm font-semibold text-slate-900">{label}</label>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        type="password"
+        className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+        placeholder="Minimum 8 karakter"
+      />
+    </div>
+  );
+}
+
+function PasswordStrengthHint({
+  password,
+  strength,
+}: {
+  password: string;
+  strength: ReturnType<typeof getPasswordStrength>;
+}) {
+  if (!password) {
+    return (
+      <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+        Hint: gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol.
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          Password Strength
+        </p>
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${strength.badgeClassName}`}
+        >
+          {strength.label}
+        </span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {strength.checks.map((check) => (
+          <span
+            key={check.label}
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              check.passed
+                ? "bg-green-100 text-green-700"
+                : "bg-slate-200 text-slate-600"
+            }`}
+          >
+            {check.label}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }

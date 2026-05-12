@@ -65,6 +65,12 @@ export default function SalesInboxPage() {
             <p className="text-sm font-medium text-slate-500">
               Clara Dashboard
             </p>
+            <Link
+              href="/dashboard"
+              className="mt-2 inline-flex text-sm font-medium text-slate-600 hover:text-slate-950"
+            >
+              ← Back to Dashboard
+            </Link>
             <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
               Sales Inbox
             </h1>

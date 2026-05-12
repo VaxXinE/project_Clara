@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import {
+  formatDateTime,
+  formatStatusLabel,
+  getPasswordStrength,
+} from "@/lib/format";
 import type {
   CreateOrganizationRequest,
   CreateUserRequest,
@@ -551,6 +555,9 @@ export default function AdminAccessPage() {
                       const canResetPassword =
                         currentUser.role === "owner" ||
                         user.created_by_user_id === currentUser.id;
+                      const passwordStrength = getPasswordStrength(
+                        passwordForm.password
+                      );
 
                       return (
                         <article
@@ -665,6 +672,11 @@ export default function AdminAccessPage() {
                                 }
                                 placeholder="Minimum 8 karakter"
                                 type="password"
+                              />
+
+                              <PasswordStrengthHint
+                                password={passwordForm.password}
+                                strength={passwordStrength}
                               />
 
                               <div className="flex flex-wrap gap-2">
@@ -870,6 +882,51 @@ function SelectField({
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+function PasswordStrengthHint({
+  password,
+  strength,
+}: {
+  password: string;
+  strength: ReturnType<typeof getPasswordStrength>;
+}) {
+  if (!password) {
+    return (
+      <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+        Hint: gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol.
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          Password Strength
+        </p>
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${strength.badgeClassName}`}
+        >
+          {strength.label}
+        </span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {strength.checks.map((check) => (
+          <span
+            key={check.label}
+            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+              check.passed
+                ? "bg-green-100 text-green-700"
+                : "bg-slate-200 text-slate-600"
+            }`}
+          >
+            {check.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

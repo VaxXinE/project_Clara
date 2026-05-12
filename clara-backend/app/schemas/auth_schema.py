@@ -50,3 +50,8 @@ class UpdateUserRequest(BaseModel):
 
 class ResetUserPasswordRequest(BaseModel):
     password: str = Field(min_length=8, max_length=255)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=255)
+    new_password: str = Field(min_length=8, max_length=255)
