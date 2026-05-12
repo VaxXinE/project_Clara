@@ -71,12 +71,10 @@ def create_product_knowledge(
     current_user: User,
 ) -> ProductKnowledge:
     if current_user.role != "owner":
-        ensure_user_has_organization(current_user)
+        raise AccessDeniedError("Only owner can create product knowledge.")
 
     entry = ProductKnowledge(
-        organization_id=(
-            None if current_user.role == "owner" else current_user.organization_id
-        ),
+        organization_id=None,
         created_by_user_id=current_user.id,
         title=payload.title.strip(),
         category=payload.category.strip().lower(),
@@ -138,17 +136,8 @@ def ensure_can_modify_product_knowledge(
     entry: ProductKnowledge,
     current_user: User,
 ) -> None:
-    if entry.organization_id is None and current_user.role != "owner":
-        raise AccessDeniedError(
-            "Global product knowledge can only be modified by owner."
-        )
-
-    if current_user.role == "owner":
-        return
-
-    if entry.organization_id != current_user.organization_id:
-        raise AccessDeniedError("Product knowledge entry not found.")
-    return
+    if current_user.role != "owner":
+        raise AccessDeniedError("Only owner can modify product knowledge.")
 
 
 def update_product_knowledge(

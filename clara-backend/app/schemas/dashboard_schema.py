@@ -168,6 +168,7 @@ class OpsOrganizationRow(BaseModel):
 class OpsConversationRow(BaseModel):
     id: UUID
     organization_id: UUID | None
+    organization_name: str | None
     sales_user_id: UUID | None
     sales_owner_name: str | None
     title: str
@@ -181,6 +182,7 @@ class OpsConversationRow(BaseModel):
 class OpsAuditLogRow(BaseModel):
     id: UUID
     organization_id: str | None
+    organization_name: str | None
     actor_email: str | None
     actor_role: str | None
     action: str
@@ -191,7 +193,8 @@ class OpsAuditLogRow(BaseModel):
 
 class OpsProductKnowledgeRow(BaseModel):
     id: UUID
-    organization_id: UUID
+    organization_id: UUID | None
+    organization_name: str | None
     title: str
     category: str
     source_type: str
@@ -202,6 +205,7 @@ class OpsProductKnowledgeRow(BaseModel):
 class OpsSnapshotRow(BaseModel):
     id: UUID
     organization_id: UUID | None
+    organization_name: str | None
     scope_type: str
     snapshot_type: str
     period_start: date

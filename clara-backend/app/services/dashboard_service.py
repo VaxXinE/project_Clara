@@ -62,6 +62,16 @@ def build_ai_summary(
     )
 
 
+def parse_uuid_or_none(value: str | None) -> UUID | None:
+    if not value:
+        return None
+
+    try:
+        return UUID(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def build_reply_summary(
     suggestion: ReplySuggestion | None,
 ) -> DashboardReplySuggestionSummary | None:
@@ -628,7 +638,10 @@ def get_ops_database_overview(
 
     conversations_statement = (
         select(Conversation)
-        .options(selectinload(Conversation.sales_user))
+        .options(
+            selectinload(Conversation.sales_user),
+            selectinload(Conversation.organization),
+        )
         .order_by(desc(Conversation.created_at))
     )
     if not can_view_global:
@@ -642,8 +655,10 @@ def get_ops_database_overview(
             AuditLog.organization_id == str(organization_id)
         )
 
-    knowledge_statement = select(ProductKnowledge).order_by(
-        desc(ProductKnowledge.updated_at)
+    knowledge_statement = (
+        select(ProductKnowledge)
+        .options(selectinload(ProductKnowledge.organization))
+        .order_by(desc(ProductKnowledge.updated_at))
     )
     if not can_view_global:
         knowledge_statement = knowledge_statement.where(
@@ -668,6 +683,30 @@ def get_ops_database_overview(
         for organization in db.scalars(organizations_statement.limit(10)).all()
     ]
 
+    recent_audit_log_records = db.scalars(audit_logs_statement.limit(12)).all()
+    recent_snapshot_records = db.scalars(snapshots_statement.limit(12)).all()
+
+    organization_ids_from_audit_logs = {
+        parsed_org_id
+        for audit_log in recent_audit_log_records
+        if (parsed_org_id := parse_uuid_or_none(audit_log.organization_id)) is not None
+    }
+    organization_ids_from_snapshots = {
+        snapshot.organization_id
+        for snapshot in recent_snapshot_records
+        if snapshot.organization_id is not None
+    }
+    organizations_by_id = {
+        organization.id: organization.name
+        for organization in db.scalars(
+            select(Organization).where(
+                Organization.id.in_(
+                    organization_ids_from_audit_logs | organization_ids_from_snapshots
+                )
+            )
+        ).all()
+    }
+
     recent_users = [
         OpsUserRow(
             id=user.id,
@@ -687,6 +726,9 @@ def get_ops_database_overview(
         OpsConversationRow(
             id=conversation.id,
             organization_id=conversation.organization_id,
+            organization_name=(
+                conversation.organization.name if conversation.organization else None
+            ),
             sales_user_id=conversation.sales_user_id,
             sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
             title=conversation.title,
@@ -703,6 +745,11 @@ def get_ops_database_overview(
         OpsAuditLogRow(
             id=audit_log.id,
             organization_id=audit_log.organization_id,
+            organization_name=(
+                organizations_by_id.get(parsed_org_id)
+                if (parsed_org_id := parse_uuid_or_none(audit_log.organization_id))
+                else None
+            ),
             actor_email=audit_log.actor_email,
             actor_role=audit_log.actor_role,
             action=audit_log.action,
@@ -710,13 +757,14 @@ def get_ops_database_overview(
             resource_id=audit_log.resource_id,
             created_at=audit_log.created_at,
         )
-        for audit_log in db.scalars(audit_logs_statement.limit(12)).all()
+        for audit_log in recent_audit_log_records
     ]
 
     recent_product_knowledge = [
         OpsProductKnowledgeRow(
             id=knowledge.id,
             organization_id=knowledge.organization_id,
+            organization_name=knowledge.organization.name if knowledge.organization else None,
             title=knowledge.title,
             category=knowledge.category,
             source_type=knowledge.source_type,
@@ -730,6 +778,11 @@ def get_ops_database_overview(
         OpsSnapshotRow(
             id=snapshot.id,
             organization_id=snapshot.organization_id,
+            organization_name=(
+                organizations_by_id.get(snapshot.organization_id)
+                if snapshot.organization_id
+                else None
+            ),
             scope_type=snapshot.scope_type,
             snapshot_type=snapshot.snapshot_type,
             period_start=snapshot.period_start,
@@ -741,7 +794,7 @@ def get_ops_database_overview(
             ),
             created_at=snapshot.created_at,
         )
-        for snapshot in db.scalars(snapshots_statement.limit(12)).all()
+        for snapshot in recent_snapshot_records
     ]
 
     return OpsDatabaseOverviewResponse(

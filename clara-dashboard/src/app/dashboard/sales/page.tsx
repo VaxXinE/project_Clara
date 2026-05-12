@@ -42,8 +42,7 @@ export default function SalesInboxPage() {
   const canAccessMarketing =
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
   const canAccessKnowledge =
-    currentUser !== null &&
-    ["owner", "admin", "marketing"].includes(currentUser.role);
+    currentUser !== null && currentUser.role === "owner";
   const canAccessAdminOps =
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
 

@@ -266,6 +266,7 @@ export type OpsDatabaseOverview = {
   recent_conversations: {
     id: string;
     organization_id: string | null;
+    organization_name: string | null;
     sales_user_id: string | null;
     sales_owner_name: string | null;
     title: string;
@@ -278,6 +279,7 @@ export type OpsDatabaseOverview = {
   recent_audit_logs: {
     id: string;
     organization_id: string | null;
+    organization_name: string | null;
     actor_email: string | null;
     actor_role: string | null;
     action: string;
@@ -287,7 +289,8 @@ export type OpsDatabaseOverview = {
   }[];
   recent_product_knowledge: {
     id: string;
-    organization_id: string;
+    organization_id: string | null;
+    organization_name: string | null;
     title: string;
     category: string;
     source_type: string;
@@ -297,6 +300,7 @@ export type OpsDatabaseOverview = {
   recent_snapshots: {
     id: string;
     organization_id: string | null;
+    organization_name: string | null;
     scope_type: string;
     snapshot_type: string;
     period_start: string;

@@ -31,6 +31,7 @@ export default function ProductKnowledgePage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const canManageKnowledge = currentUser?.role === "owner";
 
   async function loadKnowledge(activeFilters?: ProductKnowledgeListFilters) {
     setErrorMessage("");
@@ -90,10 +91,8 @@ export default function ProductKnowledgePage() {
   }
 
   function startEdit(item: ProductKnowledgeItem) {
-    if (item.scope_type === "global" && currentUser?.role !== "owner") {
-      setErrorMessage(
-        "Knowledge global milik owner hanya bisa diedit oleh owner."
-      );
+    if (!canManageKnowledge) {
+      setErrorMessage("Hanya owner yang boleh mengubah product knowledge.");
       return;
     }
 
@@ -111,6 +110,11 @@ export default function ProductKnowledgePage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!canManageKnowledge) {
+      setErrorMessage("Hanya owner yang boleh menambahkan product knowledge.");
+      return;
+    }
 
     setErrorMessage("");
     setSuccessMessage("");
@@ -145,14 +149,8 @@ export default function ProductKnowledgePage() {
   }
 
   async function handleDelete(knowledgeId: string) {
-    const targetItem = items.find((item) => item.id === knowledgeId);
-    if (
-      targetItem?.scope_type === "global" &&
-      currentUser?.role !== "owner"
-    ) {
-      setErrorMessage(
-        "Knowledge global milik owner hanya bisa dihapus oleh owner."
-      );
+    if (!canManageKnowledge) {
+      setErrorMessage("Hanya owner yang boleh menghapus product knowledge.");
       return;
     }
 
@@ -209,158 +207,160 @@ export default function ProductKnowledgePage() {
               Product Knowledge
             </h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Simpan fakta produk, legalitas, policy, dan guidance resmi agar AI
+              Product knowledge digunakan sebagai sumber fakta resmi agar AI
               reply tidak mengarang saat membalas customer.
             </p>
             <p className="mt-2 max-w-3xl text-xs text-slate-500">
-              Entry yang dibuat owner akan menjadi knowledge global: terlihat
-              oleh semua organization, tetapi hanya owner yang boleh mengubahnya.
+              Sekarang hanya owner yang boleh menambah, mengubah, dan menghapus
+              knowledge entry. Role lain tetap bisa membaca entry yang tersedia.
             </p>
           </div>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-slate-950">
-                {editingId ? "Edit Knowledge Entry" : "Tambah Knowledge Entry"}
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Gunakan bahasa faktual. Hindari isi yang ambigu atau belum
-                diverifikasi.
-              </p>
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold text-slate-900">
-                Title
-              </label>
-              <input
-                value={form.title}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    title: event.target.value,
-                  }))
-                }
-                className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
-                placeholder="Contoh: Legalitas SGB Mini"
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
+          {canManageKnowledge && (
+            <form
+              onSubmit={handleSubmit}
+              className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
               <div>
-                <label className="text-sm font-semibold text-slate-900">
-                  Category
-                </label>
-                <input
-                  value={form.category}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      category: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
-                  placeholder="legalitas / promo / policy"
-                />
+                <h2 className="text-lg font-semibold text-slate-950">
+                  {editingId ? "Edit Knowledge Entry" : "Tambah Knowledge Entry"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Gunakan bahasa faktual. Hindari isi yang ambigu atau belum
+                  diverifikasi.
+                </p>
               </div>
 
               <div>
                 <label className="text-sm font-semibold text-slate-900">
-                  Source Type
+                  Title
                 </label>
                 <input
-                  value={form.source_type}
+                  value={form.title}
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
-                      source_type: event.target.value,
+                      title: event.target.value,
                     }))
                   }
                   className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
-                  placeholder="manual_note"
+                  placeholder="Contoh: Legalitas SGB Mini"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="text-sm font-semibold text-slate-900">
-                Content
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-sm font-semibold text-slate-900">
+                    Category
+                  </label>
+                  <input
+                    value={form.category}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        category: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                    placeholder="legalitas / promo / policy"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-slate-900">
+                    Source Type
+                  </label>
+                  <input
+                    value={form.source_type}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        source_type: event.target.value,
+                      }))
+                    }
+                    className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                    placeholder="manual_note"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-slate-900">
+                  Content
+                </label>
+                <textarea
+                  value={form.content}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      content: event.target.value,
+                    }))
+                  }
+                  rows={8}
+                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                  placeholder="Tuliskan fakta produk yang boleh dipakai AI saat generate reply."
+                />
+              </div>
+
+              <label className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      is_active: event.target.checked,
+                    }))
+                  }
+                />
+                Entry aktif dan boleh dipakai untuk grounding AI
               </label>
-              <textarea
-                value={form.content}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    content: event.target.value,
-                  }))
-                }
-                rows={8}
-                className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
-                placeholder="Tuliskan fakta produk yang boleh dipakai AI saat generate reply."
-              />
-            </div>
 
-            <label className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={form.is_active}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    is_active: event.target.checked,
-                  }))
-                }
-              />
-              Entry aktif dan boleh dipakai untuk grounding AI
-            </label>
-
-            {errorMessage && (
-              <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
-                {errorMessage}
-              </p>
-            )}
-
-            {successMessage && (
-              <p className="rounded-xl bg-green-50 p-3 text-sm text-green-700">
-                {successMessage}
-              </p>
-            )}
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                type="submit"
-                disabled={
-                  isSubmitting ||
-                  form.title.trim().length === 0 ||
-                  form.category.trim().length === 0 ||
-                  form.content.trim().length === 0 ||
-                  form.source_type.trim().length === 0
-                }
-                className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isSubmitting
-                  ? "Saving..."
-                  : editingId
-                    ? "Update Entry"
-                    : "Add Entry"}
-              </button>
-
-              {editingId && (
-                <button
-                  type="button"
-                  onClick={resetForm}
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-                >
-                  Cancel Edit
-                </button>
+              {errorMessage && (
+                <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                  {errorMessage}
+                </p>
               )}
-            </div>
-          </form>
+
+              {successMessage && (
+                <p className="rounded-xl bg-green-50 p-3 text-sm text-green-700">
+                  {successMessage}
+                </p>
+              )}
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="submit"
+                  disabled={
+                    isSubmitting ||
+                    form.title.trim().length === 0 ||
+                    form.category.trim().length === 0 ||
+                    form.content.trim().length === 0 ||
+                    form.source_type.trim().length === 0
+                  }
+                  className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSubmitting
+                    ? "Saving..."
+                    : editingId
+                      ? "Update Entry"
+                      : "Add Entry"}
+                </button>
+
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
 
           <section className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -508,10 +508,7 @@ export default function ProductKnowledgePage() {
                       <button
                         type="button"
                         onClick={() => startEdit(item)}
-                        disabled={
-                          item.scope_type === "global" &&
-                          currentUser?.role !== "owner"
-                        }
+                        disabled={!canManageKnowledge}
                         className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Edit
@@ -519,11 +516,7 @@ export default function ProductKnowledgePage() {
                       <button
                         type="button"
                         onClick={() => void handleDelete(item.id)}
-                        disabled={
-                          deletingId === item.id ||
-                          (item.scope_type === "global" &&
-                            currentUser?.role !== "owner")
-                        }
+                        disabled={deletingId === item.id || !canManageKnowledge}
                         className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {deletingId === item.id ? "Deleting..." : "Delete"}

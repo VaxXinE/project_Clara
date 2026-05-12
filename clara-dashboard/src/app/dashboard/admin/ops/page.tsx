@@ -205,7 +205,7 @@ export default function AdminOpsPage() {
                           </span>
                         </div>
                         <div className="mt-2 grid gap-1 text-xs text-slate-500">
-                          <p>org: {conversation.organization_id ?? "-"}</p>
+                          <p>org: {conversation.organization_name ?? "-"}</p>
                           <p>
                             sales owner: {conversation.sales_owner_name ?? "-"}
                           </p>
@@ -244,7 +244,7 @@ export default function AdminOpsPage() {
                           <p>role: {log.actor_role ?? "-"}</p>
                           <p>resource: {log.resource_type}</p>
                           <p>resource id: {log.resource_id ?? "-"}</p>
-                          <p>org: {log.organization_id ?? "-"}</p>
+                          <p>org: {log.organization_name ?? "-"}</p>
                           <p>created: {formatDateTime(log.created_at)}</p>
                         </div>
                       </div>
@@ -285,7 +285,7 @@ export default function AdminOpsPage() {
                         <div className="mt-2 grid gap-1 text-xs text-slate-500">
                           <p>category: {item.category}</p>
                           <p>source type: {item.source_type}</p>
-                          <p>org: {item.organization_id}</p>
+                          <p>org: {item.organization_name ?? "global"}</p>
                           <p>updated: {formatDateTime(item.updated_at)}</p>
                         </div>
                       </div>
@@ -316,7 +316,7 @@ export default function AdminOpsPage() {
                           </span>
                         </div>
                         <div className="mt-2 grid gap-1 text-xs text-slate-500">
-                          <p>org: {snapshot.organization_id ?? "-"}</p>
+                          <p>org: {snapshot.organization_name ?? "global"}</p>
                           <p>conversations: {snapshot.total_conversations}</p>
                           <p>
                             analyzed conversations:{" "}
