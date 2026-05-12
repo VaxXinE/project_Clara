@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import {
   formatDateTime,
@@ -156,58 +157,41 @@ export default function DashboardHomePage() {
   const passwordStrength = getPasswordStrength(changePasswordForm.new_password);
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_40%,#ffffff_100%)] p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] backdrop-blur sm:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Clara Dashboard
-              </p>
-              <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-                {currentUser ? `Halo, ${currentUser.name}.` : "Clara Workspace"}
-              </h1>
-              <p className="mt-3 text-base leading-7 text-slate-600">
-                {roleLabel?.summary ??
-                  "Pusat kerja harian untuk mengubah percakapan customer menjadi tindakan operasional dan insight yang bisa dipakai tim."}
-              </p>
-              {currentUser && (
-                <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-600">
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 font-medium">
-                    Role: {formatStatusLabel(currentUser.role)}
-                  </span>
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 font-medium">
-                    Org: {currentUser.organization_name ?? "global"}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/dashboard/sales"
-                className="inline-flex rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                Buka Inbox
-              </Link>
-              <Link
-                href="/dashboard/upload"
-                className="inline-flex rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
-              >
-                Upload Chat
-              </Link>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleLogout();
-                }}
-                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </section>
+    <WorkspaceShell
+      currentUser={currentUser}
+      eyebrow="Workspace overview"
+      title={currentUser ? `Halo, ${currentUser.name}.` : "Clara Workspace"}
+      description={
+        roleLabel?.summary ??
+        "Pusat kerja harian untuk mengubah percakapan customer menjadi tindakan operasional dan insight yang bisa dipakai tim."
+      }
+      actions={
+        <>
+          <Link
+            href="/dashboard/sales"
+            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+          >
+            Buka Inbox
+          </Link>
+          <Link
+            href="/dashboard/upload"
+            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          >
+            Upload Chat
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              void handleLogout();
+            }}
+            className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+          >
+            Logout
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-6">
 
         {errorMessage && (
           <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
@@ -223,24 +207,24 @@ export default function DashboardHomePage() {
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
-            label="Inbox Conversations"
+            label="Percakapan Aktif"
             value={isLoading ? "..." : String(metrics.inboxCount)}
-            hint="Jumlah percakapan yang bisa dijangkau dari workspace Anda."
+            hint="Jumlah percakapan yang saat ini bisa Anda tindak lanjuti dari workspace."
           />
           <MetricCard
-            label="Analyzed"
+            label="Sudah Dianalisis"
             value={isLoading ? "..." : String(metrics.analyzedCount)}
-            hint="Conversation yang sudah punya hasil AI extraction."
+            hint="Conversation yang sudah punya hasil pembacaan AI dan next action."
           />
           <MetricCard
-            label="Insight Scope"
+            label="Cakupan Insight"
             value={isLoading ? "..." : String(metrics.insightConversationCount)}
-            hint="Total conversation yang masuk hitungan marketing insight."
+            hint="Total percakapan yang ikut membentuk marketing insight saat ini."
           />
           <MetricCard
-            label="High Risk"
+            label="Risiko Tinggi"
             value={isLoading ? "..." : String(metrics.highRiskCount)}
-            hint="Percakapan berisiko tinggi yang perlu perhatian lebih dulu."
+            hint="Percakapan sensitif yang sebaiknya ditangani atau ditinjau lebih cepat."
           />
         </section>
 
@@ -294,7 +278,7 @@ export default function DashboardHomePage() {
           <div className="space-y-6">
             <section className="rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
-                Workspace Focus
+                Fokus Hari Ini
               </p>
               <h2 className="mt-4 text-2xl font-bold tracking-tight">
                 {roleLabel?.title ?? "Team Workspace"}
@@ -308,7 +292,7 @@ export default function DashboardHomePage() {
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Latest Activity
+                Aktivitas Terakhir
               </p>
               {latestConversation ? (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -321,9 +305,9 @@ export default function DashboardHomePage() {
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
                     <span>
-                      Last update: {formatDateTime(latestConversation.last_message_at)}
-                    </span>
-                    <span>•</span>
+                    Last update: {formatDateTime(latestConversation.last_message_at)}
+                  </span>
+                  <span>•</span>
                     <span>Status: {formatStatusLabel(latestConversation.ui_status)}</span>
                   </div>
                   <Link
@@ -344,7 +328,7 @@ export default function DashboardHomePage() {
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Account Security
+                Keamanan Akun
               </p>
               <h2 className="mt-3 text-xl font-bold tracking-tight text-slate-950">
                 Ganti Password Akun
@@ -393,7 +377,7 @@ export default function DashboardHomePage() {
           </div>
         </section>
       </div>
-    </main>
+    </WorkspaceShell>
   );
 }
 
@@ -407,7 +391,7 @@ function MetricCard({
   hint: string;
 }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+    <article className="rounded-[24px] border border-slate-200/90 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
         {label}
       </p>
@@ -431,7 +415,7 @@ function ActionCard({
   return (
     <Link
       href={href}
-      className="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white"
+      className="group rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_28px_rgba(15,23,42,0.08)]"
     >
       <h3 className="text-base font-semibold text-slate-950 group-hover:text-slate-800">
         {title}

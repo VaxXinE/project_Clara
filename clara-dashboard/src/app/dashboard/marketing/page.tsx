@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import type {
+  CurrentUser,
   MarketingInsightSnapshot,
   MarketingInsightsPreview,
 } from "@/types/dashboard";
@@ -13,6 +15,7 @@ import type {
 export default function MarketingInsightsPage() {
   const [insights, setInsights] = useState<MarketingInsightsPreview | null>(null);
   const [snapshots, setSnapshots] = useState<MarketingInsightSnapshot[]>([]);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingSnapshot, setIsGeneratingSnapshot] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -27,14 +30,16 @@ export default function MarketingInsightsPage() {
   useEffect(() => {
     async function loadInsights() {
       try {
-        const [insightData, snapshotData] = await Promise.all([
+        const [insightData, snapshotData, me] = await Promise.all([
           apiFetch<MarketingInsightsPreview>("/dashboard/marketing/insights-preview"),
           apiFetch<MarketingInsightSnapshot[]>(
             "/dashboard/marketing/insight-snapshots"
           ),
+          apiFetch<CurrentUser>("/auth/me"),
         ]);
         setInsights(insightData);
         setSnapshots(snapshotData);
+        setCurrentUser(me);
       } catch (error) {
         setErrorMessage(
           error instanceof Error
@@ -78,44 +83,32 @@ export default function MarketingInsightsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <Link
-              href="/dashboard/sales"
-              className="text-sm font-medium text-slate-600 hover:text-slate-950"
-            >
-              ← Back to Sales Inbox
-            </Link>
-            <p className="mt-6 text-sm font-medium text-slate-500">
-              Clara Marketing Intelligence
-            </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-              Marketing Insights
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Ringkasan tren customer, rekomendasi konten, dan KPI untuk bantu
-              tim marketing menentukan prioritas campaign berikutnya.
-            </p>
-          </div>
-
-          {insights && (
-            <div className="flex flex-col items-start gap-3 md:items-end">
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
-                Generated: {formatDateTime(insights.generated_at)}
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleGenerateSnapshot()}
-                disabled={isGeneratingSnapshot}
-                className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isGeneratingSnapshot ? "Generating..." : "Generate Snapshot"}
-              </button>
+    <WorkspaceShell
+      currentUser={currentUser}
+      eyebrow="Strategic intelligence"
+      title="Marketing Insights"
+      description="Ringkasan yang membantu owner dan admin membaca kebutuhan pasar, area resistensi, dan prioritas konten berikutnya tanpa harus membongkar seluruh chat customer."
+      backHref="/dashboard"
+      backLabel="Kembali ke overview"
+      actions={
+        insights ? (
+          <>
+            <div className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600">
+              Snapshot: {formatDateTime(insights.generated_at)}
             </div>
-          )}
-        </section>
+            <button
+              type="button"
+              onClick={() => void handleGenerateSnapshot()}
+              disabled={isGeneratingSnapshot}
+              className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isGeneratingSnapshot ? "Generating..." : "Generate Snapshot"}
+            </button>
+          </>
+        ) : null
+      }
+    >
+      <div className="space-y-6">
 
         {isLoading && (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
@@ -158,7 +151,7 @@ export default function MarketingInsightsPage() {
               <div className="space-y-6">
                 <Panel
                   title="Top Customer Objections"
-                  description="Area resistensi yang paling sering muncul di chat customer."
+                  description="Area resistensi yang paling sering muncul dan paling layak dijawab lewat edukasi atau konten."
                 >
                   {insights.top_objections.length === 0 ? (
                     <EmptyText text="Belum ada objection yang cukup untuk dianalisis." />
@@ -167,7 +160,7 @@ export default function MarketingInsightsPage() {
                       {insights.top_objections.map((item) => (
                         <div
                           key={item.topic}
-                          className="rounded-xl bg-slate-50 p-4"
+                          className="rounded-[20px] bg-slate-50 p-4"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-semibold text-slate-900">
@@ -185,7 +178,7 @@ export default function MarketingInsightsPage() {
 
                 <Panel
                   title="Recommended Content Angles"
-                  description="Saran output marketing yang langsung bisa diprioritaskan."
+                  description="Saran output marketing yang langsung bisa diprioritaskan berdasarkan percakapan terbaru."
                 >
                   {insights.top_content_recommendations.length === 0 ? (
                     <EmptyText text="Belum ada rekomendasi konten yang cukup kuat." />
@@ -194,7 +187,7 @@ export default function MarketingInsightsPage() {
                       {insights.top_content_recommendations.map((item) => (
                         <article
                           key={`${item.title}-${item.suggested_format}`}
-                          className="rounded-2xl border border-slate-200 p-4"
+                          className="rounded-[22px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f9fbfd_100%)] p-4"
                         >
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-base font-semibold text-slate-950">
@@ -227,7 +220,7 @@ export default function MarketingInsightsPage() {
 
                 <Panel
                   title="Recent Snapshots"
-                  description="Bandingkan perubahan antar snapshot untuk membaca arah tren."
+                  description="Bandingkan perubahan antar snapshot untuk membaca apakah arah tren sedang menguat, melemah, atau bergeser."
                 >
                   {snapshots.length === 0 ? (
                     <EmptyText text="Belum ada snapshot. Generate snapshot pertama untuk mulai tracking." />
@@ -236,7 +229,7 @@ export default function MarketingInsightsPage() {
                       {snapshots.map((snapshot) => (
                         <article
                           key={snapshot.id}
-                          className="rounded-2xl border border-slate-200 p-4"
+                          className="rounded-[22px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f9fbfd_100%)] p-4"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
@@ -286,7 +279,7 @@ export default function MarketingInsightsPage() {
               <div className="space-y-6">
                 <Panel
                   title="Audience Signals"
-                  description="Breakdown intent, sentiment, dan stage percakapan."
+                  description="Breakdown cepat intent, sentiment, dan stage percakapan agar tim tahu siapa yang mendekat ke keputusan."
                 >
                   <BreakdownGroup
                     title="Buying Intent"
@@ -304,7 +297,7 @@ export default function MarketingInsightsPage() {
 
                 <Panel
                   title="Operational KPI"
-                  description="Kesehatan pipeline analysis dan reply workflow."
+                  description="KPI pendukung untuk membaca kesehatan pipeline analysis dan workflow balasan tim."
                 >
                   <div className="grid gap-3">
                     <KpiRow
@@ -336,7 +329,7 @@ export default function MarketingInsightsPage() {
           </>
         )}
       </div>
-    </main>
+    </WorkspaceShell>
   );
 }
 
@@ -350,7 +343,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
       <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
       <p className="mt-1 text-sm text-slate-600">{description}</p>
       <div className="mt-4">{children}</div>
@@ -375,7 +368,7 @@ function MetricCard({
   }[tone];
 
   return (
-    <div className={`rounded-2xl border p-5 shadow-sm ${toneClass}`}>
+    <div className={`rounded-[24px] border p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)] ${toneClass}`}>
       <p className="text-sm font-medium">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight">{value}</p>
     </div>

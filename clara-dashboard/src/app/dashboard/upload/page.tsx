@@ -1,48 +1,43 @@
 import Link from "next/link";
 
+import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { WhatsAppUploadForm } from "@/components/dashboard/WhatsAppUploadForm";
 
 export default function UploadWhatsAppPage() {
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
+    <WorkspaceShell
+      eyebrow="Data ingestion"
+      title="Upload WhatsApp Chat"
+      description="Masukkan export chat WhatsApp dalam format .txt. Clara akan mem-parse pesan, membuat conversation baru, lalu menyiapkan data untuk analysis berikutnya."
+      backHref="/dashboard/sales"
+      backLabel="Kembali ke inbox"
+      actions={
+        <Link
+          href="/dashboard/sales"
+          className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+        >
+          Lihat Inbox
+        </Link>
+      }
+    >
       <div className="mx-auto max-w-3xl space-y-6">
-        <section>
-          <Link
-            href="/dashboard/sales"
-            className="text-sm font-medium text-slate-600 hover:text-slate-950"
-          >
-            ← Back to Sales Inbox
-          </Link>
-
-          <p className="mt-6 text-sm font-medium text-slate-500">
-            Clara Dashboard
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-            Upload WhatsApp Chat
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Upload file export WhatsApp dalam format .txt. Clara akan parse
-            pesan dan menyimpannya sebagai conversation baru.
-          </p>
-        </section>
-
         <WhatsAppUploadForm />
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
           <h2 className="text-lg font-semibold text-slate-950">
-            Format yang didukung
+            Format yang Didukung
           </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Untuk MVP ini, parser Clara mendukung format umum export WhatsApp
-            seperti:
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Untuk MVP ini, parser Clara mendukung format export WhatsApp yang
+            umum dipakai tim operasional seperti contoh berikut.
           </p>
 
-          <pre className="mt-4 overflow-x-auto rounded-xl bg-slate-950 p-4 text-sm text-slate-100">
+          <pre className="mt-4 overflow-x-auto rounded-[22px] bg-slate-950 p-4 text-sm text-slate-100">
 {`12/04/26, 09.12 - Customer: Kak, ini programnya legal nggak?
 12/04/26, 09.13 - Sales Ani: Legal kak, nanti saya kirim dokumen resminya.`}
           </pre>
         </section>
       </div>
-    </main>
+    </WorkspaceShell>
   );
 }
