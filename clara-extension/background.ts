@@ -1,5 +1,9 @@
 import type { WhatsAppChatSnapshot } from "~/types/whatsapp"
-import { getConfiguredProxyUrl, getProxyCandidates } from "~/utils/proxy"
+import {
+  getClaraAuthHeaders,
+  getConfiguredProxyUrl,
+  getReplySuggestionCandidates
+} from "~/utils/proxy"
 
 const OPENAI_PROXY_URL = getConfiguredProxyUrl()
 
@@ -22,14 +26,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     try {
       let lastFetchError = ""
 
-      for (const proxyUrl of getProxyCandidates(OPENAI_PROXY_URL)) {
+      for (const proxyUrl of getReplySuggestionCandidates()) {
         try {
           const response = await fetch(proxyUrl, {
             body: JSON.stringify({
               chatData
             }),
             headers: {
-              "Content-Type": "application/json"
+              "Content-Type": "application/json",
+              ...getClaraAuthHeaders()
             },
             method: "POST"
           })
@@ -40,7 +45,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             sendResponse({
               error:
                 payload?.error ||
-                `Proxy OpenAI gagal memproses permintaan saran jawaban di ${proxyUrl}.`,
+                `API Clara/proxy gagal memproses permintaan saran jawaban di ${proxyUrl}.`,
               ok: false
             })
             return
@@ -72,7 +77,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
 
       sendResponse({
-        error: `Gagal menghubungi proxy di ${OPENAI_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`,
+        error: `Gagal menghubungi Clara/proxy reply di ${OPENAI_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`,
         ok: false
       })
     } catch (error) {
@@ -80,7 +85,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         error instanceof Error ? error.message : "Koneksi ke proxy OpenAI gagal."
 
       sendResponse({
-        error: `Gagal menghubungi proxy di ${OPENAI_PROXY_URL}. Detail: ${message}`,
+        error: `Gagal menghubungi Clara/proxy reply di ${OPENAI_PROXY_URL}. Detail: ${message}`,
         ok: false
       })
     }

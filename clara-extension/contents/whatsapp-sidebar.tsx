@@ -6,7 +6,7 @@ import {
   getClaraAuthHeaders,
   getChatSnapshotProxyUrl,
   getConfiguredProxyUrl,
-  getProxyCandidates,
+  getReplySuggestionCandidates,
   getSnapshotSyncCandidates
 } from "~/utils/proxy"
 import { insertReplyIntoComposeBox, readOpenChat } from "~/utils/whatsapp-page"
@@ -493,14 +493,15 @@ const fetchSuggestionsFromProxyDirectly = async (
 ) => {
   let lastFetchError = ""
 
-  for (const proxyUrl of getProxyCandidates(OPENAI_PROXY_URL)) {
+  for (const proxyUrl of getReplySuggestionCandidates()) {
     try {
       const response = await fetch(proxyUrl, {
         body: JSON.stringify({
           chatData
         }),
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...getClaraAuthHeaders()
         },
         method: "POST"
       })
@@ -510,7 +511,7 @@ const fetchSuggestionsFromProxyDirectly = async (
       if (!response.ok) {
         throw new Error(
           payload?.error ||
-            `Proxy OpenAI gagal memproses permintaan saran jawaban di ${proxyUrl}.`
+            `API Clara/proxy gagal memproses permintaan saran jawaban di ${proxyUrl}.`
         )
       }
 
@@ -533,7 +534,7 @@ const fetchSuggestionsFromProxyDirectly = async (
   }
 
   throw new Error(
-    `Gagal menghubungi proxy di ${OPENAI_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
+    `Gagal menghubungi Clara/proxy reply di ${OPENAI_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
   )
 }
 

@@ -5,6 +5,8 @@ from collections.abc import Generator
 
 import pytest
 from fastapi import FastAPI
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.compiler import compiles
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -28,12 +30,19 @@ from app.api import routes_auth, routes_extension, routes_product_knowledge
 from app.core.config import settings
 from app.db.session import Base, get_db
 from app.main import create_app
+from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.organization import Organization
 from app.models.product_knowledge import ProductKnowledge
+from app.models.reply_suggestion import ReplySuggestion
 from app.models.user import User
 from app.services.auth_service import hash_password
+
+
+@compiles(JSONB, "sqlite")
+def compile_jsonb_sqlite(_type, _compiler, **_kwargs):
+    return "JSON"
 
 
 @pytest.fixture()
@@ -57,6 +66,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             User.__table__,
             Conversation.__table__,
             Message.__table__,
+            AIExtraction.__table__,
+            ReplySuggestion.__table__,
             ProductKnowledge.__table__,
         ],
     )
@@ -80,6 +91,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
         bind=engine,
         tables=[
             ProductKnowledge.__table__,
+            ReplySuggestion.__table__,
+            AIExtraction.__table__,
             Message.__table__,
             Conversation.__table__,
             User.__table__,

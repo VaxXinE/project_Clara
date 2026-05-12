@@ -33,3 +33,28 @@ class WhatsAppExtensionSnapshotSyncResponse(BaseModel):
     conversation_id: UUID | None = None
     message_count: int = 0
     source: str = "whatsapp_extension"
+
+
+class WhatsAppExtensionReplySuggestionItem(BaseModel):
+    tone: str
+    text: str
+    reasoning: str
+
+
+class WhatsAppExtensionReplySuggestionsResponse(BaseModel):
+    ok: bool = True
+    status: str
+    duplicate: bool = False
+    cached: bool = False
+    conversation_id: UUID
+    reply_suggestion_id: UUID
+    message_count: int = 0
+    source: str = "whatsapp_extension"
+    suggestions: list[str] = Field(default_factory=list)
+    suggestion_details: list[WhatsAppExtensionReplySuggestionItem] = Field(
+        default_factory=list
+    )
+    risk_level: str | None = None
+    action_mode: str | None = None
+    next_best_action: str | None = None
+    customer_summary: str | None = None

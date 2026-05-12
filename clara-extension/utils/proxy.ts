@@ -40,6 +40,25 @@ export const getClaraSnapshotSyncUrl = (
   }
 }
 
+export const getClaraReplySuggestionsUrl = (
+  apiBaseUrl = getConfiguredClaraApiBaseUrl()
+) => {
+  if (!apiBaseUrl) {
+    return ""
+  }
+
+  try {
+    const url = new URL(apiBaseUrl.trim() || DEFAULT_CLARA_API_BASE_URL)
+    url.pathname = "/extension/whatsapp/reply-suggestions"
+    url.search = ""
+    url.hash = ""
+
+    return url.toString()
+  } catch (_error) {
+    return ""
+  }
+}
+
 export const getProxyCandidates = (url: string) => {
   const normalizedUrl = (url || DEFAULT_PROXY_URL).trim()
   const candidates = [normalizedUrl]
@@ -61,6 +80,19 @@ export const getSnapshotSyncCandidates = () => {
   }
 
   return getProxyCandidates(DEFAULT_CHAT_SNAPSHOT_PROXY_URL)
+}
+
+export const getReplySuggestionCandidates = () => {
+  const claraReplySuggestionsUrl = getClaraReplySuggestionsUrl()
+
+  if (claraReplySuggestionsUrl) {
+    return [
+      ...getProxyCandidates(claraReplySuggestionsUrl),
+      ...getProxyCandidates(getConfiguredProxyUrl())
+    ]
+  }
+
+  return getProxyCandidates(getConfiguredProxyUrl())
 }
 
 export const getClaraAuthHeaders = () => {

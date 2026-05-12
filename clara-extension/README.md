@@ -5,7 +5,8 @@ Browser extension ini dipakai sebagai layer operasional Clara di WhatsApp Web.
 Target integrasi saat ini:
 - membaca chat aktif di WhatsApp Web
 - mengirim snapshot chat ke backend Clara
-- tetap bisa memakai proxy lokal untuk generate draft balasan
+- meminta reply suggestion ke backend Clara
+- tetap bisa memakai proxy lokal sebagai fallback kalau endpoint Clara belum tersedia
 
 ## Konfigurasi env utama
 
@@ -21,9 +22,9 @@ PLASMO_PUBLIC_CLARA_API_TOKEN=isi-dengan-jwt-token-user-clara
 ```
 
 Catatan:
-- `PLASMO_PUBLIC_CLARA_API_BASE_URL` dipakai untuk sync snapshot ke backend Clara
+- `PLASMO_PUBLIC_CLARA_API_BASE_URL` dipakai untuk sync snapshot dan generate reply suggestion via backend Clara
 - `PLASMO_PUBLIC_CLARA_API_TOKEN` harus berisi JWT user Clara yang valid, supaya extension bisa auth ke endpoint Clara
-- `PLASMO_PUBLIC_OPENAI_PROXY_URL` tetap dipakai untuk reply suggestion sampai engine balasan dipindah penuh ke Clara
+- `PLASMO_PUBLIC_OPENAI_PROXY_URL` sekarang menjadi fallback lokal kalau reply suggestion Clara sedang tidak dipakai atau gagal
 
 ### Cara ambil token Clara untuk extension
 
@@ -53,8 +54,12 @@ Agar user tidak perlu memasukkan OpenAI token di popup extension, project ini se
 
 1. Extension membaca chat aktif dari WhatsApp Web.
 2. Extension mengirim snapshot chat ke backend Clara kalau `PLASMO_PUBLIC_CLARA_API_BASE_URL` diisi. Kalau belum, extension fallback ke API lokal `/chat-snapshots`.
-3. Proxy yang menyimpan `OPENAI_API_KEY` memanggil OpenAI Responses API lewat endpoint `/reply-suggestions`.
-4. Proxy mengembalikan 3 saran balasan ke popup.
+3. Extension mencoba memanggil endpoint Clara `/extension/whatsapp/reply-suggestions`.
+4. Backend Clara akan:
+   - sync/update conversation mirror dari snapshot chat
+   - jalankan AI extraction
+   - generate 3 draft reply berbasis product knowledge Clara
+5. Kalau endpoint Clara tidak tersedia, extension fallback ke proxy lokal `/reply-suggestions`.
 
 OpenAI sendiri menyarankan API key tidak diekspos di kode client-side/browser apps.
 

@@ -9,13 +9,19 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
+from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
 from app.models.message import Message
+from app.models.reply_suggestion import ReplySuggestion
 from app.models.user import User
 from app.schemas.extension_schema import (
     WhatsAppExtensionChatSnapshot,
+    WhatsAppExtensionReplySuggestionItem,
+    WhatsAppExtensionReplySuggestionsResponse,
     WhatsAppExtensionSnapshotSyncResponse,
 )
+from app.services.ai_extraction_service import analyze_conversation
+from app.services.reply_suggestion_service import create_reply_suggestion
 from app.services.whatsapp_parser import JAKARTA_TZ, parse_whatsapp_datetime
 
 
@@ -174,6 +180,32 @@ def get_existing_extension_conversation(
     return db.scalars(statement).first()
 
 
+def get_latest_ai_extraction_for_conversation(
+    db: Session,
+    *,
+    conversation_id: UUID,
+) -> AIExtraction | None:
+    statement = (
+        select(AIExtraction)
+        .where(AIExtraction.conversation_id == conversation_id)
+        .order_by(desc(AIExtraction.created_at))
+    )
+    return db.scalars(statement).first()
+
+
+def get_latest_reply_suggestion_for_conversation(
+    db: Session,
+    *,
+    conversation_id: UUID,
+) -> ReplySuggestion | None:
+    statement = (
+        select(ReplySuggestion)
+        .where(ReplySuggestion.conversation_id == conversation_id)
+        .order_by(desc(ReplySuggestion.created_at))
+    )
+    return db.scalars(statement).first()
+
+
 def sync_whatsapp_extension_snapshot(
     db: Session,
     *,
@@ -261,4 +293,97 @@ def sync_whatsapp_extension_snapshot(
         duplicate=False,
         conversation_id=conversation.id,
         message_count=len(normalized_messages),
+    )
+
+
+def build_extension_reply_suggestions_response(
+    *,
+    snapshot_result: WhatsAppExtensionSnapshotSyncResponse,
+    extraction: AIExtraction,
+    suggestion: ReplySuggestion,
+    cached: bool,
+) -> WhatsAppExtensionReplySuggestionsResponse:
+    suggestion_details = [
+        WhatsAppExtensionReplySuggestionItem(
+            tone=str(item.get("tone", "")),
+            text=str(item.get("text", "")),
+            reasoning=str(item.get("reasoning", "")),
+        )
+        for item in suggestion.suggested_replies
+        if isinstance(item, dict)
+        and str(item.get("text", "")).strip()
+    ]
+
+    if not suggestion_details:
+        raise ExtensionSnapshotError("Reply suggestion output is empty.")
+
+    return WhatsAppExtensionReplySuggestionsResponse(
+        status=snapshot_result.status,
+        duplicate=snapshot_result.duplicate,
+        cached=cached,
+        conversation_id=snapshot_result.conversation_id,
+        reply_suggestion_id=suggestion.id,
+        message_count=snapshot_result.message_count,
+        suggestions=[item.text for item in suggestion_details[:3]],
+        suggestion_details=suggestion_details[:3],
+        risk_level=suggestion.risk_level,
+        action_mode=suggestion.action_mode,
+        next_best_action=extraction.next_best_action,
+        customer_summary=extraction.customer_summary,
+    )
+
+
+def generate_extension_reply_suggestions(
+    db: Session,
+    *,
+    current_user: User,
+    snapshot: WhatsAppExtensionChatSnapshot | None,
+) -> WhatsAppExtensionReplySuggestionsResponse:
+    snapshot_result = sync_whatsapp_extension_snapshot(
+        db=db,
+        current_user=current_user,
+        snapshot=snapshot,
+    )
+
+    if snapshot_result.conversation_id is None:
+        raise ExtensionSnapshotError(
+            "Snapshot chat kosong. Buka percakapan WhatsApp yang aktif dulu."
+        )
+
+    latest_extraction = get_latest_ai_extraction_for_conversation(
+        db=db,
+        conversation_id=snapshot_result.conversation_id,
+    )
+    latest_suggestion = get_latest_reply_suggestion_for_conversation(
+        db=db,
+        conversation_id=snapshot_result.conversation_id,
+    )
+
+    if (
+        snapshot_result.duplicate
+        and latest_extraction is not None
+        and latest_suggestion is not None
+        and latest_suggestion.ai_extraction_id == latest_extraction.id
+    ):
+        return build_extension_reply_suggestions_response(
+            snapshot_result=snapshot_result,
+            extraction=latest_extraction,
+            suggestion=latest_suggestion,
+            cached=True,
+        )
+
+    extraction = analyze_conversation(
+        db=db,
+        conversation_id=snapshot_result.conversation_id,
+    )
+    suggestion = create_reply_suggestion(
+        db=db,
+        conversation_id=snapshot_result.conversation_id,
+    )
+
+    return build_extension_reply_suggestions_response(
+        snapshot_result=snapshot_result,
+        extraction=extraction,
+        suggestion=suggestion,
+        cached=False,
     )

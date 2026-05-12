@@ -9,8 +9,12 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
+from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
 from app.models.message import Message
+from app.models.reply_suggestion import ReplySuggestion
+from app.schemas.ai_extraction_schema import AIExtractionCreate
+from app.schemas.reply_suggestion_schema import ReplySuggestionCreate
 
 
 def login(client: TestClient, *, email: str, password: str) -> None:
@@ -136,3 +140,265 @@ def test_extension_snapshot_sync_detects_duplicate_payload(
     duplicate_payload = duplicate_response.json()
     assert duplicate_payload["status"] == "duplicate"
     assert duplicate_payload["duplicate"] is True
+
+
+def test_extension_reply_suggestions_endpoint_generates_clara_suggestions(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+
+    monkeypatch.setattr(
+        "app.services.ai_extraction_service.call_openai_for_extraction",
+        lambda _conversation_text: AIExtractionCreate(
+            lead_temperature="warm",
+            pipeline_stage="objection",
+            buying_intent="medium",
+            sentiment="cautious",
+            risk_level="medium",
+            main_objections=["legalitas"],
+            budget_signal={
+                "detected": False,
+                "amount_text": None,
+                "notes": "Belum ada sinyal budget spesifik.",
+            },
+            recommended_reply_strategy={
+                "tone": "professional",
+                "key_points": ["jelaskan legalitas", "beri referensi resmi"],
+                "avoid_topics": ["janji hasil"],
+            },
+            customer_summary="Customer masih ragu pada aspek legalitas produk.",
+            next_best_action="Berikan penjelasan legalitas dan dokumen pendukung resmi.",
+            content_insight="Topik legalitas paling dominan dalam percakapan.",
+            internal_notes="Perlu bukti legal formal.",
+            confidence_score=0.91,
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.reply_suggestion_service.call_openai_for_reply_suggestion",
+        lambda **_kwargs: ReplySuggestionCreate(
+            suggested_replies=[
+                {
+                    "tone": "friendly",
+                    "text": "Siap kak, saya jelaskan legalitasnya pelan-pelan ya.",
+                    "reasoning": "Versi ramah untuk menurunkan resistensi awal.",
+                },
+                {
+                    "tone": "professional",
+                    "text": "Baik kak, saya bantu kirim penjelasan legalitas dan referensi resmi yang tersedia.",
+                    "reasoning": "Versi profesional untuk memperkuat kredibilitas.",
+                },
+                {
+                    "tone": "empathetic",
+                    "text": "Wajar kak kalau masih ragu, nanti saya bantu kirim dasar legalitasnya supaya lebih tenang.",
+                    "reasoning": "Versi empatik untuk menjawab keraguan customer.",
+                },
+            ]
+        ),
+    )
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    response = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json={
+            "chatData": {
+                "capturedAt": "2026-05-12T09:00:00.000Z",
+                "chatTitle": "Leoni Customer",
+                "chatSubtitle": "online",
+                "messages": [
+                    {
+                        "id": "09.00-0",
+                        "author": "Leoni",
+                        "direction": "incoming",
+                        "text": "Ini legal tidak ya kak?",
+                        "timestampLabel": "09.00",
+                    },
+                    {
+                        "id": "09.01-1",
+                        "author": "Arya",
+                        "direction": "outgoing",
+                        "text": "Saya bantu jelaskan ya kak.",
+                        "timestampLabel": "09.01",
+                    },
+                ],
+            }
+        },
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert payload["status"] == "created"
+    assert payload["cached"] is False
+    assert payload["risk_level"] == "medium"
+    assert payload["next_best_action"] == (
+        "Berikan penjelasan legalitas dan dokumen pendukung resmi."
+    )
+    assert len(payload["suggestions"]) == 3
+    assert payload["suggestions"][0] == (
+        "Siap kak, saya jelaskan legalitasnya pelan-pelan ya."
+    )
+
+    db = db_session_factory()
+    conversation_id = UUID(payload["conversation_id"])
+    assert db.get(Conversation, conversation_id) is not None
+
+    extraction_count = len(
+        list(
+            db.scalars(
+                select(AIExtraction).where(
+                    AIExtraction.conversation_id == conversation_id
+                )
+            ).all()
+        )
+    )
+    suggestion_count = len(
+        list(
+            db.scalars(
+                select(ReplySuggestion).where(
+                    ReplySuggestion.conversation_id == conversation_id
+                )
+            ).all()
+        )
+    )
+    assert extraction_count == 1
+    assert suggestion_count == 1
+
+
+def test_extension_reply_suggestions_endpoint_uses_cache_for_duplicate_snapshot(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    extraction_calls = {"count": 0}
+    reply_calls = {"count": 0}
+
+    def fake_extraction(_conversation_text: str) -> AIExtractionCreate:
+        extraction_calls["count"] += 1
+        return AIExtractionCreate(
+            lead_temperature="warm",
+            pipeline_stage="objection",
+            buying_intent="medium",
+            sentiment="cautious",
+            risk_level="medium",
+            main_objections=["legalitas"],
+            budget_signal={
+                "detected": False,
+                "amount_text": None,
+                "notes": "Belum ada sinyal budget spesifik.",
+            },
+            recommended_reply_strategy={
+                "tone": "professional",
+                "key_points": ["jelaskan legalitas"],
+                "avoid_topics": ["janji hasil"],
+            },
+            customer_summary="Customer ragu soal legalitas.",
+            next_best_action="Kirim penjelasan legalitas resmi.",
+            content_insight="Legalitas adalah isu utama.",
+            internal_notes="Perlu dokumen resmi.",
+            confidence_score=0.88,
+        )
+
+    def fake_reply(**_kwargs) -> ReplySuggestionCreate:
+        reply_calls["count"] += 1
+        return ReplySuggestionCreate(
+            suggested_replies=[
+                {
+                    "tone": "friendly",
+                    "text": "Siap kak, saya bantu jelaskan legalitasnya ya.",
+                    "reasoning": "Ramah.",
+                },
+                {
+                    "tone": "professional",
+                    "text": "Baik kak, saya kirim penjelasan legalitas resmi yang tersedia.",
+                    "reasoning": "Profesional.",
+                },
+                {
+                    "tone": "empathetic",
+                    "text": "Wajar kak kalau masih ragu, nanti saya bantu kirim dasar legalitasnya.",
+                    "reasoning": "Empatik.",
+                },
+            ]
+        )
+
+    monkeypatch.setattr(
+        "app.services.ai_extraction_service.call_openai_for_extraction",
+        fake_extraction,
+    )
+    monkeypatch.setattr(
+        "app.services.reply_suggestion_service.call_openai_for_reply_suggestion",
+        fake_reply,
+    )
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    request_payload = {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:00:00.000Z",
+            "chatTitle": "Leoni Customer",
+            "chatSubtitle": "online",
+            "messages": [
+                {
+                    "id": "09.00-0",
+                    "author": "Leoni",
+                    "direction": "incoming",
+                    "text": "Ini legal tidak ya kak?",
+                    "timestampLabel": "09.00",
+                },
+                {
+                    "id": "09.01-1",
+                    "author": "Arya",
+                    "direction": "outgoing",
+                    "text": "Saya bantu jelaskan ya kak.",
+                    "timestampLabel": "09.01",
+                },
+            ],
+        }
+    }
+
+    first_response = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json=request_payload,
+        headers=csrf_headers(client),
+    )
+    assert first_response.status_code == 201, first_response.text
+
+    second_response = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json=request_payload,
+        headers=csrf_headers(client),
+    )
+    assert second_response.status_code == 201, second_response.text
+
+    second_payload = second_response.json()
+    assert second_payload["status"] == "duplicate"
+    assert second_payload["duplicate"] is True
+    assert second_payload["cached"] is True
+    assert extraction_calls["count"] == 1
+    assert reply_calls["count"] == 1
+
+    db = db_session_factory()
+    conversation_id = UUID(second_payload["conversation_id"])
+    extraction_count = len(
+        list(
+            db.scalars(
+                select(AIExtraction).where(AIExtraction.conversation_id == conversation_id)
+            ).all()
+        )
+    )
+    suggestion_count = len(
+        list(
+            db.scalars(
+                select(ReplySuggestion).where(
+                    ReplySuggestion.conversation_id == conversation_id
+                )
+            ).all()
+        )
+    )
+    assert extraction_count == 1
+    assert suggestion_count == 1
