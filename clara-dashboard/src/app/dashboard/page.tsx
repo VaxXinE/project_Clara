@@ -1,0 +1,348 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { apiFetch } from "@/lib/api";
+import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import type {
+  CurrentUser,
+  MarketingInsightsPreview,
+  SalesInboxItem,
+} from "@/types/dashboard";
+
+type OverviewMetrics = {
+  inboxCount: number;
+  analyzedCount: number;
+  insightConversationCount: number;
+  highRiskCount: number;
+};
+
+const EMPTY_METRICS: OverviewMetrics = {
+  inboxCount: 0,
+  analyzedCount: 0,
+  insightConversationCount: 0,
+  highRiskCount: 0,
+};
+
+const roleCopy: Record<string, { title: string; summary: string }> = {
+  owner: {
+    title: "Global Command Center",
+    summary:
+      "Lihat kesehatan operasional, quality insight, dan arah market signal lintas organization.",
+  },
+  admin: {
+    title: "Organization Control Room",
+    summary:
+      "Pantau aktivitas organization, kualitas follow-up, dan akses operasional tim dengan satu pintu masuk.",
+  },
+  marketing: {
+    title: "Operational Workspace",
+    summary:
+      "Masuk ke inbox, upload chat baru, dan lanjutkan analisis percakapan customer tanpa harus lompat-lompat halaman.",
+  },
+};
+
+export default function DashboardHomePage() {
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [metrics, setMetrics] = useState<OverviewMetrics>(EMPTY_METRICS);
+  const [latestConversation, setLatestConversation] =
+    useState<SalesInboxItem | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadDashboardHome() {
+      try {
+        const me = await apiFetch<CurrentUser>("/auth/me");
+        setCurrentUser(me);
+
+        const nextMetrics: OverviewMetrics = { ...EMPTY_METRICS };
+
+        if (["marketing", "admin", "owner"].includes(me.role)) {
+          try {
+            const inbox = await apiFetch<SalesInboxItem[]>("/dashboard/sales/inbox");
+            nextMetrics.inboxCount = inbox.length;
+            nextMetrics.analyzedCount = inbox.filter(
+              (item) => item.latest_ai_extraction !== null
+            ).length;
+            setLatestConversation(inbox[0] ?? null);
+          } catch {
+            // Owner bisa gagal karena route inbox masih bukan primary focus untuk role ini.
+          }
+        }
+
+        if (["owner", "admin"].includes(me.role)) {
+          try {
+            const insights = await apiFetch<MarketingInsightsPreview>(
+              "/dashboard/marketing/insights-preview"
+            );
+            nextMetrics.insightConversationCount = insights.total_conversations;
+            nextMetrics.highRiskCount =
+              insights.kpi_summary.high_risk_conversation_count;
+          } catch {
+            // Biarkan dashboard home tetap usable walau insight belum tersedia.
+          }
+        }
+
+        setMetrics(nextMetrics);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Gagal memuat dashboard overview."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void loadDashboardHome();
+  }, []);
+
+  async function handleLogout() {
+    try {
+      await apiFetch<void>("/auth/logout", { method: "POST" });
+    } catch {
+      // Ignore logout API failure.
+    } finally {
+      window.location.href = "/login";
+    }
+  }
+
+  const roleLabel = currentUser ? roleCopy[currentUser.role] : null;
+  const canAccessInsights =
+    currentUser !== null && ["owner", "admin"].includes(currentUser.role);
+  const canAccessAdmin =
+    currentUser !== null && ["owner", "admin"].includes(currentUser.role);
+
+  return (
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_40%,#ffffff_100%)] p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] backdrop-blur sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Clara Dashboard
+              </p>
+              <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+                {currentUser ? `Halo, ${currentUser.name}.` : "Clara Workspace"}
+              </h1>
+              <p className="mt-3 text-base leading-7 text-slate-600">
+                {roleLabel?.summary ??
+                  "Pusat kerja harian untuk mengubah percakapan customer menjadi tindakan operasional dan insight yang bisa dipakai tim."}
+              </p>
+              {currentUser && (
+                <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-600">
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 font-medium">
+                    Role: {formatStatusLabel(currentUser.role)}
+                  </span>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 font-medium">
+                    Org: {currentUser.organization_name ?? "global"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/dashboard/sales"
+                className="inline-flex rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                Buka Inbox
+              </Link>
+              <Link
+                href="/dashboard/upload"
+                className="inline-flex rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              >
+                Upload Chat
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleLogout();
+                }}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {errorMessage && (
+          <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+            {errorMessage}
+          </section>
+        )}
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label="Inbox Conversations"
+            value={isLoading ? "..." : String(metrics.inboxCount)}
+            hint="Jumlah percakapan yang bisa dijangkau dari workspace Anda."
+          />
+          <MetricCard
+            label="Analyzed"
+            value={isLoading ? "..." : String(metrics.analyzedCount)}
+            hint="Conversation yang sudah punya hasil AI extraction."
+          />
+          <MetricCard
+            label="Insight Scope"
+            value={isLoading ? "..." : String(metrics.insightConversationCount)}
+            hint="Total conversation yang masuk hitungan marketing insight."
+          />
+          <MetricCard
+            label="High Risk"
+            value={isLoading ? "..." : String(metrics.highRiskCount)}
+            hint="Percakapan berisiko tinggi yang perlu perhatian lebih dulu."
+          />
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Quick Actions
+            </p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <ActionCard
+                href="/dashboard/sales"
+                title="Conversation Inbox"
+                description="Masuk ke antrian percakapan, buka detail customer, dan lanjutkan follow-up."
+              />
+              <ActionCard
+                href="/dashboard/upload"
+                title="Upload WhatsApp TXT"
+                description="Masukkan export chat baru untuk diparse menjadi conversation dan message."
+              />
+              <ActionCard
+                href="/dashboard/knowledge"
+                title="Product Knowledge"
+                description="Kelola fakta produk, legalitas, dan policy supaya reply AI tetap grounded."
+              />
+              <ActionCard
+                href={canAccessInsights ? "/dashboard/marketing" : "/dashboard/sales"}
+                title={canAccessInsights ? "Marketing Insights" : "Operational Flow"}
+                description={
+                  canAccessInsights
+                    ? "Baca tren objection, insight snapshot, dan sinyal market dari percakapan customer."
+                    : "Lanjutkan alur operasional harian dari inbox, analisis, hingga reply."
+                }
+              />
+              {canAccessAdmin && (
+                <ActionCard
+                  href="/dashboard/admin/access"
+                  title="User Management"
+                  description="Kelola akses user dan organization sesuai role yang berwenang."
+                />
+              )}
+              {canAccessAdmin && (
+                <ActionCard
+                  href="/dashboard/admin/ops"
+                  title="Admin Ops"
+                  description="Lihat overview database dan metadata sistem tanpa buka PostgreSQL client."
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <section className="rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+                Workspace Focus
+              </p>
+              <h2 className="mt-4 text-2xl font-bold tracking-tight">
+                {roleLabel?.title ?? "Team Workspace"}
+              </h2>
+              <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-200">
+                <li>Prioritaskan upload chat baru dan pastikan parsing berjalan bersih.</li>
+                <li>Jalankan AI analysis lebih cepat pada conversation yang sudah aktif lagi.</li>
+                <li>Gunakan product knowledge saat menangani legalitas, harga, atau klaim sensitif.</li>
+              </ul>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Latest Activity
+              </p>
+              {latestConversation ? (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-base font-semibold text-slate-950">
+                    {latestConversation.title}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    {latestConversation.latest_message?.message_text ??
+                      "Belum ada pesan terakhir yang bisa ditampilkan."}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                    <span>
+                      Last update: {formatDateTime(latestConversation.last_message_at)}
+                    </span>
+                    <span>•</span>
+                    <span>Status: {formatStatusLabel(latestConversation.ui_status)}</span>
+                  </div>
+                  <Link
+                    href={`/dashboard/sales/conversations/${latestConversation.conversation_id}`}
+                    className="mt-4 inline-flex rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                  >
+                    Buka Conversation
+                  </Link>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                  Belum ada conversation yang tampil. Kalau baru mulai, upload
+                  chat WhatsApp pertama dulu agar workspace ini mulai terasa
+                  hidup.
+                </div>
+              )}
+            </section>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+        {value}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{hint}</p>
+    </article>
+  );
+}
+
+function ActionCard({
+  href,
+  title,
+  description,
+}: {
+  href: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white"
+    >
+      <h3 className="text-base font-semibold text-slate-950 group-hover:text-slate-800">
+        {title}
+      </h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </Link>
+  );
+}

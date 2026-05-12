@@ -7,19 +7,19 @@ import { apiFetch } from "@/lib/api";
 import type { CurrentUser } from "@/types/dashboard";
 
 type LoginResponse = {
-  access_token: string;
   token_type: string;
+  user: CurrentUser;
 };
 
 function getDashboardPathForRole(role: string): string {
   switch (role) {
     case "marketing":
-      return "/dashboard/sales";
+      return "/dashboard";
     case "owner":
-      return "/dashboard/marketing";
+      return "/dashboard";
     case "admin":
     default:
-      return "/dashboard/sales";
+      return "/dashboard";
   }
 }
 
@@ -46,9 +46,7 @@ export default function LoginPage() {
         },
       });
 
-      window.localStorage.setItem("clara_access_token", response.access_token);
-      const currentUser = await apiFetch<CurrentUser>("/auth/me");
-      router.push(getDashboardPathForRole(currentUser.role));
+      router.push(getDashboardPathForRole(response.user.role));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Login gagal.");
     } finally {

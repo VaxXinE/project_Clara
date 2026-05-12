@@ -4,35 +4,59 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.services.auth_service import AuthError, decode_access_token, get_user_by_id
 
+SAFE_HTTP_METHODS = {"GET", "HEAD", "OPTIONS"}
 
-def get_bearer_token(request: Request) -> str:
+
+def get_request_auth_token(request: Request) -> tuple[str, str]:
     authorization = request.headers.get("Authorization")
 
-    if not authorization:
+    if authorization:
+        scheme, _, token = authorization.partition(" ")
+
+        if scheme.lower() != "bearer" or not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Authorization header.",
+            )
+
+        return token, "bearer"
+
+    cookie_token = request.cookies.get(settings.auth_cookie_name)
+    if cookie_token:
+        validate_csrf_for_cookie_auth(request)
+        return cookie_token, "cookie"
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Missing authentication credentials.",
+    )
+
+
+def validate_csrf_for_cookie_auth(request: Request) -> None:
+    if request.method.upper() in SAFE_HTTP_METHODS:
+        return
+
+    csrf_cookie = request.cookies.get(settings.csrf_cookie_name)
+    csrf_header = request.headers.get("X-CSRF-Token")
+
+    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing Authorization header.",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRF validation failed.",
         )
-
-    scheme, _, token = authorization.partition(" ")
-
-    if scheme.lower() != "bearer" or not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Authorization header.",
-        )
-
-    return token
 
 
 def get_current_user(
-    token: str = Depends(get_bearer_token),
+    request: Request,
     db: Session = Depends(get_db),
 ) -> User:
+    token, _ = get_request_auth_token(request)
+
     try:
         payload = decode_access_token(token)
         user_id = UUID(payload["sub"])

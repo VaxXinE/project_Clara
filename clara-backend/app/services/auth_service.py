@@ -184,3 +184,16 @@ def set_user_active_status(
     db.commit()
     db.refresh(user)
     return user
+
+
+def set_user_password(
+    db: Session,
+    user: User,
+    *,
+    password: str,
+) -> User:
+    user.hashed_password = hash_password(password)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user

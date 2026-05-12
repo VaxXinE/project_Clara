@@ -1,6 +1,7 @@
+import secrets
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_roles
@@ -11,7 +12,8 @@ from app.schemas.auth_schema import (
     CreateUserRequest,
     CurrentUserResponse,
     LoginRequest,
-    TokenResponse,
+    ResetUserPasswordRequest,
+    SessionResponse,
     UpdateUserRequest,
 )
 from app.services.audit_service import create_audit_log
@@ -23,6 +25,7 @@ from app.services.auth_service import (
     get_user_by_id,
     list_users,
     set_user_active_status,
+    set_user_password,
     update_user,
 )
 from app.services.rate_limiter import login_rate_limiter
@@ -39,15 +42,56 @@ def build_user_response(user: User) -> CurrentUserResponse:
         is_active=user.is_active,
         created_at=user.created_at,
         organization_id=user.organization_id,
+        organization_name=user.organization.name if user.organization else None,
         created_by_user_id=user.created_by_user_id,
         created_by_user_name=user.created_by_user.name if user.created_by_user else None,
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+def set_auth_cookies(response: Response, access_token: str) -> None:
+    max_age = settings.access_token_expire_minutes * 60
+    csrf_token = secrets.token_urlsafe(32)
+
+    response.set_cookie(
+        key=settings.auth_cookie_name,
+        value=access_token,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite_value,
+        domain=settings.auth_cookie_domain,
+        max_age=max_age,
+        path="/",
+    )
+    response.set_cookie(
+        key=settings.csrf_cookie_name,
+        value=csrf_token,
+        httponly=False,
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite_value,
+        domain=settings.auth_cookie_domain,
+        max_age=max_age,
+        path="/",
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.auth_cookie_name,
+        domain=settings.auth_cookie_domain,
+        path="/",
+    )
+    response.delete_cookie(
+        key=settings.csrf_cookie_name,
+        domain=settings.auth_cookie_domain,
+        path="/",
+    )
+
+
+@router.post("/login", response_model=SessionResponse)
 def login(
     payload: LoginRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     ip_address = request.client.host if request.client else "unknown"
@@ -84,7 +128,10 @@ def login(
         metadata={"email": user.email},
     )
 
-    return TokenResponse(access_token=create_access_token(user))
+    access_token = create_access_token(user)
+    set_auth_cookies(response=response, access_token=access_token)
+
+    return SessionResponse(user=build_user_response(user))
 
 
 @router.get("/me", response_model=CurrentUserResponse)
@@ -92,6 +139,13 @@ def get_me(
     current_user: User = Depends(get_current_user),
 ):
     return build_user_response(current_user)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response) -> Response:
+    clear_auth_cookies(response)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
 
 
 @router.post(
@@ -356,6 +410,62 @@ def activate_user_endpoint(
     create_audit_log(
         db=db,
         action="auth.user.activate",
+        resource_type="user",
+        resource_id=str(updated_user.id),
+        current_user=current_user,
+        request=request,
+        metadata={"email": updated_user.email},
+    )
+    return build_user_response(updated_user)
+
+
+@router.post("/users/{user_id}/reset-password", response_model=CurrentUserResponse)
+def reset_user_password_endpoint(
+    user_id: str,
+    payload: ResetUserPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    try:
+        target_user = get_user_by_id(db=db, user_id=UUID(user_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user id.",
+        ) from exc
+
+    if target_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    if current_user.role == "admin":
+        if current_user.organization_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin has no organization assigned.",
+            )
+        if target_user.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+        if target_user.created_by_user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin can only reset passwords for users they created.",
+            )
+
+    updated_user = set_user_password(
+        db=db,
+        user=target_user,
+        password=payload.password,
+    )
+    create_audit_log(
+        db=db,
+        action="auth.user.reset_password",
         resource_type="user",
         resource_id=str(updated_user.id),
         current_user=current_user,

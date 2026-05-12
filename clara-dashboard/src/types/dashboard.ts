@@ -198,6 +198,7 @@ export type CurrentUser = {
   is_active: boolean;
   created_at: string;
   organization_id: string | null;
+  organization_name: string | null;
   created_by_user_id: string | null;
   created_by_user_name: string | null;
 };
@@ -227,6 +228,10 @@ export type UpdateUserRequest = {
   email?: string;
   role?: string;
   organization_id?: string | null;
+};
+
+export type ResetUserPasswordRequest = {
+  password: string;
 };
 
 export type OpsDatabaseOverview = {

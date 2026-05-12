@@ -47,6 +47,16 @@ export default function SalesInboxPage() {
   const canAccessAdminOps =
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
 
+  async function handleLogout() {
+    try {
+      await apiFetch<void>("/auth/logout", { method: "POST" });
+    } catch {
+      // Ignore logout API error and still force the user back to login.
+    } finally {
+      window.location.href = "/login";
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -111,8 +121,7 @@ export default function SalesInboxPage() {
             <button
               type="button"
               onClick={() => {
-                window.localStorage.removeItem("clara_access_token");
-                window.location.href = "/login";
+                void handleLogout();
               }}
               className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
             >

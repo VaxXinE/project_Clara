@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
+    auth_cookie_name: str = "clara_access_token"
+    csrf_cookie_name: str = "clara_csrf_token"
+    auth_cookie_domain: str | None = None
+    auth_cookie_samesite: str | None = None
 
     allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     login_rate_limit_per_minute: int = 5
@@ -28,6 +32,19 @@ class Settings(BaseSettings):
             for origin in self.allowed_origins.split(",")
             if origin.strip()
         ]
+
+    @property
+    def auth_cookie_secure(self) -> bool:
+        return self.app_env.lower() == "production"
+
+    @property
+    def auth_cookie_samesite_value(self) -> str:
+        if self.auth_cookie_samesite:
+            normalized = self.auth_cookie_samesite.strip().lower()
+            if normalized in {"lax", "strict", "none"}:
+                return normalized
+
+        return "none" if self.auth_cookie_secure else "lax"
 
 
 settings = Settings()

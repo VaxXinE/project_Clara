@@ -10,6 +10,7 @@ import type {
   CreateUserRequest,
   CurrentUser,
   OrganizationItem,
+  ResetUserPasswordRequest,
   UpdateUserRequest,
 } from "@/types/dashboard";
 
@@ -33,6 +34,20 @@ const EMPTY_EDIT_FORM: UpdateUserRequest = {
   organization_id: null,
 };
 
+function getOrganizationLabel(
+  organizationId: string | null,
+  organizations: OrganizationItem[]
+): string {
+  if (!organizationId) {
+    return "-";
+  }
+
+  return (
+    organizations.find((organization) => organization.id === organizationId)
+      ?.name ?? organizationId
+  );
+}
+
 export default function AdminAccessPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
@@ -42,6 +57,12 @@ export default function AdminAccessPage() {
   const [userForm, setUserForm] = useState<CreateUserRequest>(EMPTY_USER_FORM);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<UpdateUserRequest>(EMPTY_EDIT_FORM);
+  const [resettingPasswordUserId, setResettingPasswordUserId] = useState<
+    string | null
+  >(null);
+  const [passwordForm, setPasswordForm] = useState<ResetUserPasswordRequest>({
+    password: "",
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingOrganization, setIsSubmittingOrganization] = useState(false);
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
@@ -123,6 +144,18 @@ export default function AdminAccessPage() {
   function cancelEdit() {
     setEditingUserId(null);
     setEditForm(EMPTY_EDIT_FORM);
+  }
+
+  function beginPasswordReset(userId: string) {
+    setResettingPasswordUserId(userId);
+    setPasswordForm({ password: "" });
+    setErrorMessage("");
+    setSuccessMessage("");
+  }
+
+  function cancelPasswordReset() {
+    setResettingPasswordUserId(null);
+    setPasswordForm({ password: "" });
   }
 
   async function handleCreateOrganization(
@@ -228,6 +261,28 @@ export default function AdminAccessPage() {
     }
   }
 
+  async function handleResetPassword(userId: string) {
+    setActionUserId(userId);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      await apiFetch<CurrentUser>(`/auth/users/${userId}/reset-password`, {
+        method: "POST",
+        body: passwordForm,
+      });
+      setSuccessMessage("Password user berhasil diubah.");
+      cancelPasswordReset();
+      await loadPageData();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal mengubah password user."
+      );
+    } finally {
+      setActionUserId(null);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -266,7 +321,10 @@ export default function AdminAccessPage() {
               <p className="mt-1">
                 Org:{" "}
                 <span className="font-semibold">
-                  {currentUser.organization_id ?? "-"}
+                  {getOrganizationLabel(
+                    currentUser.organization_id,
+                    organizations
+                  )}
                 </span>
               </p>
             </div>
@@ -487,7 +545,12 @@ export default function AdminAccessPage() {
                   <div className="space-y-4">
                     {users.map((user) => {
                       const isEditing = editingUserId === user.id;
+                      const isResettingPassword =
+                        resettingPasswordUserId === user.id;
                       const isSelf = currentUser.id === user.id;
+                      const canResetPassword =
+                        currentUser.role === "owner" ||
+                        user.created_by_user_id === currentUser.id;
 
                       return (
                         <article
@@ -581,6 +644,49 @@ export default function AdminAccessPage() {
                                 </button>
                               </div>
                             </div>
+                          ) : isResettingPassword ? (
+                            <div className="space-y-4">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-950">
+                                  Reset password untuk {user.email}
+                                </p>
+                                <p className="mt-1 text-sm text-slate-600">
+                                  Owner bisa mengganti semua password user.
+                                  Admin hanya bisa mengganti password user yang
+                                  dia buat sendiri.
+                                </p>
+                              </div>
+
+                              <InputField
+                                label="New Password"
+                                value={passwordForm.password}
+                                onChange={(value) =>
+                                  setPasswordForm({ password: value })
+                                }
+                                placeholder="Minimum 8 karakter"
+                                type="password"
+                              />
+
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleResetPassword(user.id)}
+                                  disabled={actionUserId === user.id}
+                                  className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {actionUserId === user.id
+                                    ? "Saving..."
+                                    : "Save New Password"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={cancelPasswordReset}
+                                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
                           ) : (
                             <>
                               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -606,7 +712,13 @@ export default function AdminAccessPage() {
                                     {user.name}
                                   </p>
                                   <div className="mt-2 grid gap-1 text-xs text-slate-500">
-                                    <p>org: {user.organization_id ?? "-"}</p>
+                                    <p>
+                                      org:{" "}
+                                      {getOrganizationLabel(
+                                        user.organization_id,
+                                        organizations
+                                      )}
+                                    </p>
                                     <p>
                                       created by:{" "}
                                       {user.created_by_user_name ?? "-"}
@@ -622,6 +734,14 @@ export default function AdminAccessPage() {
                                     className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
                                   >
                                     Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => beginPasswordReset(user.id)}
+                                    disabled={!canResetPassword}
+                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    Reset Password
                                   </button>
                                   <button
                                     type="button"
@@ -646,6 +766,13 @@ export default function AdminAccessPage() {
                                 <p className="mt-3 rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
                                   Akun yang sedang Anda pakai tidak bisa
                                   dinonaktifkan dari sesi ini sendiri.
+                                </p>
+                              )}
+
+                              {!canResetPassword && (
+                                <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
+                                  Admin hanya bisa mengganti password user yang
+                                  dibuat dari akunnya sendiri.
                                 </p>
                               )}
                             </>
