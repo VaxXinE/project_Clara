@@ -46,6 +46,23 @@ def test_login_sets_cookie_session_and_allows_fetching_current_user(
     assert payload["organization_name"] == "Org Alpha"
 
 
+def test_authenticated_user_can_issue_bearer_access_token_for_extension(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    owner = seeded_data["owner"]
+
+    login(client, email=owner.email, password="OwnerPass123!")
+
+    response = client.post("/auth/access-token", headers=csrf_headers(client))
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["token_type"] == "bearer"
+    assert isinstance(payload["access_token"], str)
+    assert len(payload["access_token"]) > 20
+
+
 def test_inactive_user_cannot_login(
     client: TestClient,
     seeded_data: dict[str, object],

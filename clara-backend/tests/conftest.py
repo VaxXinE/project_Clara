@@ -24,11 +24,12 @@ os.environ.setdefault(
     "http://localhost:3000,http://127.0.0.1:3000",
 )
 
-from app.api import routes_auth, routes_product_knowledge
+from app.api import routes_auth, routes_extension, routes_product_knowledge
 from app.core.config import settings
 from app.db.session import Base, get_db
 from app.main import create_app
 from app.models.conversation import Conversation
+from app.models.message import Message
 from app.models.organization import Organization
 from app.models.product_knowledge import ProductKnowledge
 from app.models.user import User
@@ -55,11 +56,13 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             Organization.__table__,
             User.__table__,
             Conversation.__table__,
+            Message.__table__,
             ProductKnowledge.__table__,
         ],
     )
 
     monkeypatch.setattr(routes_auth, "create_audit_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(routes_extension, "create_audit_log", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         routes_product_knowledge,
         "create_audit_log",
@@ -77,6 +80,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
         bind=engine,
         tables=[
             ProductKnowledge.__table__,
+            Message.__table__,
             Conversation.__table__,
             User.__table__,
             Organization.__table__,

@@ -5,6 +5,7 @@ from app.api.routes_ai import router as ai_router
 from app.api.routes_auth import router as auth_router
 from app.api.routes_conversations import router as conversations_router
 from app.api.routes_dashboard import router as dashboard_router
+from app.api.routes_extension import router as extension_router
 from app.api.routes_reply import router as reply_router
 from app.api.routes_sent_messages import router as sent_messages_router
 from app.api.routes_upload import router as upload_router
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(organizations_router)
     app.include_router(product_knowledge_router)
+    app.include_router(extension_router)
     app.include_router(upload_router)
     app.include_router(conversations_router)
     app.include_router(ai_router)

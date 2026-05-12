@@ -1,0 +1,6 @@
+.env
+node_modules
+build
+server/data
+.plasmo/
+.tmp-*.log

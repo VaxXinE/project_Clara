@@ -15,6 +15,7 @@ from app.schemas.auth_schema import (
     LoginRequest,
     ResetUserPasswordRequest,
     SessionResponse,
+    TokenResponse,
     UpdateUserRequest,
 )
 from app.services.audit_service import create_audit_log
@@ -141,6 +142,24 @@ def get_me(
     current_user: User = Depends(get_current_user),
 ):
     return build_user_response(current_user)
+
+
+@router.post("/access-token", response_model=TokenResponse)
+def issue_access_token(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    create_audit_log(
+        db=db,
+        action="auth.access_token.issue",
+        resource_type="user",
+        resource_id=str(current_user.id),
+        current_user=current_user,
+        request=request,
+        metadata={"purpose": "extension_integration"},
+    )
+    return TokenResponse(access_token=create_access_token(current_user))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
