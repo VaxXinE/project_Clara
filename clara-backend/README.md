@@ -24,6 +24,7 @@ cp .env.example .env
 uv sync
 uv run alembic upgrade head
 uv run python scripts/bootstrap_owner.py
+uv run python scripts/import_clara_knowledge.py
 uv run uvicorn app.main:app --reload
 ```
 
@@ -48,6 +49,7 @@ BOOTSTRAP_OWNER_EMAIL=owner@clara.local
 BOOTSTRAP_OWNER_PASSWORD=OwnerPass123!
 BOOTSTRAP_ORGANIZATION_NAME=Clara Local
 BOOTSTRAP_ORGANIZATION_SLUG=clara-local
+CLARA_KNOWLEDGE_OWNER_EMAIL=owner@clara.local
 ```
 
 Behavior:
@@ -61,3 +63,27 @@ Behavior:
 - Jangan taruh logic create user di migration Alembic.
 - Migration harus tetap fokus ke schema database.
 - Bootstrap data awal lebih aman dipisah ke script idempotent seperti ini.
+
+## Import `clara_knowledge`
+
+Script [import_clara_knowledge.py](/Users/newsmaker23/Projects/clara/clara-backend/scripts/import_clara_knowledge.py) akan:
+
+- meng-import file factual dari folder [clara_knowledge](/Users/newsmaker23/Projects/clara/clara_knowledge) ke tabel `product_knowledge`
+- menandai source sebagai `markdown_import`
+- melakukan **upsert** supaya aman dijalankan berulang
+
+Command:
+
+```bash
+cd clara-backend
+uv run python scripts/import_clara_knowledge.py
+```
+
+File factual yang di-import saat ini:
+
+- `SALES_KNOWLEDGE_BRIDGE_MINI.md`
+- `POSITIONING.md`
+- `OBJECTION.md`
+- `OBJECTION_EXTREME.md`
+
+Sementara file seperti `instruction.md`, `GUARDRAIL.md`, dan `FLOW.md` dipakai sebagai **response playbook** untuk pipeline reply suggestion Clara, bukan dimasukkan mentah ke tabel knowledge biasa.

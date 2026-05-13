@@ -79,6 +79,7 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
   return {
     actionMode:
       typeof payload?.action_mode === "string" ? payload.action_mode : undefined,
+    cached: Boolean(payload?.cached),
     conversationId:
       typeof payload?.conversation_id === "string"
         ? payload.conversation_id

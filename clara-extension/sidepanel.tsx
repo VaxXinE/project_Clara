@@ -391,6 +391,8 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
         : typeof payload?.action_mode === "string"
           ? payload.action_mode
           : undefined,
+    cached:
+      typeof payload?.cached === "boolean" ? payload.cached : undefined,
     conversationId:
       typeof payload?.conversationId === "string"
         ? payload.conversationId
@@ -754,6 +756,7 @@ const requestSuggestionCandidates = async (chatData: WhatsAppChatSnapshot) => {
     })) as
       | {
           actionMode?: string
+          cached?: boolean
           customerSummary?: string
           error?: string
           nextBestAction?: string
@@ -1160,10 +1163,19 @@ function ClaraSidePanel() {
     setFeedback("")
 
     try {
-      const currentChatData =
-        chatData && chatData.messages.length > 0
-          ? chatData
-          : await readChatFromActiveTab()
+      let currentChatData: WhatsAppChatSnapshot
+
+      try {
+        // Always re-read the active chat before generating suggestions so
+        // customer replies that just arrived are included in the latest insight.
+        currentChatData = await readChatFromActiveTab()
+      } catch (readError) {
+        if (chatData && chatData.messages.length > 0) {
+          currentChatData = chatData
+        } else {
+          throw readError
+        }
+      }
 
       if (currentChatData.messages.length === 0) {
         throw new Error(
@@ -1188,7 +1200,11 @@ function ClaraSidePanel() {
       setRiskLevel(nextSuggestionResult.riskLevel || "")
       setActionMode(nextSuggestionResult.actionMode || "")
       setReplySuggestionId(nextSuggestionResult.replySuggestionId || "")
-      setFeedback("Saran balasan Clara siap dipakai.")
+      setFeedback(
+        nextSuggestionResult.cached
+          ? "Saran balasan Clara tetap sama karena snapshot chat belum berubah."
+          : "Saran balasan Clara sudah diperbarui dari chat terbaru."
+      )
     } catch (err) {
       const message =
         err instanceof Error

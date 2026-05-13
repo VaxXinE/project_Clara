@@ -223,7 +223,7 @@ export default function SalesInboxPage() {
                             </span>
                           )}
 
-                          {item.latest_sent_message && (
+                          {item.ui_status === "reply_sent" && (
                             <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
                               SENT
                             </span>
@@ -260,11 +260,7 @@ export default function SalesInboxPage() {
                           Status balasan
                         </p>
                         <p className="mt-2 text-sm font-medium text-slate-800">
-                          {item.latest_sent_message
-                            ? "sent"
-                            : suggestion
-                              ? formatStatusLabel(suggestion.approval_status)
-                              : "No suggestion"}
+                          {formatStatusLabel(item.ui_status)}
                         </p>
                       </div>
                     </div>

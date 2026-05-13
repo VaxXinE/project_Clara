@@ -230,6 +230,7 @@ cp .env.example .env
 uv sync
 uv run alembic upgrade head
 uv run python scripts/bootstrap_owner.py
+uv run python scripts/import_clara_knowledge.py
 uv run uvicorn app.main:app --reload
 ```
 
@@ -261,6 +262,7 @@ BOOTSTRAP_OWNER_EMAIL=owner@clara.local
 BOOTSTRAP_OWNER_PASSWORD=OwnerPass123!
 BOOTSTRAP_ORGANIZATION_NAME=Clara Local
 BOOTSTRAP_ORGANIZATION_SLUG=clara-local
+CLARA_KNOWLEDGE_OWNER_EMAIL=owner@clara.local
 ```
 
 ---
@@ -287,7 +289,7 @@ uv run python scripts/bootstrap_owner.py
 Untuk deploy environment seperti Railway, pola yang aman adalah:
 
 ```bash
-uv run alembic upgrade head && uv run python scripts/bootstrap_owner.py
+uv run alembic upgrade head && uv run python scripts/bootstrap_owner.py && uv run python scripts/import_clara_knowledge.py
 ```
 
 Catatan penting:
@@ -297,6 +299,44 @@ Catatan penting:
 - bootstrap owner dipisah supaya lebih aman, idempotent, dan mudah dirawat
 
 Kalau Anda tetap ingin flow manual/interaktif, script lama [create_owner.py](/Users/newsmaker23/Projects/clara/clara-backend/scripts/create_owner.py) masih bisa dipakai.
+
+---
+
+### Import folder `clara_knowledge`
+
+Folder [clara_knowledge](/Users/newsmaker23/Projects/clara/clara_knowledge) sekarang dipakai dalam dua layer:
+
+- **knowledge factual** di-import ke tabel `product_knowledge`
+- **response playbook** dipakai sebagai rule saat Clara generate reply suggestion
+
+Script import:
+
+```bash
+cd clara-backend
+uv run python scripts/import_clara_knowledge.py
+```
+
+File yang saat ini di-import ke `product_knowledge`:
+
+- `SALES_KNOWLEDGE_BRIDGE_MINI.md`
+- `POSITIONING.md`
+- `OBJECTION.md`
+- `OBJECTION_EXTREME.md`
+
+File yang dipakai sebagai **playbook / rule** untuk generate balasan:
+
+- `instruction.md`
+- `GUARDRAIL.md`
+- `FLOW.md`
+- `PERSONALITY_MODE.md`
+- `AUTO_ADAPT.md`
+- `CLOSING_ENGINE.md`
+
+Kenapa dipisah:
+
+- factual knowledge dipakai sebagai grounding fakta
+- playbook dipakai untuk tone, guardrail, style, dan strategi closing
+- ini mencegah aturan internal tercampur dengan fakta produk
 
 ---
 

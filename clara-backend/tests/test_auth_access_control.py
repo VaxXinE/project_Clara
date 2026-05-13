@@ -1,5 +1,6 @@
-from pathlib import Path
 import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
@@ -7,6 +8,10 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
+from app.models.ai_extraction import AIExtraction
+from app.models.message import Message
+from app.models.reply_suggestion import ReplySuggestion
+from app.models.sent_message import SentMessage
 from app.models.user import User
 from app.services.access_control_service import can_access_conversation
 from app.services.auth_service import verify_password
@@ -221,3 +226,93 @@ def test_conversation_access_control_respects_role_and_ownership(
     assert can_access_conversation(marketing_b, conversation) is True
     assert can_access_conversation(marketing_a, conversation) is False
     assert can_access_conversation(marketing_other_org, conversation) is False
+
+
+def test_sales_inbox_clears_sent_state_when_customer_replies_after_send(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_b = seeded_data["marketing_b"]
+    conversation = seeded_data["owned_conversation"]
+
+    db = db_session_factory()
+    base_time = datetime.now(timezone.utc) - timedelta(minutes=5)
+
+    first_customer_message = Message(
+        conversation_id=conversation.id,
+        sender_name="Customer",
+        sender_type="customer",
+        message_text="Halo, saya mau tanya dulu.",
+        message_timestamp=base_time,
+    )
+    extraction = AIExtraction(
+        conversation_id=conversation.id,
+        model_name="gpt-4.1-mini",
+        schema_version="v1",
+        customer_summary="Customer masih ragu.",
+        lead_temperature="warm",
+        pipeline_stage="consideration",
+        buying_intent="medium",
+        sentiment="cautious",
+        risk_level="medium",
+        main_objections=["legalitas"],
+        budget_signal={},
+        recommended_reply_strategy={"mode": "educate_with_proof"},
+        next_best_action="Jawab keberatan customer dengan bukti legalitas.",
+        content_insight="Customer butuh bukti legalitas dan social proof.",
+        internal_notes="Refresh analysis after every new customer objection.",
+        confidence_score=0.78,
+        created_at=base_time + timedelta(seconds=30),
+    )
+    db.add_all([first_customer_message, extraction])
+    db.flush()
+
+    suggestion = ReplySuggestion(
+        conversation_id=conversation.id,
+        ai_extraction_id=extraction.id,
+        model_name="gpt-4.1-mini",
+        schema_version="v1",
+        risk_level="medium",
+        action_mode="reply_ready",
+        approval_status="approved",
+        suggested_replies=[{"label": "friendly", "text": "Siap, kami bantu jelaskan."}],
+        policy_reasons=["safe"],
+        created_at=base_time + timedelta(minutes=1),
+    )
+    sent_message = SentMessage(
+        conversation_id=conversation.id,
+        reply_suggestion_id=suggestion.id,
+        send_mode="extension_direct_send",
+        message_text="Siap, kami bantu jelaskan.",
+        sent_by_name="Marketing Beta",
+        sent_at=base_time + timedelta(minutes=2),
+    )
+    latest_customer_message = Message(
+        conversation_id=conversation.id,
+        sender_name="Customer",
+        sender_type="customer",
+        message_text="Oke, tapi saya masih belum yakin.",
+        message_timestamp=base_time + timedelta(minutes=3),
+    )
+
+    db.add(suggestion)
+    db.flush()
+    sent_message.reply_suggestion_id = suggestion.id
+
+    db.add_all([sent_message, latest_customer_message])
+    conversation.last_message_at = latest_customer_message.message_timestamp
+    db.commit()
+    db.close()
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+
+    response = client.get("/dashboard/sales/inbox")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    owned_item = next(
+        item for item in payload if item["conversation_id"] == str(conversation.id)
+    )
+    assert owned_item["latest_sent_message"] is None
+    assert owned_item["ui_status"] == "needs_analysis"

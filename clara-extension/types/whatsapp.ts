@@ -34,6 +34,7 @@ export interface WhatsAppSuggestionDetail {
 
 export interface WhatsAppSuggestionResult {
   actionMode?: string
+  cached?: boolean
   conversationId?: string
   customerSummary?: string
   nextBestAction?: string

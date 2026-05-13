@@ -119,6 +119,55 @@ def get_latest_reply_suggestion(conversation: Conversation) -> ReplySuggestion |
     )
 
 
+def has_fresh_customer_reply(
+    latest_message: Message | None,
+    sent_message: SentMessage | None,
+) -> bool:
+    if latest_message is None or sent_message is None:
+        return False
+
+    if latest_message.sender_type != "customer":
+        return False
+
+    return latest_message.message_timestamp > sent_message.sent_at
+
+
+def extraction_is_stale(
+    extraction: AIExtraction | None,
+    latest_message: Message | None,
+) -> bool:
+    if latest_message is None or latest_message.sender_type != "customer":
+        return extraction is None
+
+    if extraction is None:
+        return True
+
+    return extraction.created_at < latest_message.message_timestamp
+
+
+def suggestion_is_stale(
+    suggestion: ReplySuggestion | None,
+    latest_message: Message | None,
+) -> bool:
+    if latest_message is None or latest_message.sender_type != "customer":
+        return suggestion is None
+
+    if suggestion is None:
+        return True
+
+    return suggestion.created_at < latest_message.message_timestamp
+
+
+def resolve_current_sent_message(
+    latest_message: Message | None,
+    sent_message: SentMessage | None,
+) -> SentMessage | None:
+    if has_fresh_customer_reply(latest_message, sent_message):
+        return None
+
+    return sent_message
+
+
 def calculate_priority_score(
     extraction: AIExtraction | None,
     suggestion: ReplySuggestion | None,
@@ -152,17 +201,25 @@ def calculate_priority_score(
 
 
 def determine_ui_status(
+    latest_message: Message | None,
     extraction: AIExtraction | None,
     suggestion: ReplySuggestion | None,
     sent_message: SentMessage | None,
 ) -> str:
+    if has_fresh_customer_reply(latest_message, sent_message):
+        if extraction_is_stale(extraction, latest_message):
+            return "needs_analysis"
+
+        if suggestion_is_stale(suggestion, latest_message):
+            return "needs_reply_suggestion"
+
     if sent_message is not None:
         return "reply_sent"
 
-    if extraction is None:
+    if extraction_is_stale(extraction, latest_message):
         return "needs_analysis"
 
-    if suggestion is None:
+    if suggestion_is_stale(suggestion, latest_message):
         return "needs_reply_suggestion"
 
     if suggestion.approval_status == "pending":
@@ -209,7 +266,10 @@ def get_sales_inbox(db: Session, current_user: User) -> list[SalesInboxItem]:
         latest_message = get_latest_message(conversation)
         latest_extraction = get_latest_extraction(conversation)
         latest_suggestion = get_latest_reply_suggestion(conversation)
-        latest_sent_message = get_latest_sent_message(conversation)
+        latest_sent_message = resolve_current_sent_message(
+            latest_message,
+            get_latest_sent_message(conversation),
+        )
 
         latest_message_summary = None
         if latest_message is not None:
@@ -235,6 +295,7 @@ def get_sales_inbox(db: Session, current_user: User) -> list[SalesInboxItem]:
                 latest_ai_extraction=build_ai_summary(latest_extraction),
                 latest_reply_suggestion=build_reply_summary(latest_suggestion),
                 ui_status=determine_ui_status(
+                    latest_message,
                     latest_extraction,
                     latest_suggestion,
                     latest_sent_message,
