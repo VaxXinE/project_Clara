@@ -38,7 +38,8 @@ User membuka WhatsApp Web, lalu:
 3. backend menyimpan/memperbarui mirror conversation,
 4. Clara menjalankan AI extraction + reply suggestion,
 5. hasil insight dan draft reply muncul di **Chrome Side Panel**,
-6. user bisa copy atau memasukkan draft ke compose box WhatsApp tanpa auto send.
+6. user bisa `Copy`, `Masukkan`, atau `Kirim` draft dari extension,
+7. jika user memilih `Masukkan` lalu mengirim manual dari WhatsApp, extension akan mencoba mendeteksi event kirim itu dan menyinkronkannya ke Clara sebagai `approved + sent`.
 
 ---
 
@@ -114,6 +115,12 @@ clara/
   - next best action
   - reasoning per draft
 - Menjalankan UI di **Chrome Side Panel**, bukan floating overlay
+- Bisa `Masukkan` draft ke compose box WhatsApp tanpa auto send
+- Bisa `Kirim` draft langsung dari extension
+- Bisa mendeteksi **manual send** setelah draft dimasukkan dari extension
+- Sinkronisasi status reply ke Clara sebagai:
+  - approved
+  - sent
 - Fallback ke proxy lokal untuk reply suggestion jika backend Clara tidak tersedia
 
 ---
@@ -356,6 +363,11 @@ Saat user menekan refresh/generate di extension:
    - customer summary
    - next best action
    - 3 draft reply
+6. jika user klik `Kirim`, extension akan:
+   - mengirim balasan ke WhatsApp
+   - lalu menandai suggestion itu sebagai `approved + sent` di Clara
+7. jika user klik `Masukkan` lalu mengirim manual dari tombol/Enter WhatsApp, extension akan mencoba mendeteksi event itu dan menyinkronkannya ke Clara
+8. backend Clara akan membuat `sent_message` dan mengubah status conversation menjadi `replied`
 
 Jika backend utama gagal, extension masih bisa fallback ke proxy lokal `9898`.
 
@@ -435,6 +447,7 @@ Backend saat ini sudah punya test dasar untuk area yang paling risk:
 - marketing insight access
 - extension snapshot sync
 - extension reply suggestion flow
+- extension send flow (`auto-approve + sent`)
 
 Menjalankan test backend:
 
@@ -517,6 +530,7 @@ Hal yang wajib Anda jaga:
 - jangan expose admin DB tool ke public internet
 - review output AI sebelum dipakai ke customer
 - pastikan extension hanya dipakai oleh akun yang berhak
+- deteksi manual send di extension adalah **best-effort sync**, jadi tetap perlu monitoring karena DOM WhatsApp Web bisa berubah sewaktu-waktu
 
 ---
 
