@@ -31,11 +31,13 @@ from app.core.config import settings
 from app.db.session import Base, get_db
 from app.main import create_app
 from app.models.ai_extraction import AIExtraction
+from app.models.approval_log import ApprovalLog
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.organization import Organization
 from app.models.product_knowledge import ProductKnowledge
 from app.models.reply_suggestion import ReplySuggestion
+from app.models.sent_message import SentMessage
 from app.models.user import User
 from app.services.auth_service import hash_password
 
@@ -68,6 +70,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             Message.__table__,
             AIExtraction.__table__,
             ReplySuggestion.__table__,
+            ApprovalLog.__table__,
+            SentMessage.__table__,
             ProductKnowledge.__table__,
         ],
     )
@@ -91,6 +95,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
         bind=engine,
         tables=[
             ProductKnowledge.__table__,
+            SentMessage.__table__,
+            ApprovalLog.__table__,
             ReplySuggestion.__table__,
             AIExtraction.__table__,
             Message.__table__,

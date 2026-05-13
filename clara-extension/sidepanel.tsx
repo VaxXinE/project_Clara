@@ -13,6 +13,7 @@ import {
   getClaraAuthHeaders,
   getChatSnapshotProxyUrl,
   getConfiguredProxyUrl,
+  getClaraSendReplyUrl,
   getReplySuggestionCandidates,
   getSnapshotSyncCandidates
 } from "~/utils/proxy"
@@ -253,6 +254,70 @@ const insertReplyIntoPage = (text: string): WhatsAppActionResponse => {
   }
 }
 
+const sendReplyFromPanel = (text: string): WhatsAppActionResponse => {
+  const insertResult = insertReplyIntoPage(text)
+
+  if (!insertResult.ok) {
+    return insertResult
+  }
+
+  const selectors = [
+    '[data-testid="compose-btn-send"]',
+    'button[aria-label="Send"]',
+    'button[aria-label="Kirim"]',
+    'span[data-icon="send"]'
+  ]
+
+  for (const selector of selectors) {
+    const node = document.querySelector<HTMLElement>(selector)
+    const button =
+      node?.tagName === "BUTTON"
+        ? (node as HTMLButtonElement)
+        : node?.closest("button")
+
+    if (button && !button.hasAttribute("disabled")) {
+      button.click()
+
+      return {
+        ok: true
+      }
+    }
+  }
+
+  const composeBox = document.querySelector<HTMLElement>(
+    '[data-testid="conversation-compose-box-input"][contenteditable="true"], [contenteditable="true"][data-lexical-editor="true"], footer [contenteditable="true"][role="textbox"]'
+  )
+
+  if (!composeBox) {
+    return {
+      error: "Kolom ketik WhatsApp belum ditemukan.",
+      ok: false
+    }
+  }
+
+  composeBox.focus()
+  composeBox.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Enter",
+      code: "Enter"
+    })
+  )
+  composeBox.dispatchEvent(
+    new KeyboardEvent("keyup", {
+      bubbles: true,
+      cancelable: true,
+      key: "Enter",
+      code: "Enter"
+    })
+  )
+
+  return {
+    ok: true
+  }
+}
+
 const softCardStyle = {
   background:
     "linear-gradient(180deg, rgba(255,255,255,0.72), rgba(255,255,255,0.50))",
@@ -317,6 +382,12 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
         : typeof payload?.action_mode === "string"
           ? payload.action_mode
           : undefined,
+    conversationId:
+      typeof payload?.conversationId === "string"
+        ? payload.conversationId
+        : typeof payload?.conversation_id === "string"
+          ? payload.conversation_id
+          : undefined,
     customerSummary:
       typeof payload?.customerSummary === "string"
         ? payload.customerSummary
@@ -328,6 +399,12 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
         ? payload.nextBestAction
         : typeof payload?.next_best_action === "string"
           ? payload.next_best_action
+          : undefined,
+    replySuggestionId:
+      typeof payload?.replySuggestionId === "string"
+        ? payload.replySuggestionId
+        : typeof payload?.reply_suggestion_id === "string"
+          ? payload.reply_suggestion_id
           : undefined,
     riskLevel:
       typeof payload?.riskLevel === "string"
@@ -713,6 +790,7 @@ function ClaraSidePanel() {
   const [nextBestAction, setNextBestAction] = useState("")
   const [riskLevel, setRiskLevel] = useState("")
   const [actionMode, setActionMode] = useState("")
+  const [replySuggestionId, setReplySuggestionId] = useState("")
   const [tabUrl, setTabUrl] = useState("")
 
   const latestMessage = useMemo(
@@ -951,6 +1029,7 @@ function ClaraSidePanel() {
       setNextBestAction(nextSuggestionResult.nextBestAction || "")
       setRiskLevel(nextSuggestionResult.riskLevel || "")
       setActionMode(nextSuggestionResult.actionMode || "")
+      setReplySuggestionId(nextSuggestionResult.replySuggestionId || "")
       setFeedback("Saran balasan Clara siap dipakai.")
     } catch (err) {
       const message =
@@ -964,6 +1043,7 @@ function ClaraSidePanel() {
       setNextBestAction("")
       setRiskLevel("")
       setActionMode("")
+      setReplySuggestionId("")
       setError(message)
     } finally {
       setIsSuggesting(false)
@@ -1034,6 +1114,109 @@ function ClaraSidePanel() {
         err instanceof Error
           ? err.message
           : "Terjadi kendala saat memasukkan saran ke chatbox."
+      )
+    } finally {
+      setIsInsertingIndex(null)
+    }
+  }
+
+  const handleSendSuggestion = async (suggestion: string, index: number) => {
+    setIsInsertingIndex(index)
+    setError("")
+    setFeedback("")
+
+    try {
+      const tab = await getActiveTab()
+
+      if (!tab?.id) {
+        throw new Error("Tab aktif tidak ditemukan.")
+      }
+
+      if (!tab.url?.startsWith("https://web.whatsapp.com/")) {
+        throw new Error("Buka WhatsApp Web dulu di tab aktif.")
+      }
+
+      let response: WhatsAppActionResponse | undefined
+
+      try {
+        response = (await chrome.tabs.sendMessage(tab.id, {
+          text: suggestion,
+          type: "SEND_WHATSAPP_REPLY"
+        })) as WhatsAppActionResponse
+      } catch (messageError) {
+        const message =
+          messageError instanceof Error
+            ? messageError.message
+            : String(messageError)
+
+        if (!message.includes("Receiving end does not exist")) {
+          throw messageError
+        }
+
+        const [result] = await chrome.scripting.executeScript({
+          args: [suggestion],
+          func: sendReplyFromPanel,
+          target: {
+            tabId: tab.id
+          }
+        })
+
+        response = result?.result as WhatsAppActionResponse | undefined
+      }
+
+      if (!response?.ok) {
+        throw new Error(response?.error || "Gagal mengirim saran ke WhatsApp.")
+      }
+
+      if (!replySuggestionId) {
+        setFeedback(
+          "Pesan terkirim ke WhatsApp, tapi belum bisa ditandai di Clara karena reply suggestion id tidak tersedia."
+        )
+        return
+      }
+
+      const claraSendUrl = getClaraSendReplyUrl(replySuggestionId)
+
+      if (!claraSendUrl) {
+        setFeedback(
+          "Pesan terkirim ke WhatsApp, tapi sinkronisasi status ke Clara belum dikonfigurasi."
+        )
+        return
+      }
+
+      const syncResponse = await fetch(claraSendUrl, {
+        body: JSON.stringify({
+          finalReplyText: suggestion,
+          selectedReplyText: suggestion,
+          sentByName: "extension_user"
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          ...getClaraAuthHeaders()
+        },
+        method: "POST"
+      })
+
+      const syncPayload = await syncResponse.json()
+
+      if (!syncResponse.ok) {
+        throw new Error(
+          syncPayload?.detail ||
+            syncPayload?.error ||
+            "Pesan terkirim ke WhatsApp, tapi gagal ditandai sebagai sent di Clara."
+        )
+      }
+
+      setFeedback(
+        syncPayload?.auto_approved
+          ? "Pesan terkirim ke WhatsApp dan otomatis dianggap approved + sent di Clara."
+          : "Pesan terkirim ke WhatsApp dan status sent sudah tercatat di Clara."
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Terjadi kendala saat mengirim saran ke WhatsApp."
       )
     } finally {
       setIsInsertingIndex(null)
@@ -1402,6 +1585,21 @@ function ClaraSidePanel() {
                       {isInsertingIndex === index
                         ? "Memasukkan..."
                         : "Masukkan"}
+                    </button>
+                    <button
+                      disabled={isInsertingIndex === index}
+                      onClick={() => handleSendSuggestion(suggestion, index)}
+                      style={{
+                        ...actionButtonStyle,
+                        background:
+                          "linear-gradient(135deg, rgba(19,138,117,0.96), rgba(16,84,130,0.94))",
+                        border: "1px solid rgba(255,255,255,0.22)",
+                        boxShadow:
+                          "0 10px 18px rgba(19, 102, 122, 0.18), inset 0 1px 0 rgba(255,255,255,0.18)",
+                        color: "#f7fbff",
+                        flex: 1
+                      }}>
+                      {isInsertingIndex === index ? "Mengirim..." : "Kirim"}
                     </button>
                   </div>
                 </div>

@@ -67,6 +67,10 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
   return {
     actionMode:
       typeof payload?.action_mode === "string" ? payload.action_mode : undefined,
+    conversationId:
+      typeof payload?.conversation_id === "string"
+        ? payload.conversation_id
+        : undefined,
     customerSummary:
       typeof payload?.customer_summary === "string"
         ? payload.customer_summary
@@ -74,6 +78,10 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
     nextBestAction:
       typeof payload?.next_best_action === "string"
         ? payload.next_best_action
+        : undefined,
+    replySuggestionId:
+      typeof payload?.reply_suggestion_id === "string"
+        ? payload.reply_suggestion_id
         : undefined,
     riskLevel:
       typeof payload?.risk_level === "string" ? payload.risk_level : undefined,

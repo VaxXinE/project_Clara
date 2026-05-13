@@ -59,6 +59,26 @@ export const getClaraReplySuggestionsUrl = (
   }
 }
 
+export const getClaraSendReplyUrl = (
+  replySuggestionId: string,
+  apiBaseUrl = getConfiguredClaraApiBaseUrl()
+) => {
+  if (!apiBaseUrl || !replySuggestionId.trim()) {
+    return ""
+  }
+
+  try {
+    const url = new URL(apiBaseUrl.trim() || DEFAULT_CLARA_API_BASE_URL)
+    url.pathname = `/extension/whatsapp/reply-suggestions/${replySuggestionId.trim()}/send`
+    url.search = ""
+    url.hash = ""
+
+    return url.toString()
+  } catch (_error) {
+    return ""
+  }
+}
+
 export const getProxyCandidates = (url: string) => {
   const normalizedUrl = (url || DEFAULT_PROXY_URL).trim()
   const candidates = [normalizedUrl]

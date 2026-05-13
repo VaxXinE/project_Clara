@@ -2,7 +2,8 @@ import type { PlasmoCSConfig } from "plasmo"
 
 import {
   insertReplyIntoComposeBox,
-  readOpenChat
+  readOpenChat,
+  sendReplyThroughComposeBox
 } from "~/utils/whatsapp-page"
 
 export const config: PlasmoCSConfig = {
@@ -23,6 +24,11 @@ const handleRuntimeMessage = (
 
   if (message?.type === "INSERT_WHATSAPP_REPLY") {
     sendResponse(insertReplyIntoComposeBox(String(message?.text || "")))
+    return
+  }
+
+  if (message?.type === "SEND_WHATSAPP_REPLY") {
+    sendResponse(sendReplyThroughComposeBox(String(message?.text || "")))
   }
 }
 

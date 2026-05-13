@@ -10,13 +10,16 @@ from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
 from app.models.ai_extraction import AIExtraction
+from app.models.approval_log import ApprovalLog
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.reply_suggestion import ReplySuggestion
+from app.models.sent_message import SentMessage
 from app.models.user import User
 from app.schemas.extension_schema import (
     WhatsAppExtensionChatSnapshot,
     WhatsAppExtensionReplySuggestionItem,
+    WhatsAppExtensionSendReplyResponse,
     WhatsAppExtensionReplySuggestionsResponse,
     WhatsAppExtensionSnapshotSyncResponse,
 )
@@ -386,4 +389,111 @@ def generate_extension_reply_suggestions(
         extraction=extraction,
         suggestion=suggestion,
         cached=False,
+    )
+
+
+def confirm_extension_reply_sent(
+    db: Session,
+    *,
+    reply_suggestion_id: UUID,
+    selected_reply_text: str,
+    final_reply_text: str,
+    sent_by_name: str,
+) -> WhatsAppExtensionSendReplyResponse:
+    suggestion = db.get(ReplySuggestion, reply_suggestion_id)
+
+    if suggestion is None:
+        raise ExtensionSnapshotError("Reply suggestion not found.")
+
+    if suggestion.approval_status == "rejected":
+        raise ExtensionSnapshotError("Rejected reply suggestion cannot be sent.")
+
+    existing_sent_message = db.scalars(
+        select(SentMessage).where(SentMessage.reply_suggestion_id == suggestion.id)
+    ).first()
+
+    if existing_sent_message is not None:
+        return WhatsAppExtensionSendReplyResponse(
+            status="already_sent",
+            conversation_id=suggestion.conversation_id,
+            reply_suggestion_id=suggestion.id,
+            sent_message_id=existing_sent_message.id,
+            approval_status=suggestion.approval_status,
+            auto_approved=False,
+            already_sent=True,
+        )
+
+    normalized_selected = selected_reply_text.strip()
+    normalized_final = final_reply_text.strip()
+
+    if not normalized_selected or not normalized_final:
+        raise ExtensionSnapshotError("Reply text cannot be empty.")
+
+    auto_approved = False
+
+    if suggestion.approval_status == "pending":
+        suggestion.selected_reply_text = normalized_selected
+        suggestion.final_reply_text = normalized_final
+        suggestion.approval_status = "approved"
+        suggestion.updated_at = datetime.utcnow()
+
+        db.add(
+            ApprovalLog(
+                reply_suggestion_id=suggestion.id,
+                reviewer_name=sent_by_name,
+                action="approved_via_extension_send",
+                before_text=normalized_selected,
+                after_text=normalized_final,
+                reason=None,
+            )
+        )
+        auto_approved = True
+    elif suggestion.approval_status == "approved":
+        if not suggestion.selected_reply_text:
+            suggestion.selected_reply_text = normalized_selected
+        if not suggestion.final_reply_text:
+            suggestion.final_reply_text = normalized_final
+        suggestion.updated_at = datetime.utcnow()
+
+    if not suggestion.final_reply_text:
+        raise ExtensionSnapshotError("Approved reply has no final reply text.")
+
+    conversation = db.get(Conversation, suggestion.conversation_id)
+
+    if conversation is None:
+        raise ExtensionSnapshotError("Conversation not found.")
+
+    latest_extraction = get_latest_ai_extraction_for_conversation(
+        db=db,
+        conversation_id=conversation.id,
+    )
+
+    conversation.status = "replied"
+
+    if latest_extraction is not None:
+        conversation.current_stage = latest_extraction.pipeline_stage
+        conversation.lead_temperature = latest_extraction.lead_temperature
+
+    sent_message = SentMessage(
+        conversation_id=conversation.id,
+        reply_suggestion_id=suggestion.id,
+        send_mode="whatsapp_extension",
+        message_text=suggestion.final_reply_text,
+        sent_by_name=sent_by_name,
+        external_message_id=None,
+    )
+
+    db.add(sent_message)
+    db.commit()
+    db.refresh(sent_message)
+    db.refresh(suggestion)
+
+    return WhatsAppExtensionSendReplyResponse(
+        status="sent",
+        conversation_id=conversation.id,
+        reply_suggestion_id=suggestion.id,
+        sent_message_id=sent_message.id,
+        approval_status=suggestion.approval_status,
+        auto_approved=auto_approved,
+        already_sent=False,
     )

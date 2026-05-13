@@ -315,3 +315,67 @@ export const insertReplyIntoComposeBox = (
     ok: true
   }
 }
+
+export const sendReplyThroughComposeBox = (
+  text: string
+): WhatsAppActionResponse => {
+  const insertResult = insertReplyIntoComposeBox(text)
+
+  if (!insertResult.ok) {
+    return insertResult
+  }
+
+  const sendButtonSelectors = [
+    '[data-testid="compose-btn-send"]',
+    'button[aria-label="Send"]',
+    'button[aria-label="Kirim"]',
+    'span[data-icon="send"]'
+  ]
+
+  for (const selector of sendButtonSelectors) {
+    const node = document.querySelector<HTMLElement>(selector)
+    const button =
+      node?.tagName === "BUTTON"
+        ? (node as HTMLButtonElement)
+        : node?.closest("button")
+
+    if (button && !button.hasAttribute("disabled")) {
+      button.click()
+
+      return {
+        ok: true
+      }
+    }
+  }
+
+  const composeBox = getComposeBox()
+
+  if (!composeBox) {
+    return {
+      error: "Kolom ketik WhatsApp belum ditemukan.",
+      ok: false
+    }
+  }
+
+  composeBox.focus()
+  composeBox.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "Enter",
+      code: "Enter"
+    })
+  )
+  composeBox.dispatchEvent(
+    new KeyboardEvent("keyup", {
+      bubbles: true,
+      cancelable: true,
+      key: "Enter",
+      code: "Enter"
+    })
+  )
+
+  return {
+    ok: true
+  }
+}

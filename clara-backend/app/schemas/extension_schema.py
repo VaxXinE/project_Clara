@@ -58,3 +58,32 @@ class WhatsAppExtensionReplySuggestionsResponse(BaseModel):
     action_mode: str | None = None
     next_best_action: str | None = None
     customer_summary: str | None = None
+
+
+class WhatsAppExtensionSendReplyRequest(BaseModel):
+    selected_reply_text: str = Field(
+        alias="selectedReplyText",
+        min_length=1,
+        max_length=2000,
+    )
+    final_reply_text: str = Field(
+        alias="finalReplyText",
+        min_length=1,
+        max_length=2000,
+    )
+    sent_by_name: str = Field(
+        alias="sentByName",
+        default="sales_user",
+        max_length=255,
+    )
+
+
+class WhatsAppExtensionSendReplyResponse(BaseModel):
+    ok: bool = True
+    status: str
+    conversation_id: UUID
+    reply_suggestion_id: UUID
+    sent_message_id: UUID
+    approval_status: str = "approved"
+    auto_approved: bool = False
+    already_sent: bool = False

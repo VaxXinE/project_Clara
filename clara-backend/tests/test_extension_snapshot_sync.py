@@ -10,9 +10,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
+from app.models.approval_log import ApprovalLog
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.reply_suggestion import ReplySuggestion
+from app.models.sent_message import SentMessage
 from app.schemas.ai_extraction_schema import AIExtractionCreate
 from app.schemas.reply_suggestion_schema import ReplySuggestionCreate
 
@@ -266,6 +268,133 @@ def test_extension_reply_suggestions_endpoint_generates_clara_suggestions(
     )
     assert extraction_count == 1
     assert suggestion_count == 1
+
+
+def test_extension_send_endpoint_auto_approves_and_marks_sent(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+
+    monkeypatch.setattr(
+        "app.services.ai_extraction_service.call_openai_for_extraction",
+        lambda _conversation_text: AIExtractionCreate(
+            lead_temperature="warm",
+            pipeline_stage="objection",
+            buying_intent="medium",
+            sentiment="cautious",
+            risk_level="medium",
+            main_objections=["legalitas"],
+            budget_signal={
+                "detected": False,
+                "amount_text": None,
+                "notes": "Belum ada sinyal budget spesifik.",
+            },
+            recommended_reply_strategy={
+                "tone": "professional",
+                "key_points": ["jelaskan legalitas", "beri referensi resmi"],
+                "avoid_topics": ["janji hasil"],
+            },
+            customer_summary="Customer masih ragu pada aspek legalitas produk.",
+            next_best_action="Berikan penjelasan legalitas dan dokumen pendukung resmi.",
+            content_insight="Topik legalitas paling dominan dalam percakapan.",
+            internal_notes="Perlu bukti legal formal.",
+            confidence_score=0.91,
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.reply_suggestion_service.call_openai_for_reply_suggestion",
+        lambda **_kwargs: ReplySuggestionCreate(
+            suggested_replies=[
+                {
+                    "tone": "friendly",
+                    "text": "Siap kak, saya jelaskan legalitasnya pelan-pelan ya.",
+                    "reasoning": "Versi ramah untuk menurunkan resistensi awal.",
+                },
+                {
+                    "tone": "professional",
+                    "text": "Baik kak, saya bantu kirim penjelasan legalitas dan referensi resmi yang tersedia.",
+                    "reasoning": "Versi profesional untuk memperkuat kredibilitas.",
+                },
+                {
+                    "tone": "empathetic",
+                    "text": "Wajar kak kalau masih ragu, nanti saya bantu kirim dasar legalitasnya supaya lebih tenang.",
+                    "reasoning": "Versi empatik untuk menjawab keraguan customer.",
+                },
+            ]
+        ),
+    )
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    suggestion_response = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json={
+            "chatData": {
+                "capturedAt": "2026-05-12T09:00:00.000Z",
+                "chatTitle": "Leoni Customer",
+                "chatSubtitle": "online",
+                "messages": [
+                    {
+                        "id": "09.00-0",
+                        "author": "Leoni",
+                        "direction": "incoming",
+                        "text": "Ini legal tidak ya kak?",
+                        "timestampLabel": "09.00",
+                    },
+                    {
+                        "id": "09.01-1",
+                        "author": "Arya",
+                        "direction": "outgoing",
+                        "text": "Saya bantu jelaskan ya kak.",
+                        "timestampLabel": "09.01",
+                    },
+                ],
+            }
+        },
+        headers=csrf_headers(client),
+    )
+
+    assert suggestion_response.status_code == 201, suggestion_response.text
+    suggestion_payload = suggestion_response.json()
+    reply_suggestion_id = suggestion_payload["reply_suggestion_id"]
+    final_reply_text = suggestion_payload["suggestions"][0]
+
+    send_response = client.post(
+        f"/extension/whatsapp/reply-suggestions/{reply_suggestion_id}/send",
+        json={
+            "selectedReplyText": final_reply_text,
+            "finalReplyText": final_reply_text,
+            "sentByName": "Marketing Alpha",
+        },
+        headers=csrf_headers(client),
+    )
+
+    assert send_response.status_code == 201, send_response.text
+    send_payload = send_response.json()
+    assert send_payload["status"] == "sent"
+    assert send_payload["approval_status"] == "approved"
+    assert send_payload["auto_approved"] is True
+    assert send_payload["already_sent"] is False
+
+    db = db_session_factory()
+    suggestion = db.get(ReplySuggestion, UUID(reply_suggestion_id))
+    assert suggestion is not None
+    assert suggestion.approval_status == "approved"
+    assert suggestion.final_reply_text == final_reply_text
+
+    sent_message = db.get(SentMessage, UUID(send_payload["sent_message_id"]))
+    assert sent_message is not None
+    assert sent_message.reply_suggestion_id == suggestion.id
+    assert sent_message.send_mode == "whatsapp_extension"
+
+    approval_log = db.scalars(
+        select(ApprovalLog).where(ApprovalLog.reply_suggestion_id == suggestion.id)
+    ).first()
+    assert approval_log is not None
+    assert approval_log.action == "approved_via_extension_send"
 
 
 def test_extension_reply_suggestions_endpoint_uses_cache_for_duplicate_snapshot(

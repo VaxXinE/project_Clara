@@ -34,8 +34,10 @@ export interface WhatsAppSuggestionDetail {
 
 export interface WhatsAppSuggestionResult {
   actionMode?: string
+  conversationId?: string
   customerSummary?: string
   nextBestAction?: string
+  replySuggestionId?: string
   riskLevel?: string
   suggestionDetails?: WhatsAppSuggestionDetail[]
   suggestions: string[]
