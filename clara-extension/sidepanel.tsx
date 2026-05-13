@@ -1477,9 +1477,13 @@ function ClaraSidePanel() {
   const [isInsertingIndex, setIsInsertingIndex] = useState<number | null>(null)
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [draftSuggestions, setDraftSuggestions] = useState<string[]>([])
   const [suggestionDetails, setSuggestionDetails] = useState<
     WhatsAppSuggestionDetail[]
   >([])
+  const [editingSuggestionIndex, setEditingSuggestionIndex] = useState<
+    number | null
+  >(null)
   const [customerSummary, setCustomerSummary] = useState("")
   const [nextBestAction, setNextBestAction] = useState("")
   const [riskLevel, setRiskLevel] = useState("")
@@ -1880,6 +1884,7 @@ function ClaraSidePanel() {
           : "Terjadi kendala saat membuat saran jawaban."
 
       setSuggestions([])
+      setDraftSuggestions([])
       setSuggestionDetails([])
       setCustomerSummary("")
       setNextBestAction("")
@@ -1890,20 +1895,6 @@ function ClaraSidePanel() {
       setError(message)
     } finally {
       setIsSuggesting(false)
-    }
-  }
-
-  const handleCopySuggestion = async (suggestion: string) => {
-    if (!(await ensureAuthenticated())) {
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(suggestion)
-      setFeedback("Saran jawaban berhasil disalin.")
-      setError("")
-    } catch (_error) {
-      setError("Clipboard tidak bisa diakses. Coba copy manual dulu.")
     }
   }
 
