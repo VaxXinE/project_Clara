@@ -603,6 +603,48 @@ const panelCss = `
     word-break: break-word;
   }
 
+  .clara-draft__editor {
+    display: grid;
+    gap: 10px;
+  }
+
+  .clara-input {
+    appearance: none;
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,251,255,0.94));
+    border: 1px solid rgba(183, 206, 226, 0.9);
+    border-radius: 16px;
+    box-shadow:
+      inset 0 1px 2px rgba(16, 30, 42, 0.04),
+      0 10px 24px rgba(67, 91, 112, 0.06);
+    color: #173245;
+    font-family: "Aptos", "Segoe UI Variable Display", "Trebuchet MS", "Segoe UI", sans-serif;
+    font-size: 13px;
+    line-height: 1.65;
+    min-width: 0;
+    outline: none;
+    padding: 14px 15px;
+    resize: vertical;
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      background 160ms ease;
+    width: 100%;
+  }
+
+  .clara-input:focus {
+    background: #ffffff;
+    border-color: rgba(22, 116, 115, 0.68);
+    box-shadow:
+      0 0 0 4px rgba(15, 118, 110, 0.12),
+      0 14px 26px rgba(44, 83, 112, 0.08);
+  }
+
+  .clara-input--textarea {
+    min-height: 172px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
   .clara-draft__reason {
     background: rgba(19, 33, 45, 0.04);
     border-radius: 14px;
@@ -1989,6 +2031,54 @@ function ClaraSidePanel() {
     }
   }
 
+  const handleStartEditingSuggestion = (index: number) => {
+    setEditingSuggestionIndex(index)
+    setError("")
+    setFeedback("")
+  }
+
+  const handleDraftSuggestionChange = (index: number, value: string) => {
+    setDraftSuggestions((currentDrafts) =>
+      currentDrafts.map((draft, draftIndex) =>
+        draftIndex === index ? value : draft
+      )
+    )
+  }
+
+  const handleSaveEditedSuggestion = (index: number) => {
+    const editedSuggestion = draftSuggestions[index]?.trim()
+
+    if (!editedSuggestion) {
+      setError("Draft balasan tidak boleh kosong.")
+      return
+    }
+
+    setSuggestions((currentSuggestions) =>
+      currentSuggestions.map((suggestion, suggestionIndex) =>
+        suggestionIndex === index ? editedSuggestion : suggestion
+      )
+    )
+    setDraftSuggestions((currentDrafts) =>
+      currentDrafts.map((draft, draftIndex) =>
+        draftIndex === index ? editedSuggestion : draft
+      )
+    )
+    setEditingSuggestionIndex(null)
+    setError("")
+    setFeedback("Draft balasan berhasil diperbarui.")
+  }
+
+  const handleCancelEditingSuggestion = (index: number) => {
+    setDraftSuggestions((currentDrafts) =>
+      currentDrafts.map((draft, draftIndex) =>
+        draftIndex === index ? suggestions[index] || draft : draft
+      )
+    )
+    setEditingSuggestionIndex(null)
+    setError("")
+    setFeedback("")
+  }
+
   const handleSendSuggestion = async (suggestion: string, index: number) => {
     if (!(await ensureAuthenticated())) {
       return
@@ -2364,12 +2454,42 @@ function ClaraSidePanel() {
                             </div>
                           </div>
 
-                          <div className="clara-draft__hint">
-                            Bisa dipakai langsung
-                          </div>
+                        <div className="clara-draft__hint">
+                          Bisa dipakai langsung
                         </div>
+                      </div>
 
-                        <div className="clara-draft__text">{suggestion}</div>
+                        {editingSuggestionIndex === index ? (
+                          <div className="clara-draft__editor">
+                            <textarea
+                              className="clara-input clara-input--textarea"
+                              onChange={(event) =>
+                                handleDraftSuggestionChange(
+                                  index,
+                                  event.target.value
+                                )
+                              }
+                              rows={6}
+                              value={draftSuggestions[index] ?? suggestion}
+                            />
+                            <div className="clara-draft__actions">
+                              <button
+                                className="clara-button clara-button--ghost"
+                                onClick={() =>
+                                  handleCancelEditingSuggestion(index)
+                                }>
+                                Batal
+                              </button>
+                              <button
+                                className="clara-button clara-button--insert"
+                                onClick={() => handleSaveEditedSuggestion(index)}>
+                                Simpan
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="clara-draft__text">{suggestion}</div>
+                        )}
 
                         {suggestionDetails[index]?.reasoning && (
                           <div className="clara-draft__reason">
@@ -2378,33 +2498,37 @@ function ClaraSidePanel() {
                           </div>
                         )}
 
-                        <div className="clara-draft__actions">
-                          <button
-                            className="clara-button clara-button--ghost"
-                            onClick={() => handleCopySuggestion(suggestion)}>
-                            Salin
-                          </button>
-                          <button
-                            className="clara-button clara-button--insert"
-                            disabled={isInsertingIndex === index}
-                            onClick={() =>
-                              handleInsertSuggestion(suggestion, index)
-                            }>
-                            {isInsertingIndex === index
-                              ? "Memasukkan..."
-                              : "Masukkan ke Chat"}
-                          </button>
-                          <button
-                            className="clara-button clara-button--send"
-                            disabled={isInsertingIndex === index}
-                            onClick={() =>
-                              handleSendSuggestion(suggestion, index)
-                            }>
-                            {isInsertingIndex === index
-                              ? "Mengirim..."
-                              : "Kirim Sekarang"}
-                          </button>
-                        </div>
+                        {editingSuggestionIndex !== index ? (
+                          <div className="clara-draft__actions">
+                            <button
+                              className="clara-button clara-button--ghost"
+                              onClick={() =>
+                                handleStartEditingSuggestion(index)
+                              }>
+                              Edit
+                            </button>
+                            <button
+                              className="clara-button clara-button--insert"
+                              disabled={isInsertingIndex === index}
+                              onClick={() =>
+                                handleInsertSuggestion(suggestion, index)
+                              }>
+                              {isInsertingIndex === index
+                                ? "Memasukkan..."
+                                : "Masukkan ke Chat"}
+                            </button>
+                            <button
+                              className="clara-button clara-button--send"
+                              disabled={isInsertingIndex === index}
+                              onClick={() =>
+                                handleSendSuggestion(suggestion, index)
+                              }>
+                              {isInsertingIndex === index
+                                ? "Mengirim..."
+                                : "Kirim Sekarang"}
+                            </button>
+                          </div>
+                        ) : null}
                       </article>
                     ))}
                   </div>
