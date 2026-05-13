@@ -1,7 +1,11 @@
 import type { PlasmoCSConfig } from "plasmo"
 import { useEffect, useMemo, useState } from "react"
 
-import type { WhatsAppChatSnapshot } from "~/types/whatsapp"
+import type {
+  WhatsAppChatSnapshot,
+  WhatsAppSuggestionDetail,
+  WhatsAppSuggestionResult
+} from "~/types/whatsapp"
 import {
   getClaraAuthHeaders,
   getChatSnapshotProxyUrl,
@@ -481,6 +485,66 @@ const SUGGESTION_TONE_LABELS = ["Friendly", "Casual", "Profesional"] as const
 
 type ActiveView = "chat" | "ai"
 
+const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
+  const suggestions = Array.isArray(payload?.suggestions)
+    ? payload.suggestions.filter(
+        (item: unknown): item is string =>
+          typeof item === "string" && item.trim().length > 0
+      )
+    : []
+
+  const suggestionDetails = Array.isArray(payload?.suggestion_details)
+    ? payload.suggestion_details
+        .filter(
+          (item: unknown): item is WhatsAppSuggestionDetail =>
+            Boolean(item) &&
+            typeof item === "object" &&
+            typeof (item as { text?: unknown }).text === "string" &&
+            (item as { text: string }).text.trim().length > 0
+        )
+        .map((item) => ({
+          reasoning:
+            typeof item.reasoning === "string" && item.reasoning.trim().length > 0
+              ? item.reasoning
+              : undefined,
+          text: item.text,
+          tone:
+            typeof item.tone === "string" && item.tone.trim().length > 0
+              ? item.tone
+              : undefined
+        }))
+    : []
+
+  return {
+    actionMode:
+      typeof payload?.actionMode === "string"
+        ? payload.actionMode
+        : typeof payload?.action_mode === "string"
+          ? payload.action_mode
+          : undefined,
+    customerSummary:
+      typeof payload?.customerSummary === "string"
+        ? payload.customerSummary
+        : typeof payload?.customer_summary === "string"
+          ? payload.customer_summary
+          : undefined,
+    nextBestAction:
+      typeof payload?.nextBestAction === "string"
+        ? payload.nextBestAction
+        : typeof payload?.next_best_action === "string"
+          ? payload.next_best_action
+          : undefined,
+    riskLevel:
+      typeof payload?.riskLevel === "string"
+        ? payload.riskLevel
+        : typeof payload?.risk_level === "string"
+          ? payload.risk_level
+          : undefined,
+    suggestionDetails,
+    suggestions: suggestions.slice(0, 3)
+  }
+}
+
 const shouldClearSnapshotForError = (message: string) =>
   [
     "Belum ada percakapan yang sedang dibuka.",
@@ -515,18 +579,14 @@ const fetchSuggestionsFromProxyDirectly = async (
         )
       }
 
-      const suggestions = Array.isArray(payload?.suggestions)
-        ? payload.suggestions.filter(
-            (item: unknown): item is string =>
-              typeof item === "string" && item.trim().length > 0
-          )
-        : []
+      const normalized = normalizeSuggestionPayload(payload)
+      const suggestions = normalized.suggestions
 
       if (suggestions.length === 0) {
         throw new Error("Proxy tidak mengembalikan saran jawaban.")
       }
 
-      return suggestions.slice(0, 3)
+      return normalized
     } catch (error) {
       lastFetchError =
         error instanceof Error ? error.message : "Failed to fetch"
@@ -649,6 +709,13 @@ const Sidebar = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestionDetails, setSuggestionDetails] = useState<
+    WhatsAppSuggestionDetail[]
+  >([])
+  const [customerSummary, setCustomerSummary] = useState("")
+  const [nextBestAction, setNextBestAction] = useState("")
+  const [riskLevel, setRiskLevel] = useState("")
+  const [actionMode, setActionMode] = useState("")
 
   const latestMessage = useMemo(
     () =>
@@ -677,6 +744,11 @@ const Sidebar = () => {
       setError("")
       setFeedback("")
       setSuggestions([])
+      setSuggestionDetails([])
+      setCustomerSummary("")
+      setNextBestAction("")
+      setRiskLevel("")
+      setActionMode("")
     }
 
     try {
@@ -805,10 +877,15 @@ const Sidebar = () => {
         // Suggestion flow should continue even when snapshot sync is unavailable.
       })
 
-      const nextSuggestions =
+      const nextSuggestionResult =
         await fetchSuggestionsFromProxyDirectly(currentChatData)
-      setSuggestions(nextSuggestions)
-      setFeedback("Saran balasan siap dipakai.")
+      setSuggestions(nextSuggestionResult.suggestions)
+      setSuggestionDetails(nextSuggestionResult.suggestionDetails || [])
+      setCustomerSummary(nextSuggestionResult.customerSummary || "")
+      setNextBestAction(nextSuggestionResult.nextBestAction || "")
+      setRiskLevel(nextSuggestionResult.riskLevel || "")
+      setActionMode(nextSuggestionResult.actionMode || "")
+      setFeedback("Saran balasan Clara siap dipakai.")
     } catch (suggestError) {
       const message =
         suggestError instanceof Error
@@ -816,6 +893,11 @@ const Sidebar = () => {
           : "Terjadi kendala saat membuat saran jawaban."
 
       setSuggestions([])
+      setSuggestionDetails([])
+      setCustomerSummary("")
+      setNextBestAction("")
+      setRiskLevel("")
+      setActionMode("")
       setError(message)
     } finally {
       setIsSuggesting(false)
@@ -1033,47 +1115,80 @@ const Sidebar = () => {
           ) : (
             <section className="sg-card sg-suggestion-scroll">
               {suggestions.length ? (
-                suggestions.map((suggestion, index) => (
-                  <article
-                    className="sg-suggestion"
-                    key={`${suggestion}-${index}`}>
-                    <div className="sg-suggestion-head">
-                      <div className="sg-suggestion-label">
-                        {SUGGESTION_TONE_LABELS[index] || `Saran ${index + 1}`}
+                <>
+                  {(customerSummary || nextBestAction || riskLevel) && (
+                    <article className="sg-suggestion">
+                      <div className="sg-suggestion-head">
+                        <div className="sg-suggestion-label">Insight Clara</div>
+                        <div className="sg-suggestion-note">
+                          {riskLevel || "analysis"}
+                          {actionMode ? ` • ${actionMode}` : ""}
+                        </div>
                       </div>
-                      <div className="sg-suggestion-note">
-                        Siap insert manual
+
+                      {customerSummary ? (
+                        <div className="sg-suggestion-text">
+                          <strong>Ringkasan customer:</strong> {customerSummary}
+                        </div>
+                      ) : null}
+
+                      {nextBestAction ? (
+                        <div className="sg-suggestion-text">
+                          <strong>Aksi berikutnya:</strong> {nextBestAction}
+                        </div>
+                      ) : null}
+                    </article>
+                  )}
+
+                  {suggestions.map((suggestion, index) => (
+                    <article
+                      className="sg-suggestion"
+                      key={`${suggestion}-${index}`}>
+                      <div className="sg-suggestion-head">
+                        <div className="sg-suggestion-label">
+                          {SUGGESTION_TONE_LABELS[index] || `Saran ${index + 1}`}
+                        </div>
+                        <div className="sg-suggestion-note">
+                          Siap insert manual
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="sg-suggestion-text">{suggestion}</div>
+                      <div className="sg-suggestion-text">{suggestion}</div>
 
-                    <div className="sg-suggestion-actions">
-                      <button
-                        className="sg-button sg-button-secondary"
-                        onClick={() => {
-                          void handleCopySuggestion(suggestion)
-                        }}>
-                        Copy
-                      </button>
+                      {suggestionDetails[index]?.reasoning ? (
+                        <div className="sg-card-copy">
+                          <strong>Kenapa draft ini:</strong>{" "}
+                          {suggestionDetails[index]?.reasoning}
+                        </div>
+                      ) : null}
 
-                      <button
-                        className="sg-button sg-button-primary"
-                        disabled={isInsertingIndex === index}
-                        onClick={() => {
-                          handleInsertSuggestion(suggestion, index).catch(
-                            () => {
-                              // Error state is already handled inside handleInsertSuggestion.
-                            }
-                          )
-                        }}>
-                        {isInsertingIndex === index
-                          ? "Memasukkan..."
-                          : "Masukkan"}
-                      </button>
-                    </div>
-                  </article>
-                ))
+                      <div className="sg-suggestion-actions">
+                        <button
+                          className="sg-button sg-button-secondary"
+                          onClick={() => {
+                            void handleCopySuggestion(suggestion)
+                          }}>
+                          Copy
+                        </button>
+
+                        <button
+                          className="sg-button sg-button-primary"
+                          disabled={isInsertingIndex === index}
+                          onClick={() => {
+                            handleInsertSuggestion(suggestion, index).catch(
+                              () => {
+                                // Error state is already handled inside handleInsertSuggestion.
+                              }
+                            )
+                          }}>
+                          {isInsertingIndex === index
+                            ? "Memasukkan..."
+                            : "Masukkan"}
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </>
               ) : (
                 <div className="sg-empty">
                   Klik "Buat Saran AI" untuk menampilkan balasan yang bisa kamu

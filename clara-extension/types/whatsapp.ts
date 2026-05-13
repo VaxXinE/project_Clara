@@ -25,3 +25,18 @@ export interface WhatsAppActionResponse {
   error?: string
   ok: boolean
 }
+
+export interface WhatsAppSuggestionDetail {
+  reasoning?: string
+  text: string
+  tone?: string
+}
+
+export interface WhatsAppSuggestionResult {
+  actionMode?: string
+  customerSummary?: string
+  nextBestAction?: string
+  riskLevel?: string
+  suggestionDetails?: WhatsAppSuggestionDetail[]
+  suggestions: string[]
+}

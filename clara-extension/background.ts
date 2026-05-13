@@ -1,4 +1,8 @@
-import type { WhatsAppChatSnapshot } from "~/types/whatsapp"
+import type {
+  WhatsAppChatSnapshot,
+  WhatsAppSuggestionDetail,
+  WhatsAppSuggestionResult
+} from "~/types/whatsapp"
 import {
   getClaraAuthHeaders,
   getConfiguredProxyUrl,
@@ -6,6 +10,53 @@ import {
 } from "~/utils/proxy"
 
 const OPENAI_PROXY_URL = getConfiguredProxyUrl()
+
+const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
+  const suggestions = Array.isArray(payload?.suggestions)
+    ? payload.suggestions.filter(
+        (item: unknown): item is string => typeof item === "string" && item.trim().length > 0
+      )
+    : []
+
+  const suggestionDetails = Array.isArray(payload?.suggestion_details)
+    ? payload.suggestion_details
+        .filter(
+          (item: unknown): item is WhatsAppSuggestionDetail =>
+            Boolean(item) &&
+            typeof item === "object" &&
+            typeof (item as { text?: unknown }).text === "string" &&
+            (item as { text: string }).text.trim().length > 0
+        )
+        .map((item) => ({
+          reasoning:
+            typeof item.reasoning === "string" && item.reasoning.trim().length > 0
+              ? item.reasoning
+              : undefined,
+          text: item.text,
+          tone:
+            typeof item.tone === "string" && item.tone.trim().length > 0
+              ? item.tone
+              : undefined
+        }))
+    : []
+
+  return {
+    actionMode:
+      typeof payload?.action_mode === "string" ? payload.action_mode : undefined,
+    customerSummary:
+      typeof payload?.customer_summary === "string"
+        ? payload.customer_summary
+        : undefined,
+    nextBestAction:
+      typeof payload?.next_best_action === "string"
+        ? payload.next_best_action
+        : undefined,
+    riskLevel:
+      typeof payload?.risk_level === "string" ? payload.risk_level : undefined,
+    suggestionDetails,
+    suggestions: suggestions.slice(0, 3)
+  }
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== "GENERATE_REPLY_SUGGESTIONS") {
@@ -51,11 +102,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
             return
           }
 
-          const suggestions = Array.isArray(payload?.suggestions)
-            ? payload.suggestions.filter(
-                (item: unknown) => typeof item === "string" && item.trim()
-              )
-            : []
+          const normalized = normalizeSuggestionPayload(payload)
+          const suggestions = normalized.suggestions
 
           if (suggestions.length === 0) {
             sendResponse({
@@ -67,7 +115,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
           sendResponse({
             ok: true,
-            suggestions: suggestions.slice(0, 3)
+            ...normalized
           })
           return
         } catch (error) {

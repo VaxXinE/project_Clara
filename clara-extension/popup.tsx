@@ -5,7 +5,9 @@ import type {
   WhatsAppChatSnapshot,
   WhatsAppMessage,
   WhatsAppMessageDirection,
-  WhatsAppReadResponse
+  WhatsAppReadResponse,
+  WhatsAppSuggestionDetail,
+  WhatsAppSuggestionResult
 } from "~/types/whatsapp"
 import {
   getClaraAuthHeaders,
@@ -277,6 +279,66 @@ const chipStyle = {
   textAlign: "center"
 } as const
 
+const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
+  const suggestions = Array.isArray(payload?.suggestions)
+    ? payload.suggestions.filter(
+        (item: unknown): item is string =>
+          typeof item === "string" && item.trim().length > 0
+      )
+    : []
+
+  const suggestionDetails = Array.isArray(payload?.suggestion_details)
+    ? payload.suggestion_details
+        .filter(
+          (item: unknown): item is WhatsAppSuggestionDetail =>
+            Boolean(item) &&
+            typeof item === "object" &&
+            typeof (item as { text?: unknown }).text === "string" &&
+            (item as { text: string }).text.trim().length > 0
+        )
+        .map((item) => ({
+          reasoning:
+            typeof item.reasoning === "string" && item.reasoning.trim().length > 0
+              ? item.reasoning
+              : undefined,
+          text: item.text,
+          tone:
+            typeof item.tone === "string" && item.tone.trim().length > 0
+              ? item.tone
+              : undefined
+        }))
+    : []
+
+  return {
+    actionMode:
+      typeof payload?.actionMode === "string"
+        ? payload.actionMode
+        : typeof payload?.action_mode === "string"
+          ? payload.action_mode
+          : undefined,
+    customerSummary:
+      typeof payload?.customerSummary === "string"
+        ? payload.customerSummary
+        : typeof payload?.customer_summary === "string"
+          ? payload.customer_summary
+          : undefined,
+    nextBestAction:
+      typeof payload?.nextBestAction === "string"
+        ? payload.nextBestAction
+        : typeof payload?.next_best_action === "string"
+          ? payload.next_best_action
+          : undefined,
+    riskLevel:
+      typeof payload?.riskLevel === "string"
+        ? payload.riskLevel
+        : typeof payload?.risk_level === "string"
+          ? payload.risk_level
+          : undefined,
+    suggestionDetails,
+    suggestions: suggestions.slice(0, 3)
+  }
+}
+
 const getActiveTab = async () => {
   const [tab] = await chrome.tabs.query({
     active: true,
@@ -490,18 +552,14 @@ const fetchSuggestionsFromProxyDirectly = async (
         )
       }
 
-      const suggestions = Array.isArray(payload?.suggestions)
-        ? payload.suggestions.filter(
-            (item: unknown): item is string =>
-              typeof item === "string" && item.trim().length > 0
-          )
-        : []
+      const normalized = normalizeSuggestionPayload(payload)
+      const suggestions = normalized.suggestions
 
       if (suggestions.length === 0) {
         throw new Error("Proxy tidak mengembalikan saran jawaban.")
       }
 
-      return suggestions
+      return normalized
     } catch (error) {
       lastFetchError =
         error instanceof Error ? error.message : "Failed to fetch"
@@ -608,8 +666,13 @@ const requestSuggestionCandidates = async (chatData: WhatsAppChatSnapshot) => {
       type: "GENERATE_REPLY_SUGGESTIONS"
     })) as
       | {
+          actionMode?: string
+          customerSummary?: string
           error?: string
+          nextBestAction?: string
           ok: boolean
+          riskLevel?: string
+          suggestionDetails?: WhatsAppSuggestionDetail[]
           suggestions?: string[]
         }
       | undefined
@@ -621,7 +684,7 @@ const requestSuggestionCandidates = async (chatData: WhatsAppChatSnapshot) => {
       )
     }
 
-    return response.suggestions
+    return normalizeSuggestionPayload(response)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
 
@@ -642,6 +705,13 @@ function IndexPopup() {
   const [isInsertingIndex, setIsInsertingIndex] = useState<number | null>(null)
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestionDetails, setSuggestionDetails] = useState<
+    WhatsAppSuggestionDetail[]
+  >([])
+  const [customerSummary, setCustomerSummary] = useState("")
+  const [nextBestAction, setNextBestAction] = useState("")
+  const [riskLevel, setRiskLevel] = useState("")
+  const [actionMode, setActionMode] = useState("")
   const [tabUrl, setTabUrl] = useState("")
 
   const latestMessage = useMemo(
@@ -727,6 +797,11 @@ function IndexPopup() {
     setError("")
     setFeedback("")
     setSuggestions([])
+    setSuggestionDetails([])
+    setCustomerSummary("")
+    setNextBestAction("")
+    setRiskLevel("")
+    setActionMode("")
 
     try {
       const data = await readChatFromActiveTab()
@@ -866,9 +941,16 @@ function IndexPopup() {
         // Suggestion flow should continue even when snapshot sync is unavailable.
       })
 
-      const nextSuggestions = await requestSuggestionCandidates(currentChatData)
+      const nextSuggestionResult =
+        await requestSuggestionCandidates(currentChatData)
 
-      setSuggestions(nextSuggestions)
+      setSuggestions(nextSuggestionResult.suggestions)
+      setSuggestionDetails(nextSuggestionResult.suggestionDetails || [])
+      setCustomerSummary(nextSuggestionResult.customerSummary || "")
+      setNextBestAction(nextSuggestionResult.nextBestAction || "")
+      setRiskLevel(nextSuggestionResult.riskLevel || "")
+      setActionMode(nextSuggestionResult.actionMode || "")
+      setFeedback("Saran balasan Clara siap dipakai.")
     } catch (err) {
       const message =
         err instanceof Error
@@ -876,6 +958,11 @@ function IndexPopup() {
           : "Terjadi kendala saat membuat saran jawaban."
 
       setSuggestions([])
+      setSuggestionDetails([])
+      setCustomerSummary("")
+      setNextBestAction("")
+      setRiskLevel("")
+      setActionMode("")
       setError(message)
     } finally {
       setIsSuggesting(false)
@@ -1147,8 +1234,8 @@ function IndexPopup() {
                   lineHeight: 1.45,
                   marginTop: 4
                 }}>
-                Popup ini memakai proxy OpenAI milikmu, jadi user akhir tidak
-                perlu isi token di extension.
+                Clara akan mencoba generate saran dari backend utama dulu, lalu
+                fallback ke proxy lokal kalau diperlukan.
               </div>
             </div>
             <div style={chipStyle}>3 saran</div>
@@ -1163,6 +1250,54 @@ function IndexPopup() {
 
           {suggestions.length > 0 && (
             <div style={{ display: "grid", gap: 10 }}>
+              {(customerSummary || nextBestAction || riskLevel) && (
+                <div
+                  style={{
+                    background:
+                      "linear-gradient(180deg, rgba(246,250,255,0.78), rgba(236,243,251,0.7))",
+                    border: "1px solid rgba(255,255,255,0.88)",
+                    borderRadius: 18,
+                    boxShadow:
+                      "0 10px 26px rgba(71, 94, 120, 0.08), inset 0 1px 0 rgba(255,255,255,0.9)",
+                    display: "grid",
+                    gap: 10,
+                    padding: 13
+                  }}>
+                  <div
+                    style={{
+                      color: "#3e6278",
+                      fontSize: 11,
+                      fontWeight: 800,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase"
+                    }}>
+                    Insight Clara
+                  </div>
+
+                  {riskLevel && (
+                    <div
+                      style={{ color: "#183245", fontSize: 12, lineHeight: 1.55 }}>
+                      <strong>Risk level:</strong> {riskLevel}
+                      {actionMode ? ` • ${actionMode}` : ""}
+                    </div>
+                  )}
+
+                  {customerSummary && (
+                    <div
+                      style={{ color: "#183245", fontSize: 12, lineHeight: 1.6 }}>
+                      <strong>Ringkasan customer:</strong> {customerSummary}
+                    </div>
+                  )}
+
+                  {nextBestAction && (
+                    <div
+                      style={{ color: "#183245", fontSize: 12, lineHeight: 1.6 }}>
+                      <strong>Aksi berikutnya:</strong> {nextBestAction}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {suggestions.map((suggestion, index) => (
                 <div
                   key={`${suggestion}-${index}`}
@@ -1205,6 +1340,17 @@ function IndexPopup() {
                     }}>
                     {suggestion}
                   </div>
+                  {suggestionDetails[index]?.reasoning && (
+                    <div
+                      style={{
+                        color: "#587067",
+                        fontSize: 12,
+                        lineHeight: 1.55
+                      }}>
+                      <strong>Kenapa draft ini:</strong>{" "}
+                      {suggestionDetails[index]?.reasoning}
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
                       onClick={() => handleCopySuggestion(suggestion)}
