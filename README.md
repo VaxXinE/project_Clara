@@ -228,7 +228,7 @@ cd clara-backend
 cp .env.example .env
 uv sync
 uv run alembic upgrade head
-uv run python scripts/create_owner.py
+uv run python scripts/bootstrap_owner.py
 uv run uvicorn app.main:app --reload
 ```
 
@@ -255,7 +255,47 @@ AUTH_COOKIE_DOMAIN=
 AUTH_COOKIE_SAMESITE=lax
 ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 LOGIN_RATE_LIMIT_PER_MINUTE=5
+BOOTSTRAP_OWNER_NAME=Clara Owner
+BOOTSTRAP_OWNER_EMAIL=owner@clara.local
+BOOTSTRAP_OWNER_PASSWORD=OwnerPass123!
+BOOTSTRAP_ORGANIZATION_NAME=Clara Local
+BOOTSTRAP_ORGANIZATION_SLUG=clara-local
 ```
+
+---
+
+### Bootstrap owner otomatis
+
+Script [bootstrap_owner.py](/Users/newsmaker23/Projects/clara/clara-backend/scripts/bootstrap_owner.py) dibuat untuk onboarding developer dan first deploy yang lebih nyaman.
+
+Behavior-nya:
+
+- kalau semua env `BOOTSTRAP_*` kosong, script akan **skip** dengan aman
+- kalau env `BOOTSTRAP_*` diisi tidak lengkap, script akan **fail** dengan pesan jelas
+- kalau owner dengan email yang sama sudah ada, script akan **skip** dan tidak membuat duplikat
+- kalau organization slug belum ada, script akan membuat organization dulu lalu membuat owner pertama
+
+Command:
+
+```bash
+cd clara-backend
+uv run alembic upgrade head
+uv run python scripts/bootstrap_owner.py
+```
+
+Untuk deploy environment seperti Railway, pola yang aman adalah:
+
+```bash
+uv run alembic upgrade head && uv run python scripts/bootstrap_owner.py
+```
+
+Catatan penting:
+
+- ini **bukan** logic yang ditaruh di file migration Alembic
+- migration tetap khusus untuk schema database
+- bootstrap owner dipisah supaya lebih aman, idempotent, dan mudah dirawat
+
+Kalau Anda tetap ingin flow manual/interaktif, script lama [create_owner.py](/Users/newsmaker23/Projects/clara/clara-backend/scripts/create_owner.py) masih bisa dipakai.
 
 ---
 
