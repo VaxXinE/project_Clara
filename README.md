@@ -1,59 +1,48 @@
 # Clara
 
-Clara adalah platform internal untuk mengubah chat WhatsApp sales/marketing menjadi data operasional dan insight bisnis yang bisa dipakai untuk:
+Clara adalah platform internal untuk membantu tim operasional, admin, dan owner mengolah percakapan WhatsApp menjadi:
 
-- membaca objection, intent, sentiment, dan tahap pipeline dari customer,
-- membantu tim operasional menyusun draft balasan yang lebih aman,
-- membangun knowledge base produk yang bisa dipakai AI sebagai grounding,
-- memberi owner/admin marketing insight lintas percakapan,
-- menjaga isolasi data per organisasi dan per user.
+- data operasional yang rapi,
+- insight bisnis yang bisa dipakai untuk pengambilan keputusan,
+- draft balasan AI yang lebih aman,
+- dan knowledge base produk yang bisa dipakai sebagai grounding.
 
-Project ini berbentuk monorepo:
+Project ini sekarang berbentuk **monorepo** dengan 3 aplikasi utama:
 
-- `clara-backend` -> FastAPI + SQLAlchemy + Alembic
+- `clara-backend` -> FastAPI backend + PostgreSQL + Redis
 - `clara-dashboard` -> Next.js dashboard untuk operasional dan admin
-- `infra` -> container lokal untuk PostgreSQL dan Redis
-- `docs` -> dokumen tambahan jika nanti dibutuhkan
+- `clara-extension` -> Chrome extension untuk WhatsApp Web yang terhubung ke Clara
 
-## Fitur Utama
+---
 
-- Login berbasis JWT dengan role `owner`, `admin`, dan `marketing`
-- Multi-tenant isolation berbasis `organization_id`
-- Ownership per conversation
-- Upload file `.txt` export WhatsApp
-- Parsing chat menjadi message terstruktur
-- AI extraction per conversation:
-  - buying intent
-  - lead temperature
-  - sentiment
-  - risk level
-  - pipeline stage
-  - main objections
-  - next best action
-- AI reply suggestion dengan approval flow
-- Product knowledge:
-  - entry global dari owner
-  - entry organization-scoped dari admin/marketing
-- Marketing insights + snapshot trend
-- Audit log untuk action penting
-- Admin Ops read-only overview untuk inspeksi data penting
-- User management:
-  - create user
-  - edit user
-  - activate/deactivate user
+## Gambaran Produk
 
-## Arsitektur Singkat
+Clara dipakai untuk dua jalur kerja utama:
 
-Flow utama Clara saat ini:
+### 1. Dashboard workflow
 
-1. User `marketing` atau `admin` upload file `.txt` WhatsApp.
-2. Backend parse isi file menjadi `Conversation` dan `Message`.
-3. AI menganalisis conversation lalu menyimpan `AIExtraction`.
-4. Sistem menghasilkan `ReplySuggestion` yang bisa di-approve.
-5. Owner/admin melihat agregasi di dashboard marketing.
-6. Insight snapshot bisa digenerate untuk tracking perubahan dari waktu ke waktu.
+User login ke dashboard, lalu:
 
-## Struktur Repo
+1. upload export chat WhatsApp `.txt`,
+2. backend parse chat menjadi conversation + messages,
+3. Clara menjalankan AI extraction,
+4. Clara generate draft reply,
+5. owner/admin melihat insight agregat dan operasional.
+
+### 2. WhatsApp extension workflow
+
+User membuka WhatsApp Web, lalu:
+
+1. extension membaca chat aktif,
+2. snapshot chat dikirim ke backend Clara,
+3. backend menyimpan/memperbarui mirror conversation,
+4. Clara menjalankan AI extraction + reply suggestion,
+5. hasil insight dan draft reply muncul di **Chrome Side Panel**,
+6. user bisa copy atau memasukkan draft ke compose box WhatsApp tanpa auto send.
+
+---
+
+## Struktur Monorepo
 
 ```text
 clara/
@@ -74,10 +63,103 @@ clara/
 │   ├── app/
 │   ├── src/
 │   └── public/
+├── clara-extension/
+│   ├── assets/
+│   ├── contents/
+│   ├── server/
+│   ├── types/
+│   └── utils/
 ├── infra/
 │   └── docker-compose.yml
 └── README.md
 ```
+
+---
+
+## Fitur Utama
+
+### Backend + Dashboard
+
+- Auth dengan role `owner`, `admin`, `marketing`
+- Session browser berbasis **HttpOnly cookie** + CSRF token
+- Multi-tenant isolation berbasis `organization_id`
+- Ownership conversation per user operasional
+- Upload file `.txt` export WhatsApp
+- Parsing chat menjadi message terstruktur
+- AI extraction per conversation:
+  - buying intent
+  - lead temperature
+  - sentiment
+  - risk level
+  - pipeline stage
+  - main objections
+  - next best action
+- Reply suggestion berbasis AI
+- Product knowledge terpusat
+- Marketing insight + snapshot trend
+- Audit log untuk action penting
+- Admin Ops read-only overview
+- User management + activate/deactivate account
+- Reset password oleh owner/admin sesuai boundary permission
+- Self-service change password
+
+### Chrome Extension
+
+- Membaca chat aktif di WhatsApp Web
+- Sync snapshot chat ke Clara backend
+- Generate reply suggestion lewat backend Clara
+- Menampilkan:
+  - customer summary
+  - risk level
+  - next best action
+  - reasoning per draft
+- Menjalankan UI di **Chrome Side Panel**, bukan floating overlay
+- Fallback ke proxy lokal untuk reply suggestion jika backend Clara tidak tersedia
+
+---
+
+## Role & Access Model
+
+### Owner
+
+- akses global lintas organization
+- bisa manage semua user
+- bisa melihat marketing insights global
+- bisa reset password semua user
+- **hanya owner** yang boleh menambah, mengubah, dan menghapus product knowledge
+
+### Admin
+
+- akses terbatas ke organization miliknya
+- bisa manage user di organization sendiri
+- bisa reset password **hanya untuk akun yang dia buat sendiri**
+- bisa membuka admin ops dan insight organization
+- hanya bisa **melihat** product knowledge
+
+### Marketing
+
+- role operasional utama
+- bisa upload chat
+- bisa melihat conversation miliknya
+- bisa trigger AI analysis dan reply suggestion untuk conversation yang dia pegang
+- bisa memakai extension WhatsApp
+- hanya bisa **melihat** product knowledge
+- tidak bisa membuka marketing insights strategis
+
+---
+
+## Catatan Naming
+
+Secara domain, role operasional sekarang adalah `marketing`.
+
+Tetapi beberapa route/field historis masih memakai istilah `sales`, misalnya:
+
+- `/dashboard/sales`
+- `sales_user_id`
+
+Secara business meaning, itu sekarang merepresentasikan user operasional yang memegang conversation.
+
+---
 
 ## Stack
 
@@ -88,54 +170,24 @@ clara/
 - Alembic
 - PostgreSQL
 - Redis
-- OpenAI API
 - Pydantic v2
-- `pwdlib[argon2]` untuk hashing password
+- `pwdlib[argon2]`
+- OpenAI API
 
-### Frontend
+### Dashboard
 
-- Next.js 16
-- React 19
+- Next.js
+- React
 - TypeScript
-- Tailwind CSS 4
 
-## Role & Access Model
+### Extension
 
-### Owner
+- Plasmo
+- React
+- TypeScript
+- Chrome Side Panel API
 
-- akses global lintas organization
-- bisa create organization
-- bisa manage semua user
-- bisa melihat marketing insights global
-- bisa membuat product knowledge global
-- hanya owner yang boleh mengubah knowledge global
-
-### Admin
-
-- akses terbatas ke organization miliknya
-- bisa manage user di organization sendiri
-- bisa mengakses inbox operasional
-- bisa melihat marketing insights organization
-- bisa membuat dan mengelola product knowledge organization
-
-### Marketing
-
-- role operasional utama pengganti role `sales`
-- bisa upload chat
-- bisa lihat conversation miliknya
-- bisa trigger AI analysis dan reply suggestion untuk conversation yang dia miliki
-- bisa melihat product knowledge global + organization sendiri
-- tidak bisa membuka marketing insights strategis
-
-## Catatan Naming
-
-Secara domain, role operasional sekarang adalah `marketing`.  
-Namun beberapa path dan field historis masih memakai kata `sales`, misalnya:
-
-- route frontend/backend: `/dashboard/sales`
-- field DB: `sales_user_id`
-
-Itu masih berfungsi, tapi secara business meaning sekarang artinya adalah user operasional yang memegang conversation.
+---
 
 ## Menjalankan Secara Lokal
 
@@ -155,12 +207,14 @@ Dari root repo:
 docker compose -f infra/docker-compose.yml up -d
 ```
 
-Service lokal default:
+Default local service:
 
-- PostgreSQL: `localhost:5432`
-- Redis: `localhost:6379`
+- PostgreSQL -> `localhost:5432`
+- Redis -> `localhost:6379`
 
-### 2. Setup backend
+---
+
+## Setup Backend
 
 ```bash
 cd clara-backend
@@ -171,25 +225,34 @@ uv run python scripts/create_owner.py
 uv run uvicorn app.main:app --reload
 ```
 
-Backend akan berjalan di:
+Backend default:
 
-```text
-http://127.0.0.1:8000
+- API: `http://127.0.0.1:8000`
+- Docs: `http://127.0.0.1:8000/docs`
+- Health: `http://127.0.0.1:8000/health`
+
+Contoh env backend:
+
+```env
+APP_ENV=development
+DATABASE_URL=postgresql+psycopg://clara_user:clara_password_dev_only@localhost:5432/clara_db
+REDIS_URL=redis://localhost:6379/0
+OPENAI_API_KEY=replace_with_your_openai_api_key
+OPENAI_MODEL=gpt-4.1-mini
+JWT_SECRET_KEY=replace_with_a_long_random_secret
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+AUTH_COOKIE_NAME=clara_access_token
+CSRF_COOKIE_NAME=clara_csrf_token
+AUTH_COOKIE_DOMAIN=
+AUTH_COOKIE_SAMESITE=lax
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+LOGIN_RATE_LIMIT_PER_MINUTE=5
 ```
 
-Swagger docs:
+---
 
-```text
-http://127.0.0.1:8000/docs
-```
-
-Health check:
-
-```text
-http://127.0.0.1:8000/health
-```
-
-### 3. Setup frontend
+## Setup Dashboard
 
 ```bash
 cd clara-dashboard
@@ -198,87 +261,158 @@ npm install
 npm run dev
 ```
 
-Isi `.env` frontend:
+Contoh env dashboard:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_CSRF_COOKIE_NAME=clara_csrf_token
 ```
 
-Frontend akan berjalan di:
+Dashboard default:
 
-```text
-http://127.0.0.1:3000
+- `http://localhost:3000`
+
+---
+
+## Setup Extension
+
+```bash
+cd clara-extension
+cp .env.example .env
+npm install
+npm run dev
 ```
 
-Root route saat ini diarahkan ke halaman login.
-
-## Environment Variables
-
-### Backend
-
-Contoh minimal:
+Contoh env extension:
 
 ```env
-APP_ENV=development
-DATABASE_URL=postgresql+psycopg://clara_user:clara_password_dev_only@localhost:5432/clara_db
-REDIS_URL=redis://localhost:6379/0
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-4.1-mini
-JWT_SECRET_KEY=replace_with_random_secret
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=1440
-ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-LOGIN_RATE_LIMIT_PER_MINUTE=5
+OPENAI_API_KEY=sk-ganti-dengan-api-key-openai-kamu
+OPENAI_MODEL=gpt-5.4-mini
+PORT=9898
+PLASMO_PUBLIC_OPENAI_PROXY_URL=http://127.0.0.1:9898/reply-suggestions
+PLASMO_PUBLIC_CLARA_API_BASE_URL=http://127.0.0.1:8000
+PLASMO_PUBLIC_CLARA_API_TOKEN=isi-dengan-jwt-token-user-clara
 ```
 
-Keterangan singkat:
+### Load extension ke Chrome
 
-- `DATABASE_URL` -> koneksi PostgreSQL
-- `REDIS_URL` -> rate limit / cache infra pendukung
-- `OPENAI_API_KEY` -> kredensial untuk AI extraction dan suggestion
-- `JWT_SECRET_KEY` -> secret untuk sign token
-- `ALLOWED_ORIGINS` -> daftar origin frontend untuk CORS
+1. Jalankan `npm run dev`
+2. buka `chrome://extensions`
+3. aktifkan `Developer mode`
+4. klik `Load unpacked`
+5. pilih folder build dev Plasmo yang sesuai
+6. klik icon Clara di toolbar Chrome
 
-### Frontend
+Sekarang UI extension akan muncul di **Chrome Side Panel**.
+
+---
+
+## Cara Ambil Token Clara untuk Extension
+
+Karena dashboard Clara sekarang memakai cookie session, extension memakai bearer token terpisah.
+
+Langkah local development:
+
+1. login dulu ke dashboard Clara
+2. ambil cookie:
+   - `clara_access_token`
+   - `clara_csrf_token`
+3. panggil endpoint:
+
+```bash
+curl -X POST http://127.0.0.1:8000/auth/access-token \
+  -H "Cookie: clara_access_token=ISI_COOKIE_LOGIN_ANDA; clara_csrf_token=ISI_CSRF_COOKIE_ANDA" \
+  -H "X-CSRF-Token: ISI_CSRF_COOKIE_ANDA"
+```
+
+4. copy `access_token` dari response
+5. isi ke:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+PLASMO_PUBLIC_CLARA_API_TOKEN=eyJhbGciOi...
 ```
+
+Catatan:
+- ini praktis untuk local/dev
+- untuk production, lebih baik nanti dibuat flow login extension yang dedicated
+
+---
+
+## Alur Integrasi Extension
+
+Saat user menekan refresh/generate di extension:
+
+1. extension membaca chat aktif dari WhatsApp Web
+2. extension kirim snapshot ke:
+   - `POST /extension/whatsapp/snapshots`
+3. extension minta draft reply ke:
+   - `POST /extension/whatsapp/reply-suggestions`
+4. backend Clara akan:
+   - sync/update conversation mirror
+   - menjalankan AI extraction
+   - generate reply suggestion
+5. extension menampilkan:
+   - risk level
+   - customer summary
+   - next best action
+   - 3 draft reply
+
+Jika backend utama gagal, extension masih bisa fallback ke proxy lokal `9898`.
+
+---
 
 ## Command Penting
 
 ### Backend
 
 ```bash
+cd clara-backend
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 uv run pytest
 ```
 
-### Frontend
+### Dashboard
 
 ```bash
+cd clara-dashboard
 npm install
 npm run dev
 npm run build
-npm run lint
 ```
 
-## Modul Utama Backend
+### Extension
 
-- `app/api/routes_auth.py` -> login, current user, user management
+```bash
+cd clara-extension
+npm install
+npm run dev
+npm run build
+npm run proxy
+```
+
+---
+
+## Endpoint / Modul Penting
+
+### Backend routes
+
+- `app/api/routes_auth.py` -> auth, current user, password change/reset, extension token
 - `app/api/routes_upload.py` -> upload `.txt` WhatsApp
 - `app/api/routes_ai.py` -> AI extraction
 - `app/api/routes_reply.py` -> reply suggestion flow
 - `app/api/routes_dashboard.py` -> inbox, marketing insights, snapshot, admin ops
-- `app/api/routes_product_knowledge.py` -> knowledge base
+- `app/api/routes_product_knowledge.py` -> product knowledge
 - `app/api/routes_organizations.py` -> organization management
 - `app/api/routes_audit_logs.py` -> audit trail
+- `app/api/routes_extension.py` -> snapshot sync + reply suggestion untuk extension
 
-## Halaman Utama Frontend
+### Dashboard pages
 
+- `/`
 - `/login`
+- `/dashboard`
 - `/dashboard/sales`
 - `/dashboard/sales/conversations/[conversationId]`
 - `/dashboard/upload`
@@ -286,6 +420,30 @@ npm run lint
 - `/dashboard/marketing`
 - `/dashboard/admin/access`
 - `/dashboard/admin/ops`
+
+---
+
+## Testing
+
+Backend saat ini sudah punya test dasar untuk area yang paling risk:
+
+- auth session dan cookie
+- access control role
+- inactive user login
+- reset password boundary
+- product knowledge owner-only
+- marketing insight access
+- extension snapshot sync
+- extension reply suggestion flow
+
+Menjalankan test backend:
+
+```bash
+cd clara-backend
+uv run pytest
+```
+
+---
 
 ## Deploy Production
 
@@ -295,16 +453,17 @@ npm run lint
 - `clara-backend` -> Railway / Render / Fly.io
 - PostgreSQL -> Railway Postgres / managed Postgres
 - Redis -> Railway Redis / managed Redis
+- `clara-extension` -> build dan distribusi manual / Chrome Web Store internal
 
 ### Railway backend
 
-Set `Root Directory` ke:
+Set `Root Directory`:
 
 ```text
 clara-backend
 ```
 
-Start command yang aman untuk MVP:
+Start command MVP:
 
 ```bash
 uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
@@ -321,68 +480,76 @@ OPENAI_MODEL=gpt-4.1-mini
 JWT_SECRET_KEY=replace_with_strong_random_secret
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
+AUTH_COOKIE_NAME=clara_access_token
+CSRF_COOKIE_NAME=clara_csrf_token
+AUTH_COOKIE_DOMAIN=
+AUTH_COOKIE_SAMESITE=none
 ALLOWED_ORIGINS=https://your-frontend-domain
 LOGIN_RATE_LIMIT_PER_MINUTE=5
 ```
 
 ### Frontend production
 
-Set env:
-
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain
+NEXT_PUBLIC_CSRF_COOKIE_NAME=clara_csrf_token
 ```
+
+---
 
 ## Security Notes
 
-Beberapa prinsip yang sudah dipakai di project ini:
+Project ini sudah mengarah ke pendekatan yang lebih aman, tapi tetap harus diperlakukan sebagai aplikasi production:
 
 - password di-hash dengan Argon2
+- auth browser memakai HttpOnly cookie + CSRF token
 - access control berbasis role + organization + ownership
 - CORS dikontrol via `ALLOWED_ORIGINS`
-- security headers middleware
 - audit log untuk action penting
-- rate limit login
-- validasi upload file `.txt`
+- login rate limit tersedia
+- input upload dibatasi ke flow yang jelas
 
-Hal yang wajib Anda jaga saat lanjut ke production:
+Hal yang wajib Anda jaga:
 
 - jangan commit secret asli ke repo
 - rotate secret yang pernah bocor
-- gunakan secret manager / environment variable
-- jangan expose database admin tool langsung ke public internet
-- pertimbangkan migrasi token dari `localStorage` ke `HttpOnly cookie`
-- review kembali output AI agar tidak halusinasi atau memberi klaim yang tidak didukung knowledge base
+- bearer token extension jangan dianggap aman untuk jangka panjang
+- jangan expose admin DB tool ke public internet
+- review output AI sebelum dipakai ke customer
+- pastikan extension hanya dipakai oleh akun yang berhak
+
+---
 
 ## Status Project Saat Ini
 
-Clara saat ini sudah berada di fase MVP internal dengan capability:
+Clara saat ini sudah cukup kuat untuk **MVP internal** dengan capability:
 
-- auth & user management
-- multi-tenant organization isolation
-- conversation ownership
+- dashboard operasional
+- insight marketing
+- admin ops
+- knowledge base terpusat
+- auth dan permission boundary
 - WhatsApp TXT ingestion
+- WhatsApp Web extension integration
 - AI extraction
 - grounded reply suggestion
-- product knowledge global + organization
-- marketing insight dashboard
-- marketing insight snapshot tracking
-- admin ops overview
 
-Yang masih bagus untuk dilanjutkan:
+Area yang paling bagus untuk dilanjutkan berikutnya:
 
-- automated tests untuk access control dan permission boundary
-- refactor naming historis `sales` -> domain yang lebih netral
-- auth berbasis cookie yang lebih aman
+- Redis-backed login rate limiter
+- dedicated login flow untuk extension
 - evaluasi kualitas AI dengan dataset internal
-- automation untuk snapshot periodik
+- refactor naming historis `sales` -> domain yang lebih netral
+- observability dan metrics yang lebih rapi
+
+---
 
 ## Lisensi
 
 Belum ditentukan.
 
-Jika project ini akan dibuka publik di GitHub, tentukan lisensi secara eksplisit, misalnya:
+Kalau repo ini akan dipublikasikan, tentukan lisensi secara eksplisit, misalnya:
 
-- MIT untuk permissive open source
-- Apache-2.0 jika ingin tambahan proteksi paten
-- proprietary/internal jika project tetap private
+- MIT
+- Apache-2.0
+- proprietary/internal

@@ -11,6 +11,30 @@ import {
 
 const OPENAI_PROXY_URL = getConfiguredProxyUrl()
 
+const initializeSidePanelBehavior = () => {
+  if (!chrome.sidePanel?.setPanelBehavior) {
+    return
+  }
+
+  chrome.sidePanel
+    .setPanelBehavior({
+      openPanelOnActionClick: true
+    })
+    .catch(() => {
+      // Ignore unsupported/runtime-sidepanel issues in non-Chrome environments.
+    })
+}
+
+initializeSidePanelBehavior()
+
+chrome.runtime.onInstalled.addListener(() => {
+  initializeSidePanelBehavior()
+})
+
+chrome.runtime.onStartup.addListener(() => {
+  initializeSidePanelBehavior()
+})
+
 const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
   const suggestions = Array.isArray(payload?.suggestions)
     ? payload.suggestions.filter(

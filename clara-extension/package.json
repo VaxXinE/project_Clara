@@ -27,6 +27,7 @@
   },
   "manifest": {
     "permissions": [
+      "sidePanel",
       "tabs",
       "scripting"
     ],
