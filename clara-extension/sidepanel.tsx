@@ -1044,6 +1044,7 @@ function ClaraSidePanel() {
       setRiskLevel("")
       setActionMode("")
       setReplySuggestionId("")
+      setReplySuggestionId("")
       setError(message)
     } finally {
       setIsSuggesting(false)
@@ -1108,7 +1109,19 @@ function ClaraSidePanel() {
         throw new Error(response?.error || "Gagal memasukkan saran ke chatbox.")
       }
 
-      setFeedback("Saran jawaban sudah dimasukkan ke chatbox. Belum terkirim.")
+      if (replySuggestionId) {
+        await chrome.runtime.sendMessage({
+          chatTitle: chatData?.chatTitle || "",
+          replySuggestionId,
+          selectedReplyText: suggestion,
+          tabId: tab.id,
+          type: "REGISTER_PENDING_REPLY"
+        })
+      }
+
+      setFeedback(
+        "Saran jawaban sudah dimasukkan ke chatbox. Kalau user kirim manual dari WhatsApp, Clara akan ikut menandainya sebagai approved + sent."
+      )
     } catch (err) {
       setError(
         err instanceof Error
@@ -1206,6 +1219,11 @@ function ClaraSidePanel() {
             "Pesan terkirim ke WhatsApp, tapi gagal ditandai sebagai sent di Clara."
         )
       }
+
+      await chrome.runtime.sendMessage({
+        tabId: tab.id,
+        type: "CLEAR_PENDING_REPLY"
+      })
 
       setFeedback(
         syncPayload?.auto_approved

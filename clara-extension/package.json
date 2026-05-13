@@ -28,6 +28,7 @@
   "manifest": {
     "permissions": [
       "sidePanel",
+      "storage",
       "tabs",
       "scripting"
     ],
