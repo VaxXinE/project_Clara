@@ -796,9 +796,13 @@ function ClaraSidePanel() {
   const [isInsertingIndex, setIsInsertingIndex] = useState<number | null>(null)
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [draftSuggestions, setDraftSuggestions] = useState<string[]>([])
   const [suggestionDetails, setSuggestionDetails] = useState<
     WhatsAppSuggestionDetail[]
   >([])
+  const [editingSuggestionIndex, setEditingSuggestionIndex] = useState<
+    number | null
+  >(null)
   const [customerSummary, setCustomerSummary] = useState("")
   const [nextBestAction, setNextBestAction] = useState("")
   const [riskLevel, setRiskLevel] = useState("")
@@ -1177,6 +1181,7 @@ function ClaraSidePanel() {
         await requestSuggestionCandidates(currentChatData)
 
       setSuggestions(nextSuggestionResult.suggestions)
+      setDraftSuggestions(nextSuggestionResult.suggestions)
       setSuggestionDetails(nextSuggestionResult.suggestionDetails || [])
       setCustomerSummary(nextSuggestionResult.customerSummary || "")
       setNextBestAction(nextSuggestionResult.nextBestAction || "")
@@ -1191,6 +1196,7 @@ function ClaraSidePanel() {
           : "Terjadi kendala saat membuat saran jawaban."
 
       setSuggestions([])
+      setDraftSuggestions([])
       setSuggestionDetails([])
       setCustomerSummary("")
       setNextBestAction("")
@@ -1201,20 +1207,6 @@ function ClaraSidePanel() {
       setError(message)
     } finally {
       setIsSuggesting(false)
-    }
-  }
-
-  const handleCopySuggestion = async (suggestion: string) => {
-    if (!(await ensureAuthenticated())) {
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(suggestion)
-      setFeedback("Saran jawaban berhasil disalin.")
-      setError("")
-    } catch (_error) {
-      setError("Clipboard tidak bisa diakses. Coba copy manual dulu.")
     }
   }
 
@@ -1404,6 +1396,48 @@ function ClaraSidePanel() {
     } finally {
       setIsInsertingIndex(null)
     }
+  }
+
+  const handleEditSuggestion = (index: number) => {
+    setEditingSuggestionIndex(index)
+    setError("")
+    setFeedback("Mode edit aktif. Ubah draft lalu pilih Simpan.")
+  }
+
+  const handleDraftSuggestionChange = (index: number, value: string) => {
+    setDraftSuggestions((currentDrafts) =>
+      currentDrafts.map((draft, currentIndex) =>
+        currentIndex === index ? value : draft
+      )
+    )
+  }
+
+  const handleSaveEditedSuggestion = (index: number) => {
+    const nextDraft = (draftSuggestions[index] || "").trim()
+
+    if (!nextDraft) {
+      setError("Draft balasan tidak boleh kosong.")
+      return
+    }
+
+    setSuggestions((currentSuggestions) =>
+      currentSuggestions.map((suggestion, currentIndex) =>
+        currentIndex === index ? nextDraft : suggestion
+      )
+    )
+    setEditingSuggestionIndex(null)
+    setError("")
+    setFeedback("Draft balasan berhasil diperbarui di extension.")
+  }
+
+  const handleCancelEditedSuggestion = (index: number) => {
+    setDraftSuggestions((currentDrafts) =>
+      currentDrafts.map((draft, currentIndex) =>
+        currentIndex === index ? suggestions[index] || draft : draft
+      )
+    )
+    setEditingSuggestionIndex(null)
+    setError("")
   }
 
   return (
@@ -1778,10 +1812,32 @@ function ClaraSidePanel() {
                       fontSize: 13,
                       lineHeight: 1.6,
                       overflowWrap: "anywhere",
-                      whiteSpace: "pre-wrap",
                       wordBreak: "break-word"
                     }}>
-                    {suggestion}
+                    {editingSuggestionIndex === index ? (
+                      <textarea
+                        onChange={(event) =>
+                          handleDraftSuggestionChange(index, event.target.value)
+                        }
+                        style={{
+                          background: "rgba(255,255,255,0.92)",
+                          border: "1px solid rgba(176, 205, 226, 0.95)",
+                          borderRadius: 14,
+                          color: "#183245",
+                          fontFamily: "inherit",
+                          fontSize: 13,
+                          lineHeight: 1.6,
+                          minHeight: 120,
+                          outline: "none",
+                          padding: 12,
+                          resize: "vertical",
+                          width: "100%"
+                        }}
+                        value={draftSuggestions[index] || ""}
+                      />
+                    ) : (
+                      <div style={{ whiteSpace: "pre-wrap" }}>{suggestion}</div>
+                    )}
                   </div>
                   {suggestionDetails[index]?.reasoning && (
                     <div
@@ -1796,15 +1852,35 @@ function ClaraSidePanel() {
                       {suggestionDetails[index]?.reasoning}
                     </div>
                   )}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={() => handleCopySuggestion(suggestion)}
-                      style={{ ...actionButtonStyle, flex: 1 }}>
-                      Copy
-                    </button>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {editingSuggestionIndex === index ? (
+                      <>
+                        <button
+                          onClick={() => handleSaveEditedSuggestion(index)}
+                          style={{
+                            ...actionButtonStyle,
+                            background:
+                              "linear-gradient(135deg, rgba(19,138,117,0.14), rgba(16,84,130,0.14))",
+                            flex: 1
+                          }}>
+                          Simpan
+                        </button>
+                        <button
+                          onClick={() => handleCancelEditedSuggestion(index)}
+                          style={{ ...actionButtonStyle, flex: 1 }}>
+                          Batal
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => handleEditSuggestion(index)}
+                        style={{ ...actionButtonStyle, flex: 1 }}>
+                        Edit
+                      </button>
+                    )}
                     <button
                       disabled={isInsertingIndex === index}
-                      onClick={() => handleInsertSuggestion(suggestion, index)}
+                      onClick={() => handleInsertSuggestion(suggestions[index], index)}
                       style={{
                         ...actionButtonStyle,
                         background:
@@ -1821,7 +1897,7 @@ function ClaraSidePanel() {
                     </button>
                     <button
                       disabled={isInsertingIndex === index}
-                      onClick={() => handleSendSuggestion(suggestion, index)}
+                      onClick={() => handleSendSuggestion(suggestions[index], index)}
                       style={{
                         ...actionButtonStyle,
                         background:
