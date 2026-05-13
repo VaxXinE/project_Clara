@@ -12,10 +12,12 @@ export const getConfiguredProxyUrl = () =>
 export const getConfiguredClaraApiBaseUrl = () =>
   (process.env.PLASMO_PUBLIC_CLARA_API_BASE_URL || "").trim()
 
+export const getConfiguredClaraApiToken = () =>
+  (process.env.PLASMO_PUBLIC_CLARA_API_TOKEN || "").trim()
+
 export const getConfiguredClaraDashboardUrl = () =>
   (
-    process.env.PLASMO_PUBLIC_CLARA_DASHBOARD_URL ||
-    DEFAULT_CLARA_DASHBOARD_URL
+    process.env.PLASMO_PUBLIC_CLARA_DASHBOARD_URL || DEFAULT_CLARA_DASHBOARD_URL
   ).trim()
 
 export const getClaraDashboardLoginUrl = () => {
@@ -33,8 +35,7 @@ export const getClaraDashboardLoginUrl = () => {
 
 export const getConfiguredClaraAuthCookieName = () =>
   (
-    process.env.PLASMO_PUBLIC_CLARA_AUTH_COOKIE_NAME ||
-    DEFAULT_AUTH_COOKIE_NAME
+    process.env.PLASMO_PUBLIC_CLARA_AUTH_COOKIE_NAME || DEFAULT_AUTH_COOKIE_NAME
   ).trim()
 
 const getOriginForCookieLookup = (url: string) => {
@@ -56,7 +57,9 @@ export const getClaraSessionOrigins = () =>
     )
   )
 
-export const getChatSnapshotProxyUrl = (replySuggestionsUrl = DEFAULT_PROXY_URL) => {
+export const getChatSnapshotProxyUrl = (
+  replySuggestionsUrl = DEFAULT_PROXY_URL
+) => {
   try {
     const url = new URL((replySuggestionsUrl || DEFAULT_PROXY_URL).trim())
     url.pathname = "/chat-snapshots"
@@ -164,8 +167,10 @@ export const getReplySuggestionCandidates = () => {
 }
 
 export const getClaraSessionAccessToken = async () => {
+  const configuredToken = getConfiguredClaraApiToken()
+
   if (!chrome.cookies?.get) {
-    return ""
+    return configuredToken
   }
 
   const cookieName = getConfiguredClaraAuthCookieName()
@@ -182,7 +187,7 @@ export const getClaraSessionAccessToken = async () => {
     }
   }
 
-  return ""
+  return configuredToken
 }
 
 export const getClaraAuthHeaders = async () => {
@@ -197,44 +202,45 @@ export const getClaraAuthHeaders = async () => {
   }
 }
 
-export const getCurrentClaraSessionUser = async (): Promise<ClaraExtensionSessionUser | null> => {
-  const apiBaseUrl = getConfiguredClaraApiBaseUrl()
+export const getCurrentClaraSessionUser =
+  async (): Promise<ClaraExtensionSessionUser | null> => {
+    const apiBaseUrl = getConfiguredClaraApiBaseUrl()
 
-  if (!apiBaseUrl) {
-    throw new Error("PLASMO_PUBLIC_CLARA_API_BASE_URL belum dikonfigurasi.")
+    if (!apiBaseUrl) {
+      throw new Error("PLASMO_PUBLIC_CLARA_API_BASE_URL belum dikonfigurasi.")
+    }
+
+    const headers = await getClaraAuthHeaders()
+
+    if (!("Authorization" in headers)) {
+      return null
+    }
+
+    const meUrl = new URL("/auth/me", apiBaseUrl).toString()
+    const response = await fetch(meUrl, {
+      headers
+    })
+
+    if (response.status === 401) {
+      return null
+    }
+
+    const payload = await response.json()
+
+    if (!response.ok) {
+      throw new Error(
+        payload?.detail || payload?.error || "Gagal membaca session Clara."
+      )
+    }
+
+    return {
+      email: String(payload.email || ""),
+      id: String(payload.id || ""),
+      name: String(payload.name || ""),
+      organizationName:
+        typeof payload.organization_name === "string"
+          ? payload.organization_name
+          : null,
+      role: String(payload.role || "")
+    }
   }
-
-  const headers = await getClaraAuthHeaders()
-
-  if (!("Authorization" in headers)) {
-    return null
-  }
-
-  const meUrl = new URL("/auth/me", apiBaseUrl).toString()
-  const response = await fetch(meUrl, {
-    headers
-  })
-
-  if (response.status === 401) {
-    return null
-  }
-
-  const payload = await response.json()
-
-  if (!response.ok) {
-    throw new Error(
-      payload?.detail || payload?.error || "Gagal membaca session Clara."
-    )
-  }
-
-  return {
-    email: String(payload.email || ""),
-    id: String(payload.id || ""),
-    name: String(payload.name || ""),
-    organizationName:
-      typeof payload.organization_name === "string"
-        ? payload.organization_name
-        : null,
-    role: String(payload.role || "")
-  }
-}
