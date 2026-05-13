@@ -42,3 +42,11 @@ export interface WhatsAppSuggestionResult {
   suggestionDetails?: WhatsAppSuggestionDetail[]
   suggestions: string[]
 }
+
+export interface ClaraExtensionSessionUser {
+  email: string
+  id: string
+  name: string
+  organizationName?: string | null
+  role: string
+}

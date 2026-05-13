@@ -39,7 +39,8 @@ User membuka WhatsApp Web, lalu:
 4. Clara menjalankan AI extraction + reply suggestion,
 5. hasil insight dan draft reply muncul di **Chrome Side Panel**,
 6. user bisa `Copy`, `Masukkan`, atau `Kirim` draft dari extension,
-7. jika user memilih `Masukkan` lalu mengirim manual dari WhatsApp, extension akan mencoba mendeteksi event kirim itu dan menyinkronkannya ke Clara sebagai `approved + sent`.
+7. extension hanya aktif kalau user sudah login di dashboard Clara,
+8. jika user memilih `Masukkan` lalu mengirim manual dari WhatsApp, extension akan mencoba mendeteksi event kirim itu dan menyinkronkannya ke Clara sebagai `approved + sent`.
 
 ---
 

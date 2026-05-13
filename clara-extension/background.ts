@@ -222,7 +222,7 @@ const syncPendingReplyAsSent = async (
     }),
     headers: {
       "Content-Type": "application/json",
-      ...getClaraAuthHeaders()
+      ...(await getClaraAuthHeaders())
     },
     method: "POST"
   })
@@ -263,7 +263,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               }),
               headers: {
                 "Content-Type": "application/json",
-                ...getClaraAuthHeaders()
+                ...(await getClaraAuthHeaders())
               },
               method: "POST"
             })

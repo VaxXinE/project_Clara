@@ -18,35 +18,26 @@ OPENAI_MODEL=gpt-5.4-mini
 PORT=9898
 PLASMO_PUBLIC_OPENAI_PROXY_URL=http://127.0.0.1:9898/reply-suggestions
 PLASMO_PUBLIC_CLARA_API_BASE_URL=http://127.0.0.1:8000
-PLASMO_PUBLIC_CLARA_API_TOKEN=isi-dengan-jwt-token-user-clara
+PLASMO_PUBLIC_CLARA_DASHBOARD_URL=http://localhost:3000
 ```
 
 Catatan:
 - `PLASMO_PUBLIC_CLARA_API_BASE_URL` dipakai untuk sync snapshot dan generate reply suggestion via backend Clara
-- `PLASMO_PUBLIC_CLARA_API_TOKEN` harus berisi JWT user Clara yang valid, supaya extension bisa auth ke endpoint Clara
+- `PLASMO_PUBLIC_CLARA_DASHBOARD_URL` dipakai extension untuk membuka halaman login dashboard Clara
 - `PLASMO_PUBLIC_OPENAI_PROXY_URL` sekarang menjadi fallback lokal kalau reply suggestion Clara sedang tidak dipakai atau gagal
 
-### Cara ambil token Clara untuk extension
+### Flow login extension
 
-Karena dashboard Clara sekarang pakai cookie session, bearer token extension diambil dari session login yang sudah valid:
+Sekarang extension **tidak lagi meminta token manual**.
 
-1. Login dulu ke Clara dashboard di browser.
-2. Panggil endpoint berikut dari terminal:
+Flow yang dipakai:
 
-```bash
-curl -X POST http://127.0.0.1:8000/auth/access-token \
-  -H "Cookie: clara_access_token=ISI_COOKIE_LOGIN_ANDA; clara_csrf_token=ISI_CSRF_COOKIE_ANDA" \
-  -H "X-CSRF-Token: ISI_CSRF_COOKIE_ANDA"
-```
+1. User login dulu ke dashboard Clara.
+2. Extension membaca session cookie Clara dari browser.
+3. Extension memakai session akun yang sama untuk memanggil backend Clara.
+4. Kalau session belum ada atau sudah expired, side panel akan terkunci dan meminta user login dulu.
 
-3. Copy field `access_token` dari response.
-4. Isi ke `.env` extension:
-
-```env
-PLASMO_PUBLIC_CLARA_API_TOKEN=eyJhbGciOi...
-```
-
-Untuk local development, ini paling praktis. Untuk production nanti, lebih bagus dibuat flow login extension yang dedicated, supaya user tidak perlu copy token manual.
+Jadi account extension sekarang otomatis mengikuti account dashboard yang sedang aktif.
 
 ## WhatsApp AI Reply Flow
 

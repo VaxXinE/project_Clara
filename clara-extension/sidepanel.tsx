@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 
 import type {
+  ClaraExtensionSessionUser,
   WhatsAppActionResponse,
   WhatsAppChatSnapshot,
   WhatsAppMessage,
@@ -11,7 +12,12 @@ import type {
 } from "~/types/whatsapp"
 import {
   getClaraAuthHeaders,
+  getClaraSessionOrigins,
+  getClaraDashboardLoginUrl,
+  getConfiguredClaraApiBaseUrl,
+  getConfiguredClaraAuthCookieName,
   getChatSnapshotProxyUrl,
+  getCurrentClaraSessionUser,
   getConfiguredProxyUrl,
   getClaraSendReplyUrl,
   getReplySuggestionCandidates,
@@ -23,6 +29,9 @@ const CHAT_SNAPSHOT_PROXY_URL = getChatSnapshotProxyUrl(OPENAI_PROXY_URL)
 const INSERT_LOCK_KEY = "__sgExtensionSidePanelInsertLock__"
 const AUTO_REFRESH_INTERVAL_MS = 2500
 const SUGGESTION_TONE_LABELS = ["Friendly", "Casual", "Profesional"] as const
+const LOGIN_MESSAGE =
+  "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
+const AUTH_REFRESH_INTERVAL_MS = 2000
 
 const panelStyle = {
   background:
@@ -616,7 +625,7 @@ const fetchSuggestionsFromProxyDirectly = async (
         }),
         headers: {
           "Content-Type": "application/json",
-          ...getClaraAuthHeaders()
+          ...(await getClaraAuthHeaders())
         },
         method: "POST"
       })
@@ -660,7 +669,7 @@ const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
         }),
         headers: {
           "Content-Type": "application/json",
-          ...getClaraAuthHeaders()
+          ...(await getClaraAuthHeaders())
         },
         method: "POST"
       })
@@ -705,7 +714,7 @@ const clearChatSnapshotInProxy = async () => {
         }),
         headers: {
           "Content-Type": "application/json",
-          ...getClaraAuthHeaders()
+          ...(await getClaraAuthHeaders())
         },
         method: "POST"
       })
@@ -776,6 +785,10 @@ const requestSuggestionCandidates = async (chatData: WhatsAppChatSnapshot) => {
 
 function ClaraSidePanel() {
   const [chatData, setChatData] = useState<WhatsAppChatSnapshot | null>(null)
+  const [authStatus, setAuthStatus] = useState<
+    "checking" | "authenticated" | "unauthenticated" | "misconfigured"
+  >("checking")
+  const [authUser, setAuthUser] = useState<ClaraExtensionSessionUser | null>(null)
   const [hasAutoReadAttempted, setHasAutoReadAttempted] = useState(false)
   const [error, setError] = useState("")
   const [feedback, setFeedback] = useState("")
@@ -792,6 +805,8 @@ function ClaraSidePanel() {
   const [actionMode, setActionMode] = useState("")
   const [replySuggestionId, setReplySuggestionId] = useState("")
   const [tabUrl, setTabUrl] = useState("")
+
+  const isAuthenticated = authStatus === "authenticated"
 
   const latestMessage = useMemo(
     () =>
@@ -825,7 +840,145 @@ function ClaraSidePanel() {
     })
   }, [])
 
+  const refreshAuthState = async (options?: { silent?: boolean }) => {
+    if (!getConfiguredClaraApiBaseUrl()) {
+      setAuthUser(null)
+      setAuthStatus("misconfigured")
+      return false
+    }
+
+    if (!options?.silent) {
+      setAuthStatus("checking")
+    }
+
+    try {
+      const user = await getCurrentClaraSessionUser()
+
+      if (!user) {
+        setAuthUser(null)
+        setAuthStatus("unauthenticated")
+        return false
+      }
+
+      setAuthUser(user)
+      setAuthStatus("authenticated")
+      return true
+    } catch (sessionError) {
+      setAuthUser(null)
+      setAuthStatus("unauthenticated")
+      setError(
+        sessionError instanceof Error
+          ? sessionError.message
+          : "Gagal membaca session Clara dari dashboard."
+      )
+      return false
+    }
+  }
+
+  useEffect(() => {
+    refreshAuthState().catch(() => {
+      setAuthStatus("unauthenticated")
+    })
+  }, [])
+
+  useEffect(() => {
+    if (isAuthenticated || authStatus === "misconfigured") {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      refreshAuthState({ silent: true }).catch(() => {
+        setAuthStatus("unauthenticated")
+      })
+    }, AUTH_REFRESH_INTERVAL_MS)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [authStatus, isAuthenticated])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        return
+      }
+
+      refreshAuthState({ silent: true }).catch(() => {
+        setAuthStatus("unauthenticated")
+      })
+    }
+
+    const handleFocus = () => {
+      refreshAuthState({ silent: true }).catch(() => {
+        setAuthStatus("unauthenticated")
+      })
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("focus", handleFocus)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("focus", handleFocus)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!chrome.cookies?.onChanged) {
+      return
+    }
+
+    const authCookieName = getConfiguredClaraAuthCookieName()
+    const allowedOrigins = getClaraSessionOrigins()
+
+    const listener = (changeInfo: chrome.cookies.CookieChangeInfo) => {
+      if (changeInfo.cookie.name !== authCookieName) {
+        return
+      }
+
+      const cookieOrigin = `http${changeInfo.cookie.secure ? "s" : ""}://${changeInfo.cookie.domain.replace(/^\./, "")}`
+
+      if (!allowedOrigins.some((origin) => origin.startsWith(cookieOrigin))) {
+        return
+      }
+
+      refreshAuthState({ silent: true }).catch(() => {
+        setAuthStatus("unauthenticated")
+      })
+    }
+
+    chrome.cookies.onChanged.addListener(listener)
+
+    return () => {
+      chrome.cookies.onChanged.removeListener(listener)
+    }
+  }, [])
+
+  const openDashboardLogin = async () => {
+    await chrome.tabs.create({
+      url: getClaraDashboardLoginUrl()
+    })
+  }
+
+  const ensureAuthenticated = async () => {
+    if (isAuthenticated) {
+      return true
+    }
+
+    const ok = await refreshAuthState()
+
+    if (!ok) {
+      setError(LOGIN_MESSAGE)
+    }
+
+    return ok
+  }
+
   const readChatFromActiveTab = async () => {
+    if (!(await ensureAuthenticated())) {
+      throw new Error(LOGIN_MESSAGE)
+    }
+
     const tab = await getActiveTab()
 
     if (!tab?.id) {
@@ -1052,6 +1205,10 @@ function ClaraSidePanel() {
   }
 
   const handleCopySuggestion = async (suggestion: string) => {
+    if (!(await ensureAuthenticated())) {
+      return
+    }
+
     try {
       await navigator.clipboard.writeText(suggestion)
       setFeedback("Saran jawaban berhasil disalin.")
@@ -1062,6 +1219,10 @@ function ClaraSidePanel() {
   }
 
   const handleInsertSuggestion = async (suggestion: string, index: number) => {
+    if (!(await ensureAuthenticated())) {
+      return
+    }
+
     setIsInsertingIndex(index)
     setError("")
     setFeedback("")
@@ -1134,6 +1295,10 @@ function ClaraSidePanel() {
   }
 
   const handleSendSuggestion = async (suggestion: string, index: number) => {
+    if (!(await ensureAuthenticated())) {
+      return
+    }
+
     setIsInsertingIndex(index)
     setError("")
     setFeedback("")
@@ -1205,7 +1370,7 @@ function ClaraSidePanel() {
         }),
         headers: {
           "Content-Type": "application/json",
-          ...getClaraAuthHeaders()
+          ...(await getClaraAuthHeaders())
         },
         method: "POST"
       })
@@ -1303,14 +1468,64 @@ function ClaraSidePanel() {
               border: "1px solid rgba(255,255,255,0.18)",
               color: "#f8fcff"
             }}>
-            Clara
+            {authUser ? `${authUser.name} • ${authUser.role}` : "Clara"}
           </div>
         </div>
       </div>
 
+      {!isAuthenticated && (
+        <div
+          style={{
+            ...softCardStyle,
+            display: "grid",
+            gap: 12,
+            marginBottom: 16
+          }}>
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>
+              Hubungkan extension ke dashboard
+            </div>
+            <div style={{ color: "#587067", fontSize: 13, lineHeight: 1.6 }}>
+              {authStatus === "misconfigured"
+                ? "PLASMO_PUBLIC_CLARA_API_BASE_URL belum diisi. Extension butuh koneksi ke backend Clara."
+                : authStatus === "checking"
+                  ? "Sedang memeriksa session login Clara..."
+                  : "Login yang berhasil akan terdeteksi otomatis oleh extension."}
+            </div>
+          </div>
+
+          <button onClick={openDashboardLogin} style={primaryButtonStyle}>
+            Buka Dashboard Login
+          </button>
+        </div>
+      )}
+
+      {isAuthenticated && authUser && (
+        <div
+          style={{
+            ...softCardStyle,
+            display: "grid",
+            gap: 6,
+            marginBottom: 16
+          }}>
+          <div style={{ color: "#35546d", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Session Clara
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 800 }}>
+            {authUser.name}
+          </div>
+          <div style={{ color: "#587067", fontSize: 12, lineHeight: 1.5 }}>
+            {authUser.email}
+            {authUser.organizationName ? ` • ${authUser.organizationName}` : ""}
+            {authUser.role ? ` • role ${authUser.role}` : ""}
+          </div>
+        </div>
+      )}
+
+      {!isAuthenticated ? null : (
       <div style={{ display: "grid", gap: 10 }}>
         <button
-          disabled={isLoading}
+          disabled={isLoading || !isAuthenticated}
           onClick={handleReadChat}
           style={primaryButtonStyle}>
           {isLoading
@@ -1456,7 +1671,7 @@ function ClaraSidePanel() {
           </div>
 
           <button
-            disabled={isSuggesting || isLoading}
+            disabled={isSuggesting || isLoading || !isAuthenticated}
             onClick={handleSuggestReplies}
             style={secondaryButtonStyle}>
             {isSuggesting ? "Membuat saran jawaban..." : "Buat Saran Jawaban"}
@@ -1645,6 +1860,7 @@ function ClaraSidePanel() {
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }
