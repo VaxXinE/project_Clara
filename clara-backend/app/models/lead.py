@@ -66,3 +66,9 @@ class Lead(Base):
         back_populates="lead",
         cascade="all, delete-orphan",
     )
+    deal = relationship(
+        "LeadDeal",
+        back_populates="lead",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )

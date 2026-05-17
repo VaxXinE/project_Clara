@@ -13,6 +13,7 @@ from app.models.conversation import Conversation
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
+from app.models.lead_deal import LeadDeal
 from app.models.organization import Organization
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
@@ -53,6 +54,17 @@ def seed_kpi_data(
     lead_a.lead_temperature = "hot"
     lead_a.current_stage = "closing"
     lead_a.next_follow_up_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    db.add(
+        LeadDeal(
+            lead_id=lead_a.id,
+            organization_id=lead_a.organization_id,
+            owner_user_id=lead_a.assigned_user_id,
+            status="won",
+            currency="IDR",
+            expected_value=5_000_000,
+            deposit_amount=1_500_000,
+        )
+    )
     db.add(
         AIExtraction(
             conversation_id=conversation_a.id,
@@ -129,6 +141,17 @@ def seed_kpi_data(
     )
     db.add(lead_b)
     db.flush()
+    db.add(
+        LeadDeal(
+            lead_id=lead_b.id,
+            organization_id=lead_b.organization_id,
+            owner_user_id=lead_b.assigned_user_id,
+            status="open",
+            currency="IDR",
+            expected_value=3_500_000,
+            deposit_amount=0,
+        )
+    )
 
     conversation_b = Conversation(
         organization_id=org_b_record.id,
@@ -193,6 +216,10 @@ def test_owner_kpi_command_center_returns_global_view(
     assert payload["summary"]["total_organizations"] == 2
     assert payload["summary"]["total_sales_users"] == 3
     assert payload["summary"]["total_leads"] >= 2
+    assert payload["summary"]["won_value"] == 5000000
+    assert payload["summary"]["deposit_amount"] == 1500000
+    assert payload["summary"]["pipeline_value"] == 3500000
+    assert payload["summary"]["win_rate"] == 1.0
     assert len(payload["alerts"]) >= 1
     assert len(payload["recommendations"]) >= 1
     assert len(payload["organization_performance"]) == 2
@@ -215,6 +242,8 @@ def test_admin_kpi_command_center_is_scoped_to_own_organization(
 
     assert payload["scope_type"] == "organization"
     assert payload["summary"]["total_organizations"] == 1
+    assert payload["summary"]["won_value"] == 5000000
+    assert payload["summary"]["deposit_amount"] == 1500000
     assert len(payload["alerts"]) >= 1
     assert len(payload["recommendations"]) >= 1
     assert len(payload["organization_performance"]) == 1

@@ -239,6 +239,40 @@ def test_admin_can_reassign_lead_and_auto_create_follow_up_task(
     assert task.status == "open"
 
 
+def test_marketing_can_upsert_lead_deal_metrics(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_b = seeded_data["marketing_b"]
+    owned_lead = seeded_data["owned_lead"]
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+
+    response = client.put(
+        f"/leads/{owned_lead.id}/deal",
+        json={
+            "status": "won",
+            "currency": "idr",
+            "expected_value": 2500000,
+            "deposit_amount": 750000,
+            "expected_close_date": "2026-05-25",
+            "notes": "Lead sudah masuk deal dan tinggal onboarding.",
+        },
+        headers=csrf_headers(client),
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "won"
+    assert payload["currency"] == "IDR"
+    assert payload["expected_value"] == 2500000
+    assert payload["deposit_amount"] == 750000
+
+    detail_response = client.get(f"/leads/{owned_lead.id}")
+    assert detail_response.status_code == 200, detail_response.text
+    assert detail_response.json()["deal"]["status"] == "won"
+
+
 def test_marketing_cannot_reassign_lead(
     client: TestClient,
     seeded_data: dict[str, object],

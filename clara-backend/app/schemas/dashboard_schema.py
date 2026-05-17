@@ -203,6 +203,10 @@ class KpiSummaryCard(BaseModel):
     reply_sent_rate: float
     approved_reply_rate: float
     overdue_follow_ups: int
+    pipeline_value: float
+    won_value: float
+    deposit_amount: float
+    win_rate: float
 
 
 class SalesPerformanceRow(BaseModel):
@@ -218,6 +222,10 @@ class SalesPerformanceRow(BaseModel):
     approved_drafts: int
     replies_sent: int
     overdue_follow_ups: int
+    won_leads: int
+    pipeline_value: float
+    won_value: float
+    deposit_amount: float
 
 
 class OrganizationPerformanceRow(BaseModel):
@@ -231,6 +239,10 @@ class OrganizationPerformanceRow(BaseModel):
     reply_sent_rate: float
     approved_reply_rate: float
     overdue_follow_ups: int
+    won_leads: int
+    pipeline_value: float
+    won_value: float
+    deposit_amount: float
 
 
 class KpiAlertItem(BaseModel):

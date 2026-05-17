@@ -11,6 +11,7 @@ from app.models.conversation import Conversation
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
+from app.models.lead_deal import LeadDeal
 from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
 from app.models.message import Message
 from app.models.organization import Organization
@@ -1235,10 +1236,15 @@ def build_kpi_observations(
             f"Ada {summary.overdue_follow_ups} follow-up yang sudah overdue. Ini sinyal paling dekat ke kehilangan momentum lead."
         )
 
+    if summary.won_value > 0 or summary.deposit_amount > 0:
+        observations.append(
+            f"Nilai deal yang sudah dimenangkan saat ini {summary.won_value:,.0f} IDR dengan deposit tercatat {summary.deposit_amount:,.0f} IDR."
+        )
+
     if top_sales_rows:
         best_sales = top_sales_rows[0]
         observations.append(
-            f"Sales paling produktif saat ini adalah {best_sales.user_name} dengan {best_sales.replies_sent} reply terkirim dan {best_sales.closing_leads} lead di stage closing."
+            f"Sales paling produktif saat ini adalah {best_sales.user_name} dengan {best_sales.replies_sent} reply terkirim, {best_sales.closing_leads} lead di stage closing, dan won value {best_sales.won_value:,.0f} IDR."
         )
 
     if top_org_rows:
@@ -1286,6 +1292,19 @@ def build_kpi_alerts(
                 ),
                 recommended_action="Audit pipeline balasan, cek approval bottleneck, dan prioritaskan percakapan yang sudah approved-ready-to-send.",
                 target_href="/dashboard/follow-up",
+            )
+        )
+
+    if summary.pipeline_value > 0 and summary.win_rate < 0.35:
+        alerts.append(
+            KpiAlertItem(
+                severity="medium",
+                title="Pipeline value belum terkonversi dengan sehat",
+                description=(
+                    f"Pipeline terbuka bernilai {summary.pipeline_value:,.0f} IDR, tapi win rate baru {(summary.win_rate * 100):.0f}%."
+                ),
+                recommended_action="Review lead yang sudah masuk closing atau negotiation, lalu pastikan follow-up dan handling objection paling dekat ke nilai terbesar berjalan hari ini.",
+                target_href="/dashboard/crm",
             )
         )
 
@@ -1350,6 +1369,17 @@ def build_executive_recommendations(
                 owner_role="admin",
                 next_step="Pantau AI Worklist setiap pagi dan pastikan overdue item turun sebelum siang.",
                 target_href="/dashboard/follow-up",
+            )
+        )
+
+    if summary.pipeline_value > 0 and summary.win_rate < 0.4:
+        recommendations.append(
+            ExecutiveRecommendationItem(
+                title="Jaga pipeline value agar tidak bocor di stage akhir",
+                rationale="Nilai pipeline yang besar tanpa win rate yang sehat biasanya berarti banyak lead bagus berhenti di objection atau negotiation.",
+                owner_role="owner",
+                next_step="Audit lead dengan expected value tertinggi, cek siapa owner-nya, lalu pastikan follow-up dan CTA closing-nya benar-benar dieksekusi.",
+                target_href="/dashboard/crm",
             )
         )
 
@@ -1478,6 +1508,10 @@ def build_kpi_command_center_data(
                     reply_sent_rate=0,
                     approved_reply_rate=0,
                     overdue_follow_ups=0,
+                    pipeline_value=0,
+                    won_value=0,
+                    deposit_amount=0,
+                    win_rate=0,
                 ),
                 "key_observations": [],
                 "alerts": [],
@@ -1507,6 +1541,7 @@ def build_kpi_command_center_data(
         selectinload(Lead.conversations).selectinload(Conversation.ai_extractions),
         selectinload(Lead.conversations).selectinload(Conversation.reply_suggestions),
         selectinload(Lead.conversations).selectinload(Conversation.sent_messages),
+        selectinload(Lead.deal).selectinload(LeadDeal.owner_user),
     )
     if not can_view_global:
         leads_statement = leads_statement.where(
@@ -1540,6 +1575,7 @@ def build_kpi_command_center_data(
 
     for user in users:
         assigned_leads = [lead for lead in leads if lead.assigned_user_id == user.id]
+        assigned_deals = [lead.deal for lead in assigned_leads if lead.deal is not None]
         owned_conversations = [
             conversation for conversation in conversations if conversation.sales_user_id == user.id
         ]
@@ -1585,11 +1621,25 @@ def build_kpi_command_center_data(
                     if (follow_up := ensure_aware_utc(lead.next_follow_up_at)) is not None
                     and follow_up <= now
                 ),
+                won_leads=sum(1 for deal in assigned_deals if deal.status == "won"),
+                pipeline_value=round(
+                    sum(float(deal.expected_value) for deal in assigned_deals if deal.status == "open"),
+                    2,
+                ),
+                won_value=round(
+                    sum(float(deal.expected_value) for deal in assigned_deals if deal.status == "won"),
+                    2,
+                ),
+                deposit_amount=round(
+                    sum(float(deal.deposit_amount) for deal in assigned_deals),
+                    2,
+                ),
             )
         )
 
     for organization in organizations:
         org_leads = [lead for lead in leads if lead.organization_id == organization.id]
+        org_deals = [lead.deal for lead in org_leads if lead.deal is not None]
         org_conversations = [
             conversation
             for conversation in conversations
@@ -1629,11 +1679,26 @@ def build_kpi_command_center_data(
                     if (follow_up := ensure_aware_utc(lead.next_follow_up_at)) is not None
                     and follow_up <= now
                 ),
+                won_leads=sum(1 for deal in org_deals if deal.status == "won"),
+                pipeline_value=round(
+                    sum(float(deal.expected_value) for deal in org_deals if deal.status == "open"),
+                    2,
+                ),
+                won_value=round(
+                    sum(float(deal.expected_value) for deal in org_deals if deal.status == "won"),
+                    2,
+                ),
+                deposit_amount=round(
+                    sum(float(deal.deposit_amount) for deal in org_deals),
+                    2,
+                ),
             )
         )
 
     sales_rows.sort(
         key=lambda row: (
+            row.won_value,
+            row.deposit_amount,
             row.replies_sent,
             row.closing_leads,
             row.hot_leads,
@@ -1643,6 +1708,8 @@ def build_kpi_command_center_data(
     )
     organization_rows.sort(
         key=lambda row: (
+            row.won_value,
+            row.deposit_amount,
             row.hot_leads,
             row.closing_leads,
             row.reply_sent_rate,
@@ -1665,6 +1732,34 @@ def build_kpi_command_center_data(
             for lead in leads
             if (follow_up := ensure_aware_utc(lead.next_follow_up_at)) is not None
             and follow_up <= now
+        ),
+        pipeline_value=round(
+            sum(
+                float(lead.deal.expected_value)
+                for lead in leads
+                if lead.deal is not None and lead.deal.status == "open"
+            ),
+            2,
+        ),
+        won_value=round(
+            sum(
+                float(lead.deal.expected_value)
+                for lead in leads
+                if lead.deal is not None and lead.deal.status == "won"
+            ),
+            2,
+        ),
+        deposit_amount=round(
+            sum(float(lead.deal.deposit_amount) for lead in leads if lead.deal is not None),
+            2,
+        ),
+        win_rate=safe_ratio(
+            sum(1 for lead in leads if lead.deal is not None and lead.deal.status == "won"),
+            sum(
+                1
+                for lead in leads
+                if lead.deal is not None and lead.deal.status in {"won", "lost"}
+            ),
         ),
     )
 

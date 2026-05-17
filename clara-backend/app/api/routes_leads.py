@@ -7,6 +7,8 @@ from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.lead_schema import (
+    LeadDealItem,
+    LeadDealUpsertRequest,
     LeadDetail,
     LeadListItem,
     LeadTaskCreateRequest,
@@ -15,8 +17,10 @@ from app.schemas.lead_schema import (
     LeadUpdateRequest,
 )
 from app.services.lead_service import (
+    get_lead_deal_for_user,
     get_lead_for_user,
     get_leads_for_user,
+    upsert_lead_deal_for_user,
     update_lead_for_user,
 )
 from app.services.lead_task_service import (
@@ -53,6 +57,34 @@ def update_lead(
     current_user: User = Depends(require_roles("marketing", "admin")),
 ) -> LeadDetail:
     return update_lead_for_user(
+        db=db,
+        lead_id=lead_id,
+        payload=payload,
+        current_user=current_user,
+    )
+
+
+@router.get("/{lead_id}/deal", response_model=LeadDealItem | None)
+def get_lead_deal(
+    lead_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+) -> LeadDealItem | None:
+    return get_lead_deal_for_user(
+        db=db,
+        lead_id=lead_id,
+        current_user=current_user,
+    )
+
+
+@router.put("/{lead_id}/deal", response_model=LeadDealItem)
+def upsert_lead_deal(
+    lead_id: UUID,
+    payload: LeadDealUpsertRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+) -> LeadDealItem:
+    return upsert_lead_deal_for_user(
         db=db,
         lead_id=lead_id,
         payload=payload,

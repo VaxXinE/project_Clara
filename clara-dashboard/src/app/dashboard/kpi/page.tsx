@@ -13,6 +13,18 @@ import type {
   KpiSnapshotHistoryResponse,
 } from "@/types/dashboard";
 
+function numberOrZero(value: number | undefined | null): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function formatIdr(value: number | undefined | null): string {
+  return `IDR ${numberOrZero(value).toLocaleString("id-ID")}`;
+}
+
+function formatPercent(value: number | undefined | null): string {
+  return `${(numberOrZero(value) * 100).toFixed(0)}%`;
+}
+
 export default function KpiCommandCenterPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
@@ -145,13 +157,36 @@ export default function KpiCommandCenterPage() {
               />
               <MetricCard
                 label="Reply Sent Rate"
-                value={`${(kpi.summary.reply_sent_rate * 100).toFixed(0)}%`}
+                value={formatPercent(kpi.summary.reply_sent_rate)}
                 hint="Persentase conversation yang sudah punya balasan final terkirim."
               />
               <MetricCard
                 label="Overdue Follow-up"
                 value={String(kpi.summary.overdue_follow_ups)}
                 hint="Follow-up yang sudah lewat jadwal dan berisiko kehilangan momentum."
+              />
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Pipeline Value"
+                value={formatIdr(kpi.summary.pipeline_value)}
+                hint="Total nilai deal yang masih terbuka dan perlu dijaga sampai close."
+              />
+              <MetricCard
+                label="Won Value"
+                value={formatIdr(kpi.summary.won_value)}
+                hint="Nilai deal yang sudah resmi dimenangkan oleh tim."
+              />
+              <MetricCard
+                label="Deposit Amount"
+                value={formatIdr(kpi.summary.deposit_amount)}
+                hint="Akumulasi deposit yang sudah tercatat dari lead aktif dan deal selesai."
+              />
+              <MetricCard
+                label="Win Rate"
+                value={formatPercent(kpi.summary.win_rate)}
+                hint="Persentase deal won dibanding deal yang sudah benar-benar closed."
               />
             </section>
 
@@ -190,7 +225,23 @@ export default function KpiCommandCenterPage() {
                   />
                   <SummaryRow
                     label="Approved reply rate"
-                    value={`${(kpi.summary.approved_reply_rate * 100).toFixed(0)}%`}
+                    value={formatPercent(kpi.summary.approved_reply_rate)}
+                  />
+                  <SummaryRow
+                    label="Pipeline value"
+                    value={formatIdr(kpi.summary.pipeline_value)}
+                  />
+                  <SummaryRow
+                    label="Won value"
+                    value={formatIdr(kpi.summary.won_value)}
+                  />
+                  <SummaryRow
+                    label="Deposit amount"
+                    value={formatIdr(kpi.summary.deposit_amount)}
+                  />
+                  <SummaryRow
+                    label="Win rate"
+                    value={formatPercent(kpi.summary.win_rate)}
                   />
                 </div>
 
@@ -262,9 +313,22 @@ export default function KpiCommandCenterPage() {
                           <SummaryTile label="Assigned Leads" value={String(row.assigned_leads)} />
                           <SummaryTile label="Hot Leads" value={String(row.hot_leads)} />
                           <SummaryTile label="Closing Leads" value={String(row.closing_leads)} />
+                          <SummaryTile label="Won Leads" value={String(row.won_leads)} />
                           <SummaryTile label="Owned Conversations" value={String(row.conversations_owned)} />
                           <SummaryTile label="Analyzed" value={String(row.analyzed_conversations)} />
                           <SummaryTile label="Overdue Follow-up" value={String(row.overdue_follow_ups)} />
+                          <SummaryTile
+                            label="Pipeline Value"
+                            value={formatIdr(row.pipeline_value)}
+                          />
+                          <SummaryTile
+                            label="Won Value"
+                            value={formatIdr(row.won_value)}
+                          />
+                          <SummaryTile
+                            label="Deposit"
+                            value={formatIdr(row.deposit_amount)}
+                          />
                         </div>
                       </article>
                     ))
@@ -485,11 +549,19 @@ export default function KpiCommandCenterPage() {
                           />
                           <SummaryTile
                             label="Reply Sent Rate"
-                            value={`${(snapshot.metrics_json.reply_sent_rate * 100).toFixed(0)}%`}
+                            value={formatPercent(snapshot.metrics_json.reply_sent_rate)}
                           />
                           <SummaryTile
                             label="Overdue"
                             value={String(snapshot.metrics_json.overdue_follow_ups)}
+                          />
+                          <SummaryTile
+                            label="Won Value"
+                            value={formatIdr(snapshot.metrics_json.won_value)}
+                          />
+                          <SummaryTile
+                            label="Deposit"
+                            value={formatIdr(snapshot.metrics_json.deposit_amount)}
                           />
                         </div>
                       </article>
@@ -539,18 +611,31 @@ export default function KpiCommandCenterPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 grid gap-3 md:grid-cols-5">
+                      <div className="mt-4 grid gap-3 md:grid-cols-4 xl:grid-cols-7">
                         <SummaryTile label="Conversations" value={String(row.conversations)} />
                         <SummaryTile label="Analyzed" value={String(row.analyzed_conversations)} />
+                        <SummaryTile label="Won Leads" value={String(row.won_leads)} />
                         <SummaryTile
                           label="Reply Sent Rate"
-                          value={`${(row.reply_sent_rate * 100).toFixed(0)}%`}
+                          value={formatPercent(row.reply_sent_rate)}
                         />
                         <SummaryTile
                           label="Approved Reply Rate"
-                          value={`${(row.approved_reply_rate * 100).toFixed(0)}%`}
+                          value={formatPercent(row.approved_reply_rate)}
                         />
                         <SummaryTile label="Overdue" value={String(row.overdue_follow_ups)} />
+                        <SummaryTile
+                          label="Pipeline Value"
+                          value={formatIdr(row.pipeline_value)}
+                        />
+                        <SummaryTile
+                          label="Won Value"
+                          value={formatIdr(row.won_value)}
+                        />
+                        <SummaryTile
+                          label="Deposit"
+                          value={formatIdr(row.deposit_amount)}
+                        />
                       </div>
                     </article>
                   ))

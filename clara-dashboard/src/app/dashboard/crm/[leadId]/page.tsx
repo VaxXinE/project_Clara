@@ -10,6 +10,8 @@ import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
 import type {
   CurrentUser,
+  LeadDealItem,
+  LeadDealUpsertRequest,
   LeadDetail,
   LeadTaskCreateRequest,
   LeadTaskItem,
@@ -30,6 +32,7 @@ const STAGE_OPTIONS = [
 ];
 
 const TEMPERATURE_OPTIONS = ["cold", "warm", "hot", "unknown"];
+const DEAL_STATUS_OPTIONS = ["open", "won", "lost"];
 
 function toDateTimeLocalValue(value: string | null): string {
   if (!value) {
@@ -60,9 +63,12 @@ export default function LeadDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [isSavingDeal, setIsSavingDeal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [dealSuccessMessage, setDealSuccessMessage] = useState("");
   const [taskErrorMessage, setTaskErrorMessage] = useState("");
+  const [dealErrorMessage, setDealErrorMessage] = useState("");
 
   const [summaryInput, setSummaryInput] = useState("");
   const [notesInput, setNotesInput] = useState("");
@@ -74,6 +80,13 @@ export default function LeadDetailPage() {
   const [taskTitleInput, setTaskTitleInput] = useState("");
   const [taskDescriptionInput, setTaskDescriptionInput] = useState("");
   const [taskDueAtInput, setTaskDueAtInput] = useState("");
+  const [dealStatusInput, setDealStatusInput] = useState("open");
+  const [dealCurrencyInput, setDealCurrencyInput] = useState("IDR");
+  const [expectedValueInput, setExpectedValueInput] = useState("0");
+  const [depositAmountInput, setDepositAmountInput] = useState("0");
+  const [expectedCloseDateInput, setExpectedCloseDateInput] = useState("");
+  const [dealClosedAtInput, setDealClosedAtInput] = useState("");
+  const [dealNotesInput, setDealNotesInput] = useState("");
 
   const canReassignLead = currentUser?.role === "admin" || currentUser?.role === "owner";
 
@@ -103,7 +116,15 @@ export default function LeadDetailPage() {
       setTemperatureInput(leadDetail.lead_temperature);
       setFollowUpInput(toDateTimeLocalValue(leadDetail.next_follow_up_at));
       setAssignedUserInput(leadDetail.assigned_user_id ?? "");
+      setDealStatusInput(leadDetail.deal?.status ?? "open");
+      setDealCurrencyInput(leadDetail.deal?.currency ?? "IDR");
+      setExpectedValueInput(String(leadDetail.deal?.expected_value ?? 0));
+      setDepositAmountInput(String(leadDetail.deal?.deposit_amount ?? 0));
+      setExpectedCloseDateInput(leadDetail.deal?.expected_close_date ?? "");
+      setDealClosedAtInput(toDateTimeLocalValue(leadDetail.deal?.closed_at ?? null));
+      setDealNotesInput(leadDetail.deal?.notes ?? "");
       setSuccessMessage("");
+      setDealSuccessMessage("");
     } catch (error) {
       setLead(null);
       setErrorMessage(
@@ -111,6 +132,50 @@ export default function LeadDetailPage() {
       );
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleSaveDeal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!lead) {
+      return;
+    }
+
+    setIsSavingDeal(true);
+    setDealErrorMessage("");
+    setDealSuccessMessage("");
+
+    try {
+      const payload: LeadDealUpsertRequest = {
+        status: dealStatusInput,
+        currency: dealCurrencyInput.trim().toUpperCase() || "IDR",
+        expected_value: Number(expectedValueInput || 0),
+        deposit_amount: Number(depositAmountInput || 0),
+        expected_close_date: expectedCloseDateInput || null,
+        closed_at: fromDateTimeLocalValue(dealClosedAtInput),
+        notes: dealNotesInput || null,
+      };
+
+      const updatedDeal = await apiFetch<LeadDealItem>(`/leads/${lead.id}/deal`, {
+        method: "PUT",
+        body: payload,
+      });
+
+      setLead((previous) =>
+        previous
+          ? {
+              ...previous,
+              deal: updatedDeal,
+            }
+          : previous
+      );
+      setDealSuccessMessage("Deal metrics berhasil diperbarui.");
+    } catch (error) {
+      setDealErrorMessage(
+        error instanceof Error ? error.message : "Gagal menyimpan deal metrics."
+      );
+    } finally {
+      setIsSavingDeal(false);
     }
   }
 
@@ -417,6 +482,126 @@ export default function LeadDetailPage() {
             </section>
 
             <aside className="space-y-6">
+              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-950">
+                      Deal Metrics
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Isi angka bisnis lead ini supaya KPI owner tidak cuma berhenti di pipeline health.
+                    </p>
+                  </div>
+                  {dealSuccessMessage && (
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      {dealSuccessMessage}
+                    </span>
+                  )}
+                </div>
+
+                {dealErrorMessage && (
+                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {dealErrorMessage}
+                  </div>
+                )}
+
+                <form
+                  onSubmit={(event) => void handleSaveDeal(event)}
+                  className="mt-5 space-y-4"
+                >
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Deal status">
+                      <select
+                        value={dealStatusInput}
+                        onChange={(event) => setDealStatusInput(event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      >
+                        {DEAL_STATUS_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option.toUpperCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Currency">
+                      <input
+                        value={dealCurrencyInput}
+                        onChange={(event) => setDealCurrencyInput(event.target.value.toUpperCase())}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+
+                    <Field label="Expected value">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={expectedValueInput}
+                        onChange={(event) => setExpectedValueInput(event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+
+                    <Field label="Deposit amount">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={depositAmountInput}
+                        onChange={(event) => setDepositAmountInput(event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+
+                    <Field label="Expected close date">
+                      <input
+                        type="date"
+                        value={expectedCloseDateInput}
+                        onChange={(event) => setExpectedCloseDateInput(event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+
+                    <Field label="Closed at">
+                      <input
+                        type="datetime-local"
+                        value={dealClosedAtInput}
+                        onChange={(event) => setDealClosedAtInput(event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Deal notes">
+                    <textarea
+                      value={dealNotesInput}
+                      onChange={(event) => setDealNotesInput(event.target.value)}
+                      rows={3}
+                      className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
+                    />
+                  </Field>
+
+                  <div className="rounded-[24px] bg-slate-50 p-4">
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <Metric label="Expected value" value={`${dealCurrencyInput} ${Number(expectedValueInput || 0).toLocaleString("id-ID")}`} />
+                      <Metric label="Deposit" value={`${dealCurrencyInput} ${Number(depositAmountInput || 0).toLocaleString("id-ID")}`} />
+                      <Metric label="Deal status" value={dealStatusInput.toUpperCase()} />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSavingDeal}
+                      className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isSavingDeal ? "Menyimpan deal..." : "Simpan Deal Metrics"}
+                    </button>
+                  </div>
+                </form>
+              </section>
+
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-950">

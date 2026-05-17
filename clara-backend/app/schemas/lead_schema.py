@@ -1,7 +1,26 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
+
+
+class LeadDealItem(BaseModel):
+    id: UUID
+    lead_id: UUID
+    organization_id: UUID | None
+    owner_user_id: UUID | None
+    owner_user_name: str | None
+    status: str
+    currency: str
+    expected_value: float
+    deposit_amount: float
+    expected_close_date: date | None
+    closed_at: datetime | None
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LeadTaskItem(BaseModel):
@@ -45,6 +64,7 @@ class LeadListItem(BaseModel):
 
 class LeadDetail(LeadListItem):
     conversation_ids: list[UUID]
+    deal: LeadDealItem | None
     tasks: list[LeadTaskItem]
 
 
@@ -71,3 +91,13 @@ class LeadTaskUpdateRequest(BaseModel):
     description: str | None = None
     due_at: datetime | None = None
     assigned_user_id: UUID | None = None
+
+
+class LeadDealUpsertRequest(BaseModel):
+    status: str | None = None
+    currency: str | None = None
+    expected_value: float | None = None
+    deposit_amount: float | None = None
+    expected_close_date: date | None = None
+    closed_at: datetime | None = None
+    notes: str | None = None

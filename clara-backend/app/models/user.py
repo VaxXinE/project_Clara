@@ -65,3 +65,8 @@ class User(Base):
         foreign_keys="LeadTask.assigned_user_id",
         back_populates="assigned_user",
     )
+    owned_lead_deals = relationship(
+        "LeadDeal",
+        foreign_keys="LeadDeal.owner_user_id",
+        back_populates="owner_user",
+    )

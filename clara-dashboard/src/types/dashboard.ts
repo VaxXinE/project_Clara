@@ -110,8 +110,26 @@ export type LeadTaskItem = {
   updated_at: string;
 };
 
+export type LeadDealItem = {
+  id: string;
+  lead_id: string;
+  organization_id: string | null;
+  owner_user_id: string | null;
+  owner_user_name: string | null;
+  status: string;
+  currency: string;
+  expected_value: number;
+  deposit_amount: number;
+  expected_close_date: string | null;
+  closed_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type LeadDetail = LeadListItem & {
   conversation_ids: string[];
+  deal: LeadDealItem | null;
   tasks: LeadTaskItem[];
 };
 
@@ -138,6 +156,16 @@ export type LeadTaskUpdateRequest = {
   description?: string | null;
   due_at?: string | null;
   assigned_user_id?: string | null;
+};
+
+export type LeadDealUpsertRequest = {
+  status?: string;
+  currency?: string;
+  expected_value?: number;
+  deposit_amount?: number;
+  expected_close_date?: string | null;
+  closed_at?: string | null;
+  notes?: string | null;
 };
 
 export type SalesWorklistItem = {
@@ -197,6 +225,10 @@ export type KpiSummaryCard = {
   reply_sent_rate: number;
   approved_reply_rate: number;
   overdue_follow_ups: number;
+  pipeline_value: number;
+  won_value: number;
+  deposit_amount: number;
+  win_rate: number;
 };
 
 export type SalesPerformanceRow = {
@@ -212,6 +244,10 @@ export type SalesPerformanceRow = {
   approved_drafts: number;
   replies_sent: number;
   overdue_follow_ups: number;
+  won_leads: number;
+  pipeline_value: number;
+  won_value: number;
+  deposit_amount: number;
 };
 
 export type OrganizationPerformanceRow = {
@@ -225,6 +261,10 @@ export type OrganizationPerformanceRow = {
   reply_sent_rate: number;
   approved_reply_rate: number;
   overdue_follow_ups: number;
+  won_leads: number;
+  pipeline_value: number;
+  won_value: number;
+  deposit_amount: number;
 };
 
 export type KpiCommandCenterResponse = {
@@ -293,6 +333,10 @@ export type KpiSnapshotItem = {
     reply_sent_rate: number;
     approved_reply_rate: number;
     overdue_follow_ups: number;
+    pipeline_value: number;
+    won_value: number;
+    deposit_amount: number;
+    win_rate: number;
   };
   observations_json: string[];
   created_at: string;
