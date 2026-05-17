@@ -66,6 +66,12 @@ class Lead(Base):
         back_populates="lead",
         cascade="all, delete-orphan",
     )
+    activity_events = relationship(
+        "LeadActivityEvent",
+        back_populates="lead",
+        cascade="all, delete-orphan",
+        order_by="desc(LeadActivityEvent.created_at)",
+    )
     deal = relationship(
         "LeadDeal",
         back_populates="lead",

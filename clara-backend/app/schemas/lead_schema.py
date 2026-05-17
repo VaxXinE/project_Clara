@@ -60,6 +60,22 @@ class LeadTaskEventItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LeadActivityEventItem(BaseModel):
+    id: UUID
+    lead_id: UUID
+    organization_id: UUID | None
+    actor_user_id: UUID | None
+    actor_user_name: str | None
+    event_type: str
+    title: str
+    description: str | None
+    from_value: str | None
+    to_value: str | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class LeadListItem(BaseModel):
     id: UUID
     organization_id: UUID | None
@@ -85,6 +101,7 @@ class LeadDetail(LeadListItem):
     conversation_ids: list[UUID]
     deal: LeadDealItem | None
     tasks: list[LeadTaskItem]
+    timeline: list[LeadActivityEventItem]
 
 
 class LeadUpdateRequest(BaseModel):

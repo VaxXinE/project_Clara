@@ -100,14 +100,31 @@ export type LeadTaskItem = {
   organization_id: string | null;
   assigned_user_id: string | null;
   assigned_user_name: string | null;
+  completed_by_user_id: string | null;
+  completed_by_user_name: string | null;
   task_type: string;
   status: string;
   title: string;
   description: string | null;
   due_at: string | null;
   completed_at: string | null;
+  last_status_changed_at: string;
   created_at: string;
   updated_at: string;
+};
+
+export type LeadActivityEventItem = {
+  id: string;
+  lead_id: string;
+  organization_id: string | null;
+  actor_user_id: string | null;
+  actor_user_name: string | null;
+  event_type: string;
+  title: string;
+  description: string | null;
+  from_value: string | null;
+  to_value: string | null;
+  created_at: string;
 };
 
 export type LeadDealItem = {
@@ -131,6 +148,7 @@ export type LeadDetail = LeadListItem & {
   conversation_ids: string[];
   deal: LeadDealItem | null;
   tasks: LeadTaskItem[];
+  timeline: LeadActivityEventItem[];
 };
 
 export type LeadUpdateRequest = {
@@ -156,6 +174,7 @@ export type LeadTaskUpdateRequest = {
   description?: string | null;
   due_at?: string | null;
   assigned_user_id?: string | null;
+  notes?: string | null;
 };
 
 export type LeadDealUpsertRequest = {

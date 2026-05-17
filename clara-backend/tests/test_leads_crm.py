@@ -314,6 +314,39 @@ def test_task_status_update_creates_persisted_task_events(
     assert any(event["event_type"] == "created" for event in events)
 
 
+def test_lead_detail_exposes_activity_timeline(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    owned_lead = seeded_data["owned_lead"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    update_response = client.patch(
+        f"/leads/{owned_lead.id}",
+        json={
+            "current_stage": "closing",
+            "next_follow_up_at": "2026-05-22T10:00:00Z",
+            "notes": "Lead ini perlu dikawal sampai deal.",
+        },
+        headers=csrf_headers(client),
+    )
+    assert update_response.status_code == 200, update_response.text
+
+    timeline_response = client.get(f"/leads/{owned_lead.id}/timeline")
+    assert timeline_response.status_code == 200, timeline_response.text
+    timeline = timeline_response.json()
+    assert len(timeline) >= 3
+    assert any(item["event_type"] == "stage_changed" for item in timeline)
+    assert any(item["event_type"] == "follow_up_updated" for item in timeline)
+    assert any(item["event_type"] == "notes_updated" for item in timeline)
+
+    detail_response = client.get(f"/leads/{owned_lead.id}")
+    assert detail_response.status_code == 200, detail_response.text
+    assert len(detail_response.json()["timeline"]) >= 3
+
+
 def test_marketing_cannot_reassign_lead(
     client: TestClient,
     seeded_data: dict[str, object],

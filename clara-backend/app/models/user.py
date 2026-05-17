@@ -75,6 +75,11 @@ class User(Base):
         foreign_keys="LeadTaskEvent.actor_user_id",
         back_populates="actor_user",
     )
+    lead_activity_events = relationship(
+        "LeadActivityEvent",
+        foreign_keys="LeadActivityEvent.actor_user_id",
+        back_populates="actor_user",
+    )
     owned_lead_deals = relationship(
         "LeadDeal",
         foreign_keys="LeadDeal.owner_user_id",

@@ -18,6 +18,7 @@ from app.schemas.lead_schema import (
     LeadTaskUpdateRequest,
 )
 from app.services.access_control_service import can_access_all_conversations
+from app.services.lead_activity_service import create_lead_activity_event
 
 VALID_TASK_TYPES = {"manual_follow_up", "scheduled_follow_up", "approval_follow_up"}
 VALID_TASK_STATUSES = {"open", "done", "snoozed", "cancelled"}
@@ -215,6 +216,15 @@ def create_lead_task_for_user(
         next_due_at=task.due_at,
         notes="Task dibuat dari UI lead detail.",
     )
+    create_lead_activity_event(
+        db=db,
+        lead=lead,
+        event_type="task_event",
+        title="Task manual dibuat",
+        description=task.title,
+        actor_user_id=current_user.id,
+        to_value=task.status,
+    )
     db.commit()
     db.refresh(task)
     return build_task_item(task)
@@ -337,6 +347,30 @@ def update_lead_task_for_user(
             notes="Assignee task diperbarui.",
         )
 
+    activity_title = "Task follow-up diperbarui"
+    if status_changed and task.status == "done":
+        activity_title = "Task follow-up selesai"
+    elif status_changed and task.status == "snoozed":
+        activity_title = "Task follow-up di-snooze"
+    elif status_changed and task.status == "open":
+        activity_title = "Task follow-up dibuka lagi"
+    elif due_changed:
+        activity_title = "Jadwal task follow-up diperbarui"
+    elif assignee_changed:
+        activity_title = "PIC task follow-up diperbarui"
+
+    if status_changed or due_changed or assignee_changed:
+        create_lead_activity_event(
+            db=db,
+            lead=lead,
+            event_type="task_event",
+            title=activity_title,
+            description=payload.notes or task.title,
+            actor_user_id=current_user.id,
+            from_value=previous_status if status_changed else None,
+            to_value=task.status,
+        )
+
     db.commit()
     db.refresh(task)
     return build_task_item(task)
@@ -401,6 +435,15 @@ def upsert_follow_up_task_for_lead(
                 next_due_at=None,
                 notes="Task follow-up dibatalkan karena lead tidak lagi punya jadwal follow-up.",
             )
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="task_event",
+                title="Task follow-up otomatis dibatalkan",
+                description="Next follow-up lead dihapus sehingga task dijadikan cancelled.",
+                from_value=previous_status,
+                to_value="cancelled",
+            )
         return existing_task
 
     if existing_task is not None:
@@ -428,6 +471,15 @@ def upsert_follow_up_task_for_lead(
             next_due_at=existing_task.due_at,
             notes="Task follow-up disinkronkan dari perubahan next follow-up lead.",
         )
+        create_lead_activity_event(
+            db=db,
+            lead=lead,
+            event_type="task_event",
+            title="Task follow-up disinkronkan",
+            description="Jadwal follow-up task diperbarui mengikuti lead.",
+            from_value=previous_due_at.isoformat() if previous_due_at else None,
+            to_value=existing_task.due_at.isoformat() if existing_task.due_at else None,
+        )
         return existing_task
 
     task = LeadTask(
@@ -452,5 +504,13 @@ def upsert_follow_up_task_for_lead(
         to_status="open",
         next_due_at=task.due_at,
         notes="Task follow-up otomatis dibuat dari next follow-up lead.",
+    )
+    create_lead_activity_event(
+        db=db,
+        lead=lead,
+        event_type="task_event",
+        title="Task follow-up otomatis dibuat",
+        description="Clara membuat task follow-up dari jadwal lead.",
+        to_value="open",
     )
     return task

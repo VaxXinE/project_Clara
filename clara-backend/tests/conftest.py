@@ -37,6 +37,7 @@ from app.models.conversation import Conversation
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
+from app.models.lead_activity_event import LeadActivityEvent
 from app.models.lead_deal import LeadDeal
 from app.models.lead_task import LeadTask
 from app.models.lead_task_event import LeadTaskEvent
@@ -76,6 +77,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             KpiCommandSnapshot.__table__,
             KpiAlertRecord.__table__,
             Lead.__table__,
+            LeadActivityEvent.__table__,
             LeadTask.__table__,
             LeadTaskEvent.__table__,
             LeadDeal.__table__,
@@ -117,6 +119,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             AIExtraction.__table__,
             Message.__table__,
             Conversation.__table__,
+            LeadActivityEvent.__table__,
             LeadTaskEvent.__table__,
             LeadTask.__table__,
             LeadDeal.__table__,

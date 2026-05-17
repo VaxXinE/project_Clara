@@ -9,15 +9,21 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.conversation import Conversation
 from app.models.lead import Lead
+from app.models.lead_activity_event import LeadActivityEvent
 from app.models.lead_deal import LeadDeal
 from app.models.lead_task import LeadTask
 from app.models.user import User
 from app.schemas.lead_schema import (
+    LeadActivityEventItem,
     LeadDealItem,
     LeadDealUpsertRequest,
     LeadDetail,
     LeadListItem,
     LeadUpdateRequest,
+)
+from app.services.lead_activity_service import (
+    create_lead_activity_event,
+    list_lead_activity_events,
 )
 from app.services.access_control_service import can_access_all_conversations
 from app.services.lead_task_service import (
@@ -89,6 +95,15 @@ def ensure_conversation_lead(
     conversation.lead_id = lead.id
     db.add(conversation)
     db.flush()
+    create_lead_activity_event(
+        db=db,
+        lead=lead,
+        event_type="lead_created",
+        title="Lead baru dibuat",
+        description="Lead otomatis dibuat saat conversation pertama kali dihubungkan.",
+        actor_user_id=conversation.sales_user_id,
+        to_value=lead.display_name,
+    )
 
     return lead
 
@@ -105,12 +120,56 @@ def sync_lead_from_conversation(
     lead.assigned_user_id = conversation.sales_user_id
     lead.display_name = derive_lead_display_name(conversation=conversation)
     lead.source = conversation.source
+    if conversation.current_stage != lead.current_stage:
+        create_lead_activity_event(
+            db=db,
+            lead=lead,
+            event_type="stage_changed",
+            title="Stage lead diperbarui dari analisis",
+            description="Clara menyelaraskan stage lead dari hasil percakapan terbaru.",
+            actor_user_id=conversation.sales_user_id,
+            from_value=lead.current_stage,
+            to_value=conversation.current_stage,
+        )
     lead.current_stage = conversation.current_stage
+    if conversation.lead_temperature != lead.lead_temperature:
+        create_lead_activity_event(
+            db=db,
+            lead=lead,
+            event_type="temperature_changed",
+            title="Temperatur lead diperbarui dari analisis",
+            description="Clara menyelaraskan temperatur lead dari hasil percakapan terbaru.",
+            actor_user_id=conversation.sales_user_id,
+            from_value=lead.lead_temperature,
+            to_value=conversation.lead_temperature,
+        )
     lead.lead_temperature = conversation.lead_temperature
     lead.last_contact_at = conversation.last_message_at
     if customer_summary:
+        if customer_summary != lead.summary:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="summary_updated",
+                title="Ringkasan lead diperbarui dari analisis",
+                description="Summary lead disegarkan dari hasil analisis AI terbaru.",
+                actor_user_id=conversation.sales_user_id,
+                from_value=lead.summary,
+                to_value=customer_summary,
+            )
         lead.summary = customer_summary
     if next_follow_up_at is not None:
+        if next_follow_up_at != lead.next_follow_up_at:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="follow_up_updated",
+                title="Jadwal follow-up diperbarui dari analisis",
+                description="AI menyarankan follow-up date baru untuk lead ini.",
+                actor_user_id=conversation.sales_user_id,
+                from_value=lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
+                to_value=next_follow_up_at.isoformat(),
+            )
         lead.next_follow_up_at = next_follow_up_at
 
     db.add(lead)
@@ -170,7 +229,7 @@ def build_lead_deal_item(deal: LeadDeal) -> LeadDealItem:
     )
 
 
-def build_lead_detail(lead: Lead) -> LeadDetail:
+def build_lead_detail(db: Session, lead: Lead) -> LeadDetail:
     list_item = build_lead_list_item(lead)
     return LeadDetail(
         **list_item.model_dump(),
@@ -183,6 +242,7 @@ def build_lead_detail(lead: Lead) -> LeadDetail:
         ],
         deal=build_lead_deal_item(lead.deal) if lead.deal else None,
         tasks=list_tasks_for_lead(lead),
+        timeline=list_lead_activity_events(db=db, lead_id=lead.id),
     )
 
 
@@ -200,6 +260,7 @@ def get_lead_model_for_user(
             selectinload(Lead.assigned_user),
             selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
             selectinload(Lead.deal).selectinload(LeadDeal.owner_user),
+            selectinload(Lead.activity_events).selectinload(LeadActivityEvent.actor_user),
         )
     )
     lead = db.scalars(statement).first()
@@ -257,7 +318,21 @@ def get_lead_for_user(
         lead_id=lead_id,
         current_user=current_user,
     )
-    return build_lead_detail(lead)
+    return build_lead_detail(db, lead)
+
+
+def get_lead_timeline_for_user(
+    db: Session,
+    *,
+    lead_id: UUID,
+    current_user: User,
+) -> list[LeadActivityEventItem]:
+    lead = get_lead_model_for_user(
+        db=db,
+        lead_id=lead_id,
+        current_user=current_user,
+    )
+    return list_lead_activity_events(db=db, lead_id=lead.id)
 
 
 def update_lead_for_user(
@@ -279,7 +354,18 @@ def update_lead_for_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid lead stage.",
             )
-        lead.current_stage = payload.current_stage
+        if payload.current_stage != lead.current_stage:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="stage_changed",
+                title="Stage lead diperbarui",
+                description="Tahap pipeline lead diubah dari CRM.",
+                actor_user_id=current_user.id,
+                from_value=lead.current_stage,
+                to_value=payload.current_stage,
+            )
+            lead.current_stage = payload.current_stage
 
     if payload.lead_temperature is not None:
         if payload.lead_temperature not in VALID_TEMPERATURES:
@@ -287,16 +373,62 @@ def update_lead_for_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid lead temperature.",
             )
-        lead.lead_temperature = payload.lead_temperature
+        if payload.lead_temperature != lead.lead_temperature:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="temperature_changed",
+                title="Temperatur lead diperbarui",
+                description="Klasifikasi cold/warm/hot lead berubah.",
+                actor_user_id=current_user.id,
+                from_value=lead.lead_temperature,
+                to_value=payload.lead_temperature,
+            )
+            lead.lead_temperature = payload.lead_temperature
 
     if payload.summary is not None:
-        lead.summary = payload.summary.strip() or None
+        next_summary = payload.summary.strip() or None
+        if next_summary != lead.summary:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="summary_updated",
+                title="Ringkasan lead diperbarui",
+                description="Summary lead diedit dari halaman detail.",
+                actor_user_id=current_user.id,
+                from_value=lead.summary,
+                to_value=next_summary,
+            )
+            lead.summary = next_summary
 
     if payload.notes is not None:
-        lead.notes = payload.notes.strip() or None
+        next_notes = payload.notes.strip() or None
+        if next_notes != lead.notes:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="notes_updated",
+                title="Catatan internal diperbarui",
+                description="Internal notes lead diubah dari CRM.",
+                actor_user_id=current_user.id,
+                from_value=lead.notes,
+                to_value=next_notes,
+            )
+            lead.notes = next_notes
 
     if "next_follow_up_at" in payload.model_fields_set:
-        lead.next_follow_up_at = payload.next_follow_up_at
+        if payload.next_follow_up_at != lead.next_follow_up_at:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="follow_up_updated",
+                title="Jadwal follow-up diperbarui",
+                description="Tanggal follow-up berikutnya diubah.",
+                actor_user_id=current_user.id,
+                from_value=lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
+                to_value=payload.next_follow_up_at.isoformat() if payload.next_follow_up_at else None,
+            )
+            lead.next_follow_up_at = payload.next_follow_up_at
 
     if "assigned_user_id" in payload.model_fields_set:
         if not can_access_all_conversations(current_user):
@@ -310,7 +442,19 @@ def update_lead_for_user(
             lead=lead,
             assignee_id=payload.assigned_user_id,
         )
-        lead.assigned_user_id = assignee.id if assignee else None
+        next_assignee_id = assignee.id if assignee else None
+        if next_assignee_id != lead.assigned_user_id:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="assignee_changed",
+                title="PIC lead diperbarui",
+                description="Lead dipindahkan ke user lain.",
+                actor_user_id=current_user.id,
+                from_value=str(lead.assigned_user_id) if lead.assigned_user_id else None,
+                to_value=str(next_assignee_id) if next_assignee_id else None,
+            )
+            lead.assigned_user_id = next_assignee_id
 
     for conversation in lead.conversations:
         if payload.current_stage is not None:
@@ -334,7 +478,7 @@ def update_lead_for_user(
     db.commit()
     db.refresh(lead)
 
-    return build_lead_detail(lead)
+    return build_lead_detail(db, lead)
 
 
 def get_lead_deal_for_user(
@@ -383,11 +527,33 @@ def upsert_lead_deal_for_user(
             organization_id=lead.organization_id,
             owner_user_id=lead.assigned_user_id,
         )
+        create_lead_activity_event(
+            db=db,
+            lead=lead,
+            event_type="deal_created",
+            title="Deal metrics dibuat",
+            description="Layer KPI bisnis untuk lead ini mulai diisi.",
+            actor_user_id=current_user.id,
+        )
 
     deal.organization_id = lead.organization_id
     deal.owner_user_id = lead.assigned_user_id
+    current_status = deal.status or "open"
+    current_expected_value = float(deal.expected_value or 0)
+    current_deposit_amount = float(deal.deposit_amount or 0)
 
     if payload.status is not None:
+        if payload.status != current_status:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="deal_status_changed",
+                title="Status deal diperbarui",
+                description="Status deal lead berubah.",
+                actor_user_id=current_user.id,
+                from_value=current_status,
+                to_value=payload.status,
+            )
         deal.status = payload.status
     if payload.currency is not None:
         currency = payload.currency.strip().upper()
@@ -398,8 +564,30 @@ def upsert_lead_deal_for_user(
             )
         deal.currency = currency
     if payload.expected_value is not None:
+        if float(payload.expected_value) != current_expected_value:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="deal_value_updated",
+                title="Nilai pipeline diperbarui",
+                description="Expected value deal diubah.",
+                actor_user_id=current_user.id,
+                from_value=str(current_expected_value),
+                to_value=str(payload.expected_value),
+            )
         deal.expected_value = payload.expected_value
     if payload.deposit_amount is not None:
+        if float(payload.deposit_amount) != current_deposit_amount:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="deposit_updated",
+                title="Nilai deposit diperbarui",
+                description="Deposit amount lead diubah.",
+                actor_user_id=current_user.id,
+                from_value=str(current_deposit_amount),
+                to_value=str(payload.deposit_amount),
+            )
         deal.deposit_amount = payload.deposit_amount
     if "expected_close_date" in payload.model_fields_set:
         deal.expected_close_date = payload.expected_close_date

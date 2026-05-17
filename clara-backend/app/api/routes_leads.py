@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.lead_schema import (
     LeadDealItem,
     LeadDealUpsertRequest,
+    LeadActivityEventItem,
     LeadDetail,
     LeadListItem,
     LeadTaskCreateRequest,
@@ -21,6 +22,7 @@ from app.services.lead_service import (
     get_lead_deal_for_user,
     get_lead_for_user,
     get_leads_for_user,
+    get_lead_timeline_for_user,
     upsert_lead_deal_for_user,
     update_lead_for_user,
 )
@@ -62,6 +64,19 @@ def update_lead(
         db=db,
         lead_id=lead_id,
         payload=payload,
+        current_user=current_user,
+    )
+
+
+@router.get("/{lead_id}/timeline", response_model=list[LeadActivityEventItem])
+def get_lead_timeline(
+    lead_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+) -> list[LeadActivityEventItem]:
+    return get_lead_timeline_for_user(
+        db=db,
+        lead_id=lead_id,
         current_user=current_user,
     )
 

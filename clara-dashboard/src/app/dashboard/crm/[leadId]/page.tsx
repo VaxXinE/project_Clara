@@ -53,6 +53,21 @@ function fromDateTimeLocalValue(value: string): string | null {
   return new Date(value).toISOString();
 }
 
+function formatTimelineValue(value: string | null): string {
+  if (!value) {
+    return "-";
+  }
+
+  if (
+    value.includes("T") &&
+    (value.endsWith("Z") || value.includes("+"))
+  ) {
+    return formatDateTime(value);
+  }
+
+  return value;
+}
+
 export default function LeadDetailPage() {
   const params = useParams<{ leadId: string }>();
   const leadId = params.leadId;
@@ -90,6 +105,10 @@ export default function LeadDetailPage() {
 
   const canReassignLead = currentUser?.role === "admin" || currentUser?.role === "owner";
 
+  async function fetchLeadDetail(): Promise<LeadDetail> {
+    return apiFetch<LeadDetail>(`/leads/${leadId}`);
+  }
+
   async function loadLeadDetail() {
     if (!leadId) {
       setErrorMessage("Lead ID tidak valid.");
@@ -103,7 +122,7 @@ export default function LeadDetailPage() {
     try {
       const [me, leadDetail, scopedUsers] = await Promise.all([
         apiFetch<CurrentUser>("/auth/me"),
-        apiFetch<LeadDetail>(`/leads/${leadId}`),
+        fetchLeadDetail(),
         apiFetch<CurrentUser[]>("/auth/users"),
       ]);
 
@@ -161,14 +180,21 @@ export default function LeadDetailPage() {
         body: payload,
       });
 
-      setLead((previous) =>
-        previous
-          ? {
-              ...previous,
-              deal: updatedDeal,
-            }
-          : previous
-      );
+      const refreshedLead = await fetchLeadDetail();
+      setLead(refreshedLead);
+      setSummaryInput(refreshedLead.summary ?? "");
+      setNotesInput(refreshedLead.notes ?? "");
+      setStageInput(refreshedLead.current_stage);
+      setTemperatureInput(refreshedLead.lead_temperature);
+      setFollowUpInput(toDateTimeLocalValue(refreshedLead.next_follow_up_at));
+      setAssignedUserInput(refreshedLead.assigned_user_id ?? "");
+      setDealStatusInput(updatedDeal.status);
+      setDealCurrencyInput(updatedDeal.currency);
+      setExpectedValueInput(String(updatedDeal.expected_value ?? 0));
+      setDepositAmountInput(String(updatedDeal.deposit_amount ?? 0));
+      setExpectedCloseDateInput(updatedDeal.expected_close_date ?? "");
+      setDealClosedAtInput(toDateTimeLocalValue(updatedDeal.closed_at ?? null));
+      setDealNotesInput(updatedDeal.notes ?? "");
       setDealSuccessMessage("Deal metrics berhasil diperbarui.");
     } catch (error) {
       setDealErrorMessage(
@@ -250,19 +276,13 @@ export default function LeadDetailPage() {
         due_at: fromDateTimeLocalValue(taskDueAtInput),
       };
 
-      const newTask = await apiFetch<LeadTaskItem>(`/leads/${lead.id}/tasks`, {
+      await apiFetch<LeadTaskItem>(`/leads/${lead.id}/tasks`, {
         method: "POST",
         body: payload,
       });
 
-      setLead((previous) =>
-        previous
-          ? {
-              ...previous,
-              tasks: [...previous.tasks, newTask],
-            }
-          : previous
-      );
+      const refreshedLead = await fetchLeadDetail();
+      setLead(refreshedLead);
       setTaskTitleInput("");
       setTaskDescriptionInput("");
       setTaskDueAtInput("");
@@ -284,24 +304,16 @@ export default function LeadDetailPage() {
 
     try {
       const payload: LeadTaskUpdateRequest = { status };
-      const updatedTask = await apiFetch<LeadTaskItem>(
+      await apiFetch<LeadTaskItem>(
         `/leads/${lead.id}/tasks/${taskId}`,
         {
           method: "PATCH",
-          body: payload,
+            body: payload,
         }
       );
 
-      setLead((previous) =>
-        previous
-          ? {
-              ...previous,
-              tasks: previous.tasks.map((task) =>
-                task.id === updatedTask.id ? updatedTask : task
-              ),
-            }
-          : previous
-      );
+      const refreshedLead = await fetchLeadDetail();
+      setLead(refreshedLead);
     } catch (error) {
       setTaskErrorMessage(
         error instanceof Error ? error.message : "Gagal mengubah status task."
@@ -701,6 +713,65 @@ export default function LeadDetailPage() {
                     {isCreatingTask ? "Membuat task..." : "Tambah Task"}
                   </button>
                 </form>
+              </section>
+
+              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-950">
+                    Activity Timeline
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Semua perubahan penting di lead ini dicatat supaya perpindahan stage, follow-up, task, dan deal bisa diaudit dengan enak.
+                  </p>
+                </div>
+
+                <div className="mt-5 space-y-4">
+                  {lead.timeline.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                      Belum ada aktivitas yang tercatat untuk lead ini.
+                    </div>
+                  ) : (
+                    lead.timeline.map((event) => (
+                      <article
+                        key={event.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="text-sm font-semibold text-slate-950">
+                              {event.title}
+                            </h3>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {event.actor_user_name ?? "System"} · {formatDateTime(event.created_at)}
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            {event.event_type.replaceAll("_", " ")}
+                          </span>
+                        </div>
+
+                        {event.description && (
+                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                            {event.description}
+                          </p>
+                        )}
+
+                        {(event.from_value || event.to_value) && (
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <Metric
+                              label="Dari"
+                              value={formatTimelineValue(event.from_value)}
+                            />
+                            <Metric
+                              label="Menjadi"
+                              value={formatTimelineValue(event.to_value)}
+                            />
+                          </div>
+                        )}
+                      </article>
+                    ))
+                  )}
+                </div>
               </section>
             </aside>
           </div>

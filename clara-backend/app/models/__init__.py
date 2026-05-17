@@ -5,6 +5,7 @@ from app.models.conversation import Conversation
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
+from app.models.lead_activity_event import LeadActivityEvent
 from app.models.lead_deal import LeadDeal
 from app.models.lead_task import LeadTask
 from app.models.lead_task_event import LeadTaskEvent
@@ -24,6 +25,7 @@ __all__ = [
     "KpiAlertRecord",
     "KpiCommandSnapshot",
     "Lead",
+    "LeadActivityEvent",
     "LeadDeal",
     "LeadTask",
     "LeadTaskEvent",
