@@ -79,6 +79,30 @@ class SalesConversationDetail(BaseModel):
     sent_messages: list[DashboardSentMessageSummary]
 
 
+class SalesWorklistItem(BaseModel):
+    lead_id: UUID
+    conversation_id: UUID | None
+    lead_name: str
+    current_stage: str
+    lead_temperature: str
+    priority_score: int
+    task_type: str
+    task_label: str
+    reason: str
+    recommended_action: str
+    last_contact_at: datetime | None
+    next_follow_up_at: datetime | None
+
+
+class SalesWorklistResponse(BaseModel):
+    generated_at: datetime
+    overdue_count: int
+    hot_lead_count: int
+    ready_to_send_count: int
+    pending_analysis_count: int
+    items: list[SalesWorklistItem]
+
+
 class MarketingObjectionInsight(BaseModel):
     topic: str
     count: int

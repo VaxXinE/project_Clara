@@ -11,6 +11,7 @@ from app.schemas.dashboard_schema import (
     OpsDatabaseOverviewResponse,
     SalesConversationDetail,
     SalesInboxItem,
+    SalesWorklistResponse,
 )
 from app.services.audit_service import create_audit_log
 from app.services.dashboard_service import (
@@ -18,6 +19,7 @@ from app.services.dashboard_service import (
     get_ops_database_overview,
     get_sales_conversation_detail,
     get_sales_inbox,
+    get_sales_worklist,
 )
 from app.services.marketing_snapshot_service import (
     generate_marketing_snapshot,
@@ -34,6 +36,14 @@ def sales_inbox(
     current_user: User = Depends(require_roles("marketing", "admin")),
 ):
     return get_sales_inbox(db=db, current_user=current_user)
+
+
+@router.get("/sales/worklist", response_model=SalesWorklistResponse)
+def sales_worklist(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+):
+    return get_sales_worklist(db=db, current_user=current_user)
 
 
 @router.get(

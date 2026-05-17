@@ -9,7 +9,15 @@ from sqlalchemy import select
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.db.session import SessionLocal
+from app.models.ai_extraction import AIExtraction  # noqa: F401
+from app.models.approval_log import ApprovalLog  # noqa: F401
+from app.models.conversation import Conversation  # noqa: F401
+from app.models.lead import Lead  # noqa: F401
+from app.models.message import Message  # noqa: F401
 from app.models.organization import Organization
+from app.models.product_knowledge import ProductKnowledge  # noqa: F401
+from app.models.reply_suggestion import ReplySuggestion  # noqa: F401
+from app.models.sent_message import SentMessage  # noqa: F401
 from app.models.user import User
 from app.schemas.auth_schema import CreateUserRequest
 from app.schemas.organization_schema import CreateOrganizationRequest

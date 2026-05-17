@@ -18,6 +18,7 @@ from app.models.user import User  # noqa: F401
 from app.models.audit_log import AuditLog  # noqa: F401
 from app.models.organization import Organization  # noqa: F401
 from app.models.product_knowledge import ProductKnowledge  # noqa: F401
+from app.models.lead import Lead  # noqa: F401
 
 config = context.config
 

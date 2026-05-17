@@ -55,3 +55,8 @@ class User(Base):
         foreign_keys="Conversation.sales_user_id",
         overlaps="sales_user",
     )
+    assigned_leads = relationship(
+        "Lead",
+        back_populates="assigned_user",
+        foreign_keys="Lead.assigned_user_id",
+    )

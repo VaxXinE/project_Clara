@@ -22,6 +22,11 @@ class Conversation(Base):
         nullable=True,
         index=True,
     )
+    lead_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     source: Mapped[str] = mapped_column(
         String(50),
@@ -69,6 +74,7 @@ class Conversation(Base):
         foreign_keys=[sales_user_id],
         overlaps="conversations_owned",
     )
+    lead = relationship("Lead", back_populates="conversations")
 
     messages = relationship(
         "Message",

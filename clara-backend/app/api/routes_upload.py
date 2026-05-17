@@ -9,6 +9,7 @@ from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.user import User
 from app.services.audit_service import create_audit_log
+from app.services.lead_service import ensure_conversation_lead
 from app.services.whatsapp_parser import WhatsAppParseError, parse_whatsapp_txt
 
 router = APIRouter(prefix="/upload", tags=["upload"])
@@ -90,6 +91,15 @@ async def upload_whatsapp_txt(
                 message_timestamp=parsed_message.message_timestamp,
             )
         )
+
+    customer_messages = [
+        message for message in parsed_messages if message.sender_type == "customer"
+    ]
+    ensure_conversation_lead(
+        db=db,
+        conversation=conversation,
+        preferred_name=customer_messages[0].sender_name if customer_messages else None,
+    )
 
     db.commit()
     db.refresh(conversation)

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.ai_extraction import AIExtraction
 from app.models.audit_log import AuditLog
 from app.models.conversation import Conversation
+from app.models.lead import Lead
 from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
 from app.models.message import Message
 from app.models.organization import Organization
@@ -35,6 +36,8 @@ from app.schemas.dashboard_schema import (
     MarketingObjectionInsight,
     SalesConversationDetail,
     SalesInboxItem,
+    SalesWorklistItem,
+    SalesWorklistResponse,
 )
 from app.services.access_control_service import (
     can_access_all_conversations,
@@ -65,6 +68,16 @@ def build_ai_summary(
 def parse_uuid_or_none(value: str | None) -> UUID | None:
     if not value:
         return None
+
+
+def ensure_aware_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
 
     try:
         return UUID(value)
@@ -385,6 +398,202 @@ def get_sales_conversation_detail(
             for sent_message in sorted_sent_messages
         ],
         sales_user_id=conversation.sales_user_id,
+    )
+
+
+def get_latest_sent_message(conversation: Conversation) -> SentMessage | None:
+    if not conversation.sent_messages:
+        return None
+
+    return max(
+        conversation.sent_messages,
+        key=lambda sent_message: sent_message.sent_at,
+    )
+
+
+def get_latest_conversation_for_lead(lead: Lead) -> Conversation | None:
+    if not lead.conversations:
+        return None
+
+    return max(
+        lead.conversations,
+        key=lambda conversation: (
+            conversation.last_message_at or conversation.created_at,
+            conversation.created_at,
+        ),
+    )
+
+
+def build_sales_worklist_item(
+    *,
+    lead: Lead,
+    conversation: Conversation,
+    latest_message: Message | None,
+    latest_extraction: AIExtraction | None,
+    latest_suggestion: ReplySuggestion | None,
+    latest_sent_message: SentMessage | None,
+    now: datetime,
+) -> SalesWorklistItem | None:
+    current_sent_state = resolve_current_sent_message(latest_message, latest_sent_message)
+    ui_status = determine_ui_status(
+        latest_message,
+        latest_extraction,
+        latest_suggestion,
+        current_sent_state,
+    )
+    priority_score = calculate_priority_score(latest_extraction, latest_suggestion)
+
+    task_type: str | None = None
+    task_label: str | None = None
+    reason: str | None = None
+    recommended_action: str | None = None
+    next_follow_up_at = ensure_aware_utc(lead.next_follow_up_at)
+
+    if next_follow_up_at is not None and next_follow_up_at <= now:
+        task_type = "overdue_follow_up"
+        task_label = "Follow up overdue"
+        reason = "Lead ini sudah melewati jadwal follow-up yang ditentukan."
+        recommended_action = (
+            latest_extraction.next_best_action
+            if latest_extraction is not None
+            else "Hubungi customer lagi dan perbarui status percakapan."
+        )
+        priority_score += 40
+    elif (
+        lead.lead_temperature == "hot"
+        and latest_message is not None
+        and latest_message.sender_type == "customer"
+        and current_sent_state is None
+    ):
+        task_type = "hot_lead_needs_reply"
+        task_label = "Hot lead belum dibalas"
+        reason = "Customer dengan temperature hot sudah membalas, tapi belum ada balasan final yang terkirim."
+        recommended_action = (
+            latest_extraction.next_best_action
+            if latest_extraction is not None
+            else "Balas secepatnya dan arahkan ke langkah closing berikutnya."
+        )
+        priority_score += 35
+    elif ui_status == "approved_ready_to_send":
+        task_type = "approved_ready_to_send"
+        task_label = "Draft siap dikirim"
+        reason = "Sudah ada draft approved, tapi pesan final belum dikirim ke customer."
+        recommended_action = "Buka conversation dan kirim balasan approved secepatnya."
+        priority_score += 20
+    elif ui_status == "needs_analysis":
+        task_type = "needs_analysis"
+        task_label = "Butuh analisis ulang"
+        reason = "Ada balasan customer baru yang belum dibaca ulang oleh AI."
+        recommended_action = "Jalankan AI analysis lagi agar next action dan draft ikut refresh."
+        priority_score += 15
+    elif ui_status == "needs_reply_suggestion":
+        task_type = "needs_reply_suggestion"
+        task_label = "Butuh draft balasan baru"
+        reason = "Analisis sudah ada, tapi Clara belum menyiapkan draft yang relevan dengan chat terbaru."
+        recommended_action = "Generate reply suggestion baru dari detail conversation."
+        priority_score += 10
+
+    if task_type is None or task_label is None or reason is None or recommended_action is None:
+        return None
+
+    return SalesWorklistItem(
+        lead_id=lead.id,
+        conversation_id=conversation.id,
+        lead_name=lead.display_name,
+        current_stage=lead.current_stage,
+        lead_temperature=lead.lead_temperature,
+        priority_score=priority_score,
+        task_type=task_type,
+        task_label=task_label,
+        reason=reason,
+        recommended_action=recommended_action,
+        last_contact_at=lead.last_contact_at,
+        next_follow_up_at=next_follow_up_at,
+    )
+
+
+def get_sales_worklist(
+    db: Session,
+    current_user: User,
+) -> SalesWorklistResponse:
+    if current_user.organization_id is None:
+        return SalesWorklistResponse(
+            generated_at=datetime.now(timezone.utc),
+            overdue_count=0,
+            hot_lead_count=0,
+            ready_to_send_count=0,
+            pending_analysis_count=0,
+            items=[],
+        )
+
+    statement = (
+        select(Lead)
+        .where(Lead.organization_id == current_user.organization_id)
+        .options(
+            selectinload(Lead.conversations).selectinload(Conversation.messages),
+            selectinload(Lead.conversations).selectinload(Conversation.ai_extractions),
+            selectinload(Lead.conversations).selectinload(Conversation.reply_suggestions),
+            selectinload(Lead.conversations).selectinload(Conversation.sent_messages),
+        )
+    )
+
+    if not can_access_all_conversations(current_user):
+        statement = statement.where(Lead.assigned_user_id == current_user.id)
+
+    leads = list(db.scalars(statement).all())
+    now = datetime.now(timezone.utc)
+    items: list[SalesWorklistItem] = []
+
+    overdue_count = 0
+    hot_lead_count = 0
+    ready_to_send_count = 0
+    pending_analysis_count = 0
+
+    for lead in leads:
+        conversation = get_latest_conversation_for_lead(lead)
+        if conversation is None:
+            continue
+
+        latest_message = get_latest_message(conversation)
+        latest_extraction = get_latest_extraction(conversation)
+        latest_suggestion = get_latest_reply_suggestion(conversation)
+        latest_sent_message = get_latest_sent_message(conversation)
+
+        item = build_sales_worklist_item(
+            lead=lead,
+            conversation=conversation,
+            latest_message=latest_message,
+            latest_extraction=latest_extraction,
+            latest_suggestion=latest_suggestion,
+            latest_sent_message=latest_sent_message,
+            now=now,
+        )
+        if item is None:
+            continue
+
+        items.append(item)
+
+        if item.task_type == "overdue_follow_up":
+            overdue_count += 1
+        elif item.task_type == "hot_lead_needs_reply":
+            hot_lead_count += 1
+        elif item.task_type == "approved_ready_to_send":
+            ready_to_send_count += 1
+        elif item.task_type == "needs_analysis":
+            pending_analysis_count += 1
+
+    items.sort(
+        key=lambda item: (item.priority_score, item.last_contact_at or now),
+        reverse=True,
+    )
+
+    return SalesWorklistResponse(
+        generated_at=now,
+        overdue_count=overdue_count,
+        hot_lead_count=hot_lead_count,
+        ready_to_send_count=ready_to_send_count,
+        pending_analysis_count=pending_analysis_count,
+        items=items,
     )
 
 
@@ -884,16 +1093,6 @@ def build_sent_message_summary(
         message_text=sent_message.message_text,
         sent_by_name=sent_message.sent_by_name,
         sent_at=sent_message.sent_at,
-    )
-
-
-def get_latest_sent_message(conversation: Conversation) -> SentMessage | None:
-    if not conversation.sent_messages:
-        return None
-
-    return max(
-        conversation.sent_messages,
-        key=lambda sent_message: sent_message.sent_at,
     )
 
 

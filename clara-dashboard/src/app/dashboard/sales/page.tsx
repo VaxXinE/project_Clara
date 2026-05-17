@@ -83,6 +83,18 @@ export default function SalesInboxPage() {
               Marketing Insights
             </Link>
           )}
+          <Link
+            href="/dashboard/crm"
+            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          >
+            Lead Pipeline
+          </Link>
+          <Link
+            href="/dashboard/follow-up"
+            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          >
+            AI Worklist
+          </Link>
           {canAccessKnowledge && (
             <Link
               href="/dashboard/knowledge"

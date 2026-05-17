@@ -33,6 +33,7 @@ from app.main import create_app
 from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
 from app.models.conversation import Conversation
+from app.models.lead import Lead
 from app.models.message import Message
 from app.models.organization import Organization
 from app.models.product_knowledge import ProductKnowledge
@@ -66,6 +67,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
         tables=[
             Organization.__table__,
             User.__table__,
+            Lead.__table__,
             Conversation.__table__,
             Message.__table__,
             AIExtraction.__table__,
@@ -101,6 +103,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             AIExtraction.__table__,
             Message.__table__,
             Conversation.__table__,
+            Lead.__table__,
             User.__table__,
             Organization.__table__,
         ],
@@ -228,6 +231,20 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         lead_temperature="unknown",
     )
     db.add(owned_conversation)
+    db.flush()
+
+    owned_lead = Lead(
+        organization_id=org_a.id,
+        assigned_user_id=marketing_b.id,
+        display_name="Owned Customer",
+        source="whatsapp_txt",
+        current_stage="qualification",
+        lead_temperature="warm",
+        last_contact_at=owned_conversation.created_at,
+    )
+    db.add(owned_lead)
+    db.flush()
+    owned_conversation.lead_id = owned_lead.id
 
     global_knowledge = ProductKnowledge(
         organization_id=None,
@@ -249,6 +266,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
     db.refresh(marketing_other_org)
     db.refresh(inactive_user)
     db.refresh(owned_conversation)
+    db.refresh(owned_lead)
     db.refresh(global_knowledge)
 
     yield {
@@ -262,6 +280,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         "marketing_other_org": marketing_other_org,
         "inactive_user": inactive_user,
         "owned_conversation": owned_conversation,
+        "owned_lead": owned_lead,
         "global_knowledge": global_knowledge,
     }
 

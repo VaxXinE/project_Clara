@@ -75,6 +75,60 @@ export type SalesConversationDetail = {
   sales_user_id: string | null;
 };
 
+export type LeadListItem = {
+  id: string;
+  organization_id: string | null;
+  assigned_user_id: string | null;
+  display_name: string;
+  source: string;
+  current_stage: string;
+  lead_temperature: string;
+  summary: string | null;
+  notes: string | null;
+  last_contact_at: string | null;
+  next_follow_up_at: string | null;
+  created_at: string;
+  updated_at: string;
+  conversation_count: number;
+  latest_conversation_id: string | null;
+};
+
+export type LeadDetail = LeadListItem & {
+  conversation_ids: string[];
+};
+
+export type LeadUpdateRequest = {
+  current_stage?: string;
+  lead_temperature?: string;
+  summary?: string | null;
+  notes?: string | null;
+  next_follow_up_at?: string | null;
+};
+
+export type SalesWorklistItem = {
+  lead_id: string;
+  conversation_id: string | null;
+  lead_name: string;
+  current_stage: string;
+  lead_temperature: string;
+  priority_score: number;
+  task_type: string;
+  task_label: string;
+  reason: string;
+  recommended_action: string;
+  last_contact_at: string | null;
+  next_follow_up_at: string | null;
+};
+
+export type SalesWorklistResponse = {
+  generated_at: string;
+  overdue_count: number;
+  hot_lead_count: number;
+  ready_to_send_count: number;
+  pending_analysis_count: number;
+  items: SalesWorklistItem[];
+};
+
 export type MarketingInsightsPreview = {
   total_conversations: number;
   total_analyzed_conversations: number;

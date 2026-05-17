@@ -24,6 +24,7 @@ from app.schemas.extension_schema import (
     WhatsAppExtensionSnapshotSyncResponse,
 )
 from app.services.ai_extraction_service import analyze_conversation
+from app.services.lead_service import ensure_conversation_lead
 from app.services.reply_suggestion_service import create_reply_suggestion
 from app.services.whatsapp_parser import JAKARTA_TZ, parse_whatsapp_datetime
 
@@ -287,6 +288,15 @@ def sync_whatsapp_extension_snapshot(
                 message_timestamp=message.timestamp,
             )
         )
+
+    customer_messages = [
+        message for message in normalized_messages if message.sender_type == "customer"
+    ]
+    ensure_conversation_lead(
+        db=db,
+        conversation=conversation,
+        preferred_name=customer_messages[0].author if customer_messages else snapshot.chat_title,
+    )
 
     db.commit()
     db.refresh(conversation)

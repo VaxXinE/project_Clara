@@ -15,6 +15,7 @@ import type {
   CurrentUser,
   MarketingInsightsPreview,
   SalesInboxItem,
+  SalesWorklistResponse,
 } from "@/types/dashboard";
 
 type OverviewMetrics = {
@@ -59,6 +60,7 @@ export default function DashboardHomePage() {
   const [metrics, setMetrics] = useState<OverviewMetrics>(EMPTY_METRICS);
   const [latestConversation, setLatestConversation] =
     useState<SalesInboxItem | null>(null);
+  const [worklist, setWorklist] = useState<SalesWorklistResponse | null>(null);
   const [changePasswordForm, setChangePasswordForm] =
     useState<ChangePasswordRequest>(EMPTY_CHANGE_PASSWORD_FORM);
   const [errorMessage, setErrorMessage] = useState("");
@@ -76,12 +78,16 @@ export default function DashboardHomePage() {
 
         if (["marketing", "admin", "owner"].includes(me.role)) {
           try {
-            const inbox = await apiFetch<SalesInboxItem[]>("/dashboard/sales/inbox");
+            const [inbox, worklistResponse] = await Promise.all([
+              apiFetch<SalesInboxItem[]>("/dashboard/sales/inbox"),
+              apiFetch<SalesWorklistResponse>("/dashboard/sales/worklist"),
+            ]);
             nextMetrics.inboxCount = inbox.length;
             nextMetrics.analyzedCount = inbox.filter(
               (item) => item.latest_ai_extraction !== null
             ).length;
             setLatestConversation(inbox[0] ?? null);
+            setWorklist(worklistResponse);
           } catch {
             // Owner bisa gagal karena route inbox masih bukan primary focus untuk role ini.
           }
@@ -245,6 +251,16 @@ export default function DashboardHomePage() {
                 description="Masukkan export chat baru untuk diparse menjadi conversation dan message."
               />
               <ActionCard
+                href="/dashboard/crm"
+                title="Lead Pipeline"
+                description="Lihat lead yang sudah terbentuk dari conversation dan mulai atur stage CRM dasarnya."
+              />
+              <ActionCard
+                href="/dashboard/follow-up"
+                title="AI Worklist"
+                description="Buka daftar follow-up harian yang sudah diprioritaskan Clara dari hot lead, overdue, dan draft siap kirim."
+              />
+              <ActionCard
                 href="/dashboard/knowledge"
                 title="Product Knowledge"
                 description="Kelola fakta produk, legalitas, dan policy supaya reply AI tetap grounded."
@@ -288,6 +304,50 @@ export default function DashboardHomePage() {
                 <li>Jalankan AI analysis lebih cepat pada conversation yang sudah aktif lagi.</li>
                 <li>Gunakan product knowledge saat menangani legalitas, harga, atau klaim sensitif.</li>
               </ul>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    AI Worklist
+                  </p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                    Prioritas follow-up hari ini
+                  </h2>
+                </div>
+                <Link
+                  href="/dashboard/follow-up"
+                  className="inline-flex rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                >
+                  Lihat Semua
+                </Link>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {worklist && worklist.items.length > 0 ? (
+                  worklist.items.slice(0, 3).map((item) => (
+                    <div
+                      key={`${item.lead_id}-${item.task_type}`}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold text-slate-950">{item.lead_name}</p>
+                        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          {item.task_label}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        {item.recommended_action}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                    Belum ada follow-up yang mendesak.
+                  </div>
+                )}
+              </div>
             </section>
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">

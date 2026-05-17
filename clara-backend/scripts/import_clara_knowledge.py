@@ -13,6 +13,7 @@ from app.db.session import SessionLocal
 from app.models.ai_extraction import AIExtraction  # noqa: F401
 from app.models.approval_log import ApprovalLog  # noqa: F401
 from app.models.conversation import Conversation  # noqa: F401
+from app.models.lead import Lead  # noqa: F401
 from app.models.message import Message  # noqa: F401
 from app.models.organization import Organization  # noqa: F401
 from app.models.product_knowledge import ProductKnowledge
