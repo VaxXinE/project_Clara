@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -435,7 +435,7 @@ def confirm_extension_reply_sent(
         suggestion.selected_reply_text = normalized_selected
         suggestion.final_reply_text = normalized_final
         suggestion.approval_status = "approved"
-        suggestion.updated_at = datetime.utcnow()
+        suggestion.updated_at = datetime.now(timezone.utc)
 
         db.add(
             ApprovalLog(
@@ -453,7 +453,7 @@ def confirm_extension_reply_sent(
             suggestion.selected_reply_text = normalized_selected
         if not suggestion.final_reply_text:
             suggestion.final_reply_text = normalized_final
-        suggestion.updated_at = datetime.utcnow()
+        suggestion.updated_at = datetime.now(timezone.utc)
 
     if not suggestion.final_reply_text:
         raise ExtensionSnapshotError("Approved reply has no final reply text.")

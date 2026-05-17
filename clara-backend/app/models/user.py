@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String
@@ -32,21 +32,26 @@ class User(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
     organization = relationship("Organization", back_populates="users")
     created_by_user = relationship(
         "User",
+        back_populates="created_users",
         remote_side=[id],
         foreign_keys=[created_by_user_id],
     )
     created_users = relationship(
         "User",
+        back_populates="created_by_user",
         foreign_keys=[created_by_user_id],
+        overlaps="created_by_user",
     )
     conversations_owned = relationship(
         "Conversation",
+        back_populates="sales_user",
         foreign_keys="Conversation.sales_user_id",
+        overlaps="sales_user",
     )

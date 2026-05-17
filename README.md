@@ -38,7 +38,7 @@ User membuka WhatsApp Web, lalu:
 3. backend menyimpan/memperbarui mirror conversation,
 4. Clara menjalankan AI extraction + reply suggestion,
 5. hasil insight dan draft reply muncul di **Chrome Side Panel**,
-6. user bisa `Copy`, `Masukkan`, atau `Kirim` draft dari extension,
+6. user bisa `Edit`, `Masukkan`, atau `Kirim` draft dari extension,
 7. extension hanya aktif kalau user sudah login di dashboard Clara,
 8. jika user memilih `Masukkan` lalu mengirim manual dari WhatsApp, extension akan mencoba mendeteksi event kirim itu dan menyinkronkannya ke Clara sebagai `approved + sent`.
 
@@ -395,34 +395,20 @@ Sekarang UI extension akan muncul di **Chrome Side Panel**.
 
 ---
 
-## Cara Ambil Token Clara untuk Extension
+## Session Extension Clara
 
-Karena dashboard Clara sekarang memakai cookie session, extension memakai bearer token terpisah.
+Extension Clara sekarang **tidak lagi butuh token manual** untuk local development.
 
-Langkah local development:
+Flow yang dipakai:
 
-1. login dulu ke dashboard Clara
-2. ambil cookie:
-   - `clara_access_token`
-   - `clara_csrf_token`
-3. panggil endpoint:
+1. user login dulu ke dashboard Clara di browser yang sama,
+2. extension mendeteksi session login itu secara otomatis,
+3. side panel akan unlock dan memakai akun dashboard yang sama untuk request ke backend Clara.
 
-```bash
-curl -X POST http://127.0.0.1:8000/auth/access-token \
-  -H "Cookie: clara_access_token=ISI_COOKIE_LOGIN_ANDA; clara_csrf_token=ISI_CSRF_COOKIE_ANDA" \
-  -H "X-CSRF-Token: ISI_CSRF_COOKIE_ANDA"
-```
-
-4. copy `access_token` dari response
-5. isi ke:
-
-```env
-PLASMO_PUBLIC_CLARA_API_TOKEN=eyJhbGciOi...
-```
-
-Catatan:
-- ini praktis untuk local/dev
-- untuk production, lebih baik nanti dibuat flow login extension yang dedicated
+Kalau session belum ada atau sudah expired:
+- side panel akan tetap terkunci,
+- user diminta membuka halaman login dashboard Clara,
+- setelah login, extension akan auto-detect tanpa klik tombol konfirmasi manual.
 
 ---
 
