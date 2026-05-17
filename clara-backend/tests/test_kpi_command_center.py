@@ -184,6 +184,8 @@ def test_owner_kpi_command_center_returns_global_view(
     assert payload["summary"]["total_organizations"] == 2
     assert payload["summary"]["total_sales_users"] == 3
     assert payload["summary"]["total_leads"] >= 2
+    assert len(payload["alerts"]) >= 1
+    assert len(payload["recommendations"]) >= 1
     assert len(payload["organization_performance"]) == 2
     assert payload["sales_performance"][0]["user_name"] == "Marketing Beta"
 
@@ -204,6 +206,8 @@ def test_admin_kpi_command_center_is_scoped_to_own_organization(
 
     assert payload["scope_type"] == "organization"
     assert payload["summary"]["total_organizations"] == 1
+    assert len(payload["alerts"]) >= 1
+    assert len(payload["recommendations"]) >= 1
     assert len(payload["organization_performance"]) == 1
     assert payload["organization_performance"][0]["organization_name"] == "Org Alpha"
     assert all(

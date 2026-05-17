@@ -210,11 +210,29 @@ class OrganizationPerformanceRow(BaseModel):
     overdue_follow_ups: int
 
 
+class KpiAlertItem(BaseModel):
+    severity: str
+    title: str
+    description: str
+    recommended_action: str
+    target_href: str | None
+
+
+class ExecutiveRecommendationItem(BaseModel):
+    title: str
+    rationale: str
+    owner_role: str
+    next_step: str
+    target_href: str | None
+
+
 class KpiCommandCenterResponse(BaseModel):
     scope_type: str
     generated_at: datetime
     summary: KpiSummaryCard
     key_observations: list[str]
+    alerts: list[KpiAlertItem]
+    recommendations: list[ExecutiveRecommendationItem]
     sales_performance: list[SalesPerformanceRow]
     organization_performance: list[OrganizationPerformanceRow]
 

@@ -21,6 +21,8 @@ from app.schemas.dashboard_schema import (
     DashboardLatestMessage,
     DashboardReplySuggestionSummary,
     DashboardSentMessageSummary,
+    ExecutiveRecommendationItem,
+    KpiAlertItem,
     KpiCommandCenterResponse,
     KpiSummaryCard,
     MarketingAdsSignal,
@@ -1156,6 +1158,156 @@ def build_kpi_observations(
     return observations[:5]
 
 
+def build_kpi_alerts(
+    *,
+    summary: KpiSummaryCard,
+    sales_rows: list[SalesPerformanceRow],
+    organization_rows: list[OrganizationPerformanceRow],
+) -> list[KpiAlertItem]:
+    alerts: list[KpiAlertItem] = []
+
+    if summary.overdue_follow_ups > 0:
+        alerts.append(
+            KpiAlertItem(
+                severity="high",
+                title="Follow-up overdue menumpuk",
+                description=(
+                    f"Ada {summary.overdue_follow_ups} lead yang sudah melewati jadwal follow-up."
+                ),
+                recommended_action="Dorong tim sales membuka AI Worklist dan selesaikan overdue item hari ini.",
+                target_href="/dashboard/follow-up",
+            )
+        )
+
+    if summary.reply_sent_rate < 0.45 and summary.total_leads > 0:
+        alerts.append(
+            KpiAlertItem(
+                severity="high",
+                title="Reply sent rate terlalu rendah",
+                description=(
+                    f"Reply sent rate baru {(summary.reply_sent_rate * 100):.0f}%, artinya banyak conversation berhenti di draft atau analisis."
+                ),
+                recommended_action="Audit pipeline balasan, cek approval bottleneck, dan prioritaskan percakapan yang sudah approved-ready-to-send.",
+                target_href="/dashboard/follow-up",
+            )
+        )
+
+    for row in sales_rows:
+        if row.overdue_follow_ups >= 2:
+            alerts.append(
+                KpiAlertItem(
+                    severity="medium",
+                    title=f"{row.user_name} punya overdue follow-up tinggi",
+                    description=(
+                        f"{row.user_name} memiliki {row.overdue_follow_ups} follow-up overdue dengan {row.hot_leads} hot lead yang masih aktif."
+                    ),
+                    recommended_action="Review workload sales ini dan bantu susun prioritas follow-up yang lebih realistis.",
+                    target_href="/dashboard/follow-up",
+                )
+            )
+
+        if row.conversations_owned >= 2 and row.replies_sent == 0:
+            alerts.append(
+                KpiAlertItem(
+                    severity="medium",
+                    title=f"{row.user_name} belum mengirim balasan final",
+                    description=(
+                        f"{row.user_name} punya {row.conversations_owned} conversation, tapi belum ada reply final yang tercatat."
+                    ),
+                    recommended_action="Periksa apakah tim ini macet di analysis, approval, atau eksekusi kirim di WhatsApp.",
+                    target_href="/dashboard/sales",
+                )
+            )
+
+    for row in organization_rows:
+        if row.hot_leads >= 1 and row.reply_sent_rate < 0.4:
+            alerts.append(
+                KpiAlertItem(
+                    severity="medium",
+                    title=f"{row.organization_name} lambat mengonversi lead panas",
+                    description=(
+                        f"Organization ini punya {row.hot_leads} hot lead, tapi reply sent rate baru {(row.reply_sent_rate * 100):.0f}%."
+                    ),
+                    recommended_action="Sinkronkan sales follow-up dengan insight marketing dan cek kualitas CTA di percakapan aktif.",
+                    target_href="/dashboard/kpi",
+                )
+            )
+
+    return alerts[:8]
+
+
+def build_executive_recommendations(
+    *,
+    summary: KpiSummaryCard,
+    alerts: list[KpiAlertItem],
+    sales_rows: list[SalesPerformanceRow],
+    organization_rows: list[OrganizationPerformanceRow],
+) -> list[ExecutiveRecommendationItem]:
+    recommendations: list[ExecutiveRecommendationItem] = []
+
+    if summary.overdue_follow_ups > 0:
+        recommendations.append(
+            ExecutiveRecommendationItem(
+                title="Jadikan overdue follow-up sebagai prioritas harian",
+                rationale="Lead yang sudah lewat jadwal follow-up adalah sumber kehilangan momentum tercepat.",
+                owner_role="admin",
+                next_step="Pantau AI Worklist setiap pagi dan pastikan overdue item turun sebelum siang.",
+                target_href="/dashboard/follow-up",
+            )
+        )
+
+    if any(alert.severity == "high" for alert in alerts):
+        recommendations.append(
+            ExecutiveRecommendationItem(
+                title="Lakukan review pipeline balasan mingguan",
+                rationale="High-severity alert menandakan ada bottleneck operasional yang tidak bisa dibiarkan berjalan otomatis terus.",
+                owner_role="owner",
+                next_step="Review KPI center, cocokkan dengan inbox/worklist, lalu tentukan intervensi per org atau per sales.",
+                target_href="/dashboard/kpi",
+            )
+        )
+
+    if organization_rows:
+        top_org = organization_rows[0]
+        recommendations.append(
+            ExecutiveRecommendationItem(
+                title=f"Scale pola yang berhasil di {top_org.organization_name}",
+                rationale="Organization dengan health paling baik bisa dijadikan baseline proses untuk tim lain.",
+                owner_role="owner",
+                next_step="Dokumentasikan pola follow-up, quality reply, dan angle marketing yang membuat org ini lebih siap closing.",
+                target_href="/dashboard/marketing",
+            )
+        )
+
+    if sales_rows:
+        weakest_sales = sorted(
+            sales_rows,
+            key=lambda row: (row.replies_sent, -row.overdue_follow_ups, row.hot_leads),
+        )[0]
+        recommendations.append(
+            ExecutiveRecommendationItem(
+                title=f"Coaching targeted untuk {weakest_sales.user_name}",
+                rationale="Sales dengan delivery rendah atau overdue tinggi biasanya memberi dampak cepat jika dibantu langsung.",
+                owner_role="admin",
+                next_step="Buka inbox dan worklist milik sales ini, lalu bantu rapikan prioritas conversation yang paling dekat ke closing.",
+                target_href="/dashboard/sales",
+            )
+        )
+
+    if summary.approved_reply_rate < 0.5:
+        recommendations.append(
+            ExecutiveRecommendationItem(
+                title="Rapikan kualitas draft dan approval flow",
+                rationale="Approved reply rate yang rendah berarti tim sering berhenti di draft yang belum cukup percaya diri untuk dikirim.",
+                owner_role="admin",
+                next_step="Audit kualitas suggestion Clara, cek objection yang belum terjawab, dan perkuat product knowledge atau playbook yang relevan.",
+                target_href="/dashboard/knowledge",
+            )
+        )
+
+    return recommendations[:6]
+
+
 def get_kpi_command_center(
     db: Session,
     current_user: User,
@@ -1181,6 +1333,8 @@ def get_kpi_command_center(
                     overdue_follow_ups=0,
                 ),
                 key_observations=[],
+                alerts=[],
+                recommendations=[],
                 sales_performance=[],
                 organization_performance=[],
             )
@@ -1370,6 +1524,12 @@ def get_kpi_command_center(
         ),
     )
 
+    alerts = build_kpi_alerts(
+        summary=summary,
+        sales_rows=sales_rows,
+        organization_rows=organization_rows,
+    )
+
     return KpiCommandCenterResponse(
         scope_type="global" if can_view_global else "organization",
         generated_at=now,
@@ -1378,6 +1538,13 @@ def get_kpi_command_center(
             summary=summary,
             top_sales_rows=sales_rows[:3],
             top_org_rows=organization_rows[:3],
+        ),
+        alerts=alerts,
+        recommendations=build_executive_recommendations(
+            summary=summary,
+            alerts=alerts,
+            sales_rows=sales_rows,
+            organization_rows=organization_rows,
         ),
         sales_performance=sales_rows,
         organization_performance=organization_rows,

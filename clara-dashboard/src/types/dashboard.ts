@@ -174,6 +174,20 @@ export type KpiCommandCenterResponse = {
   generated_at: string;
   summary: KpiSummaryCard;
   key_observations: string[];
+  alerts: {
+    severity: string;
+    title: string;
+    description: string;
+    recommended_action: string;
+    target_href: string | null;
+  }[];
+  recommendations: {
+    title: string;
+    rationale: string;
+    owner_role: string;
+    next_step: string;
+    target_href: string | null;
+  }[];
   sales_performance: SalesPerformanceRow[];
   organization_performance: OrganizationPerformanceRow[];
 };
