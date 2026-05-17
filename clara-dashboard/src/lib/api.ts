@@ -73,7 +73,29 @@ export async function apiFetch<T>(
 
     try {
       const errorBody = await response.json();
-      message = errorBody.detail ?? message;
+      const detail = errorBody.detail;
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail
+          .map((item) => {
+            if (typeof item === "string") {
+              return item;
+            }
+            if (item && typeof item === "object") {
+              const fieldPath = Array.isArray(item.loc)
+                ? item.loc.join(".")
+                : "field";
+              const reason =
+                typeof item.msg === "string" ? item.msg : JSON.stringify(item);
+              return `${fieldPath}: ${reason}`;
+            }
+            return String(item);
+          })
+          .join(" | ");
+      } else if (detail && typeof detail === "object") {
+        message = JSON.stringify(detail);
+      }
     } catch {
       // Ignore JSON parse error.
     }

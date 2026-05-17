@@ -30,6 +30,7 @@ export default function KpiCommandCenterPage() {
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
   const [alertHistory, setAlertHistory] = useState<KpiAlertHistoryResponse | null>(null);
   const [snapshotHistory, setSnapshotHistory] = useState<KpiSnapshotHistoryResponse | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -59,6 +60,11 @@ export default function KpiCommandCenterPage() {
   useEffect(() => {
     void loadKpiPage();
   }, []);
+
+  async function reloadAlertHistory() {
+    const alertsResponse = await apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts");
+    setAlertHistory(alertsResponse);
+  }
 
   async function handleRefreshSnapshot() {
     setIsRefreshing(true);
@@ -90,13 +96,43 @@ export default function KpiCommandCenterPage() {
       await apiFetch(`/dashboard/kpi/alerts/${alertId}/acknowledge`, {
         method: "PATCH",
       });
-      const alertsResponse = await apiFetch<KpiAlertHistoryResponse>(
-        "/dashboard/kpi/alerts"
-      );
-      setAlertHistory(alertsResponse);
+      await reloadAlertHistory();
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Gagal acknowledge alert."
+      );
+    }
+  }
+
+  async function handleResolveAlert(alertId: string) {
+    try {
+      await apiFetch(`/dashboard/kpi/alerts/${alertId}/resolve`, {
+        method: "PATCH",
+        body: {
+          resolution_note: resolutionNotes[alertId]?.trim() || null,
+        },
+      });
+      setResolutionNotes((current) => ({
+        ...current,
+        [alertId]: "",
+      }));
+      await reloadAlertHistory();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal resolve alert."
+      );
+    }
+  }
+
+  async function handleReopenAlert(alertId: string) {
+    try {
+      await apiFetch(`/dashboard/kpi/alerts/${alertId}/reopen`, {
+        method: "PATCH",
+      });
+      await reloadAlertHistory();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal reopen alert."
       );
     }
   }
@@ -499,6 +535,77 @@ export default function KpiCommandCenterPage() {
                         <p className="mt-3 text-sm leading-6 text-slate-600">
                           {alert.description}
                         </p>
+                        <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Recommended action
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-slate-700">
+                            {alert.recommended_action}
+                          </p>
+                        </div>
+                        {alert.resolution_note ? (
+                          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                              Resolution note
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-emerald-900">
+                              {alert.resolution_note}
+                            </p>
+                          </div>
+                        ) : null}
+                        {alert.status !== "resolved" ? (
+                          <div className="mt-4 space-y-3">
+                            <textarea
+                              value={resolutionNotes[alert.id] ?? ""}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setResolutionNotes((current) => ({
+                                  ...current,
+                                  [alert.id]: value,
+                                }));
+                              }}
+                              placeholder="Catatan resolusi opsional sebelum alert ditutup..."
+                              className="min-h-[96px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-slate-400"
+                            />
+                            <div className="flex flex-wrap gap-3">
+                              {alert.status === "active" && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void handleAcknowledgeAlert(alert.id);
+                                  }}
+                                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                                >
+                                  Acknowledge
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void handleResolveAlert(alert.id);
+                                }}
+                                className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                              >
+                                Resolve
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <p className="text-xs text-slate-500">
+                              Resolved: {alert.resolved_at ? formatDateTime(alert.resolved_at) : "-"}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void handleReopenAlert(alert.id);
+                              }}
+                              className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                            >
+                              Reopen
+                            </button>
+                          </div>
+                        )}
                         <p className="mt-3 text-xs text-slate-500">
                           First detected: {formatDateTime(alert.first_detected_at)} • Last detected:{" "}
                           {formatDateTime(alert.last_detected_at)}

@@ -314,10 +314,12 @@ class PersistedKpiAlertRecord(BaseModel):
     target_href: str | None
     status: str
     acknowledged_by_user_id: UUID | None
+    resolved_by_user_id: UUID | None
     first_detected_at: datetime
     last_detected_at: datetime
     acknowledged_at: datetime | None
     resolved_at: datetime | None
+    resolution_note: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -328,6 +330,10 @@ class KpiAlertHistoryResponse(BaseModel):
     acknowledged_count: int
     resolved_count: int
     items: list[PersistedKpiAlertRecord]
+
+
+class KpiAlertResolveRequest(BaseModel):
+    resolution_note: str | None = None
 
 
 class KpiSnapshotItem(BaseModel):

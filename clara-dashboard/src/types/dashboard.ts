@@ -326,10 +326,12 @@ export type PersistedKpiAlertRecord = {
   target_href: string | null;
   status: string;
   acknowledged_by_user_id: string | null;
+  resolved_by_user_id: string | null;
   first_detected_at: string;
   last_detected_at: string;
   acknowledged_at: string | null;
   resolved_at: string | null;
+  resolution_note: string | null;
   created_at: string;
   updated_at: string;
 };

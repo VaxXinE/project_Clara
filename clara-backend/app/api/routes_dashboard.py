@@ -7,6 +7,7 @@ from app.models.user import User
 from app.db.session import get_db
 from app.schemas.dashboard_schema import (
     KpiAlertHistoryResponse,
+    KpiAlertResolveRequest,
     KpiCommandCenterResponse,
     KpiSnapshotHistoryResponse,
     MarketingExecutionItem,
@@ -36,6 +37,8 @@ from app.services.dashboard_service import (
     list_kpi_snapshots,
     list_marketing_execution_items,
     refresh_kpi_command_center,
+    reopen_kpi_alert,
+    resolve_kpi_alert,
     update_marketing_execution_item,
 )
 from app.services.marketing_snapshot_service import (
@@ -244,6 +247,74 @@ def acknowledge_kpi_alert_endpoint(
     create_audit_log(
         db=db,
         action="kpi_alert.acknowledge",
+        resource_type="kpi_alert",
+        resource_id=str(alert.id),
+        current_user=current_user,
+        request=request,
+        metadata={"scope_type": alert.scope_type, "severity": alert.severity},
+    )
+    return alert
+
+
+@router.patch("/kpi/alerts/{alert_id}/resolve", response_model=PersistedKpiAlertRecord)
+def resolve_kpi_alert_endpoint(
+    alert_id: UUID,
+    request: Request,
+    payload: KpiAlertResolveRequest | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    try:
+        alert = resolve_kpi_alert(
+            db=db,
+            alert_id=alert_id,
+            payload=payload,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="kpi_alert.resolve",
+        resource_type="kpi_alert",
+        resource_id=str(alert.id),
+        current_user=current_user,
+        request=request,
+        metadata={
+            "scope_type": alert.scope_type,
+            "severity": alert.severity,
+            "has_resolution_note": bool(alert.resolution_note),
+        },
+    )
+    return alert
+
+
+@router.patch("/kpi/alerts/{alert_id}/reopen", response_model=PersistedKpiAlertRecord)
+def reopen_kpi_alert_endpoint(
+    alert_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    try:
+        alert = reopen_kpi_alert(
+            db=db,
+            alert_id=alert_id,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="kpi_alert.reopen",
         resource_type="kpi_alert",
         resource_id=str(alert.id),
         current_user=current_user,

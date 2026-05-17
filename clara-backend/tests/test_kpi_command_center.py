@@ -304,3 +304,101 @@ def test_acknowledge_persisted_kpi_alert_updates_status(
     )
     assert ack_response.status_code == 200, ack_response.text
     assert ack_response.json()["status"] == "acknowledged"
+
+
+def test_resolve_persisted_kpi_alert_stores_resolution_note(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    seed_kpi_data(db_session_factory, seeded_data)
+    admin_a = seeded_data["admin_a"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+    refresh_response = client.post(
+        "/dashboard/kpi/command-center/refresh",
+        headers=csrf_headers(client),
+    )
+    assert refresh_response.status_code == 200, refresh_response.text
+
+    alerts_response = client.get("/dashboard/kpi/alerts")
+    assert alerts_response.status_code == 200, alerts_response.text
+    alert_id = alerts_response.json()["items"][0]["id"]
+
+    resolve_response = client.patch(
+        f"/dashboard/kpi/alerts/{alert_id}/resolve",
+        json={"resolution_note": "Sudah ditinjau dan dipindahkan ke backlog follow-up."},
+        headers=csrf_headers(client),
+    )
+    assert resolve_response.status_code == 200, resolve_response.text
+    payload = resolve_response.json()
+    assert payload["status"] == "resolved"
+    assert payload["resolution_note"] == "Sudah ditinjau dan dipindahkan ke backlog follow-up."
+    assert payload["resolved_at"] is not None
+
+
+def test_reopen_resolved_kpi_alert_clears_resolution_metadata(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    seed_kpi_data(db_session_factory, seeded_data)
+    admin_a = seeded_data["admin_a"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+    refresh_response = client.post(
+        "/dashboard/kpi/command-center/refresh",
+        headers=csrf_headers(client),
+    )
+    assert refresh_response.status_code == 200, refresh_response.text
+
+    alerts_response = client.get("/dashboard/kpi/alerts")
+    assert alerts_response.status_code == 200, alerts_response.text
+    alert_id = alerts_response.json()["items"][0]["id"]
+
+    resolve_response = client.patch(
+        f"/dashboard/kpi/alerts/{alert_id}/resolve",
+        json={"resolution_note": "Sudah ditutup sementara."},
+        headers=csrf_headers(client),
+    )
+    assert resolve_response.status_code == 200, resolve_response.text
+
+    reopen_response = client.patch(
+        f"/dashboard/kpi/alerts/{alert_id}/reopen",
+        headers=csrf_headers(client),
+    )
+    assert reopen_response.status_code == 200, reopen_response.text
+    payload = reopen_response.json()
+    assert payload["status"] == "active"
+    assert payload["resolved_at"] is None
+    assert payload["resolved_by_user_id"] is None
+    assert payload["resolution_note"] is None
+
+
+def test_resolve_persisted_kpi_alert_allows_empty_body(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    seed_kpi_data(db_session_factory, seeded_data)
+    admin_a = seeded_data["admin_a"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+    refresh_response = client.post(
+        "/dashboard/kpi/command-center/refresh",
+        headers=csrf_headers(client),
+    )
+    assert refresh_response.status_code == 200, refresh_response.text
+
+    alerts_response = client.get("/dashboard/kpi/alerts")
+    assert alerts_response.status_code == 200, alerts_response.text
+    alert_id = alerts_response.json()["items"][0]["id"]
+
+    resolve_response = client.patch(
+        f"/dashboard/kpi/alerts/{alert_id}/resolve",
+        headers=csrf_headers(client),
+    )
+    assert resolve_response.status_code == 200, resolve_response.text
+    payload = resolve_response.json()
+    assert payload["status"] == "resolved"
+    assert payload["resolution_note"] is None

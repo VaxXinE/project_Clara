@@ -32,6 +32,7 @@ from app.schemas.dashboard_schema import (
     KpiAlertHistoryResponse,
     KpiAlertItem,
     KpiCommandCenterResponse,
+    KpiAlertResolveRequest,
     KpiSnapshotHistoryResponse,
     KpiSnapshotItem,
     KpiSummaryCard,
@@ -1725,10 +1726,12 @@ def build_persisted_alert_item(alert: KpiAlertRecord) -> PersistedKpiAlertRecord
         target_href=alert.target_href,
         status=alert.status,
         acknowledged_by_user_id=alert.acknowledged_by_user_id,
+        resolved_by_user_id=alert.resolved_by_user_id,
         first_detected_at=alert.first_detected_at,
         last_detected_at=alert.last_detected_at,
         acknowledged_at=alert.acknowledged_at,
         resolved_at=alert.resolved_at,
+        resolution_note=alert.resolution_note,
         created_at=alert.created_at,
         updated_at=alert.updated_at,
     )
@@ -2108,6 +2111,8 @@ def sync_persistent_kpi_alerts(
             existing.target_href = alert.target_href
             existing.last_detected_at = now
             existing.resolved_at = None
+            existing.resolved_by_user_id = None
+            existing.resolution_note = None
             if existing.status == "resolved":
                 existing.status = "active"
 
@@ -2208,6 +2213,56 @@ def acknowledge_kpi_alert(
     alert.status = "acknowledged"
     alert.acknowledged_by_user_id = current_user.id
     alert.acknowledged_at = datetime.now(timezone.utc)
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return build_persisted_alert_item(alert)
+
+
+def resolve_kpi_alert(
+    db: Session,
+    *,
+    alert_id: UUID,
+    payload: KpiAlertResolveRequest | None,
+    current_user: User,
+) -> PersistedKpiAlertRecord:
+    _, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
+    alert = db.get(KpiAlertRecord, alert_id)
+    if alert is None:
+        raise ValueError("Alert not found.")
+
+    if alert.scope_type != scope_type or alert.organization_id != scoped_organization_id:
+        raise ValueError("Alert not found.")
+
+    alert.status = "resolved"
+    alert.resolved_by_user_id = current_user.id
+    alert.resolved_at = datetime.now(timezone.utc)
+    resolution_note = payload.resolution_note if payload is not None else None
+    alert.resolution_note = resolution_note.strip() if resolution_note else None
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return build_persisted_alert_item(alert)
+
+
+def reopen_kpi_alert(
+    db: Session,
+    *,
+    alert_id: UUID,
+    current_user: User,
+) -> PersistedKpiAlertRecord:
+    _, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
+    alert = db.get(KpiAlertRecord, alert_id)
+    if alert is None:
+        raise ValueError("Alert not found.")
+
+    if alert.scope_type != scope_type or alert.organization_id != scoped_organization_id:
+        raise ValueError("Alert not found.")
+
+    alert.status = "active"
+    alert.resolved_by_user_id = None
+    alert.resolved_at = None
+    alert.resolution_note = None
     db.add(alert)
     db.commit()
     db.refresh(alert)

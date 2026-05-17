@@ -21,6 +21,11 @@ class KpiAlertRecord(Base):
         nullable=True,
         index=True,
     )
+    resolved_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     scope_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     alert_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
@@ -30,6 +35,7 @@ class KpiAlertRecord(Base):
     recommended_action: Mapped[str] = mapped_column(Text, nullable=False)
     target_href: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="active")
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     first_detected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
