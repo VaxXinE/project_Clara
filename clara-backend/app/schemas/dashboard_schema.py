@@ -80,13 +80,16 @@ class SalesConversationDetail(BaseModel):
 
 
 class SalesWorklistItem(BaseModel):
+    task_id: UUID | None
     lead_id: UUID
     conversation_id: UUID | None
     lead_name: str
+    assigned_user_name: str | None
     current_stage: str
     lead_temperature: str
     priority_score: int
     task_type: str
+    task_status: str | None
     task_label: str
     reason: str
     recommended_action: str
@@ -100,6 +103,8 @@ class SalesWorklistResponse(BaseModel):
     hot_lead_count: int
     ready_to_send_count: int
     pending_analysis_count: int
+    snoozed_count: int
+    completed_today_count: int
     items: list[SalesWorklistItem]
 
 

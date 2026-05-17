@@ -9,9 +9,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.lead import Lead
 from app.models.lead_task import LeadTask
+from app.models.lead_task_event import LeadTaskEvent
 from app.models.user import User
 from app.schemas.lead_schema import (
     LeadTaskCreateRequest,
+    LeadTaskEventItem,
     LeadTaskItem,
     LeadTaskUpdateRequest,
 )
@@ -28,15 +30,63 @@ def build_task_item(task: LeadTask) -> LeadTaskItem:
         organization_id=task.organization_id,
         assigned_user_id=task.assigned_user_id,
         assigned_user_name=task.assigned_user.name if task.assigned_user else None,
+        completed_by_user_id=task.completed_by_user_id,
+        completed_by_user_name=(
+            task.completed_by_user.name if task.completed_by_user else None
+        ),
         task_type=task.task_type,
         status=task.status,
         title=task.title,
         description=task.description,
         due_at=task.due_at,
         completed_at=task.completed_at,
+        last_status_changed_at=task.last_status_changed_at,
         created_at=task.created_at,
         updated_at=task.updated_at,
     )
+
+
+def build_task_event_item(event: LeadTaskEvent) -> LeadTaskEventItem:
+    return LeadTaskEventItem(
+        id=event.id,
+        task_id=event.task_id,
+        actor_user_id=event.actor_user_id,
+        actor_user_name=event.actor_user.name if event.actor_user else None,
+        event_type=event.event_type,
+        from_status=event.from_status,
+        to_status=event.to_status,
+        previous_due_at=event.previous_due_at,
+        next_due_at=event.next_due_at,
+        notes=event.notes,
+        created_at=event.created_at,
+    )
+
+
+def create_task_event(
+    db: Session,
+    *,
+    task: LeadTask,
+    event_type: str,
+    actor_user_id: UUID | None = None,
+    from_status: str | None = None,
+    to_status: str | None = None,
+    previous_due_at: datetime | None = None,
+    next_due_at: datetime | None = None,
+    notes: str | None = None,
+) -> LeadTaskEvent:
+    event = LeadTaskEvent(
+        task_id=task.id,
+        actor_user_id=actor_user_id,
+        event_type=event_type,
+        from_status=from_status,
+        to_status=to_status,
+        previous_due_at=previous_due_at,
+        next_due_at=next_due_at,
+        notes=notes,
+    )
+    db.add(event)
+    db.flush()
+    return event
 
 
 def get_accessible_lead(
@@ -51,6 +101,8 @@ def get_accessible_lead(
         .options(
             selectinload(Lead.assigned_user),
             selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
+            selectinload(Lead.tasks).selectinload(LeadTask.completed_by_user),
+            selectinload(Lead.tasks).selectinload(LeadTask.events).selectinload(LeadTaskEvent.actor_user),
         )
     )
     lead = db.scalars(statement).first()
@@ -145,6 +197,7 @@ def create_lead_task_for_user(
         lead_id=lead.id,
         organization_id=lead.organization_id,
         assigned_user_id=assignee.id if assignee else None,
+        completed_by_user_id=None,
         task_type=payload.task_type,
         status="open",
         title=payload.title.strip(),
@@ -152,6 +205,16 @@ def create_lead_task_for_user(
         due_at=payload.due_at,
     )
     db.add(task)
+    db.flush()
+    create_task_event(
+        db=db,
+        task=task,
+        event_type="created",
+        actor_user_id=current_user.id,
+        to_status=task.status,
+        next_due_at=task.due_at,
+        notes="Task dibuat dari UI lead detail.",
+    )
     db.commit()
     db.refresh(task)
     return build_task_item(task)
@@ -174,16 +237,30 @@ def update_lead_task_for_user(
             detail="Task not found.",
         )
 
+    status_changed = False
+    due_changed = False
+    assignee_changed = False
+    note_messages: list[str] = []
+    previous_status = task.status
+    previous_due_at = task.due_at
+    previous_assigned_user_id = task.assigned_user_id
+
     if payload.status is not None:
         if payload.status not in VALID_TASK_STATUSES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid task status.",
             )
-        task.status = payload.status
-        task.completed_at = (
-            datetime.now(timezone.utc) if payload.status == "done" else None
-        )
+        if payload.status != task.status:
+            status_changed = True
+            task.status = payload.status
+            task.last_status_changed_at = datetime.now(timezone.utc)
+        if payload.status == "done":
+            task.completed_at = datetime.now(timezone.utc)
+            task.completed_by_user_id = current_user.id
+        else:
+            task.completed_at = None
+            task.completed_by_user_id = None
 
     if payload.title is not None:
         task.title = payload.title.strip() or task.title
@@ -192,7 +269,10 @@ def update_lead_task_for_user(
         task.description = payload.description.strip() or None
 
     if "due_at" in payload.model_fields_set:
+        due_changed = task.due_at != payload.due_at
         task.due_at = payload.due_at
+        if due_changed and not status_changed:
+            task.last_status_changed_at = datetime.now(timezone.utc)
 
     if "assigned_user_id" in payload.model_fields_set:
         if (
@@ -211,11 +291,80 @@ def update_lead_task_for_user(
             assignee_id=payload.assigned_user_id,
         )
         task.assigned_user_id = assignee.id if assignee else None
+        assignee_changed = previous_assigned_user_id != task.assigned_user_id
+
+    if payload.notes is not None and payload.notes.strip():
+        note_messages.append(payload.notes.strip())
 
     db.add(task)
+    db.flush()
+
+    if status_changed:
+        create_task_event(
+            db=db,
+            task=task,
+            event_type="status_changed",
+            actor_user_id=current_user.id,
+            from_status=previous_status,
+            to_status=task.status,
+            previous_due_at=previous_due_at,
+            next_due_at=task.due_at,
+            notes=" ; ".join(note_messages) if note_messages else None,
+        )
+    elif due_changed:
+        create_task_event(
+            db=db,
+            task=task,
+            event_type="rescheduled",
+            actor_user_id=current_user.id,
+            from_status=task.status,
+            to_status=task.status,
+            previous_due_at=previous_due_at,
+            next_due_at=task.due_at,
+            notes=" ; ".join(note_messages) if note_messages else None,
+        )
+
+    if assignee_changed:
+        create_task_event(
+            db=db,
+            task=task,
+            event_type="reassigned",
+            actor_user_id=current_user.id,
+            from_status=task.status,
+            to_status=task.status,
+            previous_due_at=task.due_at,
+            next_due_at=task.due_at,
+            notes="Assignee task diperbarui.",
+        )
+
     db.commit()
     db.refresh(task)
     return build_task_item(task)
+
+
+def get_lead_task_events_for_user(
+    db: Session,
+    *,
+    lead_id: UUID,
+    task_id: UUID,
+    current_user: User,
+) -> list[LeadTaskEventItem]:
+    lead = get_accessible_lead(db=db, lead_id=lead_id, current_user=current_user)
+    task = next((item for item in lead.tasks if item.id == task_id), None)
+
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found.",
+        )
+
+    statement = (
+        select(LeadTaskEvent)
+        .where(LeadTaskEvent.task_id == task.id)
+        .options(selectinload(LeadTaskEvent.actor_user))
+        .order_by(LeadTaskEvent.created_at.desc())
+    )
+    return [build_task_event_item(event) for event in db.scalars(statement).all()]
 
 
 def upsert_follow_up_task_for_lead(
@@ -235,13 +384,28 @@ def upsert_follow_up_task_for_lead(
 
     if lead.next_follow_up_at is None:
         if existing_task is not None and existing_task.status in {"open", "snoozed"}:
+            previous_status = existing_task.status
             existing_task.status = "cancelled"
             existing_task.completed_at = None
+            existing_task.completed_by_user_id = None
+            existing_task.last_status_changed_at = datetime.now(timezone.utc)
             db.add(existing_task)
             db.flush()
+            create_task_event(
+                db=db,
+                task=existing_task,
+                event_type="system_sync",
+                from_status=previous_status,
+                to_status="cancelled",
+                previous_due_at=existing_task.due_at,
+                next_due_at=None,
+                notes="Task follow-up dibatalkan karena lead tidak lagi punya jadwal follow-up.",
+            )
         return existing_task
 
     if existing_task is not None:
+        previous_status = existing_task.status
+        previous_due_at = existing_task.due_at
         existing_task.status = "open"
         existing_task.title = "Follow up lead"
         existing_task.description = (
@@ -249,15 +413,28 @@ def upsert_follow_up_task_for_lead(
         )
         existing_task.due_at = lead.next_follow_up_at
         existing_task.completed_at = None
+        existing_task.completed_by_user_id = None
         existing_task.assigned_user_id = lead.assigned_user_id
+        existing_task.last_status_changed_at = datetime.now(timezone.utc)
         db.add(existing_task)
         db.flush()
+        create_task_event(
+            db=db,
+            task=existing_task,
+            event_type="system_sync",
+            from_status=previous_status,
+            to_status="open",
+            previous_due_at=previous_due_at,
+            next_due_at=existing_task.due_at,
+            notes="Task follow-up disinkronkan dari perubahan next follow-up lead.",
+        )
         return existing_task
 
     task = LeadTask(
         lead_id=lead.id,
         organization_id=lead.organization_id,
         assigned_user_id=lead.assigned_user_id,
+        completed_by_user_id=None,
         task_type="scheduled_follow_up",
         status="open",
         title="Follow up lead",
@@ -268,4 +445,12 @@ def upsert_follow_up_task_for_lead(
     )
     db.add(task)
     db.flush()
+    create_task_event(
+        db=db,
+        task=task,
+        event_type="system_sync",
+        to_status="open",
+        next_due_at=task.due_at,
+        notes="Task follow-up otomatis dibuat dari next follow-up lead.",
+    )
     return task

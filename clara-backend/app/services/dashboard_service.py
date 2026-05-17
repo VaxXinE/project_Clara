@@ -12,6 +12,7 @@ from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
 from app.models.lead_deal import LeadDeal
+from app.models.lead_task import LeadTask
 from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
 from app.models.message import Message
 from app.models.organization import Organization
@@ -515,18 +516,74 @@ def build_sales_worklist_item(
         return None
 
     return SalesWorklistItem(
+        task_id=None,
         lead_id=lead.id,
         conversation_id=conversation.id,
         lead_name=lead.display_name,
+        assigned_user_name=lead.assigned_user.name if lead.assigned_user else None,
         current_stage=lead.current_stage,
         lead_temperature=lead.lead_temperature,
         priority_score=priority_score,
         task_type=task_type,
+        task_status=None,
         task_label=task_label,
         reason=reason,
         recommended_action=recommended_action,
         last_contact_at=lead.last_contact_at,
         next_follow_up_at=next_follow_up_at,
+    )
+
+
+def build_sales_worklist_item_from_task(
+    *,
+    lead: Lead,
+    conversation: Conversation | None,
+    task: LeadTask,
+    latest_extraction: AIExtraction | None,
+    now: datetime,
+) -> SalesWorklistItem:
+    due_at = ensure_aware_utc(task.due_at)
+    is_overdue = due_at is not None and due_at <= now
+    is_snoozed = task.status == "snoozed"
+
+    if is_overdue:
+        task_type = "overdue_follow_up"
+        task_label = task.title
+        reason = "Task follow-up ini sudah melewati jadwal dan butuh tindakan segera."
+        priority_bonus = 45
+    elif is_snoozed:
+        task_type = "snoozed_follow_up"
+        task_label = task.title
+        reason = "Task ini sedang di-snooze. Pastikan alasan penundaannya masih valid."
+        priority_bonus = 20
+    else:
+        task_type = task.task_type
+        task_label = task.title
+        reason = "Task ini sudah dipersist ke sistem dan menunggu eksekusi manual dari tim."
+        priority_bonus = 15
+
+    recommended_action = (
+        latest_extraction.next_best_action
+        if latest_extraction is not None
+        else "Buka detail lead, review konteks terbaru, lalu putuskan follow-up yang paling aman."
+    )
+
+    return SalesWorklistItem(
+        task_id=task.id,
+        lead_id=lead.id,
+        conversation_id=conversation.id if conversation else None,
+        lead_name=lead.display_name,
+        assigned_user_name=task.assigned_user.name if task.assigned_user else None,
+        current_stage=lead.current_stage,
+        lead_temperature=lead.lead_temperature,
+        priority_score=calculate_priority_score(latest_extraction, None) + priority_bonus,
+        task_type=task_type,
+        task_status=task.status,
+        task_label=task_label,
+        reason=reason,
+        recommended_action=recommended_action,
+        last_contact_at=lead.last_contact_at,
+        next_follow_up_at=due_at,
     )
 
 
@@ -541,6 +598,8 @@ def get_sales_worklist(
             hot_lead_count=0,
             ready_to_send_count=0,
             pending_analysis_count=0,
+            snoozed_count=0,
+            completed_today_count=0,
             items=[],
         )
 
@@ -548,6 +607,8 @@ def get_sales_worklist(
         select(Lead)
         .where(Lead.organization_id == current_user.organization_id)
         .options(
+            selectinload(Lead.assigned_user),
+            selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
             selectinload(Lead.conversations).selectinload(Conversation.messages),
             selectinload(Lead.conversations).selectinload(Conversation.ai_extractions),
             selectinload(Lead.conversations).selectinload(Conversation.reply_suggestions),
@@ -566,18 +627,53 @@ def get_sales_worklist(
     hot_lead_count = 0
     ready_to_send_count = 0
     pending_analysis_count = 0
+    snoozed_count = 0
+    completed_today_count = 0
 
     for lead in leads:
         conversation = get_latest_conversation_for_lead(lead)
+
+        latest_message = get_latest_message(conversation) if conversation else None
+        latest_extraction = get_latest_extraction(conversation) if conversation else None
+        latest_suggestion = get_latest_reply_suggestion(conversation) if conversation else None
+        latest_sent_message = get_latest_sent_message(conversation) if conversation else None
+
+        open_or_snoozed_tasks = sorted(
+            [
+                task
+                for task in lead.tasks
+                if task.status in {"open", "snoozed"}
+            ],
+            key=lambda task: (ensure_aware_utc(task.due_at) or now, task.created_at),
+        )
+        done_today_tasks = [
+            task
+            for task in lead.tasks
+            if task.status == "done"
+            and (completed_at := ensure_aware_utc(task.completed_at)) is not None
+            and completed_at.date() == now.date()
+        ]
+        completed_today_count += len(done_today_tasks)
+
+        if open_or_snoozed_tasks:
+            task_item = build_sales_worklist_item_from_task(
+                lead=lead,
+                conversation=conversation,
+                task=open_or_snoozed_tasks[0],
+                latest_extraction=latest_extraction,
+                now=now,
+            )
+            items.append(task_item)
+            if task_item.task_type == "overdue_follow_up":
+                overdue_count += 1
+            elif task_item.task_type == "snoozed_follow_up":
+                snoozed_count += 1
+            continue
+
         if conversation is None:
             continue
 
-        latest_message = get_latest_message(conversation)
-        latest_extraction = get_latest_extraction(conversation)
-        latest_suggestion = get_latest_reply_suggestion(conversation)
-        latest_sent_message = get_latest_sent_message(conversation)
-
-        item = build_sales_worklist_item(
+        derived_item = build_sales_worklist_item(
             lead=lead,
             conversation=conversation,
             latest_message=latest_message,
@@ -586,18 +682,18 @@ def get_sales_worklist(
             latest_sent_message=latest_sent_message,
             now=now,
         )
-        if item is None:
+        if derived_item is None:
             continue
 
-        items.append(item)
+        items.append(derived_item)
 
-        if item.task_type == "overdue_follow_up":
+        if derived_item.task_type == "overdue_follow_up":
             overdue_count += 1
-        elif item.task_type == "hot_lead_needs_reply":
+        elif derived_item.task_type == "hot_lead_needs_reply":
             hot_lead_count += 1
-        elif item.task_type == "approved_ready_to_send":
+        elif derived_item.task_type == "approved_ready_to_send":
             ready_to_send_count += 1
-        elif item.task_type == "needs_analysis":
+        elif derived_item.task_type == "needs_analysis":
             pending_analysis_count += 1
 
     items.sort(
@@ -611,6 +707,8 @@ def get_sales_worklist(
         hot_lead_count=hot_lead_count,
         ready_to_send_count=ready_to_send_count,
         pending_analysis_count=pending_analysis_count,
+        snoozed_count=snoozed_count,
+        completed_today_count=completed_today_count,
         items=items,
     )
 

@@ -12,6 +12,7 @@ from app.schemas.lead_schema import (
     LeadDetail,
     LeadListItem,
     LeadTaskCreateRequest,
+    LeadTaskEventItem,
     LeadTaskItem,
     LeadTaskUpdateRequest,
     LeadUpdateRequest,
@@ -25,6 +26,7 @@ from app.services.lead_service import (
 )
 from app.services.lead_task_service import (
     create_lead_task_for_user,
+    get_lead_task_events_for_user,
     get_lead_tasks_for_user,
     update_lead_task_for_user,
 )
@@ -133,5 +135,20 @@ def update_lead_task(
         lead_id=lead_id,
         task_id=task_id,
         payload=payload,
+        current_user=current_user,
+    )
+
+
+@router.get("/{lead_id}/tasks/{task_id}/events", response_model=list[LeadTaskEventItem])
+def list_lead_task_events(
+    lead_id: UUID,
+    task_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+) -> list[LeadTaskEventItem]:
+    return get_lead_task_events_for_user(
+        db=db,
+        lead_id=lead_id,
+        task_id=task_id,
         current_user=current_user,
     )

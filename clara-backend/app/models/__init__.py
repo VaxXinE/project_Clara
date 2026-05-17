@@ -7,6 +7,7 @@ from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
 from app.models.lead_deal import LeadDeal
 from app.models.lead_task import LeadTask
+from app.models.lead_task_event import LeadTaskEvent
 from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
 from app.models.message import Message
 from app.models.organization import Organization
@@ -25,6 +26,7 @@ __all__ = [
     "Lead",
     "LeadDeal",
     "LeadTask",
+    "LeadTaskEvent",
     "MarketingInsightSnapshot",
     "Message",
     "Organization",

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
+from app.models.lead_task import LeadTask
 from app.models.message import Message
 
 
@@ -101,7 +102,45 @@ def test_admin_worklist_surfaces_overdue_follow_up(
     assert payload["overdue_count"] == 1
     assert len(payload["items"]) == 1
     assert payload["items"][0]["task_type"] == "overdue_follow_up"
+    assert payload["items"][0]["task_id"] is None
     assert payload["items"][0]["lead_name"] == "Owned Customer"
     assert payload["items"][0]["recommended_action"] == (
         "Hubungi sekarang dan kunci langkah closing berikutnya."
     )
+
+
+def test_worklist_prefers_persisted_snoozed_task_over_derived_signal(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    owned_lead = seeded_data["owned_lead"]
+
+    db = db_session_factory()
+    lead = db.get(type(owned_lead), owned_lead.id)
+    assert lead is not None
+    db.add(
+        LeadTask(
+            lead_id=lead.id,
+            organization_id=lead.organization_id,
+            assigned_user_id=lead.assigned_user_id,
+            task_type="manual_follow_up",
+            status="snoozed",
+            title="Follow up besok siang",
+            description="Customer minta jeda sebentar.",
+            due_at=datetime.now(timezone.utc) + timedelta(hours=20),
+        )
+    )
+    db.commit()
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    response = client.get("/dashboard/sales/worklist")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert payload["snoozed_count"] == 1
+    assert payload["items"][0]["task_type"] == "snoozed_follow_up"
+    assert payload["items"][0]["task_id"] is not None
+    assert payload["items"][0]["task_status"] == "snoozed"

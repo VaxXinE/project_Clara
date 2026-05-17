@@ -273,6 +273,47 @@ def test_marketing_can_upsert_lead_deal_metrics(
     assert detail_response.json()["deal"]["status"] == "won"
 
 
+def test_task_status_update_creates_persisted_task_events(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_b = seeded_data["marketing_b"]
+    owned_lead = seeded_data["owned_lead"]
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+
+    create_response = client.post(
+        f"/leads/{owned_lead.id}/tasks",
+        json={
+            "title": "Follow up legalitas",
+            "description": "Hubungi lagi besok pagi.",
+            "due_at": "2026-05-20T09:00:00Z",
+        },
+        headers=csrf_headers(client),
+    )
+    assert create_response.status_code == 201, create_response.text
+    task_id = create_response.json()["id"]
+
+    update_response = client.patch(
+        f"/leads/{owned_lead.id}/tasks/{task_id}",
+        json={
+            "status": "snoozed",
+            "due_at": "2026-05-21T09:00:00Z",
+            "notes": "Customer minta follow up besok.",
+        },
+        headers=csrf_headers(client),
+    )
+    assert update_response.status_code == 200, update_response.text
+    assert update_response.json()["status"] == "snoozed"
+
+    events_response = client.get(f"/leads/{owned_lead.id}/tasks/{task_id}/events")
+    assert events_response.status_code == 200, events_response.text
+    events = events_response.json()
+    assert len(events) >= 2
+    assert events[0]["event_type"] in {"status_changed", "rescheduled"}
+    assert any(event["event_type"] == "created" for event in events)
+
+
 def test_marketing_cannot_reassign_lead(
     client: TestClient,
     seeded_data: dict[str, object],

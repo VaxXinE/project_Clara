@@ -65,6 +65,16 @@ class User(Base):
         foreign_keys="LeadTask.assigned_user_id",
         back_populates="assigned_user",
     )
+    completed_tasks = relationship(
+        "LeadTask",
+        foreign_keys="LeadTask.completed_by_user_id",
+        back_populates="completed_by_user",
+    )
+    lead_task_events = relationship(
+        "LeadTaskEvent",
+        foreign_keys="LeadTaskEvent.actor_user_id",
+        back_populates="actor_user",
+    )
     owned_lead_deals = relationship(
         "LeadDeal",
         foreign_keys="LeadDeal.owner_user_id",

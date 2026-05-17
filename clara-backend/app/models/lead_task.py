@@ -27,6 +27,11 @@ class LeadTask(Base):
         nullable=True,
         index=True,
     )
+    completed_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     task_type: Mapped[str] = mapped_column(
         String(50),
@@ -48,6 +53,11 @@ class LeadTask(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    last_status_changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -62,4 +72,18 @@ class LeadTask(Base):
 
     lead = relationship("Lead", back_populates="tasks")
     organization = relationship("Organization", back_populates="lead_tasks")
-    assigned_user = relationship("User", back_populates="assigned_tasks")
+    assigned_user = relationship(
+        "User",
+        back_populates="assigned_tasks",
+        foreign_keys=[assigned_user_id],
+    )
+    completed_by_user = relationship(
+        "User",
+        back_populates="completed_tasks",
+        foreign_keys=[completed_by_user_id],
+    )
+    events = relationship(
+        "LeadTaskEvent",
+        back_populates="task",
+        cascade="all, delete-orphan",
+    )

@@ -169,13 +169,16 @@ export type LeadDealUpsertRequest = {
 };
 
 export type SalesWorklistItem = {
+  task_id: string | null;
   lead_id: string;
   conversation_id: string | null;
   lead_name: string;
+  assigned_user_name: string | null;
   current_stage: string;
   lead_temperature: string;
   priority_score: number;
   task_type: string;
+  task_status: string | null;
   task_label: string;
   reason: string;
   recommended_action: string;
@@ -189,6 +192,8 @@ export type SalesWorklistResponse = {
   hot_lead_count: number;
   ready_to_send_count: number;
   pending_analysis_count: number;
+  snoozed_count: number;
+  completed_today_count: number;
   items: SalesWorklistItem[];
 };
 

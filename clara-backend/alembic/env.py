@@ -20,6 +20,8 @@ from app.models.organization import Organization  # noqa: F401
 from app.models.product_knowledge import ProductKnowledge  # noqa: F401
 from app.models.lead import Lead  # noqa: F401
 from app.models.lead_deal import LeadDeal  # noqa: F401
+from app.models.lead_task import LeadTask  # noqa: F401
+from app.models.lead_task_event import LeadTaskEvent  # noqa: F401
 
 config = context.config
 
