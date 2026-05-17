@@ -31,6 +31,10 @@ from app.services.lead_task_service import (
     upsert_follow_up_task_for_lead,
     validate_assignee_for_lead,
 )
+from app.services.source_intelligence_service import (
+    build_source_label,
+    normalize_source_channel,
+)
 
 VALID_LEAD_STAGES = {
     "new_lead",
@@ -197,6 +201,8 @@ def build_lead_list_item(lead: Lead) -> LeadListItem:
         assigned_user_name=lead.assigned_user.name if lead.assigned_user else None,
         display_name=lead.display_name,
         source=lead.source,
+        source_channel=normalize_source_channel(lead.source),
+        source_label=build_source_label(lead.source),
         current_stage=lead.current_stage,
         lead_temperature=lead.lead_temperature,
         summary=lead.summary,

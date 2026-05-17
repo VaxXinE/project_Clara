@@ -175,6 +175,8 @@ def test_admin_can_list_and_update_org_leads(
     payload = list_response.json()
     assert len(payload) == 1
     assert payload[0]["id"] == str(owned_lead.id)
+    assert payload[0]["source_channel"] == "whatsapp"
+    assert payload[0]["source_label"] == "WhatsApp TXT Import"
 
     patch_response = client.patch(
         f"/leads/{owned_lead.id}",

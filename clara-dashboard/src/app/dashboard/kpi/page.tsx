@@ -373,6 +373,72 @@ export default function KpiCommandCenterPage() {
               </section>
             </section>
 
+            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Source Performance
+                  </p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                    Performa pipeline per source dan channel
+                  </h2>
+                </div>
+                <Badge label={`${kpi.source_performance.length} sources`} />
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {kpi.source_performance.length === 0 ? (
+                  <EmptyState text="Belum ada data source yang cukup untuk dibandingkan." />
+                ) : (
+                  kpi.source_performance.map((row) => (
+                    <article
+                      key={row.source_key}
+                      className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-950">
+                            {row.source_label}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Channel: {row.source_channel}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge label={`Leads ${row.lead_count}`} />
+                          <Badge label={`Conv ${row.conversation_count}`} />
+                          <Badge label={`Hot ${row.hot_leads}`} />
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+                        <SummaryTile
+                          label="Analyzed"
+                          value={String(row.analyzed_conversations)}
+                        />
+                        <SummaryTile
+                          label="Reply Sent Rate"
+                          value={formatPercent(row.reply_sent_rate)}
+                        />
+                        <SummaryTile
+                          label="Pipeline Value"
+                          value={formatIdr(row.pipeline_value)}
+                        />
+                        <SummaryTile
+                          label="Won Value"
+                          value={formatIdr(row.won_value)}
+                        />
+                        <SummaryTile
+                          label="Source Key"
+                          value={row.source_key}
+                        />
+                      </div>
+                    </article>
+                  ))
+                )}
+              </div>
+            </section>
+
             <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">

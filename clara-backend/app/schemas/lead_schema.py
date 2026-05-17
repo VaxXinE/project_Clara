@@ -83,6 +83,8 @@ class LeadListItem(BaseModel):
     assigned_user_name: str | None
     display_name: str
     source: str
+    source_channel: str
+    source_label: str
     current_stage: str
     lead_temperature: str
     summary: str | None

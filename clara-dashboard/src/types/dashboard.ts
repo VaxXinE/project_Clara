@@ -39,6 +39,8 @@ export type SalesInboxItem = {
   organization_id: string | null;
   title: string;
   source: string;
+  source_channel: string;
+  source_label: string;
   status: string;
   started_at: string | null;
   last_message_at: string | null;
@@ -65,6 +67,8 @@ export type SalesConversationDetail = {
   organization_id: string | null;
   title: string;
   source: string;
+  source_channel: string;
+  source_label: string;
   status: string;
   started_at: string | null;
   last_message_at: string | null;
@@ -82,6 +86,8 @@ export type LeadListItem = {
   assigned_user_name: string | null;
   display_name: string;
   source: string;
+  source_channel: string;
+  source_label: string;
   current_stage: string;
   lead_temperature: string;
   summary: string | null;
@@ -291,6 +297,19 @@ export type OrganizationPerformanceRow = {
   deposit_amount: number;
 };
 
+export type SourcePerformanceRow = {
+  source_key: string;
+  source_channel: string;
+  source_label: string;
+  lead_count: number;
+  conversation_count: number;
+  analyzed_conversations: number;
+  hot_leads: number;
+  reply_sent_rate: number;
+  pipeline_value: number;
+  won_value: number;
+};
+
 export type KpiCommandCenterResponse = {
   scope_type: string;
   generated_at: string;
@@ -313,6 +332,7 @@ export type KpiCommandCenterResponse = {
   persisted_alerts: PersistedKpiAlertRecord[];
   sales_performance: SalesPerformanceRow[];
   organization_performance: OrganizationPerformanceRow[];
+  source_performance: SourcePerformanceRow[];
 };
 
 export type PersistedKpiAlertRecord = {

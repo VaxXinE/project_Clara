@@ -62,12 +62,18 @@ from app.schemas.dashboard_schema import (
     SalesConversationDetail,
     SalesInboxItem,
     PersistedKpiAlertRecord,
+    SourcePerformanceRow,
     SalesWorklistItem,
     SalesWorklistResponse,
 )
 from app.services.access_control_service import (
     can_access_all_conversations,
     can_access_conversation,
+)
+from app.services.source_intelligence_service import (
+    build_source_label,
+    normalize_source_channel,
+    normalize_source_key,
 )
 
 
@@ -325,6 +331,8 @@ def get_sales_inbox(db: Session, current_user: User) -> list[SalesInboxItem]:
                 organization_id=conversation.organization_id,
                 title=conversation.title,
                 source=conversation.source,
+                source_channel=normalize_source_channel(conversation.source),
+                source_label=build_source_label(conversation.source),
                 status=conversation.status,
                 started_at=conversation.started_at,
                 last_message_at=conversation.last_message_at,
@@ -397,6 +405,8 @@ def get_sales_conversation_detail(
         organization_id=conversation.organization_id,
         title=conversation.title,
         source=conversation.source,
+        source_channel=normalize_source_channel(conversation.source),
+        source_label=build_source_label(conversation.source),
         status=conversation.status,
         started_at=conversation.started_at,
         last_message_at=conversation.last_message_at,
@@ -1789,6 +1799,7 @@ def build_kpi_command_center_data(
                 "recommendations": [],
                 "sales_performance": [],
                 "organization_performance": [],
+                "source_performance": [],
                 "organization_id": scoped_organization_id,
             }
         organizations_statement = organizations_statement.where(
@@ -1989,6 +2000,70 @@ def build_kpi_command_center_data(
         reverse=True,
     )
 
+    source_keys = {
+        normalize_source_key(lead.source) for lead in leads
+    } | {
+        normalize_source_key(conversation.source) for conversation in conversations
+    }
+    source_rows: list[SourcePerformanceRow] = []
+    for source_key in sorted(source_keys):
+        source_leads = [
+            lead for lead in leads if normalize_source_key(lead.source) == source_key
+        ]
+        source_conversations = [
+            conversation
+            for conversation in conversations
+            if normalize_source_key(conversation.source) == source_key
+        ]
+        source_sent_count = sum(
+            1
+            for conversation in source_conversations
+            if get_latest_sent_message(conversation) is not None
+        )
+        source_analyzed_count = sum(
+            1
+            for conversation in source_conversations
+            if get_latest_extraction(conversation) is not None
+        )
+        source_rows.append(
+            SourcePerformanceRow(
+                source_key=source_key,
+                source_channel=normalize_source_channel(source_key),
+                source_label=build_source_label(source_key),
+                lead_count=len(source_leads),
+                conversation_count=len(source_conversations),
+                analyzed_conversations=source_analyzed_count,
+                hot_leads=sum(1 for lead in source_leads if lead.lead_temperature == "hot"),
+                reply_sent_rate=safe_ratio(source_sent_count, len(source_conversations)),
+                pipeline_value=round(
+                    sum(
+                        float(lead.deal.expected_value)
+                        for lead in source_leads
+                        if lead.deal is not None and lead.deal.status == "open"
+                    ),
+                    2,
+                ),
+                won_value=round(
+                    sum(
+                        float(lead.deal.expected_value)
+                        for lead in source_leads
+                        if lead.deal is not None and lead.deal.status == "won"
+                    ),
+                    2,
+                ),
+            )
+        )
+
+    source_rows.sort(
+        key=lambda row: (
+            row.won_value,
+            row.pipeline_value,
+            row.conversation_count,
+            row.lead_count,
+        ),
+        reverse=True,
+    )
+
     summary = KpiSummaryCard(
         total_organizations=len(organizations),
         total_sales_users=len(users),
@@ -2060,6 +2135,7 @@ def build_kpi_command_center_data(
         "recommendations": recommendations,
         "sales_performance": sales_rows,
         "organization_performance": organization_rows,
+        "source_performance": source_rows,
         "organization_id": scoped_organization_id,
     }
 
@@ -2298,6 +2374,7 @@ def refresh_kpi_command_center(
         recommendations=data["recommendations"],
         sales_performance=data["sales_performance"],
         organization_performance=data["organization_performance"],
+        source_performance=data["source_performance"],
     )
 
 
@@ -2318,6 +2395,7 @@ def get_kpi_command_center(
         recommendations=data["recommendations"],
         sales_performance=data["sales_performance"],
         organization_performance=data["organization_performance"],
+        source_performance=data["source_performance"],
     )
 
 

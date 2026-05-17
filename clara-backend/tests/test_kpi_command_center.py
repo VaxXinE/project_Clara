@@ -134,7 +134,7 @@ def seed_kpi_data(
         organization_id=org_b_record.id,
         assigned_user_id=marketing_other_org.id,
         display_name="Gamma Prospect",
-        source="whatsapp_extension",
+        source="telegram_manual",
         current_stage="negotiation",
         lead_temperature="warm",
         last_contact_at=datetime.now(timezone.utc) - timedelta(hours=3),
@@ -158,7 +158,7 @@ def seed_kpi_data(
         sales_user_id=marketing_other_org.id,
         lead_id=lead_b.id,
         title="Gamma Conversation",
-        source="whatsapp_extension",
+        source="telegram_manual",
         status="replied",
         current_stage="negotiation",
         lead_temperature="warm",
@@ -223,6 +223,11 @@ def test_owner_kpi_command_center_returns_global_view(
     assert len(payload["alerts"]) >= 1
     assert len(payload["recommendations"]) >= 1
     assert len(payload["organization_performance"]) == 2
+    assert len(payload["source_performance"]) == 2
+    assert {row["source_channel"] for row in payload["source_performance"]} == {
+        "whatsapp",
+        "telegram",
+    }
     assert payload["sales_performance"][0]["user_name"] == "Marketing Beta"
 
 
@@ -247,6 +252,8 @@ def test_admin_kpi_command_center_is_scoped_to_own_organization(
     assert len(payload["alerts"]) >= 1
     assert len(payload["recommendations"]) >= 1
     assert len(payload["organization_performance"]) == 1
+    assert len(payload["source_performance"]) == 1
+    assert payload["source_performance"][0]["source_channel"] == "whatsapp"
     assert payload["organization_performance"][0]["organization_name"] == "Org Alpha"
     assert all(
         row["organization_name"] == "Org Alpha"

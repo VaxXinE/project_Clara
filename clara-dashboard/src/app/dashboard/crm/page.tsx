@@ -214,7 +214,9 @@ export default function CrmPage() {
                           <div className="mt-4 space-y-2 text-xs text-slate-500">
                             <p>Last contact: {formatDateTime(lead.last_contact_at)}</p>
                             <p>Conversation: {lead.conversation_count}</p>
-                            <p>Source: {lead.source}</p>
+                            <p>
+                              Source: {lead.source_label} ({lead.source_channel})
+                            </p>
                             <p>
                               Owner:{" "}
                               {lead.assigned_user_name ?? "Belum ada assignee"}

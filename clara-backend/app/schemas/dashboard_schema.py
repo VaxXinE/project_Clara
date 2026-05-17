@@ -50,6 +50,8 @@ class SalesInboxItem(BaseModel):
     organization_id: UUID | None
     title: str
     source: str
+    source_channel: str
+    source_label: str
     status: str
     started_at: datetime | None
     last_message_at: datetime | None
@@ -69,6 +71,8 @@ class SalesConversationDetail(BaseModel):
     organization_id: UUID | None
     title: str
     source: str
+    source_channel: str
+    source_label: str
     status: str
     started_at: datetime | None
     last_message_at: datetime | None
@@ -287,6 +291,19 @@ class OrganizationPerformanceRow(BaseModel):
     deposit_amount: float
 
 
+class SourcePerformanceRow(BaseModel):
+    source_key: str
+    source_channel: str
+    source_label: str
+    lead_count: int
+    conversation_count: int
+    analyzed_conversations: int
+    hot_leads: int
+    reply_sent_rate: float
+    pipeline_value: float
+    won_value: float
+
+
 class KpiAlertItem(BaseModel):
     severity: str
     title: str
@@ -361,6 +378,7 @@ class KpiCommandCenterResponse(BaseModel):
     recommendations: list[ExecutiveRecommendationItem]
     sales_performance: list[SalesPerformanceRow]
     organization_performance: list[OrganizationPerformanceRow]
+    source_performance: list[SourcePerformanceRow]
 
 
 class MarketingInsightSnapshotComparison(BaseModel):
