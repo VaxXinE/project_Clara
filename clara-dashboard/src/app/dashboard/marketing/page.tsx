@@ -219,6 +219,67 @@ export default function MarketingInsightsPage() {
                 </Panel>
 
                 <Panel
+                  title="Ready-to-use Content Briefs"
+                  description="Brief ringkas yang bisa langsung dilempar ke content creator tanpa harus menyusun ulang insight mentah."
+                >
+                  {insights.content_briefs.length === 0 ? (
+                    <EmptyText text="Belum ada brief yang cukup kuat untuk disiapkan." />
+                  ) : (
+                    <div className="space-y-4">
+                      {insights.content_briefs.map((brief) => (
+                        <article
+                          key={`${brief.title}-${brief.suggested_format}`}
+                          className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfd_100%)] p-5 shadow-[0_10px_26px_rgba(15,23,42,0.04)]"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-semibold text-slate-950">
+                              {brief.title}
+                            </h3>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                brief.urgency === "high"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {brief.urgency}
+                            </span>
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <BriefRow
+                              label="Audience"
+                              value={brief.audience_segment}
+                            />
+                            <BriefRow
+                              label="Format"
+                              value={formatStatusLabel(brief.suggested_format)}
+                            />
+                            <BriefRow
+                              label="Tone"
+                              value={formatStatusLabel(brief.tone)}
+                            />
+                            <BriefRow
+                              label="CTA"
+                              value={brief.call_to_action}
+                            />
+                          </div>
+
+                          <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Key message
+                            </p>
+                            <p className="mt-2 text-sm leading-6 text-slate-700">
+                              {brief.key_message}
+                            </p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
+
+                <Panel
                   title="Recent Snapshots"
                   description="Bandingkan perubahan antar snapshot untuk membaca apakah arah tren sedang menguat, melemah, atau bergeser."
                 >
@@ -324,6 +385,94 @@ export default function MarketingInsightsPage() {
                     />
                   </div>
                 </Panel>
+
+                <Panel
+                  title="Signals for Ads Specialist"
+                  description="Sinyal yang lebih operasional untuk pengambilan keputusan budget, retargeting, dan angle creative."
+                >
+                  {insights.ads_signals.length === 0 ? (
+                    <EmptyText text="Belum ada sinyal budget atau creative yang cukup kuat." />
+                  ) : (
+                    <div className="space-y-4">
+                      {insights.ads_signals.map((signal) => (
+                        <article
+                          key={`${signal.title}-${signal.budget_shift}`}
+                          className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfd_100%)] p-5"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-semibold text-slate-950">
+                              {signal.title}
+                            </h3>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                signal.urgency === "high"
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-sky-100 text-sky-700"
+                              }`}
+                            >
+                              {signal.urgency}
+                            </span>
+                          </div>
+                          <div className="mt-4 space-y-3">
+                            <SignalBlock
+                              label="Observation"
+                              value={signal.observation}
+                            />
+                            <SignalBlock
+                              label="Recommended move"
+                              value={signal.recommendation}
+                            />
+                            <SignalBlock
+                              label="Budget shift"
+                              value={signal.budget_shift}
+                            />
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
+
+                <Panel
+                  title="30-day Content Plan"
+                  description="Draft planning bulanan berbasis percakapan real, supaya tim konten tidak mulai dari kertas kosong."
+                >
+                  {insights.monthly_content_plan.length === 0 ? (
+                    <EmptyText text="Belum ada plan yang cukup untuk dirangkai." />
+                  ) : (
+                    <div className="space-y-4">
+                      {insights.monthly_content_plan.map((item) => (
+                        <article
+                          key={`${item.window_label}-${item.theme}`}
+                          className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)]"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              {item.window_label}
+                            </h3>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                              {formatStatusLabel(item.suggested_format)}
+                            </span>
+                          </div>
+                          <p className="mt-3 text-base font-semibold text-slate-950">
+                            {item.theme}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                            {item.objective}
+                          </p>
+                          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Primary metric
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-slate-800">
+                              {item.primary_metric}
+                            </p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
               </div>
             </section>
           </>
@@ -421,6 +570,28 @@ function KpiRow({ label, value }: { label: string; value: string }) {
 
 function EmptyText({ text }: { text: string }) {
   return <p className="text-sm text-slate-600">{text}</p>;
+}
+
+function BriefRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-sm leading-6 text-slate-700">{value}</p>
+    </div>
+  );
+}
+
+function SignalBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
+    </div>
+  );
 }
 
 function TrendRow({

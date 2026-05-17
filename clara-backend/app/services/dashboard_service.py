@@ -21,7 +21,9 @@ from app.schemas.dashboard_schema import (
     DashboardLatestMessage,
     DashboardReplySuggestionSummary,
     DashboardSentMessageSummary,
+    MarketingAdsSignal,
     MarketingBreakdownItem,
+    MarketingContentBrief,
     MarketingContentRecommendation,
     OpsAuditLogRow,
     OpsConversationRow,
@@ -34,6 +36,7 @@ from app.schemas.dashboard_schema import (
     MarketingInsightsPreview,
     MarketingKpiSummary,
     MarketingObjectionInsight,
+    MarketingPlanningItem,
     SalesConversationDetail,
     SalesInboxItem,
     SalesWorklistItem,
@@ -69,6 +72,11 @@ def parse_uuid_or_none(value: str | None) -> UUID | None:
     if not value:
         return None
 
+    try:
+        return UUID(value)
+    except (TypeError, ValueError):
+        return None
+
 
 def ensure_aware_utc(value: datetime | None) -> datetime | None:
     if value is None:
@@ -78,11 +86,6 @@ def ensure_aware_utc(value: datetime | None) -> datetime | None:
         return value.replace(tzinfo=timezone.utc)
 
     return value.astimezone(timezone.utc)
-
-    try:
-        return UUID(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def build_reply_summary(
@@ -614,6 +617,9 @@ def get_marketing_insights_preview(
             sentiment_breakdown=[],
             pipeline_stage_breakdown=[],
             top_content_recommendations=[],
+            content_briefs=[],
+            ads_signals=[],
+            monthly_content_plan=[],
             kpi_summary=MarketingKpiSummary(
                 reply_sent_rate=0,
                 analysis_coverage_rate=0,
@@ -705,6 +711,26 @@ def get_marketing_insights_preview(
         sentiment_counter=sentiment_counter,
         risk_level_counter=risk_level_counter,
     )
+    content_briefs = build_content_briefs(
+        objection_counter=objection_counter,
+        sentiment_counter=sentiment_counter,
+        risk_level_counter=risk_level_counter,
+        buying_intent_counter=buying_intent_counter,
+    )
+    ads_signals = build_ads_signals(
+        lead_temperature_counter=lead_temperature_counter,
+        pipeline_stage_counter=pipeline_stage_counter,
+        sentiment_counter=sentiment_counter,
+        risk_level_counter=risk_level_counter,
+        reply_sent_count=reply_sent_count,
+        total_conversations=total_conversations,
+    )
+    monthly_content_plan = build_monthly_content_plan(
+        top_objections=top_objections,
+        lead_temperature_counter=lead_temperature_counter,
+        sentiment_counter=sentiment_counter,
+        buying_intent_counter=buying_intent_counter,
+    )
 
     return MarketingInsightsPreview(
         total_conversations=total_conversations,
@@ -716,6 +742,9 @@ def get_marketing_insights_preview(
         sentiment_breakdown=to_breakdown_items(sentiment_counter),
         pipeline_stage_breakdown=to_breakdown_items(pipeline_stage_counter),
         top_content_recommendations=top_content_recommendations,
+        content_briefs=content_briefs,
+        ads_signals=ads_signals,
+        monthly_content_plan=monthly_content_plan,
         kpi_summary=MarketingKpiSummary(
             reply_sent_rate=safe_ratio(reply_sent_count, total_conversations),
             analysis_coverage_rate=safe_ratio(
@@ -1157,3 +1186,208 @@ def build_content_recommendations(
         )
 
     return recommendations[:5]
+
+
+def build_content_briefs(
+    *,
+    objection_counter: Counter[str],
+    sentiment_counter: Counter[str],
+    risk_level_counter: Counter[str],
+    buying_intent_counter: Counter[str],
+) -> list[MarketingContentBrief]:
+    briefs: list[MarketingContentBrief] = []
+
+    for topic, count in objection_counter.most_common(2):
+        briefs.append(
+            MarketingContentBrief(
+                title=f"Brief edukasi objection: {topic}",
+                audience_segment="Leads yang masih ragu sebelum registrasi",
+                key_message=(
+                    f"Topik '{topic}' muncul {count} kali. Konten harus menjawab"
+                    " keraguan paling sering dengan bukti, alur yang jelas, dan CTA"
+                    " follow-up ke sales."
+                ),
+                suggested_format="short_video_or_carousel",
+                tone="reassuring",
+                call_to_action="Ajak audience minta penjelasan lanjutan via WhatsApp.",
+                urgency="high" if count >= 3 else "medium",
+            )
+        )
+
+    if sentiment_counter.get("cautious", 0) > 0:
+        briefs.append(
+            MarketingContentBrief(
+                title="Brief trust-building untuk leads cautious",
+                audience_segment="Audience yang tertarik tapi belum cukup percaya",
+                key_message=(
+                    "Tekankan legalitas, transparansi proses, dan testimoni nyata"
+                    " agar rasa aman naik sebelum masuk ke pembicaraan closing."
+                ),
+                suggested_format="testimonial_video",
+                tone="empathetic",
+                call_to_action="Dorong audience untuk cek bukti dan konsultasi langsung.",
+                urgency="high",
+            )
+        )
+
+    if (
+        risk_level_counter.get("high", 0) > 0
+        and buying_intent_counter.get("high", 0) > 0
+    ):
+        briefs.append(
+            MarketingContentBrief(
+                title="Brief klarifikasi untuk hot leads berisiko tinggi",
+                audience_segment="Prospek dengan intent tinggi tapi masih menahan keputusan",
+                key_message=(
+                    "Sediakan asset resmi yang menjawab titik risiko utama agar sales"
+                    " tidak menjelaskan dengan improvisasi."
+                ),
+                suggested_format="faq_landing_snippet",
+                tone="professional",
+                call_to_action="Arahkan ke chat sales untuk dapat panduan personal.",
+                urgency="high",
+            )
+        )
+
+    return briefs[:4]
+
+
+def build_ads_signals(
+    *,
+    lead_temperature_counter: Counter[str],
+    pipeline_stage_counter: Counter[str],
+    sentiment_counter: Counter[str],
+    risk_level_counter: Counter[str],
+    reply_sent_count: int,
+    total_conversations: int,
+) -> list[MarketingAdsSignal]:
+    signals: list[MarketingAdsSignal] = []
+    reply_sent_rate = safe_ratio(reply_sent_count, total_conversations)
+
+    hot_count = lead_temperature_counter.get("hot", 0)
+    warm_count = lead_temperature_counter.get("warm", 0)
+    cautious_count = sentiment_counter.get("cautious", 0)
+    high_risk_count = risk_level_counter.get("high", 0)
+    closing_count = pipeline_stage_counter.get("closing", 0)
+
+    if cautious_count > 0:
+        signals.append(
+            MarketingAdsSignal(
+                title="Naikkan budget retargeting untuk audience yang sudah engage",
+                observation=(
+                    f"Ada {cautious_count} percakapan dengan sentimen cautious."
+                    " Mereka tertarik, tapi masih butuh trust layer tambahan."
+                ),
+                recommendation=(
+                    "Geser budget ke creative retargeting berisi legalitas,"
+                    " transparansi, dan social proof."
+                ),
+                budget_shift="Top up retargeting warm audience, kurangi cold broad test.",
+                urgency="high",
+            )
+        )
+
+    if hot_count > 0 and closing_count < hot_count:
+        signals.append(
+            MarketingAdsSignal(
+                title="Perkuat nurturing untuk hot leads yang belum masuk closing",
+                observation=(
+                    f"Lead hot terdeteksi {hot_count}, tapi stage closing baru {closing_count}."
+                ),
+                recommendation=(
+                    "Siapkan creative follow-up dan landing support agar lead panas"
+                    " tidak drop di tengah funnel."
+                ),
+                budget_shift="Tambah spend pada audience warm-to-hot yang sudah pernah klik/chat.",
+                urgency="high",
+            )
+        )
+
+    if high_risk_count > 0 or reply_sent_rate < 0.5:
+        signals.append(
+            MarketingAdsSignal(
+                title="Turunkan friksi pesan awal di top funnel",
+                observation=(
+                    f"High-risk conversations: {high_risk_count}. Reply sent rate saat ini"
+                    f" {reply_sent_rate * 100:.0f}%."
+                ),
+                recommendation=(
+                    "Uji angle iklan yang lebih edukatif dan lebih spesifik soal"
+                    " ekspektasi, supaya sales menerima lead yang lebih siap."
+                ),
+                budget_shift="Kurangi creative hype, alihkan ke angle edukasi dan FAQ.",
+                urgency="medium",
+            )
+        )
+
+    if warm_count > 0 and not signals:
+        signals.append(
+            MarketingAdsSignal(
+                title="Pertahankan budget nurture untuk warm leads",
+                observation=(
+                    f"Warm leads terdeteksi {warm_count} dan belum ada sinyal anomali besar."
+                ),
+                recommendation=(
+                    "Lanjutkan campaign nurture dengan pembuktian value dan contoh use case."
+                ),
+                budget_shift="Pertahankan distribusi budget sambil monitor performa mingguan.",
+                urgency="medium",
+            )
+        )
+
+    return signals[:4]
+
+
+def build_monthly_content_plan(
+    *,
+    top_objections: list[MarketingObjectionInsight],
+    lead_temperature_counter: Counter[str],
+    sentiment_counter: Counter[str],
+    buying_intent_counter: Counter[str],
+) -> list[MarketingPlanningItem]:
+    primary_objection = top_objections[0].topic if top_objections else "trust dan klarifikasi awal"
+    secondary_objection = (
+        top_objections[1].topic if len(top_objections) > 1 else "bukti hasil dan proses"
+    )
+    cautious_count = sentiment_counter.get("cautious", 0)
+    high_intent_count = buying_intent_counter.get("high", 0)
+    hot_count = lead_temperature_counter.get("hot", 0)
+
+    return [
+        MarketingPlanningItem(
+            window_label="Week 1",
+            theme=f"Jawab objection utama: {primary_objection}",
+            objective="Naikkan trust awal dan kurangi friksi sebelum audience chat ke sales.",
+            suggested_format="carousel_and_short_video",
+            primary_metric="WhatsApp inquiries from educated audience",
+        ),
+        MarketingPlanningItem(
+            window_label="Week 2",
+            theme="Bangun social proof dan bukti proses",
+            objective=(
+                "Ubah audience cautious menjadi lebih siap masuk percakapan"
+                if cautious_count > 0
+                else "Pertahankan rasa aman audience dengan bukti yang konkret"
+            ),
+            suggested_format="testimonial_video",
+            primary_metric="Reply quality and follow-up continuation rate",
+        ),
+        MarketingPlanningItem(
+            window_label="Week 3",
+            theme=f"Perkuat angle intent tinggi: {secondary_objection}",
+            objective=(
+                "Dorong warm leads menjadi closing-ready"
+                if high_intent_count > 0 or hot_count > 0
+                else "Bangun minat yang lebih jelas sebelum CTA konsultasi"
+            ),
+            suggested_format="faq_reels_or_landing_snippet",
+            primary_metric="Warm-to-hot lead progression",
+        ),
+        MarketingPlanningItem(
+            window_label="Week 4",
+            theme="Recap insight dan refresh creative terbaik",
+            objective="Scale angle yang paling banyak menurunkan resistance di chat.",
+            suggested_format="best_angle_recut",
+            primary_metric="Cost per qualified conversation",
+        ),
+    ]

@@ -156,6 +156,29 @@ export type MarketingInsightsPreview = {
     suggested_format: string;
     priority: string;
   }[];
+  content_briefs: {
+    title: string;
+    audience_segment: string;
+    key_message: string;
+    suggested_format: string;
+    tone: string;
+    call_to_action: string;
+    urgency: string;
+  }[];
+  ads_signals: {
+    title: string;
+    observation: string;
+    recommendation: string;
+    budget_shift: string;
+    urgency: string;
+  }[];
+  monthly_content_plan: {
+    window_label: string;
+    theme: string;
+    objective: string;
+    suggested_format: string;
+    primary_metric: string;
+  }[];
   kpi_summary: {
     reply_sent_rate: number;
     analysis_coverage_rate: number;

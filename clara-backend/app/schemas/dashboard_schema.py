@@ -120,6 +120,32 @@ class MarketingContentRecommendation(BaseModel):
     priority: str
 
 
+class MarketingContentBrief(BaseModel):
+    title: str
+    audience_segment: str
+    key_message: str
+    suggested_format: str
+    tone: str
+    call_to_action: str
+    urgency: str
+
+
+class MarketingAdsSignal(BaseModel):
+    title: str
+    observation: str
+    recommendation: str
+    budget_shift: str
+    urgency: str
+
+
+class MarketingPlanningItem(BaseModel):
+    window_label: str
+    theme: str
+    objective: str
+    suggested_format: str
+    primary_metric: str
+
+
 class MarketingKpiSummary(BaseModel):
     reply_sent_rate: float
     analysis_coverage_rate: float
@@ -137,6 +163,9 @@ class MarketingInsightsPreview(BaseModel):
     sentiment_breakdown: list[MarketingBreakdownItem]
     pipeline_stage_breakdown: list[MarketingBreakdownItem]
     top_content_recommendations: list[MarketingContentRecommendation]
+    content_briefs: list[MarketingContentBrief]
+    ads_signals: list[MarketingAdsSignal]
+    monthly_content_plan: list[MarketingPlanningItem]
     kpi_summary: MarketingKpiSummary
     generated_at: datetime
 
