@@ -8,16 +8,24 @@ import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import type {
   CurrentUser,
+  MarketingExecutionItem,
+  MarketingExecutionItemCreateRequest,
+  MarketingExecutionItemUpdateRequest,
   MarketingInsightSnapshot,
   MarketingInsightsPreview,
 } from "@/types/dashboard";
+
+const EXECUTION_STATUS_OPTIONS = ["draft", "assigned", "in_progress", "done"];
 
 export default function MarketingInsightsPage() {
   const [insights, setInsights] = useState<MarketingInsightsPreview | null>(null);
   const [snapshots, setSnapshots] = useState<MarketingInsightSnapshot[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [users, setUsers] = useState<CurrentUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingSnapshot, setIsGeneratingSnapshot] = useState(false);
+  const [isCreatingExecutionItem, setIsCreatingExecutionItem] = useState(false);
+  const [updatingExecutionItemId, setUpdatingExecutionItemId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   async function loadSnapshotList() {
@@ -30,16 +38,24 @@ export default function MarketingInsightsPage() {
   useEffect(() => {
     async function loadInsights() {
       try {
-        const [insightData, snapshotData, me] = await Promise.all([
+        const [insightData, snapshotData, me, scopedUsers] = await Promise.all([
           apiFetch<MarketingInsightsPreview>("/dashboard/marketing/insights-preview"),
           apiFetch<MarketingInsightSnapshot[]>(
             "/dashboard/marketing/insight-snapshots"
           ),
           apiFetch<CurrentUser>("/auth/me"),
+          apiFetch<CurrentUser[]>("/auth/users"),
         ]);
         setInsights(insightData);
         setSnapshots(snapshotData);
         setCurrentUser(me);
+        setUsers(
+          scopedUsers.filter(
+            (user) =>
+              user.is_active &&
+              (!me.organization_id || user.organization_id === me.organization_id)
+          )
+        );
       } catch (error) {
         setErrorMessage(
           error instanceof Error
@@ -79,6 +95,77 @@ export default function MarketingInsightsPage() {
       );
     } finally {
       setIsGeneratingSnapshot(false);
+    }
+  }
+
+  async function handleCreateExecutionItem(
+    payload: MarketingExecutionItemCreateRequest
+  ) {
+    setIsCreatingExecutionItem(true);
+    setErrorMessage("");
+
+    try {
+      const createdItem = await apiFetch<MarketingExecutionItem>(
+        "/dashboard/marketing/execution-items",
+        {
+          method: "POST",
+          body: payload,
+        }
+      );
+
+      setInsights((previous) =>
+        previous
+          ? {
+              ...previous,
+              execution_items: [createdItem, ...previous.execution_items],
+            }
+          : previous
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal membuat execution item marketing."
+      );
+    } finally {
+      setIsCreatingExecutionItem(false);
+    }
+  }
+
+  async function handleUpdateExecutionItem(
+    itemId: string,
+    payload: MarketingExecutionItemUpdateRequest
+  ) {
+    setUpdatingExecutionItemId(itemId);
+    setErrorMessage("");
+
+    try {
+      const updatedItem = await apiFetch<MarketingExecutionItem>(
+        `/dashboard/marketing/execution-items/${itemId}`,
+        {
+          method: "PATCH",
+          body: payload,
+        }
+      );
+
+      setInsights((previous) =>
+        previous
+          ? {
+              ...previous,
+              execution_items: previous.execution_items.map((item) =>
+                item.id === updatedItem.id ? updatedItem : item
+              ),
+            }
+          : previous
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal memperbarui execution item marketing."
+      );
+    } finally {
+      setUpdatingExecutionItemId(null);
     }
   }
 
@@ -273,6 +360,134 @@ export default function MarketingInsightsPage() {
                               {brief.key_message}
                             </p>
                           </div>
+
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleCreateExecutionItem({
+                                  item_type: "content_brief",
+                                  source_kind: "content_brief",
+                                  title: brief.title,
+                                  summary: brief.key_message,
+                                  recommended_action: brief.call_to_action,
+                                  priority: brief.urgency === "high" ? "high" : "medium",
+                                  assigned_user_id: currentUser?.id ?? null,
+                                })
+                              }
+                              disabled={isCreatingExecutionItem}
+                              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan Execution Item"}
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
+
+                <Panel
+                  title="Marketing Execution Board"
+                  description="Daftar item kerja yang sudah diturunkan dari insight, supaya tim tahu mana yang masih draft, sudah di-assign, sedang dikerjakan, atau selesai."
+                >
+                  {insights.execution_items.length === 0 ? (
+                    <EmptyText text="Belum ada execution item. Konversi content brief atau ads signal menjadi item kerja." />
+                  ) : (
+                    <div className="space-y-4">
+                      {insights.execution_items.map((item) => (
+                        <article
+                          key={item.id}
+                          className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfd_100%)] p-5"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-semibold text-slate-950">
+                              {item.title}
+                            </h3>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                              {formatStatusLabel(item.item_type)}
+                            </span>
+                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                              {item.priority}
+                            </span>
+                          </div>
+
+                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                            {item.summary}
+                          </p>
+
+                          <div className="mt-4 grid gap-4 md:grid-cols-2">
+                            <SignalBlock label="Recommended action" value={item.recommended_action} />
+                            <div className="rounded-2xl bg-slate-50 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Ownership
+                              </p>
+                              <p className="mt-2 text-sm text-slate-700">
+                                Dibuat oleh {item.created_by_user_name ?? "System"}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-700">
+                                PIC: {item.assigned_user_name ?? "Belum di-assign"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Status
+                              </span>
+                              <select
+                                value={item.status}
+                                onChange={(event) =>
+                                  void handleUpdateExecutionItem(item.id, {
+                                    status: event.target.value,
+                                  })
+                                }
+                                disabled={updatingExecutionItemId === item.id}
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                              >
+                                {EXECUTION_STATUS_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>
+                                    {formatStatusLabel(option)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Assign PIC
+                              </span>
+                              <select
+                                value={item.assigned_user_id ?? ""}
+                                onChange={(event) =>
+                                  void handleUpdateExecutionItem(item.id, {
+                                    assigned_user_id: event.target.value || null,
+                                  })
+                                }
+                                disabled={updatingExecutionItemId === item.id}
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                              >
+                                <option value="">Belum di-assign</option>
+                                {users.map((user) => (
+                                  <option key={user.id} value={user.id}>
+                                    {user.name} · {user.role}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+
+                          {item.notes && (
+                            <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Notes
+                              </p>
+                              <p className="mt-2 text-sm leading-6 text-slate-700">
+                                {item.notes}
+                              </p>
+                            </div>
+                          )}
                         </article>
                       ))}
                     </div>
@@ -426,6 +641,27 @@ export default function MarketingInsightsPage() {
                               label="Budget shift"
                               value={signal.budget_shift}
                             />
+                          </div>
+
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleCreateExecutionItem({
+                                  item_type: "ads_signal",
+                                  source_kind: "ads_signal",
+                                  title: signal.title,
+                                  summary: signal.observation,
+                                  recommended_action: `${signal.recommendation} ${signal.budget_shift}`,
+                                  priority: signal.urgency === "high" ? "high" : "medium",
+                                  assigned_user_id: currentUser?.id ?? null,
+                                })
+                              }
+                              disabled={isCreatingExecutionItem}
+                              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan Execution Item"}
+                            </button>
                           </div>
                         </article>
                       ))}

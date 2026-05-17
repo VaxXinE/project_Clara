@@ -414,6 +414,7 @@ export type MarketingInsightsPreview = {
     budget_shift: string;
     urgency: string;
   }[];
+  execution_items: MarketingExecutionItem[];
   monthly_content_plan: {
     window_label: string;
     theme: string;
@@ -428,6 +429,42 @@ export type MarketingInsightsPreview = {
     high_risk_conversation_count: number;
   };
   generated_at: string;
+};
+
+export type MarketingExecutionItem = {
+  id: string;
+  organization_id: string | null;
+  created_by_user_id: string | null;
+  created_by_user_name: string | null;
+  assigned_user_id: string | null;
+  assigned_user_name: string | null;
+  item_type: string;
+  source_kind: string;
+  status: string;
+  priority: string;
+  title: string;
+  summary: string;
+  recommended_action: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MarketingExecutionItemCreateRequest = {
+  item_type: string;
+  source_kind: string;
+  title: string;
+  summary: string;
+  recommended_action: string;
+  priority?: string;
+  assigned_user_id?: string | null;
+  notes?: string | null;
+};
+
+export type MarketingExecutionItemUpdateRequest = {
+  status?: string;
+  assigned_user_id?: string | null;
+  notes?: string | null;
 };
 
 export type MarketingInsightSnapshot = {

@@ -85,3 +85,13 @@ class User(Base):
         foreign_keys="LeadDeal.owner_user_id",
         back_populates="owner_user",
     )
+    created_marketing_execution_items = relationship(
+        "MarketingExecutionItem",
+        foreign_keys="MarketingExecutionItem.created_by_user_id",
+        back_populates="created_by_user",
+    )
+    assigned_marketing_execution_items = relationship(
+        "MarketingExecutionItem",
+        foreign_keys="MarketingExecutionItem.assigned_user_id",
+        back_populates="assigned_user",
+    )

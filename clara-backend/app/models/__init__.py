@@ -10,6 +10,7 @@ from app.models.lead_deal import LeadDeal
 from app.models.lead_task import LeadTask
 from app.models.lead_task_event import LeadTaskEvent
 from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
+from app.models.marketing_execution_item import MarketingExecutionItem
 from app.models.message import Message
 from app.models.organization import Organization
 from app.models.product_knowledge import ProductKnowledge
@@ -29,6 +30,7 @@ __all__ = [
     "LeadDeal",
     "LeadTask",
     "LeadTaskEvent",
+    "MarketingExecutionItem",
     "MarketingInsightSnapshot",
     "Message",
     "Organization",

@@ -28,5 +28,9 @@ class Organization(Base):
         "LeadActivityEvent",
         back_populates="organization",
     )
+    marketing_execution_items = relationship(
+        "MarketingExecutionItem",
+        back_populates="organization",
+    )
     conversations = relationship("Conversation", back_populates="organization")
     lead_tasks = relationship("LeadTask", back_populates="organization")

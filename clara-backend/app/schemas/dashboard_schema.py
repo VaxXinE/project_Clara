@@ -166,6 +166,42 @@ class MarketingAdsSignal(BaseModel):
     urgency: str
 
 
+class MarketingExecutionItem(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    created_by_user_id: UUID | None
+    created_by_user_name: str | None
+    assigned_user_id: UUID | None
+    assigned_user_name: str | None
+    item_type: str
+    source_kind: str
+    status: str
+    priority: str
+    title: str
+    summary: str
+    recommended_action: str
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MarketingExecutionItemCreateRequest(BaseModel):
+    item_type: str
+    source_kind: str
+    title: str
+    summary: str
+    recommended_action: str
+    priority: str = "medium"
+    assigned_user_id: UUID | None = None
+    notes: str | None = None
+
+
+class MarketingExecutionItemUpdateRequest(BaseModel):
+    status: str | None = None
+    assigned_user_id: UUID | None = None
+    notes: str | None = None
+
+
 class MarketingPlanningItem(BaseModel):
     window_label: str
     theme: str
@@ -194,6 +230,7 @@ class MarketingInsightsPreview(BaseModel):
     content_briefs: list[MarketingContentBrief]
     ads_signals: list[MarketingAdsSignal]
     monthly_content_plan: list[MarketingPlanningItem]
+    execution_items: list[MarketingExecutionItem]
     kpi_summary: MarketingKpiSummary
     generated_at: datetime
 

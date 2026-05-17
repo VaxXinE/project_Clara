@@ -9,6 +9,9 @@ from app.schemas.dashboard_schema import (
     KpiAlertHistoryResponse,
     KpiCommandCenterResponse,
     KpiSnapshotHistoryResponse,
+    MarketingExecutionItem,
+    MarketingExecutionItemCreateRequest,
+    MarketingExecutionItemUpdateRequest,
     MarketingInsightSnapshotResponse,
     MarketingInsightsPreview,
     OpsDatabaseOverviewResponse,
@@ -21,6 +24,7 @@ from app.schemas.dashboard_schema import (
 from app.services.audit_service import create_audit_log
 from app.services.dashboard_service import (
     acknowledge_kpi_alert,
+    create_marketing_execution_item,
     get_kpi_command_center,
     get_marketing_insights_preview,
     get_ops_database_overview,
@@ -30,7 +34,9 @@ from app.services.dashboard_service import (
     get_sales_worklist,
     list_kpi_alert_records,
     list_kpi_snapshots,
+    list_marketing_execution_items,
     refresh_kpi_command_center,
+    update_marketing_execution_item,
 )
 from app.services.marketing_snapshot_service import (
     generate_marketing_snapshot,
@@ -95,6 +101,90 @@ def marketing_insights_preview(
     current_user: User = Depends(require_roles("admin")),
 ):
     return get_marketing_insights_preview(db=db, current_user=current_user)
+
+
+@router.get("/marketing/execution-items", response_model=list[MarketingExecutionItem])
+def list_marketing_execution_items_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    return list_marketing_execution_items(db=db, current_user=current_user)
+
+
+@router.post(
+    "/marketing/execution-items",
+    response_model=MarketingExecutionItem,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_marketing_execution_item_endpoint(
+    payload: MarketingExecutionItemCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    try:
+        item = create_marketing_execution_item(
+            db=db,
+            payload=payload,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="marketing_execution_item.create",
+        resource_type="marketing_execution_item",
+        resource_id=str(item.id),
+        current_user=current_user,
+        request=request,
+        metadata={"item_type": item.item_type, "status": item.status},
+    )
+    return item
+
+
+@router.patch(
+    "/marketing/execution-items/{item_id}",
+    response_model=MarketingExecutionItem,
+)
+def update_marketing_execution_item_endpoint(
+    item_id: UUID,
+    payload: MarketingExecutionItemUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    try:
+        item = update_marketing_execution_item(
+            db=db,
+            item_id=item_id,
+            payload=payload,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        detail = str(error)
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if "not found" in detail.lower()
+                else status.HTTP_400_BAD_REQUEST
+            ),
+            detail=detail,
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="marketing_execution_item.update",
+        resource_type="marketing_execution_item",
+        resource_id=str(item.id),
+        current_user=current_user,
+        request=request,
+        metadata={"item_type": item.item_type, "status": item.status},
+    )
+    return item
 
 
 @router.get("/kpi/command-center", response_model=KpiCommandCenterResponse)

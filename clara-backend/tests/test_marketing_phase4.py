@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.message import Message
 from app.models.reply_suggestion import ReplySuggestion
@@ -19,6 +20,12 @@ def login(client: TestClient, *, email: str, password: str) -> None:
         json={"email": email, "password": password},
     )
     assert response.status_code == 200, response.text
+
+
+def csrf_headers(client: TestClient) -> dict[str, str]:
+    csrf_token = client.cookies.get(settings.csrf_cookie_name)
+    assert csrf_token
+    return {"X-CSRF-Token": csrf_token}
 
 
 def test_marketing_preview_surfaces_operational_content_outputs(
@@ -116,3 +123,47 @@ def test_marketing_preview_surfaces_operational_content_outputs(
     assert "retarget" in payload["ads_signals"][0]["budget_shift"].lower()
     assert len(payload["monthly_content_plan"]) == 4
     assert payload["monthly_content_plan"][0]["window_label"] == "Week 1"
+
+
+def test_admin_can_create_and_update_marketing_execution_item(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    marketing_b = seeded_data["marketing_b"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    create_response = client.post(
+        "/dashboard/marketing/execution-items",
+        json={
+            "item_type": "content_brief",
+            "source_kind": "content_brief",
+            "title": "Brief trust building",
+            "summary": "Fokus ke legalitas dan testimoni agar trust naik.",
+            "recommended_action": "Assign ke content creator untuk video edukasi.",
+            "priority": "high",
+            "assigned_user_id": str(marketing_b.id),
+        },
+        headers=csrf_headers(client),
+    )
+    assert create_response.status_code == 201, create_response.text
+    payload = create_response.json()
+    assert payload["status"] == "assigned"
+    assert payload["assigned_user_id"] == str(marketing_b.id)
+
+    list_response = client.get("/dashboard/marketing/execution-items")
+    assert list_response.status_code == 200, list_response.text
+    assert len(list_response.json()) >= 1
+
+    update_response = client.patch(
+        f"/dashboard/marketing/execution-items/{payload['id']}",
+        json={
+            "status": "in_progress",
+            "notes": "Sudah masuk antrian produksi.",
+        },
+        headers=csrf_headers(client),
+    )
+    assert update_response.status_code == 200, update_response.text
+    assert update_response.json()["status"] == "in_progress"
+    assert update_response.json()["notes"] == "Sudah masuk antrian produksi."

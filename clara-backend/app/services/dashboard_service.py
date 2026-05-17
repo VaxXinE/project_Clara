@@ -13,6 +13,9 @@ from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
 from app.models.lead_deal import LeadDeal
 from app.models.lead_task import LeadTask
+from app.models.marketing_execution_item import (
+    MarketingExecutionItem as MarketingExecutionItemModel,
+)
 from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
 from app.models.message import Message
 from app.models.organization import Organization
@@ -36,6 +39,9 @@ from app.schemas.dashboard_schema import (
     MarketingBreakdownItem,
     MarketingContentBrief,
     MarketingContentRecommendation,
+    MarketingExecutionItem,
+    MarketingExecutionItemCreateRequest,
+    MarketingExecutionItemUpdateRequest,
     OrganizationPerformanceRow,
     OpsAuditLogRow,
     OpsConversationRow,
@@ -822,6 +828,7 @@ def get_marketing_insights_preview(
             content_briefs=[],
             ads_signals=[],
             monthly_content_plan=[],
+            execution_items=[],
             kpi_summary=MarketingKpiSummary(
                 reply_sent_rate=0,
                 analysis_coverage_rate=0,
@@ -933,6 +940,10 @@ def get_marketing_insights_preview(
         sentiment_counter=sentiment_counter,
         buying_intent_counter=buying_intent_counter,
     )
+    execution_items = list_marketing_execution_items(
+        db=db,
+        current_user=current_user,
+    )
 
     return MarketingInsightsPreview(
         total_conversations=total_conversations,
@@ -947,6 +958,7 @@ def get_marketing_insights_preview(
         content_briefs=content_briefs,
         ads_signals=ads_signals,
         monthly_content_plan=monthly_content_plan,
+        execution_items=execution_items,
         kpi_summary=MarketingKpiSummary(
             reply_sent_rate=safe_ratio(reply_sent_count, total_conversations),
             analysis_coverage_rate=safe_ratio(
@@ -961,6 +973,164 @@ def get_marketing_insights_preview(
         ),
         generated_at=datetime.now(timezone.utc),
     )
+
+
+VALID_MARKETING_EXECUTION_ITEM_TYPES = {"content_brief", "ads_signal"}
+VALID_MARKETING_EXECUTION_STATUS = {"draft", "assigned", "in_progress", "done"}
+VALID_MARKETING_EXECUTION_PRIORITY = {"low", "medium", "high"}
+
+
+def build_marketing_execution_item(
+    item: MarketingExecutionItemModel,
+) -> MarketingExecutionItem:
+    return MarketingExecutionItem(
+        id=item.id,
+        organization_id=item.organization_id,
+        created_by_user_id=item.created_by_user_id,
+        created_by_user_name=item.created_by_user.name if item.created_by_user else None,
+        assigned_user_id=item.assigned_user_id,
+        assigned_user_name=item.assigned_user.name if item.assigned_user else None,
+        item_type=item.item_type,
+        source_kind=item.source_kind,
+        status=item.status,
+        priority=item.priority,
+        title=item.title,
+        summary=item.summary,
+        recommended_action=item.recommended_action,
+        notes=item.notes,
+        created_at=item.created_at,
+        updated_at=item.updated_at,
+    )
+
+
+def validate_marketing_execution_assignee(
+    db: Session,
+    *,
+    organization_id: UUID | None,
+    assigned_user_id: UUID | None,
+) -> User | None:
+    if assigned_user_id is None:
+        return None
+
+    assignee = db.get(User, assigned_user_id)
+    if assignee is None or not assignee.is_active:
+        raise ValueError("Assigned user is invalid or inactive.")
+    if organization_id is None or assignee.organization_id != organization_id:
+        raise ValueError("Assigned user must belong to the same organization.")
+    return assignee
+
+
+def list_marketing_execution_items(
+    db: Session,
+    *,
+    current_user: User,
+) -> list[MarketingExecutionItem]:
+    if current_user.organization_id is None:
+        return []
+
+    statement = (
+        select(MarketingExecutionItemModel)
+        .where(MarketingExecutionItemModel.organization_id == current_user.organization_id)
+        .options(
+            selectinload(MarketingExecutionItemModel.created_by_user),
+            selectinload(MarketingExecutionItemModel.assigned_user),
+        )
+        .order_by(
+            MarketingExecutionItemModel.status.asc(),
+            desc(MarketingExecutionItemModel.updated_at),
+        )
+    )
+    items = list(db.scalars(statement).all())
+    return [build_marketing_execution_item(item) for item in items]
+
+
+def create_marketing_execution_item(
+    db: Session,
+    *,
+    payload: MarketingExecutionItemCreateRequest,
+    current_user: User,
+) -> MarketingExecutionItem:
+    if current_user.organization_id is None:
+        raise ValueError("Current user does not belong to an organization.")
+    if payload.item_type not in VALID_MARKETING_EXECUTION_ITEM_TYPES:
+        raise ValueError("Invalid marketing execution item type.")
+    if payload.priority not in VALID_MARKETING_EXECUTION_PRIORITY:
+        raise ValueError("Invalid marketing execution priority.")
+
+    assignee = validate_marketing_execution_assignee(
+        db=db,
+        organization_id=current_user.organization_id,
+        assigned_user_id=payload.assigned_user_id,
+    )
+
+    item = MarketingExecutionItemModel(
+        organization_id=current_user.organization_id,
+        created_by_user_id=current_user.id,
+        assigned_user_id=assignee.id if assignee else None,
+        item_type=payload.item_type,
+        source_kind=payload.source_kind,
+        status="assigned" if assignee else "draft",
+        priority=payload.priority,
+        title=payload.title.strip(),
+        summary=payload.summary.strip(),
+        recommended_action=payload.recommended_action.strip(),
+        notes=payload.notes.strip() if payload.notes else None,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return build_marketing_execution_item(item)
+
+
+def update_marketing_execution_item(
+    db: Session,
+    *,
+    item_id: UUID,
+    payload: MarketingExecutionItemUpdateRequest,
+    current_user: User,
+) -> MarketingExecutionItem:
+    if current_user.organization_id is None:
+        raise ValueError("Current user does not belong to an organization.")
+
+    statement = (
+        select(MarketingExecutionItemModel)
+        .where(
+            MarketingExecutionItemModel.id == item_id,
+            MarketingExecutionItemModel.organization_id == current_user.organization_id,
+        )
+        .options(
+            selectinload(MarketingExecutionItemModel.created_by_user),
+            selectinload(MarketingExecutionItemModel.assigned_user),
+        )
+    )
+    item = db.scalars(statement).first()
+    if item is None:
+        raise ValueError("Marketing execution item not found.")
+
+    if payload.status is not None:
+        if payload.status not in VALID_MARKETING_EXECUTION_STATUS:
+            raise ValueError("Invalid marketing execution status.")
+        item.status = payload.status
+
+    if "assigned_user_id" in payload.model_fields_set:
+        assignee = validate_marketing_execution_assignee(
+            db=db,
+            organization_id=current_user.organization_id,
+            assigned_user_id=payload.assigned_user_id,
+        )
+        item.assigned_user_id = assignee.id if assignee else None
+        if item.assigned_user_id is None and item.status == "assigned":
+            item.status = "draft"
+        elif item.assigned_user_id is not None and item.status == "draft":
+            item.status = "assigned"
+
+    if payload.notes is not None:
+        item.notes = payload.notes.strip() or None
+
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return build_marketing_execution_item(item)
 
 
 def get_ops_database_overview(
