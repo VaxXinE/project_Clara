@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.ai_extraction import AIExtraction
 from app.models.audit_log import AuditLog
 from app.models.conversation import Conversation
+from app.models.kpi_alert_record import KpiAlertRecord
+from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
 from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
 from app.models.message import Message
@@ -22,8 +24,11 @@ from app.schemas.dashboard_schema import (
     DashboardReplySuggestionSummary,
     DashboardSentMessageSummary,
     ExecutiveRecommendationItem,
+    KpiAlertHistoryResponse,
     KpiAlertItem,
     KpiCommandCenterResponse,
+    KpiSnapshotHistoryResponse,
+    KpiSnapshotItem,
     KpiSummaryCard,
     MarketingAdsSignal,
     MarketingBreakdownItem,
@@ -47,6 +52,7 @@ from app.schemas.dashboard_schema import (
     SalesPerformanceRow,
     SalesConversationDetail,
     SalesInboxItem,
+    PersistedKpiAlertRecord,
     SalesWorklistItem,
     SalesWorklistResponse,
 )
@@ -1399,20 +1405,70 @@ def build_executive_recommendations(
     return recommendations[:6]
 
 
-def get_kpi_command_center(
+def build_alert_key(
+    *,
+    scope_type: str,
+    organization_id: UUID | None,
+    alert: KpiAlertItem,
+) -> str:
+    scope_part = str(organization_id) if organization_id is not None else "global"
+    return f"{scope_type}:{scope_part}:{alert.severity}:{alert.title}"
+
+
+def build_persisted_alert_item(alert: KpiAlertRecord) -> PersistedKpiAlertRecord:
+    return PersistedKpiAlertRecord(
+        id=alert.id,
+        organization_id=alert.organization_id,
+        scope_type=alert.scope_type,
+        severity=alert.severity,
+        title=alert.title,
+        description=alert.description,
+        recommended_action=alert.recommended_action,
+        target_href=alert.target_href,
+        status=alert.status,
+        acknowledged_by_user_id=alert.acknowledged_by_user_id,
+        first_detected_at=alert.first_detected_at,
+        last_detected_at=alert.last_detected_at,
+        acknowledged_at=alert.acknowledged_at,
+        resolved_at=alert.resolved_at,
+        created_at=alert.created_at,
+        updated_at=alert.updated_at,
+    )
+
+
+def build_kpi_snapshot_item(snapshot: KpiCommandSnapshot) -> KpiSnapshotItem:
+    return KpiSnapshotItem(
+        id=snapshot.id,
+        organization_id=snapshot.organization_id,
+        scope_type=snapshot.scope_type,
+        snapshot_type=snapshot.snapshot_type,
+        metrics_json=snapshot.metrics_json,
+        observations_json=snapshot.observations_json,
+        created_at=snapshot.created_at,
+    )
+
+
+def resolve_kpi_scope(current_user: User) -> tuple[bool, str, UUID | None]:
+    can_view_global = current_user.role == "owner"
+    scope_type = "global" if can_view_global else "organization"
+    organization_id = None if can_view_global else current_user.organization_id
+    return can_view_global, scope_type, organization_id
+
+
+def build_kpi_command_center_data(
     db: Session,
     current_user: User,
-) -> KpiCommandCenterResponse:
-    can_view_global = current_user.role == "owner"
+) -> dict:
+    can_view_global, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
     now = datetime.now(timezone.utc)
 
     organizations_statement = select(Organization)
     if not can_view_global:
-        if current_user.organization_id is None:
-            return KpiCommandCenterResponse(
-                scope_type="organization",
-                generated_at=now,
-                summary=KpiSummaryCard(
+        if scoped_organization_id is None:
+            return {
+                "scope_type": scope_type,
+                "generated_at": now,
+                "summary": KpiSummaryCard(
                     total_organizations=0,
                     total_sales_users=0,
                     total_leads=0,
@@ -1423,14 +1479,15 @@ def get_kpi_command_center(
                     approved_reply_rate=0,
                     overdue_follow_ups=0,
                 ),
-                key_observations=[],
-                alerts=[],
-                recommendations=[],
-                sales_performance=[],
-                organization_performance=[],
-            )
+                "key_observations": [],
+                "alerts": [],
+                "recommendations": [],
+                "sales_performance": [],
+                "organization_performance": [],
+                "organization_id": scoped_organization_id,
+            }
         organizations_statement = organizations_statement.where(
-            Organization.id == current_user.organization_id
+            Organization.id == scoped_organization_id
         )
 
     organizations = list(db.scalars(organizations_statement).all())
@@ -1442,7 +1499,7 @@ def get_kpi_command_center(
     )
     if not can_view_global:
         users_statement = users_statement.where(
-            User.organization_id == current_user.organization_id
+            User.organization_id == scoped_organization_id
         )
     users = list(db.scalars(users_statement).all())
 
@@ -1453,7 +1510,7 @@ def get_kpi_command_center(
     )
     if not can_view_global:
         leads_statement = leads_statement.where(
-            Lead.organization_id == current_user.organization_id
+            Lead.organization_id == scoped_organization_id
         )
     elif organization_ids:
         leads_statement = leads_statement.where(Lead.organization_id.in_(organization_ids))
@@ -1462,7 +1519,7 @@ def get_kpi_command_center(
     conversations_statement = select(Conversation)
     if not can_view_global:
         conversations_statement = conversations_statement.where(
-            Conversation.organization_id == current_user.organization_id
+            Conversation.organization_id == scoped_organization_id
         )
     elif organization_ids:
         conversations_statement = conversations_statement.where(
@@ -1482,13 +1539,9 @@ def get_kpi_command_center(
     organization_name_by_id = {organization.id: organization.name for organization in organizations}
 
     for user in users:
-        assigned_leads = [
-            lead for lead in leads if lead.assigned_user_id == user.id
-        ]
+        assigned_leads = [lead for lead in leads if lead.assigned_user_id == user.id]
         owned_conversations = [
-            conversation
-            for conversation in conversations
-            if conversation.sales_user_id == user.id
+            conversation for conversation in conversations if conversation.sales_user_id == user.id
         ]
 
         user_analyzed = 0
@@ -1620,25 +1673,233 @@ def get_kpi_command_center(
         sales_rows=sales_rows,
         organization_rows=organization_rows,
     )
+    observations = build_kpi_observations(
+        summary=summary,
+        top_sales_rows=sales_rows[:3],
+        top_org_rows=organization_rows[:3],
+    )
+    recommendations = build_executive_recommendations(
+        summary=summary,
+        alerts=alerts,
+        sales_rows=sales_rows,
+        organization_rows=organization_rows,
+    )
+
+    return {
+        "scope_type": scope_type,
+        "generated_at": now,
+        "summary": summary,
+        "key_observations": observations,
+        "alerts": alerts,
+        "recommendations": recommendations,
+        "sales_performance": sales_rows,
+        "organization_performance": organization_rows,
+        "organization_id": scoped_organization_id,
+    }
+
+
+def sync_persistent_kpi_alerts(
+    db: Session,
+    *,
+    scope_type: str,
+    organization_id: UUID | None,
+    alerts: list[KpiAlertItem],
+) -> list[PersistedKpiAlertRecord]:
+    statement = select(KpiAlertRecord).where(
+        KpiAlertRecord.scope_type == scope_type,
+        KpiAlertRecord.organization_id == organization_id,
+    )
+    existing_records = list(db.scalars(statement).all())
+    existing_by_key = {record.alert_key: record for record in existing_records}
+    current_keys: set[str] = set()
+    now = datetime.now(timezone.utc)
+
+    for alert in alerts:
+        alert_key = build_alert_key(
+            scope_type=scope_type,
+            organization_id=organization_id,
+            alert=alert,
+        )
+        current_keys.add(alert_key)
+        existing = existing_by_key.get(alert_key)
+
+        if existing is None:
+            existing = KpiAlertRecord(
+                organization_id=organization_id,
+                scope_type=scope_type,
+                alert_key=alert_key,
+                severity=alert.severity,
+                title=alert.title,
+                description=alert.description,
+                recommended_action=alert.recommended_action,
+                target_href=alert.target_href,
+                status="active",
+                first_detected_at=now,
+                last_detected_at=now,
+            )
+        else:
+            existing.severity = alert.severity
+            existing.title = alert.title
+            existing.description = alert.description
+            existing.recommended_action = alert.recommended_action
+            existing.target_href = alert.target_href
+            existing.last_detected_at = now
+            existing.resolved_at = None
+            if existing.status == "resolved":
+                existing.status = "active"
+
+        db.add(existing)
+
+    for existing in existing_records:
+        if existing.alert_key not in current_keys and existing.status in {"active", "acknowledged"}:
+            existing.status = "resolved"
+            existing.resolved_at = now
+            db.add(existing)
+
+    db.commit()
+
+    refreshed_statement = (
+        select(KpiAlertRecord)
+        .where(
+            KpiAlertRecord.scope_type == scope_type,
+            KpiAlertRecord.organization_id == organization_id,
+        )
+        .order_by(desc(KpiAlertRecord.last_detected_at), desc(KpiAlertRecord.created_at))
+    )
+    return [
+        build_persisted_alert_item(item)
+        for item in db.scalars(refreshed_statement).all()
+    ]
+
+
+def create_kpi_snapshot(
+    db: Session,
+    *,
+    scope_type: str,
+    organization_id: UUID | None,
+    summary: KpiSummaryCard,
+    observations: list[str],
+) -> KpiSnapshotItem:
+    snapshot = KpiCommandSnapshot(
+        organization_id=organization_id,
+        scope_type=scope_type,
+        snapshot_type="manual_refresh",
+        metrics_json=summary.model_dump(),
+        observations_json=observations,
+    )
+    db.add(snapshot)
+    db.commit()
+    db.refresh(snapshot)
+    return build_kpi_snapshot_item(snapshot)
+
+
+def list_kpi_snapshots(
+    db: Session,
+    current_user: User,
+) -> KpiSnapshotHistoryResponse:
+    _, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
+    statement = select(KpiCommandSnapshot).where(
+        KpiCommandSnapshot.scope_type == scope_type,
+        KpiCommandSnapshot.organization_id == scoped_organization_id,
+    ).order_by(desc(KpiCommandSnapshot.created_at))
+    items = [build_kpi_snapshot_item(item) for item in db.scalars(statement).all()]
+    return KpiSnapshotHistoryResponse(
+        generated_at=datetime.now(timezone.utc),
+        items=items,
+    )
+
+
+def list_kpi_alert_records(
+    db: Session,
+    current_user: User,
+) -> KpiAlertHistoryResponse:
+    _, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
+    statement = select(KpiAlertRecord).where(
+        KpiAlertRecord.scope_type == scope_type,
+        KpiAlertRecord.organization_id == scoped_organization_id,
+    ).order_by(desc(KpiAlertRecord.last_detected_at), desc(KpiAlertRecord.created_at))
+    items = [build_persisted_alert_item(item) for item in db.scalars(statement).all()]
+    return KpiAlertHistoryResponse(
+        generated_at=datetime.now(timezone.utc),
+        active_count=sum(1 for item in items if item.status == "active"),
+        acknowledged_count=sum(1 for item in items if item.status == "acknowledged"),
+        resolved_count=sum(1 for item in items if item.status == "resolved"),
+        items=items,
+    )
+
+
+def acknowledge_kpi_alert(
+    db: Session,
+    *,
+    alert_id: UUID,
+    current_user: User,
+) -> PersistedKpiAlertRecord:
+    _, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
+    alert = db.get(KpiAlertRecord, alert_id)
+    if alert is None:
+        raise ValueError("Alert not found.")
+
+    if alert.scope_type != scope_type or alert.organization_id != scoped_organization_id:
+        raise ValueError("Alert not found.")
+
+    alert.status = "acknowledged"
+    alert.acknowledged_by_user_id = current_user.id
+    alert.acknowledged_at = datetime.now(timezone.utc)
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+    return build_persisted_alert_item(alert)
+
+
+def refresh_kpi_command_center(
+    db: Session,
+    current_user: User,
+) -> KpiCommandCenterResponse:
+    data = build_kpi_command_center_data(db=db, current_user=current_user)
+    persisted_alerts = sync_persistent_kpi_alerts(
+        db=db,
+        scope_type=data["scope_type"],
+        organization_id=data["organization_id"],
+        alerts=data["alerts"],
+    )
+    create_kpi_snapshot(
+        db=db,
+        scope_type=data["scope_type"],
+        organization_id=data["organization_id"],
+        summary=data["summary"],
+        observations=data["key_observations"],
+    )
 
     return KpiCommandCenterResponse(
-        scope_type="global" if can_view_global else "organization",
-        generated_at=now,
-        summary=summary,
-        key_observations=build_kpi_observations(
-            summary=summary,
-            top_sales_rows=sales_rows[:3],
-            top_org_rows=organization_rows[:3],
-        ),
-        alerts=alerts,
-        recommendations=build_executive_recommendations(
-            summary=summary,
-            alerts=alerts,
-            sales_rows=sales_rows,
-            organization_rows=organization_rows,
-        ),
-        sales_performance=sales_rows,
-        organization_performance=organization_rows,
+        scope_type=data["scope_type"],
+        generated_at=data["generated_at"],
+        summary=data["summary"],
+        key_observations=data["key_observations"],
+        alerts=data["alerts"],
+        persisted_alerts=persisted_alerts[:8],
+        recommendations=data["recommendations"],
+        sales_performance=data["sales_performance"],
+        organization_performance=data["organization_performance"],
+    )
+
+
+def get_kpi_command_center(
+    db: Session,
+    current_user: User,
+) -> KpiCommandCenterResponse:
+    data = build_kpi_command_center_data(db=db, current_user=current_user)
+    persisted_alerts = list_kpi_alert_records(db=db, current_user=current_user).items[:8]
+
+    return KpiCommandCenterResponse(
+        scope_type=data["scope_type"],
+        generated_at=data["generated_at"],
+        summary=data["summary"],
+        key_observations=data["key_observations"],
+        alerts=data["alerts"],
+        persisted_alerts=persisted_alerts,
+        recommendations=data["recommendations"],
+        sales_performance=data["sales_performance"],
+        organization_performance=data["organization_performance"],
     )
 
 

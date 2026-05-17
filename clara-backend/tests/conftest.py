@@ -26,13 +26,16 @@ os.environ.setdefault(
     "http://localhost:3000,http://127.0.0.1:3000",
 )
 
-from app.api import routes_auth, routes_extension, routes_product_knowledge
+from app.api import routes_auth, routes_dashboard, routes_extension, routes_product_knowledge
 from app.core.config import settings
 from app.db.session import Base, get_db
 from app.main import create_app
 from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
+from app.models.audit_log import AuditLog
 from app.models.conversation import Conversation
+from app.models.kpi_alert_record import KpiAlertRecord
+from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
 from app.models.lead_task import LeadTask
 from app.models.message import Message
@@ -68,6 +71,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
         tables=[
             Organization.__table__,
             User.__table__,
+            KpiCommandSnapshot.__table__,
+            KpiAlertRecord.__table__,
             Lead.__table__,
             LeadTask.__table__,
             Conversation.__table__,
@@ -75,6 +80,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             AIExtraction.__table__,
             ReplySuggestion.__table__,
             ApprovalLog.__table__,
+            AuditLog.__table__,
             SentMessage.__table__,
             ProductKnowledge.__table__,
         ],
@@ -82,6 +88,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
 
     monkeypatch.setattr(routes_auth, "create_audit_log", lambda *args, **kwargs: None)
     monkeypatch.setattr(routes_extension, "create_audit_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(routes_dashboard, "create_audit_log", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         routes_product_knowledge,
         "create_audit_log",
@@ -100,6 +107,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
         tables=[
             ProductKnowledge.__table__,
             SentMessage.__table__,
+            AuditLog.__table__,
             ApprovalLog.__table__,
             ReplySuggestion.__table__,
             AIExtraction.__table__,
@@ -107,6 +115,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             Conversation.__table__,
             LeadTask.__table__,
             Lead.__table__,
+            KpiAlertRecord.__table__,
+            KpiCommandSnapshot.__table__,
             User.__table__,
             Organization.__table__,
         ],

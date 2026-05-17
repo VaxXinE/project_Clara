@@ -6,10 +6,13 @@ from app.core.security import require_roles
 from app.models.user import User
 from app.db.session import get_db
 from app.schemas.dashboard_schema import (
+    KpiAlertHistoryResponse,
     KpiCommandCenterResponse,
+    KpiSnapshotHistoryResponse,
     MarketingInsightSnapshotResponse,
     MarketingInsightsPreview,
     OpsDatabaseOverviewResponse,
+    PersistedKpiAlertRecord,
     SalesApprovalQueueResponse,
     SalesConversationDetail,
     SalesInboxItem,
@@ -17,6 +20,7 @@ from app.schemas.dashboard_schema import (
 )
 from app.services.audit_service import create_audit_log
 from app.services.dashboard_service import (
+    acknowledge_kpi_alert,
     get_kpi_command_center,
     get_marketing_insights_preview,
     get_ops_database_overview,
@@ -24,6 +28,9 @@ from app.services.dashboard_service import (
     get_sales_conversation_detail,
     get_sales_inbox,
     get_sales_worklist,
+    list_kpi_alert_records,
+    list_kpi_snapshots,
+    refresh_kpi_command_center,
 )
 from app.services.marketing_snapshot_service import (
     generate_marketing_snapshot,
@@ -96,6 +103,72 @@ def kpi_command_center(
     current_user: User = Depends(require_roles("admin")),
 ):
     return get_kpi_command_center(db=db, current_user=current_user)
+
+
+@router.post("/kpi/command-center/refresh", response_model=KpiCommandCenterResponse)
+def refresh_kpi_command_center_endpoint(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    response = refresh_kpi_command_center(db=db, current_user=current_user)
+    create_audit_log(
+        db=db,
+        action="kpi_command_center.refresh",
+        resource_type="kpi_command_center",
+        resource_id=None,
+        current_user=current_user,
+        request=request,
+        metadata={"scope_type": response.scope_type},
+    )
+    return response
+
+
+@router.get("/kpi/alerts", response_model=KpiAlertHistoryResponse)
+def list_kpi_alerts_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    return list_kpi_alert_records(db=db, current_user=current_user)
+
+
+@router.patch("/kpi/alerts/{alert_id}/acknowledge", response_model=PersistedKpiAlertRecord)
+def acknowledge_kpi_alert_endpoint(
+    alert_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    try:
+        alert = acknowledge_kpi_alert(
+            db=db,
+            alert_id=alert_id,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="kpi_alert.acknowledge",
+        resource_type="kpi_alert",
+        resource_id=str(alert.id),
+        current_user=current_user,
+        request=request,
+        metadata={"scope_type": alert.scope_type, "severity": alert.severity},
+    )
+    return alert
+
+
+@router.get("/kpi/snapshots", response_model=KpiSnapshotHistoryResponse)
+def list_kpi_snapshots_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    return list_kpi_snapshots(db=db, current_user=current_user)
 
 
 @router.post(

@@ -7,8 +7,11 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
+from app.models.kpi_alert_record import KpiAlertRecord
+from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
 from app.models.organization import Organization
 from app.models.reply_suggestion import ReplySuggestion
@@ -21,6 +24,12 @@ def login(client: TestClient, *, email: str, password: str) -> None:
         json={"email": email, "password": password},
     )
     assert response.status_code == 200, response.text
+
+
+def csrf_headers(client: TestClient) -> dict[str, str]:
+    csrf_token = client.cookies.get(settings.csrf_cookie_name)
+    assert csrf_token
+    return {"X-CSRF-Token": csrf_token}
 
 
 def seed_kpi_data(
@@ -214,3 +223,55 @@ def test_admin_kpi_command_center_is_scoped_to_own_organization(
         row["organization_name"] == "Org Alpha"
         for row in payload["sales_performance"]
     )
+
+
+def test_refresh_kpi_command_center_persists_snapshot_and_alerts(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    seed_kpi_data(db_session_factory, seeded_data)
+    admin_a = seeded_data["admin_a"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    response = client.post(
+        "/dashboard/kpi/command-center/refresh",
+        headers=csrf_headers(client),
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert "persisted_alerts" in payload
+
+    db = db_session_factory()
+    snapshots = db.query(KpiCommandSnapshot).all()
+    alerts = db.query(KpiAlertRecord).all()
+    assert len(snapshots) == 1
+    assert len(alerts) >= 1
+
+
+def test_acknowledge_persisted_kpi_alert_updates_status(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    seed_kpi_data(db_session_factory, seeded_data)
+    admin_a = seeded_data["admin_a"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+    refresh_response = client.post(
+        "/dashboard/kpi/command-center/refresh",
+        headers=csrf_headers(client),
+    )
+    assert refresh_response.status_code == 200, refresh_response.text
+
+    alerts_response = client.get("/dashboard/kpi/alerts")
+    assert alerts_response.status_code == 200, alerts_response.text
+    alert_id = alerts_response.json()["items"][0]["id"]
+
+    ack_response = client.patch(
+        f"/dashboard/kpi/alerts/{alert_id}/acknowledge",
+        headers=csrf_headers(client),
+    )
+    assert ack_response.status_code == 200, ack_response.text
+    assert ack_response.json()["status"] == "acknowledged"

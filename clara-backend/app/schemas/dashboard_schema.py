@@ -249,12 +249,55 @@ class ExecutiveRecommendationItem(BaseModel):
     target_href: str | None
 
 
+class PersistedKpiAlertRecord(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    scope_type: str
+    severity: str
+    title: str
+    description: str
+    recommended_action: str
+    target_href: str | None
+    status: str
+    acknowledged_by_user_id: UUID | None
+    first_detected_at: datetime
+    last_detected_at: datetime
+    acknowledged_at: datetime | None
+    resolved_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class KpiAlertHistoryResponse(BaseModel):
+    generated_at: datetime
+    active_count: int
+    acknowledged_count: int
+    resolved_count: int
+    items: list[PersistedKpiAlertRecord]
+
+
+class KpiSnapshotItem(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    scope_type: str
+    snapshot_type: str
+    metrics_json: dict
+    observations_json: list[str]
+    created_at: datetime
+
+
+class KpiSnapshotHistoryResponse(BaseModel):
+    generated_at: datetime
+    items: list[KpiSnapshotItem]
+
+
 class KpiCommandCenterResponse(BaseModel):
     scope_type: str
     generated_at: datetime
     summary: KpiSummaryCard
     key_observations: list[str]
     alerts: list[KpiAlertItem]
+    persisted_alerts: list[PersistedKpiAlertRecord]
     recommendations: list[ExecutiveRecommendationItem]
     sales_performance: list[SalesPerformanceRow]
     organization_performance: list[OrganizationPerformanceRow]

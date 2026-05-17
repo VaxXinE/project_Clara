@@ -246,8 +246,61 @@ export type KpiCommandCenterResponse = {
     next_step: string;
     target_href: string | null;
   }[];
+  persisted_alerts: PersistedKpiAlertRecord[];
   sales_performance: SalesPerformanceRow[];
   organization_performance: OrganizationPerformanceRow[];
+};
+
+export type PersistedKpiAlertRecord = {
+  id: string;
+  organization_id: string | null;
+  scope_type: string;
+  severity: string;
+  title: string;
+  description: string;
+  recommended_action: string;
+  target_href: string | null;
+  status: string;
+  acknowledged_by_user_id: string | null;
+  first_detected_at: string;
+  last_detected_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type KpiAlertHistoryResponse = {
+  generated_at: string;
+  active_count: number;
+  acknowledged_count: number;
+  resolved_count: number;
+  items: PersistedKpiAlertRecord[];
+};
+
+export type KpiSnapshotItem = {
+  id: string;
+  organization_id: string | null;
+  scope_type: string;
+  snapshot_type: string;
+  metrics_json: {
+    total_organizations: number;
+    total_sales_users: number;
+    total_leads: number;
+    hot_leads: number;
+    closing_leads: number;
+    analyzed_conversations: number;
+    reply_sent_rate: number;
+    approved_reply_rate: number;
+    overdue_follow_ups: number;
+  };
+  observations_json: string[];
+  created_at: string;
+};
+
+export type KpiSnapshotHistoryResponse = {
+  generated_at: string;
+  items: KpiSnapshotItem[];
 };
 
 export type MarketingInsightsPreview = {
