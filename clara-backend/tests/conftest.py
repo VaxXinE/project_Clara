@@ -34,6 +34,7 @@ from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
 from app.models.conversation import Conversation
 from app.models.lead import Lead
+from app.models.lead_task import LeadTask
 from app.models.message import Message
 from app.models.organization import Organization
 from app.models.product_knowledge import ProductKnowledge
@@ -68,6 +69,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             Organization.__table__,
             User.__table__,
             Lead.__table__,
+            LeadTask.__table__,
             Conversation.__table__,
             Message.__table__,
             AIExtraction.__table__,
@@ -103,6 +105,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             AIExtraction.__table__,
             Message.__table__,
             Conversation.__table__,
+            LeadTask.__table__,
             Lead.__table__,
             User.__table__,
             Organization.__table__,

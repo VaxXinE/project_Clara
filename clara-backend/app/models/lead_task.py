@@ -7,11 +7,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
 
-class Lead(Base):
-    __tablename__ = "leads"
+class LeadTask(Base):
+    __tablename__ = "lead_tasks"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
 
+    lead_id: Mapped[UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     organization_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("organizations.id", ondelete="SET NULL"),
         nullable=True,
@@ -23,26 +28,23 @@ class Lead(Base):
         index=True,
     )
 
-    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    source: Mapped[str] = mapped_column(String(50), nullable=False, default="unknown")
-    current_stage: Mapped[str] = mapped_column(
+    task_type: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
-        default="new_lead",
+        default="manual_follow_up",
     )
-    lead_temperature: Mapped[str] = mapped_column(
+    status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
-        default="unknown",
+        default="open",
     )
-    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    last_contact_at: Mapped[datetime | None] = mapped_column(
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    due_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
-    next_follow_up_at: Mapped[datetime | None] = mapped_column(
+    completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
@@ -58,11 +60,6 @@ class Lead(Base):
         nullable=False,
     )
 
-    organization = relationship("Organization", back_populates="leads")
-    assigned_user = relationship("User", back_populates="assigned_leads")
-    conversations = relationship("Conversation", back_populates="lead")
-    tasks = relationship(
-        "LeadTask",
-        back_populates="lead",
-        cascade="all, delete-orphan",
-    )
+    lead = relationship("Lead", back_populates="tasks")
+    organization = relationship("Organization", back_populates="lead_tasks")
+    assigned_user = relationship("User", back_populates="assigned_tasks")

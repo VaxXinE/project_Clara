@@ -79,6 +79,7 @@ export type LeadListItem = {
   id: string;
   organization_id: string | null;
   assigned_user_id: string | null;
+  assigned_user_name: string | null;
   display_name: string;
   source: string;
   current_stage: string;
@@ -93,8 +94,25 @@ export type LeadListItem = {
   latest_conversation_id: string | null;
 };
 
+export type LeadTaskItem = {
+  id: string;
+  lead_id: string;
+  organization_id: string | null;
+  assigned_user_id: string | null;
+  assigned_user_name: string | null;
+  task_type: string;
+  status: string;
+  title: string;
+  description: string | null;
+  due_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type LeadDetail = LeadListItem & {
   conversation_ids: string[];
+  tasks: LeadTaskItem[];
 };
 
 export type LeadUpdateRequest = {
@@ -103,6 +121,23 @@ export type LeadUpdateRequest = {
   summary?: string | null;
   notes?: string | null;
   next_follow_up_at?: string | null;
+  assigned_user_id?: string | null;
+};
+
+export type LeadTaskCreateRequest = {
+  task_type?: string;
+  title: string;
+  description?: string | null;
+  due_at?: string | null;
+  assigned_user_id?: string | null;
+};
+
+export type LeadTaskUpdateRequest = {
+  status?: string;
+  title?: string;
+  description?: string | null;
+  due_at?: string | null;
+  assigned_user_id?: string | null;
 };
 
 export type SalesWorklistItem = {
@@ -127,6 +162,29 @@ export type SalesWorklistResponse = {
   ready_to_send_count: number;
   pending_analysis_count: number;
   items: SalesWorklistItem[];
+};
+
+export type SalesApprovalQueueItem = {
+  reply_suggestion_id: string;
+  conversation_id: string;
+  lead_id: string | null;
+  lead_name: string;
+  conversation_title: string;
+  current_stage: string;
+  lead_temperature: string;
+  risk_level: string;
+  action_mode: string;
+  approval_status: string;
+  suggested_reply_preview: string | null;
+  recommended_action: string;
+  created_at: string;
+};
+
+export type SalesApprovalQueueResponse = {
+  generated_at: string;
+  pending_count: number;
+  escalation_count: number;
+  items: SalesApprovalQueueItem[];
 };
 
 export type KpiSummaryCard = {

@@ -103,6 +103,29 @@ class SalesWorklistResponse(BaseModel):
     items: list[SalesWorklistItem]
 
 
+class SalesApprovalQueueItem(BaseModel):
+    reply_suggestion_id: UUID
+    conversation_id: UUID
+    lead_id: UUID | None
+    lead_name: str
+    conversation_title: str
+    current_stage: str
+    lead_temperature: str
+    risk_level: str
+    action_mode: str
+    approval_status: str
+    suggested_reply_preview: str | None
+    recommended_action: str
+    created_at: datetime
+
+
+class SalesApprovalQueueResponse(BaseModel):
+    generated_at: datetime
+    pending_count: int
+    escalation_count: int
+    items: list[SalesApprovalQueueItem]
+
+
 class MarketingObjectionInsight(BaseModel):
     topic: str
     count: int

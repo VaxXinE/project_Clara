@@ -6,11 +6,23 @@ from sqlalchemy.orm import Session
 from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.lead_schema import LeadDetail, LeadListItem, LeadUpdateRequest
+from app.schemas.lead_schema import (
+    LeadDetail,
+    LeadListItem,
+    LeadTaskCreateRequest,
+    LeadTaskItem,
+    LeadTaskUpdateRequest,
+    LeadUpdateRequest,
+)
 from app.services.lead_service import (
     get_lead_for_user,
     get_leads_for_user,
     update_lead_for_user,
+)
+from app.services.lead_task_service import (
+    create_lead_task_for_user,
+    get_lead_tasks_for_user,
+    update_lead_task_for_user,
 )
 
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -43,6 +55,51 @@ def update_lead(
     return update_lead_for_user(
         db=db,
         lead_id=lead_id,
+        payload=payload,
+        current_user=current_user,
+    )
+
+
+@router.get("/{lead_id}/tasks", response_model=list[LeadTaskItem])
+def list_lead_tasks(
+    lead_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+) -> list[LeadTaskItem]:
+    return get_lead_tasks_for_user(
+        db=db,
+        lead_id=lead_id,
+        current_user=current_user,
+    )
+
+
+@router.post("/{lead_id}/tasks", response_model=LeadTaskItem, status_code=201)
+def create_lead_task(
+    lead_id: UUID,
+    payload: LeadTaskCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+) -> LeadTaskItem:
+    return create_lead_task_for_user(
+        db=db,
+        lead_id=lead_id,
+        payload=payload,
+        current_user=current_user,
+    )
+
+
+@router.patch("/{lead_id}/tasks/{task_id}", response_model=LeadTaskItem)
+def update_lead_task(
+    lead_id: UUID,
+    task_id: UUID,
+    payload: LeadTaskUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+) -> LeadTaskItem:
+    return update_lead_task_for_user(
+        db=db,
+        lead_id=lead_id,
+        task_id=task_id,
         payload=payload,
         current_user=current_user,
     )

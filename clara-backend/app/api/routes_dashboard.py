@@ -10,6 +10,7 @@ from app.schemas.dashboard_schema import (
     MarketingInsightSnapshotResponse,
     MarketingInsightsPreview,
     OpsDatabaseOverviewResponse,
+    SalesApprovalQueueResponse,
     SalesConversationDetail,
     SalesInboxItem,
     SalesWorklistResponse,
@@ -19,6 +20,7 @@ from app.services.dashboard_service import (
     get_kpi_command_center,
     get_marketing_insights_preview,
     get_ops_database_overview,
+    get_sales_approval_queue,
     get_sales_conversation_detail,
     get_sales_inbox,
     get_sales_worklist,
@@ -46,6 +48,14 @@ def sales_worklist(
     current_user: User = Depends(require_roles("marketing", "admin")),
 ):
     return get_sales_worklist(db=db, current_user=current_user)
+
+
+@router.get("/sales/approval-queue", response_model=SalesApprovalQueueResponse)
+def sales_approval_queue(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+):
+    return get_sales_approval_queue(db=db, current_user=current_user)
 
 
 @router.get(

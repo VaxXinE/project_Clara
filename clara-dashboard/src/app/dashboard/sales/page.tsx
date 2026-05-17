@@ -95,6 +95,12 @@ export default function SalesInboxPage() {
           >
             AI Worklist
           </Link>
+          <Link
+            href="/dashboard/approvals"
+            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          >
+            Approval Queue
+          </Link>
           {canAccessKnowledge && (
             <Link
               href="/dashboard/knowledge"

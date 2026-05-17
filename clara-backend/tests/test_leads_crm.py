@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.config import settings
 from app.models.conversation import Conversation
 from app.models.lead import Lead
+from app.models.lead_task import LeadTask
 from app.schemas.ai_extraction_schema import AIExtractionCreate
 
 
@@ -197,3 +198,60 @@ def test_admin_can_list_and_update_org_leads(
     lead = db.scalars(select(Lead).where(Lead.id == owned_lead.id)).first()
     assert lead is not None
     assert lead.summary == "Sudah sangat dekat ke closing."
+
+
+def test_admin_can_reassign_lead_and_auto_create_follow_up_task(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    marketing_a = seeded_data["marketing_a"]
+    owned_lead = seeded_data["owned_lead"]
+    owned_conversation = seeded_data["owned_conversation"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    patch_response = client.patch(
+        f"/leads/{owned_lead.id}",
+        json={
+            "assigned_user_id": str(marketing_a.id),
+            "next_follow_up_at": "2026-05-20T10:30:00Z",
+        },
+        headers=csrf_headers(client),
+    )
+    assert patch_response.status_code == 200, patch_response.text
+    payload = patch_response.json()
+    assert payload["assigned_user_id"] == str(marketing_a.id)
+    assert payload["tasks"][0]["task_type"] == "scheduled_follow_up"
+
+    db = db_session_factory()
+    lead = db.get(Lead, owned_lead.id)
+    conversation = db.get(Conversation, owned_conversation.id)
+    task = db.scalars(select(LeadTask).where(LeadTask.lead_id == owned_lead.id)).first()
+
+    assert lead is not None
+    assert conversation is not None
+    assert task is not None
+    assert lead.assigned_user_id == marketing_a.id
+    assert conversation.sales_user_id == marketing_a.id
+    assert task.assigned_user_id == marketing_a.id
+    assert task.status == "open"
+
+
+def test_marketing_cannot_reassign_lead(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_b = seeded_data["marketing_b"]
+    marketing_a = seeded_data["marketing_a"]
+    owned_lead = seeded_data["owned_lead"]
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+
+    response = client.patch(
+        f"/leads/{owned_lead.id}",
+        json={"assigned_user_id": str(marketing_a.id)},
+        headers=csrf_headers(client),
+    )
+    assert response.status_code == 403, response.text

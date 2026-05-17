@@ -215,6 +215,10 @@ export default function CrmPage() {
                             <p>Last contact: {formatDateTime(lead.last_contact_at)}</p>
                             <p>Conversation: {lead.conversation_count}</p>
                             <p>Source: {lead.source}</p>
+                            <p>
+                              Owner:{" "}
+                              {lead.assigned_user_name ?? "Belum ada assignee"}
+                            </p>
                           </div>
 
                           <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -236,6 +240,12 @@ export default function CrmPage() {
                           </select>
 
                           <div className="mt-4 flex flex-wrap gap-2">
+                            <Link
+                              href={`/dashboard/crm/${lead.id}`}
+                              className="inline-flex rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                            >
+                              Detail Lead
+                            </Link>
                             {lead.latest_conversation_id && (
                               <Link
                                 href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}

@@ -1,0 +1,209 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { apiFetch } from "@/lib/api";
+import { formatDateTime, formatStatusLabel, getLeadBadgeClass, getRiskBadgeClass } from "@/lib/format";
+import type {
+  CurrentUser,
+  SalesApprovalQueueResponse,
+} from "@/types/dashboard";
+
+export default function ApprovalQueuePage() {
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [queue, setQueue] = useState<SalesApprovalQueueResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function loadQueue() {
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const [me, data] = await Promise.all([
+        apiFetch<CurrentUser>("/auth/me"),
+        apiFetch<SalesApprovalQueueResponse>("/dashboard/sales/approval-queue"),
+      ]);
+      setCurrentUser(me);
+      setQueue(data);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal memuat approval queue."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadQueue();
+  }, []);
+
+  return (
+    <WorkspaceShell
+      currentUser={currentUser}
+      eyebrow="Approval workflow"
+      title="Approval Queue"
+      description="Antrian ini mengumpulkan draft yang masih pending approval atau escalation, supaya tim tidak perlu membuka conversation satu per satu."
+      backHref="/dashboard/sales"
+      backLabel="Kembali ke Sales Inbox"
+      actions={
+        <Link
+          href="/dashboard/follow-up"
+          className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+        >
+          AI Worklist
+        </Link>
+      }
+    >
+      <div className="space-y-6">
+        {isLoading && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+            Loading approval queue...
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        )}
+
+        {queue && !isLoading && !errorMessage && (
+          <>
+            <section className="grid gap-4 md:grid-cols-3">
+              <QueueMetric
+                label="Pending approvals"
+                value={String(queue.pending_count)}
+                hint="Semua draft yang menunggu keputusan reviewer."
+              />
+              <QueueMetric
+                label="Escalations"
+                value={String(queue.escalation_count)}
+                hint="Draft berisiko tinggi atau perlu intervensi manusia."
+              />
+              <QueueMetric
+                label="Generated at"
+                value={formatDateTime(queue.generated_at)}
+                hint="Waktu queue terakhir dibangun dari data terbaru."
+              />
+            </section>
+
+            <section className="space-y-4">
+              {queue.items.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                  Tidak ada draft yang menunggu approval saat ini.
+                </div>
+              ) : (
+                queue.items.map((item) => (
+                  <article
+                    key={item.reply_suggestion_id}
+                    className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+                  >
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-lg font-semibold text-slate-950">
+                            {item.lead_name}
+                          </h2>
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
+                              item.lead_temperature
+                            )}`}
+                          >
+                            {item.lead_temperature.toUpperCase()}
+                          </span>
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
+                              item.risk_level
+                            )}`}
+                          >
+                            Risk {item.risk_level}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-600">
+                          {item.conversation_title} • {formatStatusLabel(item.current_stage)}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                          {formatStatusLabel(item.approval_status)}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                          {formatStatusLabel(item.action_mode)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Draft Preview
+                        </p>
+                        <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                          {item.suggested_reply_preview ?? "Belum ada preview draft."}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Recommended Action
+                        </p>
+                        <p className="mt-3 text-sm leading-7 text-slate-700">
+                          {item.recommended_action}
+                        </p>
+                        <p className="mt-4 text-xs text-slate-500">
+                          Draft created: {formatDateTime(item.created_at)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <Link
+                        href={`/dashboard/sales/conversations/${item.conversation_id}`}
+                        className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                      >
+                        Review Conversation
+                      </Link>
+                      {item.lead_id && (
+                        <Link
+                          href={`/dashboard/crm/${item.lead_id}`}
+                          className="inline-flex rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                        >
+                          Buka Lead Detail
+                        </Link>
+                      )}
+                    </div>
+                  </article>
+                ))
+              )}
+            </section>
+          </>
+        )}
+      </div>
+    </WorkspaceShell>
+  );
+}
+
+function QueueMetric({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-3 text-3xl font-bold text-slate-950">{value}</p>
+      <p className="mt-2 text-sm text-slate-600">{hint}</p>
+    </article>
+  );
+}

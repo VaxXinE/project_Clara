@@ -42,6 +42,8 @@ from app.schemas.dashboard_schema import (
     MarketingKpiSummary,
     MarketingObjectionInsight,
     MarketingPlanningItem,
+    SalesApprovalQueueItem,
+    SalesApprovalQueueResponse,
     SalesPerformanceRow,
     SalesConversationDetail,
     SalesInboxItem,
@@ -602,6 +604,95 @@ def get_sales_worklist(
         hot_lead_count=hot_lead_count,
         ready_to_send_count=ready_to_send_count,
         pending_analysis_count=pending_analysis_count,
+        items=items,
+    )
+
+
+def get_sales_approval_queue(
+    db: Session,
+    current_user: User,
+) -> SalesApprovalQueueResponse:
+    now = datetime.now(timezone.utc)
+
+    if current_user.organization_id is None:
+        return SalesApprovalQueueResponse(
+            generated_at=now,
+            pending_count=0,
+            escalation_count=0,
+            items=[],
+        )
+
+    statement = (
+        select(Conversation)
+        .where(Conversation.organization_id == current_user.organization_id)
+        .options(
+            selectinload(Conversation.lead),
+            selectinload(Conversation.ai_extractions),
+            selectinload(Conversation.reply_suggestions),
+        )
+        .order_by(desc(Conversation.last_message_at), desc(Conversation.created_at))
+    )
+
+    if not can_access_all_conversations(current_user):
+        statement = statement.where(Conversation.sales_user_id == current_user.id)
+
+    conversations = list(db.scalars(statement).all())
+    items: list[SalesApprovalQueueItem] = []
+    escalation_count = 0
+
+    for conversation in conversations:
+        latest_suggestion = get_latest_reply_suggestion(conversation)
+        if latest_suggestion is None or latest_suggestion.approval_status != "pending":
+            continue
+
+        latest_extraction = get_latest_extraction(conversation)
+        suggested_reply_preview = None
+        if latest_suggestion.suggested_replies:
+            first_reply = latest_suggestion.suggested_replies[0]
+            suggested_reply_preview = first_reply.get("text")
+
+        if latest_suggestion.action_mode == "escalate_to_human":
+            escalation_count += 1
+
+        items.append(
+            SalesApprovalQueueItem(
+                reply_suggestion_id=latest_suggestion.id,
+                conversation_id=conversation.id,
+                lead_id=conversation.lead_id,
+                lead_name=(
+                    conversation.lead.display_name
+                    if conversation.lead is not None
+                    else conversation.title
+                ),
+                conversation_title=conversation.title,
+                current_stage=conversation.current_stage,
+                lead_temperature=conversation.lead_temperature,
+                risk_level=latest_suggestion.risk_level,
+                action_mode=latest_suggestion.action_mode,
+                approval_status=latest_suggestion.approval_status,
+                suggested_reply_preview=suggested_reply_preview,
+                recommended_action=(
+                    latest_extraction.next_best_action
+                    if latest_extraction is not None
+                    else "Review draft ini dan tentukan perlu approve atau revisi."
+                ),
+                created_at=latest_suggestion.created_at,
+            )
+        )
+
+    items.sort(
+        key=lambda item: (
+            1 if item.action_mode == "escalate_to_human" else 0,
+            1 if item.risk_level == "high" else 0,
+            item.created_at,
+        ),
+        reverse=True,
+    )
+
+    return SalesApprovalQueueResponse(
+        generated_at=now,
+        pending_count=len(items),
+        escalation_count=escalation_count,
         items=items,
     )
 

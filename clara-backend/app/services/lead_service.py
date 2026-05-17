@@ -9,9 +9,15 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.conversation import Conversation
 from app.models.lead import Lead
+from app.models.lead_task import LeadTask
 from app.models.user import User
 from app.schemas.lead_schema import LeadDetail, LeadListItem, LeadUpdateRequest
 from app.services.access_control_service import can_access_all_conversations
+from app.services.lead_task_service import (
+    list_tasks_for_lead,
+    upsert_follow_up_task_for_lead,
+    validate_assignee_for_lead,
+)
 
 VALID_LEAD_STAGES = {
     "new_lead",
@@ -101,6 +107,8 @@ def sync_lead_from_conversation(
 
     db.add(lead)
     db.flush()
+    if next_follow_up_at is not None:
+        upsert_follow_up_task_for_lead(db=db, lead=lead)
     return lead
 
 
@@ -119,6 +127,7 @@ def build_lead_list_item(lead: Lead) -> LeadListItem:
         id=lead.id,
         organization_id=lead.organization_id,
         assigned_user_id=lead.assigned_user_id,
+        assigned_user_name=lead.assigned_user.name if lead.assigned_user else None,
         display_name=lead.display_name,
         source=lead.source,
         current_stage=lead.current_stage,
@@ -145,6 +154,7 @@ def build_lead_detail(lead: Lead) -> LeadDetail:
                 key=lambda item: item.created_at,
             )
         ],
+        tasks=list_tasks_for_lead(lead),
     )
 
 
@@ -155,7 +165,10 @@ def get_leads_for_user(db: Session, *, current_user: User) -> list[LeadListItem]
     statement = (
         select(Lead)
         .where(Lead.organization_id == current_user.organization_id)
-        .options(selectinload(Lead.conversations))
+        .options(
+            selectinload(Lead.conversations),
+            selectinload(Lead.assigned_user),
+        )
         .order_by(desc(Lead.last_contact_at), desc(Lead.created_at))
     )
 
@@ -175,7 +188,11 @@ def get_lead_for_user(
     statement = (
         select(Lead)
         .where(Lead.id == lead_id)
-        .options(selectinload(Lead.conversations))
+        .options(
+            selectinload(Lead.conversations),
+            selectinload(Lead.assigned_user),
+            selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
+        )
     )
     lead = db.scalars(statement).first()
 
@@ -210,7 +227,11 @@ def update_lead_for_user(
     statement = (
         select(Lead)
         .where(Lead.id == lead_id)
-        .options(selectinload(Lead.conversations))
+        .options(
+            selectinload(Lead.conversations),
+            selectinload(Lead.assigned_user),
+            selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
+        )
     )
     lead = db.scalars(statement).first()
 
@@ -254,15 +275,38 @@ def update_lead_for_user(
     if payload.notes is not None:
         lead.notes = payload.notes.strip() or None
 
-    if payload.next_follow_up_at is not None:
+    if "next_follow_up_at" in payload.model_fields_set:
         lead.next_follow_up_at = payload.next_follow_up_at
 
+    if "assigned_user_id" in payload.model_fields_set:
+        if not can_access_all_conversations(current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin can reassign leads.",
+            )
+
+        assignee = validate_assignee_for_lead(
+            db=db,
+            lead=lead,
+            assignee_id=payload.assigned_user_id,
+        )
+        lead.assigned_user_id = assignee.id if assignee else None
+
     for conversation in lead.conversations:
-        conversation.current_stage = lead.current_stage
-        conversation.lead_temperature = lead.lead_temperature
+        if payload.current_stage is not None:
+            conversation.current_stage = lead.current_stage
+        if payload.lead_temperature is not None:
+            conversation.lead_temperature = lead.lead_temperature
+        if "assigned_user_id" in payload.model_fields_set:
+            conversation.sales_user_id = lead.assigned_user_id
         db.add(conversation)
 
     db.add(lead)
+    if (
+        "next_follow_up_at" in payload.model_fields_set
+        or "assigned_user_id" in payload.model_fields_set
+    ):
+        upsert_follow_up_task_for_lead(db=db, lead=lead)
     db.commit()
     db.refresh(lead)
 

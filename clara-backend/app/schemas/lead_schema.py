@@ -4,10 +4,29 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 
+class LeadTaskItem(BaseModel):
+    id: UUID
+    lead_id: UUID
+    organization_id: UUID | None
+    assigned_user_id: UUID | None
+    assigned_user_name: str | None
+    task_type: str
+    status: str
+    title: str
+    description: str | None
+    due_at: datetime | None
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class LeadListItem(BaseModel):
     id: UUID
     organization_id: UUID | None
     assigned_user_id: UUID | None
+    assigned_user_name: str | None
     display_name: str
     source: str
     current_stage: str
@@ -26,6 +45,7 @@ class LeadListItem(BaseModel):
 
 class LeadDetail(LeadListItem):
     conversation_ids: list[UUID]
+    tasks: list[LeadTaskItem]
 
 
 class LeadUpdateRequest(BaseModel):
@@ -34,3 +54,20 @@ class LeadUpdateRequest(BaseModel):
     summary: str | None = None
     notes: str | None = None
     next_follow_up_at: datetime | None = None
+    assigned_user_id: UUID | None = None
+
+
+class LeadTaskCreateRequest(BaseModel):
+    task_type: str = "manual_follow_up"
+    title: str
+    description: str | None = None
+    due_at: datetime | None = None
+    assigned_user_id: UUID | None = None
+
+
+class LeadTaskUpdateRequest(BaseModel):
+    status: str | None = None
+    title: str | None = None
+    description: str | None = None
+    due_at: datetime | None = None
+    assigned_user_id: UUID | None = None

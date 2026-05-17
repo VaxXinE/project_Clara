@@ -267,6 +267,11 @@ export default function DashboardHomePage() {
                 description="Buka daftar follow-up harian yang sudah diprioritaskan Clara dari hot lead, overdue, dan draft siap kirim."
               />
               <ActionCard
+                href="/dashboard/approvals"
+                title="Approval Queue"
+                description="Lihat draft pending approval dan escalation tanpa buka conversation satu per satu."
+              />
+              <ActionCard
                 href="/dashboard/knowledge"
                 title="Product Knowledge"
                 description="Kelola fakta produk, legalitas, dan policy supaya reply AI tetap grounded."
