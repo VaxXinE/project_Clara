@@ -129,6 +129,55 @@ export type SalesWorklistResponse = {
   items: SalesWorklistItem[];
 };
 
+export type KpiSummaryCard = {
+  total_organizations: number;
+  total_sales_users: number;
+  total_leads: number;
+  hot_leads: number;
+  closing_leads: number;
+  analyzed_conversations: number;
+  reply_sent_rate: number;
+  approved_reply_rate: number;
+  overdue_follow_ups: number;
+};
+
+export type SalesPerformanceRow = {
+  user_id: string;
+  user_name: string;
+  organization_id: string | null;
+  organization_name: string | null;
+  assigned_leads: number;
+  hot_leads: number;
+  closing_leads: number;
+  conversations_owned: number;
+  analyzed_conversations: number;
+  approved_drafts: number;
+  replies_sent: number;
+  overdue_follow_ups: number;
+};
+
+export type OrganizationPerformanceRow = {
+  organization_id: string;
+  organization_name: string;
+  total_leads: number;
+  hot_leads: number;
+  closing_leads: number;
+  conversations: number;
+  analyzed_conversations: number;
+  reply_sent_rate: number;
+  approved_reply_rate: number;
+  overdue_follow_ups: number;
+};
+
+export type KpiCommandCenterResponse = {
+  scope_type: string;
+  generated_at: string;
+  summary: KpiSummaryCard;
+  key_observations: string[];
+  sales_performance: SalesPerformanceRow[];
+  organization_performance: OrganizationPerformanceRow[];
+};
+
 export type MarketingInsightsPreview = {
   total_conversations: number;
   total_analyzed_conversations: number;

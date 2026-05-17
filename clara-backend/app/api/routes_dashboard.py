@@ -6,6 +6,7 @@ from app.core.security import require_roles
 from app.models.user import User
 from app.db.session import get_db
 from app.schemas.dashboard_schema import (
+    KpiCommandCenterResponse,
     MarketingInsightSnapshotResponse,
     MarketingInsightsPreview,
     OpsDatabaseOverviewResponse,
@@ -15,6 +16,7 @@ from app.schemas.dashboard_schema import (
 )
 from app.services.audit_service import create_audit_log
 from app.services.dashboard_service import (
+    get_kpi_command_center,
     get_marketing_insights_preview,
     get_ops_database_overview,
     get_sales_conversation_detail,
@@ -76,6 +78,14 @@ def marketing_insights_preview(
     current_user: User = Depends(require_roles("admin")),
 ):
     return get_marketing_insights_preview(db=db, current_user=current_user)
+
+
+@router.get("/kpi/command-center", response_model=KpiCommandCenterResponse)
+def kpi_command_center(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    return get_kpi_command_center(db=db, current_user=current_user)
 
 
 @router.post(

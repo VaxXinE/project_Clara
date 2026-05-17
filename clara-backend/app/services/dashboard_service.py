@@ -21,10 +21,13 @@ from app.schemas.dashboard_schema import (
     DashboardLatestMessage,
     DashboardReplySuggestionSummary,
     DashboardSentMessageSummary,
+    KpiCommandCenterResponse,
+    KpiSummaryCard,
     MarketingAdsSignal,
     MarketingBreakdownItem,
     MarketingContentBrief,
     MarketingContentRecommendation,
+    OrganizationPerformanceRow,
     OpsAuditLogRow,
     OpsConversationRow,
     OpsDatabaseOverviewResponse,
@@ -37,6 +40,7 @@ from app.schemas.dashboard_schema import (
     MarketingKpiSummary,
     MarketingObjectionInsight,
     MarketingPlanningItem,
+    SalesPerformanceRow,
     SalesConversationDetail,
     SalesInboxItem,
     SalesWorklistItem,
@@ -1106,6 +1110,277 @@ def get_ops_database_overview(
         recent_audit_logs=recent_audit_logs,
         recent_product_knowledge=recent_product_knowledge,
         recent_snapshots=recent_snapshots,
+    )
+
+
+def build_kpi_observations(
+    *,
+    summary: KpiSummaryCard,
+    top_sales_rows: list[SalesPerformanceRow],
+    top_org_rows: list[OrganizationPerformanceRow],
+) -> list[str]:
+    observations: list[str] = []
+
+    if summary.hot_leads > summary.closing_leads:
+        observations.append(
+            "Lead panas lebih banyak daripada lead yang sudah masuk closing. Tim sales perlu dorongan follow-up dan closing discipline yang lebih ketat."
+        )
+
+    if summary.reply_sent_rate < 0.5:
+        observations.append(
+            "Reply sent rate masih di bawah 50%. Ada risiko banyak percakapan yang dianalisis tapi belum benar-benar dituntaskan menjadi balasan final."
+        )
+
+    if summary.overdue_follow_ups > 0:
+        observations.append(
+            f"Ada {summary.overdue_follow_ups} follow-up yang sudah overdue. Ini sinyal paling dekat ke kehilangan momentum lead."
+        )
+
+    if top_sales_rows:
+        best_sales = top_sales_rows[0]
+        observations.append(
+            f"Sales paling produktif saat ini adalah {best_sales.user_name} dengan {best_sales.replies_sent} reply terkirim dan {best_sales.closing_leads} lead di stage closing."
+        )
+
+    if top_org_rows:
+        strongest_org = top_org_rows[0]
+        observations.append(
+            f"Organization dengan pipeline paling siap saat ini adalah {strongest_org.organization_name}, dengan {strongest_org.hot_leads} hot lead dan reply sent rate {(strongest_org.reply_sent_rate * 100):.0f}%."
+        )
+
+    if not observations:
+        observations.append(
+            "Data KPI masih tipis. Tambahkan lebih banyak conversation aktif agar owner view mulai menghasilkan sinyal yang berarti."
+        )
+
+    return observations[:5]
+
+
+def get_kpi_command_center(
+    db: Session,
+    current_user: User,
+) -> KpiCommandCenterResponse:
+    can_view_global = current_user.role == "owner"
+    now = datetime.now(timezone.utc)
+
+    organizations_statement = select(Organization)
+    if not can_view_global:
+        if current_user.organization_id is None:
+            return KpiCommandCenterResponse(
+                scope_type="organization",
+                generated_at=now,
+                summary=KpiSummaryCard(
+                    total_organizations=0,
+                    total_sales_users=0,
+                    total_leads=0,
+                    hot_leads=0,
+                    closing_leads=0,
+                    analyzed_conversations=0,
+                    reply_sent_rate=0,
+                    approved_reply_rate=0,
+                    overdue_follow_ups=0,
+                ),
+                key_observations=[],
+                sales_performance=[],
+                organization_performance=[],
+            )
+        organizations_statement = organizations_statement.where(
+            Organization.id == current_user.organization_id
+        )
+
+    organizations = list(db.scalars(organizations_statement).all())
+    organization_ids = {organization.id for organization in organizations}
+
+    users_statement = select(User).where(
+        User.role == "marketing",
+        User.is_active.is_(True),
+    )
+    if not can_view_global:
+        users_statement = users_statement.where(
+            User.organization_id == current_user.organization_id
+        )
+    users = list(db.scalars(users_statement).all())
+
+    leads_statement = select(Lead).options(
+        selectinload(Lead.conversations).selectinload(Conversation.ai_extractions),
+        selectinload(Lead.conversations).selectinload(Conversation.reply_suggestions),
+        selectinload(Lead.conversations).selectinload(Conversation.sent_messages),
+    )
+    if not can_view_global:
+        leads_statement = leads_statement.where(
+            Lead.organization_id == current_user.organization_id
+        )
+    elif organization_ids:
+        leads_statement = leads_statement.where(Lead.organization_id.in_(organization_ids))
+    leads = list(db.scalars(leads_statement).all())
+
+    conversations_statement = select(Conversation)
+    if not can_view_global:
+        conversations_statement = conversations_statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
+    elif organization_ids:
+        conversations_statement = conversations_statement.where(
+            Conversation.organization_id.in_(organization_ids)
+        )
+    conversations = list(db.scalars(conversations_statement).all())
+
+    total_conversations = len(conversations)
+    analyzed_conversations = 0
+    approved_reply_count = 0
+    total_reply_suggestions = 0
+    reply_sent_count = 0
+
+    sales_rows: list[SalesPerformanceRow] = []
+    organization_rows: list[OrganizationPerformanceRow] = []
+
+    organization_name_by_id = {organization.id: organization.name for organization in organizations}
+
+    for user in users:
+        assigned_leads = [
+            lead for lead in leads if lead.assigned_user_id == user.id
+        ]
+        owned_conversations = [
+            conversation
+            for conversation in conversations
+            if conversation.sales_user_id == user.id
+        ]
+
+        user_analyzed = 0
+        user_approved = 0
+        user_sent = 0
+
+        for conversation in owned_conversations:
+            latest_extraction = get_latest_extraction(conversation)
+            latest_suggestion = get_latest_reply_suggestion(conversation)
+            latest_sent_message = get_latest_sent_message(conversation)
+
+            if latest_extraction is not None:
+                user_analyzed += 1
+            if latest_suggestion is not None:
+                total_reply_suggestions += 1
+                if latest_suggestion.approval_status == "approved":
+                    user_approved += 1
+                    approved_reply_count += 1
+            if latest_sent_message is not None:
+                user_sent += 1
+                reply_sent_count += 1
+
+        analyzed_conversations += user_analyzed
+
+        sales_rows.append(
+            SalesPerformanceRow(
+                user_id=user.id,
+                user_name=user.name,
+                organization_id=user.organization_id,
+                organization_name=organization_name_by_id.get(user.organization_id),
+                assigned_leads=len(assigned_leads),
+                hot_leads=sum(1 for lead in assigned_leads if lead.lead_temperature == "hot"),
+                closing_leads=sum(1 for lead in assigned_leads if lead.current_stage == "closing"),
+                conversations_owned=len(owned_conversations),
+                analyzed_conversations=user_analyzed,
+                approved_drafts=user_approved,
+                replies_sent=user_sent,
+                overdue_follow_ups=sum(
+                    1
+                    for lead in assigned_leads
+                    if (follow_up := ensure_aware_utc(lead.next_follow_up_at)) is not None
+                    and follow_up <= now
+                ),
+            )
+        )
+
+    for organization in organizations:
+        org_leads = [lead for lead in leads if lead.organization_id == organization.id]
+        org_conversations = [
+            conversation
+            for conversation in conversations
+            if conversation.organization_id == organization.id
+        ]
+
+        org_analyzed = 0
+        org_approved = 0
+        org_sent = 0
+
+        for conversation in org_conversations:
+            latest_extraction = get_latest_extraction(conversation)
+            latest_suggestion = get_latest_reply_suggestion(conversation)
+            latest_sent_message = get_latest_sent_message(conversation)
+
+            if latest_extraction is not None:
+                org_analyzed += 1
+            if latest_suggestion is not None and latest_suggestion.approval_status == "approved":
+                org_approved += 1
+            if latest_sent_message is not None:
+                org_sent += 1
+
+        organization_rows.append(
+            OrganizationPerformanceRow(
+                organization_id=organization.id,
+                organization_name=organization.name,
+                total_leads=len(org_leads),
+                hot_leads=sum(1 for lead in org_leads if lead.lead_temperature == "hot"),
+                closing_leads=sum(1 for lead in org_leads if lead.current_stage == "closing"),
+                conversations=len(org_conversations),
+                analyzed_conversations=org_analyzed,
+                reply_sent_rate=safe_ratio(org_sent, len(org_conversations)),
+                approved_reply_rate=safe_ratio(org_approved, len(org_conversations)),
+                overdue_follow_ups=sum(
+                    1
+                    for lead in org_leads
+                    if (follow_up := ensure_aware_utc(lead.next_follow_up_at)) is not None
+                    and follow_up <= now
+                ),
+            )
+        )
+
+    sales_rows.sort(
+        key=lambda row: (
+            row.replies_sent,
+            row.closing_leads,
+            row.hot_leads,
+            row.assigned_leads,
+        ),
+        reverse=True,
+    )
+    organization_rows.sort(
+        key=lambda row: (
+            row.hot_leads,
+            row.closing_leads,
+            row.reply_sent_rate,
+            row.total_leads,
+        ),
+        reverse=True,
+    )
+
+    summary = KpiSummaryCard(
+        total_organizations=len(organizations),
+        total_sales_users=len(users),
+        total_leads=len(leads),
+        hot_leads=sum(1 for lead in leads if lead.lead_temperature == "hot"),
+        closing_leads=sum(1 for lead in leads if lead.current_stage == "closing"),
+        analyzed_conversations=analyzed_conversations,
+        reply_sent_rate=safe_ratio(reply_sent_count, total_conversations),
+        approved_reply_rate=safe_ratio(approved_reply_count, total_reply_suggestions),
+        overdue_follow_ups=sum(
+            1
+            for lead in leads
+            if (follow_up := ensure_aware_utc(lead.next_follow_up_at)) is not None
+            and follow_up <= now
+        ),
+    )
+
+    return KpiCommandCenterResponse(
+        scope_type="global" if can_view_global else "organization",
+        generated_at=now,
+        summary=summary,
+        key_observations=build_kpi_observations(
+            summary=summary,
+            top_sales_rows=sales_rows[:3],
+            top_org_rows=organization_rows[:3],
+        ),
+        sales_performance=sales_rows,
+        organization_performance=organization_rows,
     )
 
 

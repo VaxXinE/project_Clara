@@ -13,6 +13,7 @@ import {
 import type {
   ChangePasswordRequest,
   CurrentUser,
+  KpiCommandCenterResponse,
   MarketingInsightsPreview,
   SalesInboxItem,
   SalesWorklistResponse,
@@ -61,6 +62,7 @@ export default function DashboardHomePage() {
   const [latestConversation, setLatestConversation] =
     useState<SalesInboxItem | null>(null);
   const [worklist, setWorklist] = useState<SalesWorklistResponse | null>(null);
+  const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
   const [changePasswordForm, setChangePasswordForm] =
     useState<ChangePasswordRequest>(EMPTY_CHANGE_PASSWORD_FORM);
   const [errorMessage, setErrorMessage] = useState("");
@@ -95,12 +97,16 @@ export default function DashboardHomePage() {
 
         if (["owner", "admin"].includes(me.role)) {
           try {
-            const insights = await apiFetch<MarketingInsightsPreview>(
-              "/dashboard/marketing/insights-preview"
-            );
+            const [insights, kpiResponse] = await Promise.all([
+              apiFetch<MarketingInsightsPreview>(
+                "/dashboard/marketing/insights-preview"
+              ),
+              apiFetch<KpiCommandCenterResponse>("/dashboard/kpi/command-center"),
+            ]);
             nextMetrics.insightConversationCount = insights.total_conversations;
             nextMetrics.highRiskCount =
               insights.kpi_summary.high_risk_conversation_count;
+            setKpi(kpiResponse);
           } catch {
             // Biarkan dashboard home tetap usable walau insight belum tersedia.
           }
@@ -276,6 +282,13 @@ export default function DashboardHomePage() {
               />
               {canAccessAdmin && (
                 <ActionCard
+                  href="/dashboard/kpi"
+                  title="KPI Command Center"
+                  description="Baca leaderboard sales, health pipeline per organization, dan KPI foundation untuk owner/admin."
+                />
+              )}
+              {canAccessAdmin && (
+                <ActionCard
                   href="/dashboard/admin/access"
                   title="User Management"
                   description="Kelola akses user dan organization sesuai role yang berwenang."
@@ -349,6 +362,75 @@ export default function DashboardHomePage() {
                 )}
               </div>
             </section>
+
+            {canAccessAdmin && (
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      KPI Preview
+                    </p>
+                    <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                      Health pipeline & sales snapshot
+                    </h2>
+                  </div>
+                  <Link
+                    href="/dashboard/kpi"
+                    className="inline-flex rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                  >
+                    Buka KPI Center
+                  </Link>
+                </div>
+
+                {kpi ? (
+                  <div className="mt-5 space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Top Sales
+                        </p>
+                        <p className="mt-2 text-base font-semibold text-slate-950">
+                          {kpi.sales_performance[0]?.user_name ?? "Belum ada data"}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {kpi.sales_performance[0]
+                            ? `${kpi.sales_performance[0].replies_sent} replies sent • ${kpi.sales_performance[0].closing_leads} closing leads`
+                            : "Tambahkan lebih banyak activity untuk mulai melihat ranking."}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Top Organization
+                        </p>
+                        <p className="mt-2 text-base font-semibold text-slate-950">
+                          {kpi.organization_performance[0]?.organization_name ??
+                            "Belum ada data"}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {kpi.organization_performance[0]
+                            ? `${kpi.organization_performance[0].hot_leads} hot leads • ${(kpi.organization_performance[0].reply_sent_rate * 100).toFixed(0)}% reply sent rate`
+                            : "Organization performance akan muncul ketika data pipeline mulai cukup."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-950 p-4 text-white">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+                        Observation
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-100">
+                        {kpi.key_observations[0] ??
+                          "Belum ada observasi yang cukup kuat untuk ditampilkan."}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                    KPI preview belum tersedia untuk role ini atau data pipeline masih tipis.
+                  </div>
+                )}
+              </section>
+            )}
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">

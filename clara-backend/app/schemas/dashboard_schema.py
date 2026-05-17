@@ -170,6 +170,55 @@ class MarketingInsightsPreview(BaseModel):
     generated_at: datetime
 
 
+class KpiSummaryCard(BaseModel):
+    total_organizations: int
+    total_sales_users: int
+    total_leads: int
+    hot_leads: int
+    closing_leads: int
+    analyzed_conversations: int
+    reply_sent_rate: float
+    approved_reply_rate: float
+    overdue_follow_ups: int
+
+
+class SalesPerformanceRow(BaseModel):
+    user_id: UUID
+    user_name: str
+    organization_id: UUID | None
+    organization_name: str | None
+    assigned_leads: int
+    hot_leads: int
+    closing_leads: int
+    conversations_owned: int
+    analyzed_conversations: int
+    approved_drafts: int
+    replies_sent: int
+    overdue_follow_ups: int
+
+
+class OrganizationPerformanceRow(BaseModel):
+    organization_id: UUID
+    organization_name: str
+    total_leads: int
+    hot_leads: int
+    closing_leads: int
+    conversations: int
+    analyzed_conversations: int
+    reply_sent_rate: float
+    approved_reply_rate: float
+    overdue_follow_ups: int
+
+
+class KpiCommandCenterResponse(BaseModel):
+    scope_type: str
+    generated_at: datetime
+    summary: KpiSummaryCard
+    key_observations: list[str]
+    sales_performance: list[SalesPerformanceRow]
+    organization_performance: list[OrganizationPerformanceRow]
+
+
 class MarketingInsightSnapshotComparison(BaseModel):
     conversation_delta: int
     analyzed_delta: int
