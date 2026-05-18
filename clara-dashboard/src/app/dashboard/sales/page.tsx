@@ -13,21 +13,35 @@ import {
 } from "@/lib/format";
 import type { CurrentUser, SalesInboxItem } from "@/types/dashboard";
 
+const SOURCE_CHANNEL_OPTIONS = [
+  { value: "all", label: "Semua Channel" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "telegram", label: "Telegram" },
+] as const;
+
 export default function SalesInboxPage() {
   const [inboxItems, setInboxItems] = useState<SalesInboxItem[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function loadInbox() {
       try {
+        const inboxPath =
+          sourceChannelFilter === "all"
+            ? "/dashboard/sales/inbox"
+            : `/dashboard/sales/inbox?source_channel=${encodeURIComponent(
+                sourceChannelFilter
+              )}`;
         const [data, me] = await Promise.all([
-          apiFetch<SalesInboxItem[]>("/dashboard/sales/inbox"),
+          apiFetch<SalesInboxItem[]>(inboxPath),
           apiFetch<CurrentUser>("/auth/me"),
         ]);
         setInboxItems(data);
         setCurrentUser(me);
+        setErrorMessage("");
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Failed to load inbox."
@@ -37,8 +51,8 @@ export default function SalesInboxPage() {
       }
     }
 
-    loadInbox();
-  }, []);
+    void loadInbox();
+  }, [sourceChannelFilter]);
 
   const canAccessMarketing =
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
@@ -144,7 +158,6 @@ export default function SalesInboxPage() {
       }
     >
       <div className="space-y-6">
-
         {isLoading && (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
             Loading inbox...
@@ -186,106 +199,143 @@ export default function SalesInboxPage() {
               />
             </section>
 
-            <section className="grid gap-4">
-            {inboxItems.length === 0 ? (
-              <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-10 text-center shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-                <h2 className="text-xl font-semibold text-slate-900">
-                  Belum ada conversation
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Workspace ini akan mulai terasa hidup setelah chat WhatsApp pertama
-                  di-upload dan diparse menjadi conversation.
-                </p>
-                <Link
-                  href="/dashboard/upload"
-                  className="mt-5 inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
-                >
-                  Upload Chat Pertama
-                </Link>
+            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Filter Channel
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Pisahkan inbox berdasarkan WhatsApp atau Telegram.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {SOURCE_CHANNEL_OPTIONS.map((option) => {
+                    const isActive = sourceChannelFilter === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setSourceChannelFilter(option.value);
+                        }}
+                        className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                          isActive
+                            ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
+                            : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            ) : (
-              inboxItems.map((item) => {
-                const extraction = item.latest_ai_extraction;
-                const suggestion = item.latest_reply_suggestion;
+            </section>
 
-                return (
+            <section className="grid gap-4">
+              {inboxItems.length === 0 ? (
+                <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-10 text-center shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    Belum ada conversation
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Workspace ini akan mulai terasa hidup setelah chat WhatsApp atau Telegram pertama
+                    di-upload dan diparse menjadi conversation.
+                  </p>
                   <Link
-                    key={item.conversation_id}
-                    href={`/dashboard/sales/conversations/${item.conversation_id}`}
-                    className="group block rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+                    href="/dashboard/upload"
+                    className="mt-5 inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
                   >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                          <h2 className="truncate text-lg font-semibold text-slate-950 group-hover:text-slate-800">
-                            {item.title}
-                          </h2>
-
-                          {extraction && (
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                                extraction.lead_temperature
-                              )}`}
-                            >
-                              {extraction.lead_temperature.toUpperCase()}
-                            </span>
-                          )}
-
-                          {extraction && (
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
-                                extraction.risk_level
-                              )}`}
-                            >
-                              Risk {extraction.risk_level}
-                            </span>
-                          )}
-
-                          {item.ui_status === "reply_sent" && (
-                            <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
-                              SENT
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
-                          {item.latest_message
-                            ? item.latest_message.message_text
-                            : "Belum ada pesan."}
-                        </p>
-
-                        <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
-                          <span>
-                            Pesan terakhir: {formatDateTime(item.last_message_at)}
-                          </span>
-                          <span>•</span>
-                          <span>Priority: {item.priority_score}</span>
-                          <span>•</span>
-                          <span>{formatStatusLabel(item.ui_status)}</span>
-                        </div>
-                      </div>
-
-                      <div className="w-full rounded-[24px] border border-slate-200 bg-slate-50/90 p-4 md:w-80">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                          Langkah berikutnya
-                        </p>
-                        <p className="mt-3 text-sm leading-6 text-slate-700">
-                          {extraction?.next_best_action ??
-                            "Belum dianalisis. Jalankan AI analysis dulu."}
-                        </p>
-
-                        <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                          Status balasan
-                        </p>
-                        <p className="mt-2 text-sm font-medium text-slate-800">
-                          {formatStatusLabel(item.ui_status)}
-                        </p>
-                      </div>
-                    </div>
+                    Upload Chat Pertama
                   </Link>
-                );
-              })
-            )}
+                </div>
+              ) : (
+                inboxItems.map((item) => {
+                  const extraction = item.latest_ai_extraction;
+                  const suggestion = item.latest_reply_suggestion;
+
+                  return (
+                    <Link
+                      key={item.conversation_id}
+                      href={`/dashboard/sales/conversations/${item.conversation_id}`}
+                      className="group block rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+                    >
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            <h2 className="truncate text-lg font-semibold text-slate-950 group-hover:text-slate-800">
+                              {item.title}
+                            </h2>
+
+                            {extraction && (
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
+                                  extraction.lead_temperature
+                                )}`}
+                              >
+                                {extraction.lead_temperature.toUpperCase()}
+                              </span>
+                            )}
+
+                            {extraction && (
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
+                                  extraction.risk_level
+                                )}`}
+                              >
+                                Risk {extraction.risk_level}
+                              </span>
+                            )}
+
+                            {item.ui_status === "reply_sent" && (
+                              <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                                SENT
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
+                            {item.latest_message
+                              ? item.latest_message.message_text
+                              : "Belum ada pesan."}
+                          </p>
+
+                          <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
+                            <span>Source: {item.source_label}</span>
+                            <span>•</span>
+                            <span>
+                              Pesan terakhir: {formatDateTime(item.last_message_at)}
+                            </span>
+                            <span>•</span>
+                            <span>Priority: {item.priority_score}</span>
+                            <span>•</span>
+                            <span>{formatStatusLabel(item.ui_status)}</span>
+                          </div>
+                        </div>
+
+                        <div className="w-full rounded-[24px] border border-slate-200 bg-slate-50/90 p-4 md:w-80">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                            Langkah berikutnya
+                          </p>
+                          <p className="mt-3 text-sm leading-6 text-slate-700">
+                            {extraction?.next_best_action ??
+                              "Belum dianalisis. Jalankan AI analysis dulu."}
+                          </p>
+
+                          <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                            Status balasan
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">
+                            {formatStatusLabel(item.ui_status)}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })
+              )}
             </section>
           </>
         )}

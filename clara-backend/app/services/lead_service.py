@@ -33,6 +33,7 @@ from app.services.lead_task_service import (
 )
 from app.services.source_intelligence_service import (
     build_source_label,
+    matches_source_channel,
     normalize_source_channel,
 )
 
@@ -292,7 +293,12 @@ def get_lead_model_for_user(
     return lead
 
 
-def get_leads_for_user(db: Session, *, current_user: User) -> list[LeadListItem]:
+def get_leads_for_user(
+    db: Session,
+    *,
+    current_user: User,
+    source_channel: str | None = None,
+) -> list[LeadListItem]:
     if current_user.organization_id is None:
         return []
 
@@ -309,7 +315,11 @@ def get_leads_for_user(db: Session, *, current_user: User) -> list[LeadListItem]
     if not can_access_all_conversations(current_user):
         statement = statement.where(Lead.assigned_user_id == current_user.id)
 
-    leads = list(db.scalars(statement).all())
+    leads = [
+        lead
+        for lead in db.scalars(statement).all()
+        if matches_source_channel(lead.source, source_channel)
+    ]
     return [build_lead_list_item(lead) for lead in leads]
 
 

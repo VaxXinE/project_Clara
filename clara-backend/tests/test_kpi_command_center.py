@@ -230,6 +230,15 @@ def test_owner_kpi_command_center_returns_global_view(
     }
     assert payload["sales_performance"][0]["user_name"] == "Marketing Beta"
 
+    telegram_response = client.get("/dashboard/kpi/command-center?source_channel=telegram")
+    assert telegram_response.status_code == 200, telegram_response.text
+    telegram_payload = telegram_response.json()
+    assert telegram_payload["summary"]["total_leads"] == 1
+    assert telegram_payload["summary"]["pipeline_value"] == 3500000
+    assert telegram_payload["summary"]["won_value"] == 0
+    assert len(telegram_payload["source_performance"]) == 1
+    assert telegram_payload["source_performance"][0]["source_channel"] == "telegram"
+
 
 def test_admin_kpi_command_center_is_scoped_to_own_organization(
     client: TestClient,
@@ -259,6 +268,13 @@ def test_admin_kpi_command_center_is_scoped_to_own_organization(
         row["organization_name"] == "Org Alpha"
         for row in payload["sales_performance"]
     )
+
+    telegram_response = client.get("/dashboard/kpi/command-center?source_channel=telegram")
+    assert telegram_response.status_code == 200, telegram_response.text
+    telegram_payload = telegram_response.json()
+    assert telegram_payload["summary"]["total_leads"] == 0
+    assert telegram_payload["summary"]["pipeline_value"] == 0
+    assert telegram_payload["source_performance"] == []
 
 
 def test_refresh_kpi_command_center_persists_snapshot_and_alerts(

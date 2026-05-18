@@ -24,11 +24,30 @@ def normalize_source_channel(source: str | None) -> str:
     return "unknown"
 
 
+def normalize_requested_source_channel(source_channel: str | None) -> str | None:
+    if source_channel is None:
+        return None
+
+    normalized = source_channel.strip().lower().replace(" ", "_")
+    if normalized in {"", "all"}:
+        return None
+    return normalized
+
+
+def matches_source_channel(source: str | None, source_channel: str | None) -> bool:
+    normalized_channel = normalize_requested_source_channel(source_channel)
+    if normalized_channel is None:
+        return True
+
+    return normalize_source_channel(source) == normalized_channel
+
+
 def build_source_label(source: str | None) -> str:
     source_key = normalize_source_key(source)
     explicit_labels = {
         "whatsapp_extension": "WhatsApp Extension",
         "whatsapp_txt": "WhatsApp TXT Import",
+        "telegram_txt": "Telegram TXT Import",
         "telegram_extension": "Telegram Extension",
         "telegram_manual": "Telegram Manual",
         "instagram_dm": "Instagram DM",

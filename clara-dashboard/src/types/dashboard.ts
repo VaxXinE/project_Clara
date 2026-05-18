@@ -524,7 +524,7 @@ export type MarketingInsightSnapshot = {
   } | null;
 };
 
-export type UploadWhatsAppResponse = {
+export type UploadConversationResponse = {
   conversation_id: string;
   message_count: number;
   status: string;

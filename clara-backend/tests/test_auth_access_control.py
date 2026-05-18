@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
+from app.models.conversation import Conversation
 from app.models.message import Message
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
@@ -316,3 +317,49 @@ def test_sales_inbox_clears_sent_state_when_customer_replies_after_send(
     )
     assert owned_item["latest_sent_message"] is None
     assert owned_item["ui_status"] == "needs_analysis"
+
+
+def test_sales_inbox_can_be_filtered_by_source_channel(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_b = seeded_data["marketing_b"]
+    org_a = seeded_data["org_a"]
+
+    db = db_session_factory()
+    telegram_conversation = Conversation(
+        organization_id=org_a.id,
+        sales_user_id=marketing_b.id,
+        title="Telegram Prospect",
+        source="telegram_txt",
+        status="open",
+        last_message_at=datetime.now(timezone.utc),
+    )
+    db.add(telegram_conversation)
+    db.flush()
+    db.add(
+        Message(
+            conversation_id=telegram_conversation.id,
+            sender_name="Prospect TG",
+            sender_type="customer",
+            message_text="Halo dari Telegram",
+            message_timestamp=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+    db.close()
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+
+    telegram_response = client.get("/dashboard/sales/inbox?source_channel=telegram")
+    assert telegram_response.status_code == 200, telegram_response.text
+    telegram_payload = telegram_response.json()
+    assert len(telegram_payload) == 1
+    assert telegram_payload[0]["source_channel"] == "telegram"
+
+    whatsapp_response = client.get("/dashboard/sales/inbox?source_channel=whatsapp")
+    assert whatsapp_response.status_code == 200, whatsapp_response.text
+    whatsapp_payload = whatsapp_response.json()
+    assert len(whatsapp_payload) >= 1
+    assert all(item["source_channel"] == "whatsapp" for item in whatsapp_payload)

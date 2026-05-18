@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.core.security import require_roles
 from app.models.user import User
@@ -52,10 +52,15 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 @router.get("/sales/inbox", response_model=list[SalesInboxItem])
 def sales_inbox(
+    source_channel: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("marketing", "admin")),
 ):
-    return get_sales_inbox(db=db, current_user=current_user)
+    return get_sales_inbox(
+        db=db,
+        current_user=current_user,
+        source_channel=source_channel,
+    )
 
 
 @router.get("/sales/worklist", response_model=SalesWorklistResponse)
@@ -192,19 +197,29 @@ def update_marketing_execution_item_endpoint(
 
 @router.get("/kpi/command-center", response_model=KpiCommandCenterResponse)
 def kpi_command_center(
+    source_channel: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin")),
 ):
-    return get_kpi_command_center(db=db, current_user=current_user)
+    return get_kpi_command_center(
+        db=db,
+        current_user=current_user,
+        source_channel=source_channel,
+    )
 
 
 @router.post("/kpi/command-center/refresh", response_model=KpiCommandCenterResponse)
 def refresh_kpi_command_center_endpoint(
     request: Request,
+    source_channel: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin")),
 ):
-    response = refresh_kpi_command_center(db=db, current_user=current_user)
+    response = refresh_kpi_command_center(
+        db=db,
+        current_user=current_user,
+        source_channel=source_channel,
+    )
     create_audit_log(
         db=db,
         action="kpi_command_center.refresh",

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.security import require_roles
@@ -38,10 +38,15 @@ router = APIRouter(prefix="/leads", tags=["leads"])
 
 @router.get("", response_model=list[LeadListItem])
 def list_leads(
+    source_channel: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("marketing", "admin")),
 ) -> list[LeadListItem]:
-    return get_leads_for_user(db=db, current_user=current_user)
+    return get_leads_for_user(
+        db=db,
+        current_user=current_user,
+        source_channel=source_channel,
+    )
 
 
 @router.get("/{lead_id}", response_model=LeadDetail)

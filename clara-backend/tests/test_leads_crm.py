@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 import sys
 from uuid import UUID
@@ -200,6 +201,45 @@ def test_admin_can_list_and_update_org_leads(
     lead = db.scalars(select(Lead).where(Lead.id == owned_lead.id)).first()
     assert lead is not None
     assert lead.summary == "Sudah sangat dekat ke closing."
+
+
+def test_admin_can_filter_leads_by_source_channel(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    marketing_a = seeded_data["marketing_a"]
+    org_a = seeded_data["org_a"]
+
+    db = db_session_factory()
+    telegram_lead = Lead(
+        organization_id=org_a.id,
+        assigned_user_id=marketing_a.id,
+        display_name="Telegram Prospect",
+        source="telegram_txt",
+        current_stage="qualification",
+        lead_temperature="warm",
+        last_contact_at=datetime.now(timezone.utc),
+    )
+    db.add(telegram_lead)
+    db.commit()
+    db.close()
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    whatsapp_response = client.get("/leads?source_channel=whatsapp")
+    assert whatsapp_response.status_code == 200, whatsapp_response.text
+    whatsapp_payload = whatsapp_response.json()
+    assert len(whatsapp_payload) == 1
+    assert whatsapp_payload[0]["source_channel"] == "whatsapp"
+
+    telegram_response = client.get("/leads?source_channel=telegram")
+    assert telegram_response.status_code == 200, telegram_response.text
+    telegram_payload = telegram_response.json()
+    assert len(telegram_payload) == 1
+    assert telegram_payload[0]["display_name"] == "Telegram Prospect"
+    assert telegram_payload[0]["source_label"] == "Telegram TXT Import"
 
 
 def test_admin_can_reassign_lead_and_auto_create_follow_up_task(

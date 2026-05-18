@@ -7,8 +7,8 @@ export default function UploadWhatsAppPage() {
   return (
     <WorkspaceShell
       eyebrow="Data ingestion"
-      title="Upload WhatsApp Chat"
-      description="Masukkan export chat WhatsApp dalam format .txt. Clara akan mem-parse pesan, membuat conversation baru, lalu menyiapkan data untuk analysis berikutnya."
+      title="Upload Chat Multi-Channel"
+      description="Masukkan export chat dalam format .txt dan pilih channel yang sesuai. Clara akan mem-parse pesan, membuat conversation baru, lalu menyiapkan data untuk analysis berikutnya."
       backHref="/dashboard/sales"
       backLabel="Kembali ke inbox"
       actions={
@@ -28,13 +28,16 @@ export default function UploadWhatsAppPage() {
             Format yang Didukung
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Untuk MVP ini, parser Clara mendukung format export WhatsApp yang
-            umum dipakai tim operasional seperti contoh berikut.
+            Untuk tahap ini, parser Clara mendukung format export WhatsApp dan
+            Telegram TXT yang eksplisit seperti contoh berikut.
           </p>
 
           <pre className="mt-4 overflow-x-auto rounded-[22px] bg-slate-950 p-4 text-sm text-slate-100">
 {`12/04/26, 09.12 - Customer: Kak, ini programnya legal nggak?
-12/04/26, 09.13 - Sales Ani: Legal kak, nanti saya kirim dokumen resminya.`}
+12/04/26, 09.13 - Sales Ani: Legal kak, nanti saya kirim dokumen resminya.
+
+[18.05.2026 09:12] Customer Leoni: Halo kak, saya tertarik.
+[18.05.2026 09:13] Sales Aria: Siap kak, saya bantu jelaskan.`}
           </pre>
         </section>
       </div>

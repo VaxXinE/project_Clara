@@ -72,6 +72,7 @@ from app.services.access_control_service import (
 )
 from app.services.source_intelligence_service import (
     build_source_label,
+    matches_source_channel,
     normalize_source_channel,
     normalize_source_key,
 )
@@ -285,7 +286,12 @@ def determine_ui_status(
     return "unknown"
 
 
-def get_sales_inbox(db: Session, current_user: User) -> list[SalesInboxItem]:
+def get_sales_inbox(
+    db: Session,
+    current_user: User,
+    *,
+    source_channel: str | None = None,
+) -> list[SalesInboxItem]:
     if current_user.organization_id is None:
         return []
 
@@ -304,7 +310,11 @@ def get_sales_inbox(db: Session, current_user: User) -> list[SalesInboxItem]:
 
     statement = statement.order_by(desc(Conversation.last_message_at))
 
-    conversations = list(db.scalars(statement).all())
+    conversations = [
+        conversation
+        for conversation in db.scalars(statement).all()
+        if matches_source_channel(conversation.source, source_channel)
+    ]
     inbox_items: list[SalesInboxItem] = []
 
     for conversation in conversations:
@@ -1769,6 +1779,8 @@ def resolve_kpi_scope(current_user: User) -> tuple[bool, str, UUID | None]:
 def build_kpi_command_center_data(
     db: Session,
     current_user: User,
+    *,
+    source_channel: str | None = None,
 ) -> dict:
     can_view_global, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
     now = datetime.now(timezone.utc)
@@ -1831,7 +1843,11 @@ def build_kpi_command_center_data(
         )
     elif organization_ids:
         leads_statement = leads_statement.where(Lead.organization_id.in_(organization_ids))
-    leads = list(db.scalars(leads_statement).all())
+    leads = [
+        lead
+        for lead in db.scalars(leads_statement).all()
+        if matches_source_channel(lead.source, source_channel)
+    ]
 
     conversations_statement = select(Conversation)
     if not can_view_global:
@@ -1842,7 +1858,11 @@ def build_kpi_command_center_data(
         conversations_statement = conversations_statement.where(
             Conversation.organization_id.in_(organization_ids)
         )
-    conversations = list(db.scalars(conversations_statement).all())
+    conversations = [
+        conversation
+        for conversation in db.scalars(conversations_statement).all()
+        if matches_source_channel(conversation.source, source_channel)
+    ]
 
     total_conversations = len(conversations)
     analyzed_conversations = 0
@@ -2348,8 +2368,14 @@ def reopen_kpi_alert(
 def refresh_kpi_command_center(
     db: Session,
     current_user: User,
+    *,
+    source_channel: str | None = None,
 ) -> KpiCommandCenterResponse:
-    data = build_kpi_command_center_data(db=db, current_user=current_user)
+    data = build_kpi_command_center_data(
+        db=db,
+        current_user=current_user,
+        source_channel=source_channel,
+    )
     persisted_alerts = sync_persistent_kpi_alerts(
         db=db,
         scope_type=data["scope_type"],
@@ -2381,8 +2407,14 @@ def refresh_kpi_command_center(
 def get_kpi_command_center(
     db: Session,
     current_user: User,
+    *,
+    source_channel: str | None = None,
 ) -> KpiCommandCenterResponse:
-    data = build_kpi_command_center_data(db=db, current_user=current_user)
+    data = build_kpi_command_center_data(
+        db=db,
+        current_user=current_user,
+        source_channel=source_channel,
+    )
     persisted_alerts = list_kpi_alert_records(db=db, current_user=current_user).items[:8]
 
     return KpiCommandCenterResponse(

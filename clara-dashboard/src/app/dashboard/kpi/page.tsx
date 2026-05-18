@@ -13,6 +13,12 @@ import type {
   KpiSnapshotHistoryResponse,
 } from "@/types/dashboard";
 
+const SOURCE_CHANNEL_OPTIONS = [
+  { value: "all", label: "Semua Channel" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "telegram", label: "Telegram" },
+] as const;
+
 function numberOrZero(value: number | undefined | null): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
@@ -31,16 +37,23 @@ export default function KpiCommandCenterPage() {
   const [alertHistory, setAlertHistory] = useState<KpiAlertHistoryResponse | null>(null);
   const [snapshotHistory, setSnapshotHistory] = useState<KpiSnapshotHistoryResponse | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
+  const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   async function loadKpiPage() {
     try {
+      const kpiPath =
+        sourceChannelFilter === "all"
+          ? "/dashboard/kpi/command-center"
+          : `/dashboard/kpi/command-center?source_channel=${encodeURIComponent(
+              sourceChannelFilter
+            )}`;
       const [me, kpiResponse, alertsResponse, snapshotsResponse] =
         await Promise.all([
           apiFetch<CurrentUser>("/auth/me"),
-          apiFetch<KpiCommandCenterResponse>("/dashboard/kpi/command-center"),
+          apiFetch<KpiCommandCenterResponse>(kpiPath),
           apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts"),
           apiFetch<KpiSnapshotHistoryResponse>("/dashboard/kpi/snapshots"),
         ]);
@@ -59,7 +72,7 @@ export default function KpiCommandCenterPage() {
 
   useEffect(() => {
     void loadKpiPage();
-  }, []);
+  }, [sourceChannelFilter]);
 
   async function reloadAlertHistory() {
     const alertsResponse = await apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts");
@@ -71,8 +84,14 @@ export default function KpiCommandCenterPage() {
     setErrorMessage("");
 
     try {
+      const refreshPath =
+        sourceChannelFilter === "all"
+          ? "/dashboard/kpi/command-center/refresh"
+          : `/dashboard/kpi/command-center/refresh?source_channel=${encodeURIComponent(
+              sourceChannelFilter
+            )}`;
       const refreshed = await apiFetch<KpiCommandCenterResponse>(
-        "/dashboard/kpi/command-center/refresh",
+        refreshPath,
         { method: "POST" }
       );
       setKpi(refreshed);
@@ -201,6 +220,41 @@ export default function KpiCommandCenterPage() {
                 value={String(kpi.summary.overdue_follow_ups)}
                 hint="Follow-up yang sudah lewat jadwal dan berisiko kehilangan momentum."
               />
+            </section>
+
+            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Filter Channel
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Summary KPI live bisa difokuskan ke WhatsApp atau Telegram.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {SOURCE_CHANNEL_OPTIONS.map((option) => {
+                    const isActive = sourceChannelFilter === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setSourceChannelFilter(option.value);
+                        }}
+                        className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                          isActive
+                            ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
+                            : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </section>
 
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
