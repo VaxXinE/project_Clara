@@ -171,6 +171,52 @@ export default function NotificationsPage() {
 
         {notifications && !isLoading && !errorMessage && (
           <>
+            <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#eef2ff_0%,#ffffff_45%,#f8fafc_100%)] p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Langkah Berikutnya
+                  </p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                    {notifications.items.length === 0
+                      ? "Tidak ada notifikasi aktif sekarang"
+                      : "Ambil notifikasi active yang paling kritis lebih dulu"}
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    {notifications.items.length === 0
+                      ? "Kalau notification center kosong, itu berarti operasional relatif stabil. Tetap cek AI Worklist untuk memastikan tidak ada task yang harus ditindak."
+                      : "Notification Center dipakai untuk aksi cepat pada sinyal operasional. Baca severity, age, dan target tindakan sebelum memilih acknowledge, resolve, atau escalate."}
+                  </p>
+                </div>
+                <Link
+                  href={notifications.items[0]?.target_href ?? "/dashboard/follow-up"}
+                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                >
+                  {notifications.items[0] ? "Buka Notifikasi Teratas" : "Buka AI Worklist"}
+                </Link>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Cara Pakai Halaman Ini
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <UsageHint
+                  title="1. Baca title dan severity"
+                  description="Itu memberi konteks tercepat soal seberapa kritis notifikasi ini."
+                />
+                <UsageHint
+                  title="2. Pakai Acknowledge untuk tandai sedang ditangani"
+                  description="Resolve dipakai kalau isu memang selesai, bukan sekadar sudah dibaca."
+                />
+                <UsageHint
+                  title="3. Escalate kalau perlu level keputusan lebih tinggi"
+                  description="Gunakan escalation untuk isu yang tidak bisa diselesaikan di level operator saat ini."
+                />
+              </div>
+            </section>
+
             <section className="grid gap-4 md:grid-cols-3">
               <MetricCard label="Active" value={String(notifications.active_count)} />
               <MetricCard
@@ -206,7 +252,7 @@ export default function NotificationsPage() {
             <section className="space-y-4">
               {notifications.items.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-                  Belum ada notifikasi operasional aktif.
+                  Belum ada notifikasi operasional aktif. Ini bagus, tapi bukan berarti tidak ada pekerjaan. Biasanya langkah berikutnya adalah cek AI Worklist atau Approval Queue.
                 </div>
               ) : (
                 notifications.items.map((item) => (
@@ -321,6 +367,21 @@ export default function NotificationsPage() {
         )}
       </div>
     </WorkspaceShell>
+  );
+}
+
+function UsageHint({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
   );
 }
 

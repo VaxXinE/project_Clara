@@ -167,6 +167,13 @@ export default function DashboardHomePage() {
   const canAccessAdmin =
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
   const passwordStrength = getPasswordStrength(changePasswordForm.new_password);
+  const nextStep = getDashboardNextStep({
+    currentUser,
+    latestConversation,
+    worklist,
+    metrics,
+    canAccessInsights,
+  });
 
   return (
     <WorkspaceShell
@@ -180,10 +187,16 @@ export default function DashboardHomePage() {
       actions={
         <>
           <Link
-            href="/dashboard/sales"
+            href="/dashboard/start"
             className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
           >
-            Buka Inbox
+            Mulai dari Sini
+          </Link>
+          <Link
+            href="/dashboard/sales"
+            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          >
+            Buka Chat Masuk
           </Link>
           <Link
             href="/dashboard/upload"
@@ -216,7 +229,6 @@ export default function DashboardHomePage() {
       }
     >
       <div className="space-y-6">
-
         {errorMessage && (
           <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
             {errorMessage}
@@ -228,6 +240,13 @@ export default function DashboardHomePage() {
             {successMessage}
           </section>
         )}
+
+        <NextStepBanner
+          title={nextStep.title}
+          description={nextStep.description}
+          href={nextStep.href}
+          actionLabel={nextStep.actionLabel}
+        />
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
@@ -252,21 +271,77 @@ export default function DashboardHomePage() {
           />
         </section>
 
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Cara Pakai Clara
+              </p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+                Gunakan Clara dalam 4 langkah
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+                Kalau Anda bingung harus mulai dari mana, jangan lompat ke semua menu sekaligus.
+                Clara paling mudah dipakai dengan alur ini: masukkan chat, review chat masuk,
+                ubah jadi lead kerja, lalu eksekusi follow-up harian.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/start"
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            >
+              Buka Panduan Lengkap
+            </Link>
+          </div>
+
+          <div className="mt-5 grid gap-4 xl:grid-cols-4">
+            <WorkflowStepCard
+              step="1"
+              title="Import Chat"
+              description="Upload TXT atau paste chat ke Clara."
+              href="/dashboard/upload"
+            />
+            <WorkflowStepCard
+              step="2"
+              title="Review Chat Masuk"
+              description="Buka percakapan, jalankan AI analysis, dan siapkan draft."
+              href="/dashboard/sales"
+            />
+            <WorkflowStepCard
+              step="3"
+              title="Kelola Lead"
+              description="Pindahkan stage, atur follow-up, dan baca identity customer."
+              href="/dashboard/crm"
+            />
+            <WorkflowStepCard
+              step="4"
+              title="Eksekusi Tindakan"
+              description="Gunakan worklist, approvals, dan notifications untuk aksi harian."
+              href="/dashboard/follow-up"
+            />
+          </div>
+        </section>
+
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Quick Actions
+              Paling Sering Dipakai
             </p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <ActionCard
+                href="/dashboard/start"
+                title="Mulai dari Sini"
+                description="Panduan langkah demi langkah supaya user baru tidak bingung membaca alur Clara."
+              />
+              <ActionCard
                 href="/dashboard/sales"
-                title="Conversation Inbox"
+                title="Chat Masuk"
                 description="Masuk ke antrian percakapan, buka detail customer, dan lanjutkan follow-up."
               />
               <ActionCard
                 href="/dashboard/upload"
-                title="Upload WhatsApp TXT"
-                description="Masukkan export chat baru untuk diparse menjadi conversation dan message."
+                title="Import Chat"
+                description="Masukkan export chat baru atau paste chat langsung untuk diparse menjadi conversation."
               />
               <ActionCard
                 href="/dashboard/crm"
@@ -283,6 +358,13 @@ export default function DashboardHomePage() {
                 title="Approval Queue"
                 description="Lihat draft pending approval dan escalation tanpa buka conversation satu per satu."
               />
+            </div>
+
+            <div className="mt-6 border-t border-slate-200 pt-6">
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                Tools Tambahan
+              </p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <ActionCard
                 href="/dashboard/knowledge"
                 title="Product Knowledge"
@@ -318,6 +400,7 @@ export default function DashboardHomePage() {
                   description="Lihat overview database dan metadata sistem tanpa buka PostgreSQL client."
                 />
               )}
+              </div>
             </div>
           </div>
 
@@ -540,6 +623,85 @@ export default function DashboardHomePage() {
   );
 }
 
+function getDashboardNextStep({
+  currentUser,
+  latestConversation,
+  worklist,
+  metrics,
+  canAccessInsights,
+}: {
+  currentUser: CurrentUser | null;
+  latestConversation: SalesInboxItem | null;
+  worklist: SalesWorklistResponse | null;
+  metrics: OverviewMetrics;
+  canAccessInsights: boolean;
+}) {
+  if (!currentUser) {
+    return {
+      title: "Mulai dari halaman panduan",
+      description:
+        "Kalau Anda baru masuk ke Clara, buka panduan singkat dulu supaya alurnya cepat kebaca.",
+      href: "/dashboard/start",
+      actionLabel: "Buka Panduan",
+    };
+  }
+
+  if (metrics.inboxCount === 0) {
+    return {
+      title: "Masukkan chat pertama Anda",
+      description:
+        "Workspace masih kosong. Langkah paling masuk akal sekarang adalah import atau paste chat agar Clara mulai membentuk conversation dan lead.",
+      href: "/dashboard/upload",
+      actionLabel: "Import Chat",
+    };
+  }
+
+  if (metrics.analyzedCount < metrics.inboxCount) {
+    return {
+      title: "Masih ada chat yang belum dibaca AI",
+      description:
+        "Buka Chat Masuk lalu jalankan AI analysis pada conversation yang belum punya insight. Ini langkah paling penting sebelum reply atau memindahkan lead.",
+      href: latestConversation
+        ? `/dashboard/sales/conversations/${latestConversation.conversation_id}`
+        : "/dashboard/sales",
+      actionLabel: latestConversation ? "Buka Chat Terbaru" : "Buka Chat Masuk",
+    };
+  }
+
+  if (worklist && worklist.items.length > 0) {
+    return {
+      title: "Ada tindakan harian yang sudah siap dikerjakan",
+      description:
+        "AI Worklist sudah menyusun prioritas follow-up. Fokus ke sana dulu supaya tidak kehilangan hot lead atau task yang overdue.",
+      href: "/dashboard/follow-up",
+      actionLabel: "Buka AI Worklist",
+    };
+  }
+
+  if (canAccessInsights) {
+    return {
+      title: "Operasional sudah cukup stabil, lanjut baca insight",
+      description:
+        "Kalau inbox dan follow-up relatif aman, langkah berikutnya yang paling bernilai adalah membaca Marketing Insights atau KPI untuk mengambil keputusan level tim.",
+      href: currentUser.role === "owner" || currentUser.role === "admin"
+        ? "/dashboard/marketing"
+        : "/dashboard/sales",
+      actionLabel:
+        currentUser.role === "owner" || currentUser.role === "admin"
+          ? "Buka Marketing Insights"
+          : "Buka Workspace",
+    };
+  }
+
+  return {
+    title: "Lead sudah terbentuk, saatnya rapikan pipeline",
+    description:
+      "Masuk ke Lead Pipeline untuk memastikan stage, follow-up, dan identitas customer sudah rapi sebelum volume chat bertambah.",
+    href: "/dashboard/crm",
+    actionLabel: "Buka Lead Pipeline",
+  };
+}
+
 function MetricCard({
   label,
   value,
@@ -562,6 +724,40 @@ function MetricCard({
   );
 }
 
+function NextStepBanner({
+  title,
+  description,
+  href,
+  actionLabel,
+}: {
+  title: string;
+  description: string;
+  href: string;
+  actionLabel: string;
+}) {
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_55%,#334155_100%)] p-6 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+            Langkah Berikutnya
+          </p>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight">{title}</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-200">
+            {description}
+          </p>
+        </div>
+        <Link
+          href={href}
+          className="inline-flex rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-slate-100"
+        >
+          {actionLabel}
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 function ActionCard({
   href,
   title,
@@ -579,6 +775,31 @@ function ActionCard({
       <h3 className="text-base font-semibold text-slate-950 group-hover:text-slate-800">
         {title}
       </h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </Link>
+  );
+}
+
+function WorkflowStepCard({
+  step,
+  title,
+  description,
+  href,
+}: {
+  step: string;
+  title: string;
+  description: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5 transition hover:border-slate-300 hover:bg-white"
+    >
+      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
+        {step}
+      </span>
+      <h3 className="mt-4 text-lg font-semibold text-slate-950">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
     </Link>
   );

@@ -83,7 +83,7 @@ export default function SalesInboxPage() {
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Operational inbox"
-      title="Conversation Inbox"
+      title="Chat Masuk"
       description="Semua percakapan penting dikumpulkan di satu tempat. User tidak perlu menebak mana yang harus dibalas dulu karena Clara sudah menyorot prioritas, risiko, dan langkah berikutnya."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
@@ -176,6 +176,56 @@ export default function SalesInboxPage() {
 
         {!isLoading && !errorMessage && (
           <>
+            <section className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_45%,#eff6ff_100%)] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Langkah Berikutnya
+                  </p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                    {inboxItems.length === 0
+                      ? "Inbox masih kosong"
+                      : "Buka conversation paling atas lebih dulu"}
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    {inboxItems.length === 0
+                      ? "Kalau belum ada percakapan, langkah paling masuk akal adalah import chat dulu supaya Clara punya bahan kerja."
+                      : "Urutan di inbox ini sudah cukup dekat dengan prioritas operasional. Setelah membuka conversation, pastikan AI analysis tersedia sebelum Anda memutuskan reply, approval, atau pindah ke lead detail."}
+                  </p>
+                </div>
+                <Link
+                  href={
+                    inboxItems[0]
+                      ? `/dashboard/sales/conversations/${inboxItems[0].conversation_id}`
+                      : "/dashboard/upload"
+                  }
+                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                >
+                  {inboxItems[0] ? "Buka Chat Prioritas" : "Import Chat"}
+                </Link>
+              </div>
+            </section>
+
+            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Cara Pakai Halaman Ini
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <UsageHint
+                  title="1. Buka chat paling atas"
+                  description="Biasanya item teratas sudah diprioritaskan Clara dari status dan konteks terbaru."
+                />
+                <UsageHint
+                  title="2. Jalankan AI analysis"
+                  description="Kalau belum ada insight, analisis dulu sebelum membuat keputusan reply atau follow-up."
+                />
+                <UsageHint
+                  title="3. Lanjutkan ke lead"
+                  description="Kalau chat sudah jelas arahnya, buka lead detail untuk atur stage dan follow-up."
+                />
+              </div>
+            </section>
+
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <OverviewTile
                 label="Total Percakapan"
@@ -341,6 +391,21 @@ export default function SalesInboxPage() {
         )}
       </div>
     </WorkspaceShell>
+  );
+}
+
+function UsageHint({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
   );
 }
 

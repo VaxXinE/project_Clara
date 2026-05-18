@@ -102,7 +102,7 @@ export default function FollowUpPage() {
             href="/dashboard/sales"
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
           >
-            Conversation Inbox
+            Chat Masuk
           </Link>
           <Link
             href="/dashboard/crm"
@@ -128,6 +128,56 @@ export default function FollowUpPage() {
 
         {!isLoading && worklist && (
           <>
+            <section className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#fef2f2_0%,#ffffff_45%,#eef2ff_100%)] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Langkah Berikutnya
+                  </p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                    {worklist.items.length === 0
+                      ? "Worklist sedang relatif aman"
+                      : "Kerjakan item urutan teratas lebih dulu"}
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    {worklist.items.length === 0
+                      ? "Kalau tidak ada item prioritas, kembali cek Chat Masuk atau Lead Pipeline. Bisa jadi tidak ada task yang jatuh tempo hari ini."
+                      : "Halaman ini bukan untuk membaca semua detail dari awal. Fungsinya adalah memilih tindakan harian tercepat: buka conversation, snooze task, atau tandai selesai."}
+                  </p>
+                </div>
+                <Link
+                  href={
+                    worklist.items[0]?.conversation_id
+                      ? `/dashboard/sales/conversations/${worklist.items[0].conversation_id}`
+                      : "/dashboard/sales"
+                  }
+                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                >
+                  {worklist.items[0] ? "Buka Prioritas Teratas" : "Buka Chat Masuk"}
+                </Link>
+              </div>
+            </section>
+
+            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Cara Pakai Halaman Ini
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <UsageHint
+                  title="1. Ambil item paling atas"
+                  description="Urutannya sudah diprioritaskan. Anda tidak perlu memilah dari nol kecuali ada konteks khusus."
+                />
+                <UsageHint
+                  title="2. Putuskan aksi singkat"
+                  description="Buka conversation kalau perlu konteks, snooze kalau belum waktunya, dan mark done kalau task benar-benar selesai."
+                />
+                <UsageHint
+                  title="3. Naikkan ke CRM bila perlu"
+                  description="Kalau follow-up mengubah status bisnis lead, rapikan stage, notes, atau deal di halaman Lead Pipeline."
+                />
+              </div>
+            </section>
+
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="Follow-up Overdue" value={String(worklist.overdue_count)} />
               <MetricCard label="Hot Lead Alert" value={String(worklist.hot_lead_count)} />
@@ -200,6 +250,21 @@ export default function FollowUpPage() {
         )}
       </div>
     </WorkspaceShell>
+  );
+}
+
+function UsageHint({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
   );
 }
 

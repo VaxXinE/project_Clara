@@ -29,19 +29,25 @@ function buildNavItems(currentUser?: CurrentUser | null): NavItem[] {
 
   const items: NavItem[] = [
     { href: "/dashboard", label: "Overview" },
-    { href: "/dashboard/sales", label: "Inbox" },
-    { href: "/dashboard/upload", label: "Upload" },
+    { href: "/dashboard/start", label: "Mulai" },
+    { href: "/dashboard/sales", label: "Chat Masuk" },
+    { href: "/dashboard/upload", label: "Import Chat" },
+    { href: "/dashboard/crm", label: "Lead Pipeline" },
+    { href: "/dashboard/follow-up", label: "AI Worklist" },
+    { href: "/dashboard/approvals", label: "Approvals" },
+    { href: "/dashboard/notifications", label: "Notifications" },
     { href: "/dashboard/channels", label: "Channels" },
   ];
 
   if (["owner", "admin"].includes(currentUser.role)) {
-    items.push({ href: "/dashboard/marketing", label: "Insights" });
+    items.push({ href: "/dashboard/marketing", label: "Marketing" });
+    items.push({ href: "/dashboard/kpi", label: "KPI" });
     items.push({ href: "/dashboard/admin/ops", label: "Admin Ops" });
     items.push({ href: "/dashboard/admin/access", label: "Users" });
   }
 
   if (currentUser.role === "owner") {
-    items.splice(3, 0, { href: "/dashboard/knowledge", label: "Knowledge" });
+    items.push({ href: "/dashboard/knowledge", label: "Knowledge" });
   }
 
   return items;

@@ -63,7 +63,7 @@ export default function SalesConversationDetailPage() {
             href="/dashboard/sales"
             className="text-sm font-medium text-slate-600 hover:text-slate-950"
           >
-            ← Back to Sales Inbox
+            ← Kembali ke Chat Masuk
           </Link>
         </section>
 
@@ -86,6 +86,7 @@ export default function SalesConversationDetailPage() {
         {detail && !isLoading && !errorMessage && (
           <>
             <ConversationDetailHeader detail={detail} />
+            <ConversationUsageGuide detail={detail} />
             <ConversationDetailContent
               detail={detail}
               onUpdated={loadConversationDetail}
@@ -109,14 +110,12 @@ function ConversationDetailHeader({
     <section>
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-500">
-            Conversation Detail
-          </p>
+          <p className="text-sm font-medium text-slate-500">Detail Percakapan</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
             {detail.title}
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            Last message: {formatDateTime(detail.last_message_at)}
+            Pesan terakhir: {formatDateTime(detail.last_message_at)}
           </p>
         </div>
 
@@ -152,6 +151,72 @@ function ConversationDetailHeader({
   );
 }
 
+function ConversationUsageGuide({
+  detail,
+}: {
+  detail: SalesConversationDetail;
+}) {
+  const extraction = detail.latest_ai_extraction;
+  const suggestion = detail.latest_reply_suggestion;
+  const sentCount = detail.sent_messages.length;
+
+  const nextStep = !extraction
+    ? {
+        title: "Jalankan AI analysis dulu",
+        description:
+          "Tanpa AI analysis, Anda belum punya ringkasan stage, risiko, objection, dan next best action. Ini langkah pertama yang paling masuk akal.",
+      }
+    : !suggestion
+      ? {
+          title: "Buat draft balasan",
+          description:
+            "Analisis sudah ada. Langkah berikutnya adalah menghasilkan reply suggestion supaya conversation ini bisa ditindaklanjuti dengan cepat.",
+        }
+      : sentCount === 0
+        ? {
+            title: "Review lalu kirim atau approve draft",
+            description:
+              "Draft sudah tersedia. Sekarang fokus Anda adalah mengecek kesesuaian bahasa, approval status, dan apakah balasan sudah siap dikirim.",
+          }
+        : {
+            title: "Naikkan konteksnya ke lead dan follow-up",
+            description:
+              "Percakapan ini sudah punya jejak balasan. Pastikan lead stage, task, dan follow-up berikutnya di CRM sudah ikut rapi.",
+          };
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Langkah Berikutnya
+          </p>
+          <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+            {nextStep.title}
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            {nextStep.description}
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+          <UsageCard
+            title="1. Baca chat dulu"
+            description="Pahami konteks terbaru sebelum melihat analisis atau draft."
+          />
+          <UsageCard
+            title="2. Lihat AI analysis"
+            description="Gunakan stage, risk, objection, dan next action sebagai panduan keputusan."
+          />
+          <UsageCard
+            title="3. Putuskan aksi"
+            description="Entah generate draft, approve/kirim, atau pindah ke lead detail untuk follow-up."
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ConversationDetailContent({
   detail,
   onUpdated,
@@ -170,7 +235,7 @@ function ConversationDetailContent({
             Chat Timeline
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Pesan hasil parsing dari export WhatsApp.
+            Pesan hasil parsing dari channel customer yang masuk ke Clara.
           </p>
         </div>
 
@@ -271,7 +336,7 @@ function ConversationDetailContent({
             </div>
           ) : (
             <p className="mt-3 text-sm text-slate-600">
-              Conversation ini belum dianalisis AI.
+              Conversation ini belum dianalisis AI. Mulai dari tombol AI analysis di panel aksi.
             </p>
           )}
         </div>
@@ -292,7 +357,7 @@ function ConversationDetailContent({
               Belum ada reply suggestion
             </h2>
             <p className="mt-2 text-sm text-slate-600">
-              Generate reply suggestion dari backend dulu untuk MVP ini.
+              Generate reply suggestion dulu, lalu review approval status sebelum memutuskan kirim balasan.
             </p>
           </div>
         )}
@@ -323,11 +388,26 @@ function ConversationDetailContent({
             </div>
           ) : (
             <p className="mt-3 text-sm text-slate-600">
-              Belum ada message yang ditandai terkirim.
+              Belum ada pesan yang ditandai terkirim. Kalau balasan sudah benar-benar dikirim, pastikan status ini ikut tercatat.
             </p>
           )}
         </div>
       </aside>
     </section>
+  );
+}
+
+function UsageCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
   );
 }
