@@ -19,6 +19,7 @@ from app.models.marketing_execution_item import (
 from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
 from app.models.message import Message
 from app.models.organization import Organization
+from app.models.ops_notification import OpsNotification
 from app.models.product_knowledge import ProductKnowledge
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
@@ -46,6 +47,8 @@ from app.schemas.dashboard_schema import (
     OrganizationPerformanceRow,
     OpsAuditLogRow,
     OpsConversationRow,
+    OpsNotificationItem,
+    OpsNotificationResponse,
     OpsDatabaseOverviewResponse,
     OpsOrganizationRow,
     OpsProductKnowledgeRow,
@@ -116,6 +119,36 @@ def ensure_aware_utc(value: datetime | None) -> datetime | None:
         return value.replace(tzinfo=timezone.utc)
 
     return value.astimezone(timezone.utc)
+
+
+def get_age_bucket(created_at: datetime, now: datetime) -> str:
+    age_seconds = max((now - ensure_aware_utc(created_at)).total_seconds(), 0)
+
+    if age_seconds >= 72 * 60 * 60:
+        return "stale"
+    if age_seconds >= 24 * 60 * 60:
+        return "aging"
+    return "fresh"
+
+
+def build_ops_notification_item(notification: OpsNotification) -> OpsNotificationItem:
+    return OpsNotificationItem(
+        id=notification.id,
+        organization_id=notification.organization_id,
+        user_id=notification.user_id,
+        source_type=notification.source_type,
+        source_key=notification.source_key,
+        severity=notification.severity,
+        title=notification.title,
+        body=notification.body,
+        target_href=notification.target_href,
+        status=notification.status,
+        acknowledged_by_user_id=notification.acknowledged_by_user_id,
+        acknowledged_at=notification.acknowledged_at,
+        resolved_at=notification.resolved_at,
+        created_at=notification.created_at,
+        updated_at=notification.updated_at,
+    )
 
 
 def build_reply_summary(
@@ -627,6 +660,11 @@ def get_sales_worklist(
             pending_analysis_count=0,
             snoozed_count=0,
             completed_today_count=0,
+            due_today_count=0,
+            overdue_24h_count=0,
+            overdue_72h_count=0,
+            open_task_count=0,
+            completion_rate_today=0,
             items=[],
         )
 
@@ -656,6 +694,10 @@ def get_sales_worklist(
     pending_analysis_count = 0
     snoozed_count = 0
     completed_today_count = 0
+    due_today_count = 0
+    overdue_24h_count = 0
+    overdue_72h_count = 0
+    open_task_count = 0
 
     for lead in leads:
         conversation = get_latest_conversation_for_lead(lead)
@@ -681,8 +723,18 @@ def get_sales_worklist(
             and completed_at.date() == now.date()
         ]
         completed_today_count += len(done_today_tasks)
+        open_task_count += len(open_or_snoozed_tasks)
 
         if open_or_snoozed_tasks:
+            task_due_at = ensure_aware_utc(open_or_snoozed_tasks[0].due_at)
+            if task_due_at is not None:
+                age_seconds = (now - task_due_at).total_seconds()
+                if task_due_at.date() == now.date():
+                    due_today_count += 1
+                if age_seconds >= 24 * 60 * 60:
+                    overdue_24h_count += 1
+                if age_seconds >= 72 * 60 * 60:
+                    overdue_72h_count += 1
             task_item = build_sales_worklist_item_from_task(
                 lead=lead,
                 conversation=conversation,
@@ -736,6 +788,18 @@ def get_sales_worklist(
         pending_analysis_count=pending_analysis_count,
         snoozed_count=snoozed_count,
         completed_today_count=completed_today_count,
+        due_today_count=due_today_count,
+        overdue_24h_count=overdue_24h_count,
+        overdue_72h_count=overdue_72h_count,
+        open_task_count=open_task_count,
+        completion_rate_today=(
+            round(
+                (completed_today_count / (completed_today_count + open_task_count)) * 100,
+                1,
+            )
+            if (completed_today_count + open_task_count) > 0
+            else 0
+        ),
         items=items,
     )
 
@@ -743,6 +807,10 @@ def get_sales_worklist(
 def get_sales_approval_queue(
     db: Session,
     current_user: User,
+    *,
+    risk_level: str | None = None,
+    action_mode: str | None = None,
+    age_bucket: str | None = None,
 ) -> SalesApprovalQueueResponse:
     now = datetime.now(timezone.utc)
 
@@ -751,6 +819,8 @@ def get_sales_approval_queue(
             generated_at=now,
             pending_count=0,
             escalation_count=0,
+            high_risk_count=0,
+            stale_count=0,
             items=[],
         )
 
@@ -771,6 +841,8 @@ def get_sales_approval_queue(
     conversations = list(db.scalars(statement).all())
     items: list[SalesApprovalQueueItem] = []
     escalation_count = 0
+    high_risk_count = 0
+    stale_count = 0
 
     for conversation in conversations:
         latest_suggestion = get_latest_reply_suggestion(conversation)
@@ -785,6 +857,17 @@ def get_sales_approval_queue(
 
         if latest_suggestion.action_mode == "escalate_to_human":
             escalation_count += 1
+        if latest_suggestion.risk_level == "high":
+            high_risk_count += 1
+        if get_age_bucket(latest_suggestion.created_at, now) == "stale":
+            stale_count += 1
+
+        if risk_level and latest_suggestion.risk_level != risk_level:
+            continue
+        if action_mode and latest_suggestion.action_mode != action_mode:
+            continue
+        if age_bucket and get_age_bucket(latest_suggestion.created_at, now) != age_bucket:
+            continue
 
         items.append(
             SalesApprovalQueueItem(
@@ -825,8 +908,196 @@ def get_sales_approval_queue(
         generated_at=now,
         pending_count=len(items),
         escalation_count=escalation_count,
+        high_risk_count=high_risk_count,
+        stale_count=stale_count,
         items=items,
     )
+
+
+def sync_ops_notifications(
+    db: Session,
+    current_user: User,
+) -> list[OpsNotification]:
+    now = datetime.now(timezone.utc)
+    worklist = get_sales_worklist(db=db, current_user=current_user)
+    approval_queue = get_sales_approval_queue(db=db, current_user=current_user)
+    kpi_alerts = (
+        list_kpi_alert_records(db=db, current_user=current_user).items
+        if current_user.role in {"admin", "owner"}
+        else []
+    )
+
+    desired_notifications: list[dict[str, str | None]] = []
+
+    for item in worklist.items[:20]:
+        if item.task_type not in {
+            "overdue_follow_up",
+            "hot_lead_needs_reply",
+            "approved_ready_to_send",
+            "needs_analysis",
+        }:
+            continue
+
+        severity = "medium"
+        if item.task_type in {"overdue_follow_up", "hot_lead_needs_reply"}:
+            severity = "high"
+
+        target_href = (
+            f"/dashboard/sales/conversations/{item.conversation_id}"
+            if item.conversation_id
+            else f"/dashboard/crm/{item.lead_id}"
+        )
+
+        desired_notifications.append(
+            {
+                "source_type": "sales_worklist",
+                "source_key": f"worklist:{item.lead_id}:{item.task_id or item.task_type}",
+                "severity": severity,
+                "title": item.task_label,
+                "body": item.reason,
+                "target_href": target_href,
+            }
+        )
+
+    for item in approval_queue.items[:20]:
+        severity = "high" if item.risk_level == "high" or item.action_mode == "escalate_to_human" else "medium"
+        desired_notifications.append(
+            {
+                "source_type": "approval_queue",
+                "source_key": f"approval:{item.reply_suggestion_id}",
+                "severity": severity,
+                "title": f"Approval queue: {item.lead_name}",
+                "body": item.recommended_action,
+                "target_href": f"/dashboard/sales/conversations/{item.conversation_id}",
+            }
+        )
+
+    for alert in kpi_alerts[:20]:
+        if alert.status == "resolved":
+            continue
+        desired_notifications.append(
+            {
+                "source_type": "kpi_alert",
+                "source_key": f"kpi:{alert.id}",
+                "severity": alert.severity,
+                "title": alert.title,
+                "body": alert.description,
+                "target_href": alert.target_href,
+            }
+        )
+
+    statement = select(OpsNotification).where(
+        OpsNotification.organization_id == current_user.organization_id
+    )
+    if current_user.role != "owner":
+        statement = statement.where(OpsNotification.user_id == current_user.id)
+
+    existing_notifications = list(db.scalars(statement).all())
+    existing_by_key = {
+        (notification.source_type, notification.source_key): notification
+        for notification in existing_notifications
+    }
+    desired_keys = {
+        (str(item["source_type"]), str(item["source_key"]))
+        for item in desired_notifications
+    }
+
+    for notification in existing_notifications:
+        key = (notification.source_type, notification.source_key)
+        if key not in desired_keys and notification.status != "resolved":
+            notification.status = "resolved"
+            notification.resolved_at = now
+            db.add(notification)
+
+    for item in desired_notifications:
+        key = (str(item["source_type"]), str(item["source_key"]))
+        notification = existing_by_key.get(key)
+        if notification is None:
+            notification = OpsNotification(
+                organization_id=current_user.organization_id,
+                user_id=None if current_user.role == "owner" else current_user.id,
+                source_type=str(item["source_type"]),
+                source_key=str(item["source_key"]),
+                severity=str(item["severity"]),
+                title=str(item["title"]),
+                body=str(item["body"]),
+                target_href=str(item["target_href"]) if item["target_href"] else None,
+                status="active",
+            )
+        else:
+            notification.severity = str(item["severity"])
+            notification.title = str(item["title"])
+            notification.body = str(item["body"])
+            notification.target_href = (
+                str(item["target_href"]) if item["target_href"] else None
+            )
+            if notification.status == "resolved":
+                notification.status = "active"
+                notification.resolved_at = None
+
+        db.add(notification)
+
+    db.commit()
+
+    refreshed_statement = (
+        select(OpsNotification)
+        .where(OpsNotification.organization_id == current_user.organization_id)
+        .order_by(
+            desc(OpsNotification.updated_at),
+            desc(OpsNotification.created_at),
+        )
+    )
+    if current_user.role != "owner":
+        refreshed_statement = refreshed_statement.where(
+            OpsNotification.user_id == current_user.id
+        )
+
+    return list(db.scalars(refreshed_statement).all())
+
+
+def list_ops_notifications(
+    db: Session,
+    current_user: User,
+) -> OpsNotificationResponse:
+    notifications = sync_ops_notifications(db=db, current_user=current_user)
+
+    return OpsNotificationResponse(
+        generated_at=datetime.now(timezone.utc),
+        active_count=sum(1 for item in notifications if item.status == "active"),
+        acknowledged_count=sum(
+            1 for item in notifications if item.status == "acknowledged"
+        ),
+        resolved_count=sum(1 for item in notifications if item.status == "resolved"),
+        items=[build_ops_notification_item(item) for item in notifications],
+    )
+
+
+def acknowledge_ops_notification(
+    db: Session,
+    notification_id: UUID,
+    current_user: User,
+) -> OpsNotificationItem:
+    notification = db.get(OpsNotification, notification_id)
+    if notification is None:
+        raise ValueError("Notification not found.")
+
+    if (
+        notification.organization_id != current_user.organization_id
+        or (
+            notification.user_id is not None
+            and notification.user_id != current_user.id
+            and current_user.role != "owner"
+        )
+    ):
+        raise ValueError("Notification not found.")
+
+    notification.status = "acknowledged"
+    notification.acknowledged_by_user_id = current_user.id
+    notification.acknowledged_at = datetime.now(timezone.utc)
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    return build_ops_notification_item(notification)
 
 
 def get_marketing_insights_preview(

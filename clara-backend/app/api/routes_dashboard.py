@@ -16,6 +16,8 @@ from app.schemas.dashboard_schema import (
     MarketingInsightSnapshotResponse,
     MarketingInsightsPreview,
     OpsDatabaseOverviewResponse,
+    OpsNotificationItem,
+    OpsNotificationResponse,
     PersistedKpiAlertRecord,
     SalesApprovalQueueResponse,
     SalesConversationDetail,
@@ -24,11 +26,13 @@ from app.schemas.dashboard_schema import (
 )
 from app.services.audit_service import create_audit_log
 from app.services.dashboard_service import (
+    acknowledge_ops_notification,
     acknowledge_kpi_alert,
     create_marketing_execution_item,
     get_kpi_command_center,
     get_marketing_insights_preview,
     get_ops_database_overview,
+    list_ops_notifications,
     get_sales_approval_queue,
     get_sales_conversation_detail,
     get_sales_inbox,
@@ -73,10 +77,61 @@ def sales_worklist(
 
 @router.get("/sales/approval-queue", response_model=SalesApprovalQueueResponse)
 def sales_approval_queue(
+    risk_level: str | None = Query(default=None),
+    action_mode: str | None = Query(default=None),
+    age_bucket: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("marketing", "admin")),
 ):
-    return get_sales_approval_queue(db=db, current_user=current_user)
+    return get_sales_approval_queue(
+        db=db,
+        current_user=current_user,
+        risk_level=risk_level,
+        action_mode=action_mode,
+        age_bucket=age_bucket,
+    )
+
+
+@router.get("/notifications", response_model=OpsNotificationResponse)
+def list_ops_notifications_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+):
+    return list_ops_notifications(db=db, current_user=current_user)
+
+
+@router.patch(
+    "/notifications/{notification_id}/acknowledge",
+    response_model=OpsNotificationItem,
+)
+def acknowledge_ops_notification_endpoint(
+    notification_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+):
+    try:
+        notification = acknowledge_ops_notification(
+            db=db,
+            notification_id=notification_id,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="ops_notification.acknowledge",
+        resource_type="ops_notification",
+        resource_id=str(notification.id),
+        current_user=current_user,
+        request=request,
+        metadata={"status": notification.status, "source_type": notification.source_type},
+    )
+    return notification
 
 
 @router.get(

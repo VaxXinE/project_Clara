@@ -191,6 +191,12 @@ export default function DashboardHomePage() {
           >
             Upload Chat
           </Link>
+          <Link
+            href="/dashboard/notifications"
+            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          >
+            Notifications
+          </Link>
           <button
             type="button"
             onClick={() => {

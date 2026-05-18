@@ -35,3 +35,8 @@ class Organization(Base):
     )
     conversations = relationship("Conversation", back_populates="organization")
     lead_tasks = relationship("LeadTask", back_populates="organization")
+    ops_notifications = relationship(
+        "OpsNotification",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )

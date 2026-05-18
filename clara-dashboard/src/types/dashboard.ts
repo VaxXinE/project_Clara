@@ -250,6 +250,11 @@ export type SalesWorklistResponse = {
   pending_analysis_count: number;
   snoozed_count: number;
   completed_today_count: number;
+  due_today_count: number;
+  overdue_24h_count: number;
+  overdue_72h_count: number;
+  open_task_count: number;
+  completion_rate_today: number;
   items: SalesWorklistItem[];
 };
 
@@ -273,7 +278,35 @@ export type SalesApprovalQueueResponse = {
   generated_at: string;
   pending_count: number;
   escalation_count: number;
+  high_risk_count: number;
+  stale_count: number;
   items: SalesApprovalQueueItem[];
+};
+
+export type OpsNotificationItem = {
+  id: string;
+  organization_id: string | null;
+  user_id: string | null;
+  source_type: string;
+  source_key: string;
+  severity: string;
+  title: string;
+  body: string;
+  target_href: string | null;
+  status: string;
+  acknowledged_by_user_id: string | null;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OpsNotificationResponse = {
+  generated_at: string;
+  active_count: number;
+  acknowledged_count: number;
+  resolved_count: number;
+  items: OpsNotificationItem[];
 };
 
 export type KpiSummaryCard = {

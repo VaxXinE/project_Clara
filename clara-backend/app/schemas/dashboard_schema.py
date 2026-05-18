@@ -109,6 +109,11 @@ class SalesWorklistResponse(BaseModel):
     pending_analysis_count: int
     snoozed_count: int
     completed_today_count: int
+    due_today_count: int
+    overdue_24h_count: int
+    overdue_72h_count: int
+    open_task_count: int
+    completion_rate_today: float
     items: list[SalesWorklistItem]
 
 
@@ -132,7 +137,35 @@ class SalesApprovalQueueResponse(BaseModel):
     generated_at: datetime
     pending_count: int
     escalation_count: int
+    high_risk_count: int
+    stale_count: int
     items: list[SalesApprovalQueueItem]
+
+
+class OpsNotificationItem(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    user_id: UUID | None
+    source_type: str
+    source_key: str
+    severity: str
+    title: str
+    body: str
+    target_href: str | None
+    status: str
+    acknowledged_by_user_id: UUID | None
+    acknowledged_at: datetime | None
+    resolved_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OpsNotificationResponse(BaseModel):
+    generated_at: datetime
+    active_count: int
+    acknowledged_count: int
+    resolved_count: int
+    items: list[OpsNotificationItem]
 
 
 class MarketingObjectionInsight(BaseModel):

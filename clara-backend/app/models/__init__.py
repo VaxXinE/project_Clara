@@ -14,6 +14,7 @@ from app.models.marketing_insight_snapshot import MarketingInsightSnapshot
 from app.models.marketing_execution_item import MarketingExecutionItem
 from app.models.message import Message
 from app.models.organization import Organization
+from app.models.ops_notification import OpsNotification
 from app.models.product_knowledge import ProductKnowledge
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
@@ -36,6 +37,7 @@ __all__ = [
     "MarketingInsightSnapshot",
     "Message",
     "Organization",
+    "OpsNotification",
     "ProductKnowledge",
     "ReplySuggestion",
     "SentMessage",

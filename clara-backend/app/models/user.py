@@ -100,3 +100,13 @@ class User(Base):
         foreign_keys="MarketingExecutionItem.assigned_user_id",
         back_populates="assigned_user",
     )
+    ops_notifications = relationship(
+        "OpsNotification",
+        foreign_keys="OpsNotification.user_id",
+        back_populates="user",
+    )
+    acknowledged_ops_notifications = relationship(
+        "OpsNotification",
+        foreign_keys="OpsNotification.acknowledged_by_user_id",
+        back_populates="acknowledged_by_user",
+    )

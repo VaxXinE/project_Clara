@@ -14,6 +14,9 @@ import type {
 export default function ApprovalQueuePage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [queue, setQueue] = useState<SalesApprovalQueueResponse | null>(null);
+  const [riskLevelFilter, setRiskLevelFilter] = useState("all");
+  const [actionModeFilter, setActionModeFilter] = useState("all");
+  const [ageBucketFilter, setAgeBucketFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -22,9 +25,22 @@ export default function ApprovalQueuePage() {
     setErrorMessage("");
 
     try {
+      const query = new URLSearchParams();
+      if (riskLevelFilter !== "all") {
+        query.set("risk_level", riskLevelFilter);
+      }
+      if (actionModeFilter !== "all") {
+        query.set("action_mode", actionModeFilter);
+      }
+      if (ageBucketFilter !== "all") {
+        query.set("age_bucket", ageBucketFilter);
+      }
+      const queuePath = query.size
+        ? `/dashboard/sales/approval-queue?${query.toString()}`
+        : "/dashboard/sales/approval-queue";
       const [me, data] = await Promise.all([
         apiFetch<CurrentUser>("/auth/me"),
-        apiFetch<SalesApprovalQueueResponse>("/dashboard/sales/approval-queue"),
+        apiFetch<SalesApprovalQueueResponse>(queuePath),
       ]);
       setCurrentUser(me);
       setQueue(data);
@@ -39,7 +55,7 @@ export default function ApprovalQueuePage() {
 
   useEffect(() => {
     void loadQueue();
-  }, []);
+  }, [riskLevelFilter, actionModeFilter, ageBucketFilter]);
 
   return (
     <WorkspaceShell
@@ -85,10 +101,64 @@ export default function ApprovalQueuePage() {
                 hint="Draft berisiko tinggi atau perlu intervensi manusia."
               />
               <QueueMetric
+                label="High Risk"
+                value={String(queue.high_risk_count)}
+                hint="Jumlah draft high risk dalam queue saat ini."
+              />
+              <QueueMetric
+                label="Stale Items"
+                value={String(queue.stale_count)}
+                hint="Draft yang sudah mengendap lebih dari 72 jam."
+              />
+              <QueueMetric
                 label="Generated at"
                 value={formatDateTime(queue.generated_at)}
                 hint="Waktu queue terakhir dibangun dari data terbaru."
               />
+            </section>
+
+            <section className="grid gap-3 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)] md:grid-cols-3">
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Filter risk</span>
+                <select
+                  value={riskLevelFilter}
+                  onChange={(event) => setRiskLevelFilter(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                >
+                  <option value="all">Semua risk</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </label>
+
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Filter action mode</span>
+                <select
+                  value={actionModeFilter}
+                  onChange={(event) => setActionModeFilter(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                >
+                  <option value="all">Semua mode</option>
+                  <option value="escalate_to_human">Escalate to human</option>
+                  <option value="human_approval_required">Human approval required</option>
+                  <option value="auto_approved">Auto approved</option>
+                </select>
+              </label>
+
+              <label className="space-y-2 text-sm font-medium text-slate-700">
+                <span>Filter age</span>
+                <select
+                  value={ageBucketFilter}
+                  onChange={(event) => setAgeBucketFilter(event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                >
+                  <option value="all">Semua age</option>
+                  <option value="fresh">Fresh (&lt;24 jam)</option>
+                  <option value="aging">Aging (24-72 jam)</option>
+                  <option value="stale">Stale (&gt;72 jam)</option>
+                </select>
+              </label>
             </section>
 
             <section className="space-y-4">

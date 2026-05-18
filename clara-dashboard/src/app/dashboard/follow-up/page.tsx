@@ -93,6 +93,12 @@ export default function FollowUpPage() {
       actions={
         <>
           <Link
+            href="/dashboard/notifications"
+            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          >
+            Notifications
+          </Link>
+          <Link
             href="/dashboard/sales"
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
           >
@@ -134,6 +140,26 @@ export default function FollowUpPage() {
               <MetricCard
                 label="Done Today"
                 value={String(worklist.completed_today_count)}
+              />
+              <MetricCard
+                label="Due Today"
+                value={String(worklist.due_today_count)}
+              />
+              <MetricCard
+                label="Open Tasks"
+                value={String(worklist.open_task_count)}
+              />
+              <MetricCard
+                label="Overdue >24h"
+                value={String(worklist.overdue_24h_count)}
+              />
+              <MetricCard
+                label="Overdue >72h"
+                value={String(worklist.overdue_72h_count)}
+              />
+              <MetricCard
+                label="Completion Rate"
+                value={`${worklist.completion_rate_today.toFixed(1)}%`}
               />
             </section>
 
