@@ -208,6 +208,20 @@ export type CustomerRelatedLeadItem = {
   latest_conversation_id: string | null;
 };
 
+export type CustomerMergeCandidateItem = {
+  id: string;
+  display_name: string;
+  canonical_key: string;
+  identity_confidence: number;
+  match_strategy: string;
+  match_score: number;
+  overlap_reason: string;
+  lead_count: number;
+  conversation_count: number;
+  source_labels: string[];
+  last_contact_at: string | null;
+};
+
 export type CustomerProfileSummaryItem = {
   id: string;
   organization_id: string | null;
@@ -215,6 +229,10 @@ export type CustomerProfileSummaryItem = {
   assigned_user_name: string | null;
   display_name: string;
   canonical_key: string;
+  identity_confidence: number;
+  match_strategy: string;
+  merge_notes: string | null;
+  merged_into_profile_id: string | null;
   lead_count: number;
   conversation_count: number;
   source_channels: string[];
@@ -222,7 +240,14 @@ export type CustomerProfileSummaryItem = {
   last_contact_at: string | null;
   created_at: string;
   updated_at: string;
+  merge_candidates: CustomerMergeCandidateItem[];
   related_leads: CustomerRelatedLeadItem[];
+};
+
+export type CustomerProfileMergeRequest = {
+  source_profile_id: string;
+  target_profile_id: string;
+  merge_notes?: string | null;
 };
 
 export type LeadDetail = LeadListItem & {

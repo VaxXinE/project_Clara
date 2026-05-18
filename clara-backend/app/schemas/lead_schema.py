@@ -87,6 +87,20 @@ class CustomerRelatedLeadItem(BaseModel):
     latest_conversation_id: UUID | None
 
 
+class CustomerMergeCandidateItem(BaseModel):
+    id: UUID
+    display_name: str
+    canonical_key: str
+    identity_confidence: float
+    match_strategy: str
+    match_score: float
+    overlap_reason: str
+    lead_count: int
+    conversation_count: int
+    source_labels: list[str]
+    last_contact_at: datetime | None
+
+
 class CustomerProfileSummaryItem(BaseModel):
     id: UUID
     organization_id: UUID | None
@@ -94,6 +108,10 @@ class CustomerProfileSummaryItem(BaseModel):
     assigned_user_name: str | None
     display_name: str
     canonical_key: str
+    identity_confidence: float
+    match_strategy: str
+    merge_notes: str | None
+    merged_into_profile_id: UUID | None
     lead_count: int
     conversation_count: int
     source_channels: list[str]
@@ -101,7 +119,14 @@ class CustomerProfileSummaryItem(BaseModel):
     last_contact_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    merge_candidates: list[CustomerMergeCandidateItem] = []
     related_leads: list[CustomerRelatedLeadItem]
+
+
+class CustomerProfileMergeRequest(BaseModel):
+    source_profile_id: UUID
+    target_profile_id: UUID
+    merge_notes: str | None = None
 
 
 class LeadListItem(BaseModel):
