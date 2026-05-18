@@ -1,27 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
-import type { UploadConversationResponse } from "@/types/dashboard";
+import type {
+  ChannelDefinitionItem,
+  ChannelDetectResponse,
+  UploadConversationResponse,
+} from "@/types/dashboard";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
-
-const CHANNEL_OPTIONS = [
-  {
-    value: "whatsapp",
-    label: "WhatsApp TXT",
-    endpoint: "/upload/whatsapp-txt",
-    textEndpoint: "/upload/whatsapp-text",
-  },
-  {
-    value: "telegram",
-    label: "Telegram TXT",
-    endpoint: "/upload/telegram-txt",
-    textEndpoint: "/upload/telegram-text",
-  },
-] as const;
 
 const INPUT_MODE_OPTIONS = [
   { value: "file", label: "Upload File" },
@@ -32,15 +21,39 @@ export function WhatsAppUploadForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [channelOptions, setChannelOptions] = useState<ChannelDefinitionItem[]>(
+    []
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedChannel, setSelectedChannel] =
-    useState<(typeof CHANNEL_OPTIONS)[number]["value"]>("whatsapp");
+  const [selectedChannel, setSelectedChannel] = useState("whatsapp");
   const [inputMode, setInputMode] =
     useState<(typeof INPUT_MODE_OPTIONS)[number]["value"]>("file");
   const [pastedText, setPastedText] = useState("");
   const [conversationTitle, setConversationTitle] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [isDetectingChannel, setIsDetectingChannel] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [detectionMessage, setDetectionMessage] = useState("");
+
+  useEffect(() => {
+    async function loadChannels() {
+      try {
+        const channels = await apiFetch<ChannelDefinitionItem[]>("/upload/channels");
+        setChannelOptions(channels);
+        if (channels.length > 0) {
+          setSelectedChannel((current) =>
+            channels.some((channel) => channel.key === current)
+              ? current
+              : channels[0].key
+          );
+        }
+      } catch {
+        setErrorMessage("Gagal memuat daftar channel upload.");
+      }
+    }
+
+    void loadChannels();
+  }, []);
 
   function validateFile(file: File): string | null {
     if (!file.name.toLowerCase().endsWith(".txt")) {
@@ -84,9 +97,10 @@ export function WhatsAppUploadForm() {
     event.preventDefault();
 
     setErrorMessage("");
+    setDetectionMessage("");
 
-    const channelConfig = CHANNEL_OPTIONS.find(
-      (item) => item.value === selectedChannel
+    const channelConfig = channelOptions.find(
+      (item) => item.key === selectedChannel
     );
 
     setIsUploading(true);
@@ -111,7 +125,7 @@ export function WhatsAppUploadForm() {
         const formData = new FormData();
         formData.append("file", selectedFile);
         result = await apiFetch<UploadConversationResponse>(
-          channelConfig?.endpoint ?? "/upload/whatsapp-txt",
+          channelConfig?.file_endpoint ?? "/upload/whatsapp-txt",
           {
             method: "POST",
             body: formData,
@@ -125,7 +139,7 @@ export function WhatsAppUploadForm() {
         }
 
         result = await apiFetch<UploadConversationResponse>(
-          channelConfig?.textEndpoint ?? "/upload/whatsapp-text",
+          channelConfig?.text_endpoint ?? "/upload/whatsapp-text",
           {
             method: "POST",
             body: {
@@ -147,6 +161,47 @@ export function WhatsAppUploadForm() {
     }
   }
 
+  async function handleDetectChannel() {
+    if (pastedText.trim().length === 0) {
+      setErrorMessage("Paste chat terlebih dahulu sebelum auto-detect channel.");
+      return;
+    }
+
+    setErrorMessage("");
+    setDetectionMessage("");
+    setIsDetectingChannel(true);
+
+    try {
+      const result = await apiFetch<ChannelDetectResponse>("/upload/detect-channel", {
+        method: "POST",
+        body: { raw_text: pastedText },
+      });
+
+      if (!result.detected_channel) {
+        setDetectionMessage(
+          "Clara belum bisa menebak channel dari isi chat ini. Pilih channel manual."
+        );
+        return;
+      }
+
+      setSelectedChannel(result.detected_channel);
+      const topCandidate = result.candidates[0];
+      setDetectionMessage(
+        `Clara mendeteksi ${topCandidate.label} (${topCandidate.matched_message_count} pesan, confidence ${Math.round(topCandidate.confidence * 100)}%).`
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Auto-detect channel gagal."
+      );
+    } finally {
+      setIsDetectingChannel(false);
+    }
+  }
+
+  const activeChannel = channelOptions.find(
+    (channel) => channel.key === selectedChannel
+  );
+
   return (
     <form
       onSubmit={handleUpload}
@@ -163,18 +218,22 @@ export function WhatsAppUploadForm() {
           id="channelType"
           value={selectedChannel}
           onChange={(event) => {
-            setSelectedChannel(
-              event.target.value as (typeof CHANNEL_OPTIONS)[number]["value"]
-            );
+            setSelectedChannel(event.target.value);
+            setDetectionMessage("");
           }}
           className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
         >
-          {CHANNEL_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
+          {channelOptions.map((option) => (
+            <option key={option.key} value={option.key}>
               {option.label}
             </option>
           ))}
         </select>
+        {activeChannel ? (
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            {activeChannel.description}
+          </p>
+        ) : null}
       </div>
 
       <div>
@@ -258,13 +317,31 @@ export function WhatsAppUploadForm() {
               value={pastedText}
               onChange={(event) => {
                 setPastedText(event.target.value);
+                setDetectionMessage("");
               }}
               placeholder="Paste export chat di sini..."
               className="mt-2 min-h-[220px] w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
             />
-            <p className="mt-2 text-xs text-slate-500">
-              Cocok untuk user yang tidak ingin menyimpan file .txt dulu.
-            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  void handleDetectChannel();
+                }}
+                disabled={isDetectingChannel}
+                className="rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDetectingChannel ? "Mendeteksi..." : "Auto-Detect Channel"}
+              </button>
+              <p className="text-xs text-slate-500">
+                Cocok untuk user yang tidak ingin menyimpan file .txt dulu.
+              </p>
+            </div>
+            {detectionMessage ? (
+              <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
+                {detectionMessage}
+              </p>
+            ) : null}
           </div>
         </div>
       )}
@@ -291,6 +368,7 @@ export function WhatsAppUploadForm() {
         type="submit"
         disabled={
           isUploading ||
+          channelOptions.length === 0 ||
           (inputMode === "file" ? !selectedFile : pastedText.trim().length === 0)
         }
         className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"

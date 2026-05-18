@@ -126,3 +126,59 @@ def test_paste_telegram_text_creates_conversation_and_lead(
     lead = db.get(Lead, conversation.lead_id)
     assert lead is not None
     assert lead.source == "telegram_txt"
+
+
+def test_list_upload_channels_returns_registry(
+    client,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    response = client.get("/upload/channels")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    channel_keys = {item["key"] for item in payload}
+    assert {"whatsapp", "telegram"} <= channel_keys
+    whatsapp = next(item for item in payload if item["key"] == "whatsapp")
+    assert whatsapp["supports_live_sync"] is True
+    assert whatsapp["text_endpoint"] == "/upload/whatsapp-text"
+
+
+def test_detect_upload_channel_prefers_telegram_for_telegram_text(
+    client,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    raw_text = """
+    [18.05.2026 09:12] Customer Leoni: Halo kak, saya tertarik.
+    [18.05.2026 09:13] Sales Aria: Siap kak, saya bantu jelaskan.
+    """.strip()
+
+    response = client.post(
+        "/upload/detect-channel",
+        json={"raw_text": raw_text},
+        headers=csrf_headers(client),
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["detected_channel"] == "telegram"
+    assert payload["candidates"][0]["matched_message_count"] == 2
+
+
+def test_dashboard_channel_overview_returns_counts(
+    client,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    response = client.get("/dashboard/channels")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["scope_type"] == "organization"
+    channel_keys = {item["key"] for item in payload["items"]}
+    assert {"whatsapp", "telegram"} <= channel_keys

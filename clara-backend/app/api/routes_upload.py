@@ -9,9 +9,16 @@ from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.conversation import Conversation
 from app.models.message import Message
+from app.schemas.channel_schema import (
+    ChannelDefinitionItem,
+    ChannelDetectCandidate,
+    ChannelDetectRequest,
+    ChannelDetectResponse,
+)
 from app.models.user import User
 from app.services.audit_service import create_audit_log
 from app.services.lead_service import ensure_conversation_lead
+from app.services.source_intelligence_service import list_channel_definitions
 from app.services.telegram_parser import TelegramParseError, parse_telegram_txt
 from app.services.whatsapp_parser import WhatsAppParseError, parse_whatsapp_txt
 
@@ -24,6 +31,37 @@ MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 class UploadRawChatRequest(BaseModel):
     raw_text: str
     title: str | None = None
+
+
+def detect_channel_candidates(raw_text: str) -> list[ChannelDetectCandidate]:
+    candidates: list[ChannelDetectCandidate] = []
+    channel_parsers = [
+        ("whatsapp", "WhatsApp", parse_whatsapp_txt, WhatsAppParseError),
+        ("telegram", "Telegram", parse_telegram_txt, TelegramParseError),
+    ]
+
+    for channel_key, channel_label, parser, parser_error in channel_parsers:
+        try:
+            parsed_messages = parser(raw_text)
+        except parser_error:
+            continue
+
+        confidence = min(0.6 + (len(parsed_messages) * 0.08), 0.99)
+        candidates.append(
+            ChannelDetectCandidate(
+                channel=channel_key,
+                label=channel_label,
+                confidence=round(confidence, 2),
+                matched_message_count=len(parsed_messages),
+                reason=f"Parser {channel_label} berhasil membaca {len(parsed_messages)} pesan.",
+            )
+        )
+
+    return sorted(
+        candidates,
+        key=lambda item: (item.matched_message_count, item.confidence),
+        reverse=True,
+    )
 
 
 def validate_upload_access(current_user: User) -> None:
@@ -92,6 +130,35 @@ def create_conversation_from_messages(
     db.commit()
     db.refresh(conversation)
     return conversation
+
+
+@router.get("/channels", response_model=list[ChannelDefinitionItem])
+def list_upload_channels(
+    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+) -> list[ChannelDefinitionItem]:
+    validate_upload_access(current_user)
+    return [ChannelDefinitionItem(**item) for item in list_channel_definitions()]
+
+
+@router.post("/detect-channel", response_model=ChannelDetectResponse)
+def detect_upload_channel(
+    payload: ChannelDetectRequest,
+    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+) -> ChannelDetectResponse:
+    validate_upload_access(current_user)
+    raw_text = payload.raw_text.strip()
+    if not raw_text:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Chat text cannot be empty.",
+        )
+
+    ensure_text_size_limit(raw_text)
+    candidates = detect_channel_candidates(raw_text)
+    return ChannelDetectResponse(
+        detected_channel=candidates[0].channel if candidates else None,
+        candidates=candidates,
+    )
 
 
 @router.post("/whatsapp-txt", status_code=status.HTTP_201_CREATED)

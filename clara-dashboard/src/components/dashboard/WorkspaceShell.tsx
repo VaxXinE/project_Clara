@@ -31,6 +31,7 @@ function buildNavItems(currentUser?: CurrentUser | null): NavItem[] {
     { href: "/dashboard", label: "Overview" },
     { href: "/dashboard/sales", label: "Inbox" },
     { href: "/dashboard/upload", label: "Upload" },
+    { href: "/dashboard/channels", label: "Channels" },
   ];
 
   if (["owner", "admin"].includes(currentUser.role)) {

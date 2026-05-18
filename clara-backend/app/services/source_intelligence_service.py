@@ -1,6 +1,34 @@
 from __future__ import annotations
 
 
+CHANNEL_REGISTRY: dict[str, dict[str, object]] = {
+    "whatsapp": {
+        "key": "whatsapp",
+        "label": "WhatsApp",
+        "description": "Channel utama untuk operasional sales, baik dari extension maupun import chat.",
+        "supports_file_upload": True,
+        "supports_text_paste": True,
+        "supports_live_sync": True,
+        "file_endpoint": "/upload/whatsapp-txt",
+        "text_endpoint": "/upload/whatsapp-text",
+        "supported_sources": ["whatsapp_extension", "whatsapp_txt"],
+        "sample_hint": "12/04/26, 09.12 - Customer: Halo kak",
+    },
+    "telegram": {
+        "key": "telegram",
+        "label": "Telegram",
+        "description": "Channel kedua untuk import chat dan eksperimen multi-channel non-WhatsApp.",
+        "supports_file_upload": True,
+        "supports_text_paste": True,
+        "supports_live_sync": False,
+        "file_endpoint": "/upload/telegram-txt",
+        "text_endpoint": "/upload/telegram-text",
+        "supported_sources": ["telegram_txt", "telegram_extension", "telegram_manual"],
+        "sample_hint": "[18.05.2026 09:12] Customer: Halo kak",
+    },
+}
+
+
 def normalize_source_key(source: str | None) -> str:
     if source is None:
         return "unknown"
@@ -60,3 +88,17 @@ def build_source_label(source: str | None) -> str:
         return explicit_labels[source_key]
 
     return " ".join(part.capitalize() for part in source_key.split("_"))
+
+
+def list_channel_definitions() -> list[dict[str, object]]:
+    return [CHANNEL_REGISTRY[key].copy() for key in CHANNEL_REGISTRY]
+
+
+def get_channel_definition(channel: str | None) -> dict[str, object] | None:
+    if channel is None:
+        return None
+    normalized = normalize_requested_source_channel(channel)
+    if normalized is None:
+        return None
+    definition = CHANNEL_REGISTRY.get(normalized)
+    return definition.copy() if definition else None

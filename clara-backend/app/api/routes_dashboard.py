@@ -24,11 +24,13 @@ from app.schemas.dashboard_schema import (
     SalesInboxItem,
     SalesWorklistResponse,
 )
+from app.schemas.channel_schema import ChannelOverviewResponse
 from app.services.audit_service import create_audit_log
 from app.services.dashboard_service import (
     acknowledge_ops_notification,
     acknowledge_kpi_alert,
     create_marketing_execution_item,
+    get_channel_overview,
     get_kpi_command_center,
     get_marketing_insights_preview,
     get_ops_database_overview,
@@ -52,6 +54,14 @@ from app.services.marketing_snapshot_service import (
 from fastapi import Request
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+@router.get("/channels", response_model=ChannelOverviewResponse)
+def channel_overview(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+):
+    return get_channel_overview(db=db, current_user=current_user)
 
 
 @router.get("/sales/inbox", response_model=list[SalesInboxItem])

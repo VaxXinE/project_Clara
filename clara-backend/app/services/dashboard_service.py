@@ -24,6 +24,7 @@ from app.models.product_knowledge import ProductKnowledge
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
 from app.models.user import User
+from app.schemas.channel_schema import ChannelOverviewItem, ChannelOverviewResponse
 from app.schemas.dashboard_schema import (
     DashboardAIExtractionSummary,
     DashboardLatestMessage,
@@ -76,6 +77,7 @@ from app.services.access_control_service import (
 )
 from app.services.source_intelligence_service import (
     build_source_label,
+    list_channel_definitions,
     matches_source_channel,
     normalize_source_channel,
     normalize_source_key,
@@ -2162,6 +2164,69 @@ def resolve_kpi_scope(current_user: User) -> tuple[bool, str, UUID | None]:
     scope_type = "global" if can_view_global else "organization"
     organization_id = None if can_view_global else current_user.organization_id
     return can_view_global, scope_type, organization_id
+
+
+def get_channel_overview(
+    db: Session,
+    current_user: User,
+) -> ChannelOverviewResponse:
+    can_view_global = current_user.role == "owner"
+    scope_type = "global" if can_view_global else "organization"
+    scoped_organization_id = None if can_view_global else current_user.organization_id
+    now = datetime.now(timezone.utc)
+
+    conversation_statement = select(Conversation)
+    lead_statement = select(Lead)
+
+    if not can_view_global:
+        if scoped_organization_id is None:
+            return ChannelOverviewResponse(generated_at=now, scope_type=scope_type, items=[])
+        conversation_statement = conversation_statement.where(
+            Conversation.organization_id == scoped_organization_id
+        )
+        lead_statement = lead_statement.where(Lead.organization_id == scoped_organization_id)
+
+    conversations = db.scalars(conversation_statement).all()
+    leads = db.scalars(lead_statement).all()
+
+    items: list[ChannelOverviewItem] = []
+    for definition in list_channel_definitions():
+        channel_key = str(definition["key"])
+        channel_conversations = [
+            conversation
+            for conversation in conversations
+            if normalize_source_channel(conversation.source) == channel_key
+        ]
+        channel_leads = [
+            lead for lead in leads if normalize_source_channel(lead.source) == channel_key
+        ]
+        latest_activity_at = max(
+            (
+                ensure_aware_utc(conversation.last_message_at) or conversation.created_at
+                for conversation in channel_conversations
+            ),
+            default=None,
+        )
+        items.append(
+            ChannelOverviewItem(
+                key=channel_key,
+                label=str(definition["label"]),
+                description=str(definition["description"]),
+                supports_file_upload=bool(definition["supports_file_upload"]),
+                supports_text_paste=bool(definition["supports_text_paste"]),
+                supports_live_sync=bool(definition["supports_live_sync"]),
+                supported_sources=list(definition["supported_sources"]),
+                conversation_count=len(channel_conversations),
+                lead_count=len(channel_leads),
+                latest_activity_at=latest_activity_at,
+            )
+        )
+
+    return ChannelOverviewResponse(
+        generated_at=now,
+        scope_type=scope_type,
+        items=items,
+    )
 
 
 def build_kpi_command_center_data(

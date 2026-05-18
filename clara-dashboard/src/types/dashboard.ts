@@ -5,6 +5,51 @@ export type DashboardLatestMessage = {
   message_timestamp: string;
 };
 
+export type ChannelDefinitionItem = {
+  key: string;
+  label: string;
+  description: string;
+  supports_file_upload: boolean;
+  supports_text_paste: boolean;
+  supports_live_sync: boolean;
+  file_endpoint: string | null;
+  text_endpoint: string | null;
+  supported_sources: string[];
+  sample_hint: string;
+};
+
+export type ChannelDetectCandidate = {
+  channel: string;
+  label: string;
+  confidence: number;
+  matched_message_count: number;
+  reason: string;
+};
+
+export type ChannelDetectResponse = {
+  detected_channel: string | null;
+  candidates: ChannelDetectCandidate[];
+};
+
+export type ChannelOverviewItem = {
+  key: string;
+  label: string;
+  description: string;
+  supports_file_upload: boolean;
+  supports_text_paste: boolean;
+  supports_live_sync: boolean;
+  supported_sources: string[];
+  conversation_count: number;
+  lead_count: number;
+  latest_activity_at: string | null;
+};
+
+export type ChannelOverviewResponse = {
+  generated_at: string;
+  scope_type: string;
+  items: ChannelOverviewItem[];
+};
+
 export type DashboardAIExtractionSummary = {
   id: string;
   lead_temperature: string;
