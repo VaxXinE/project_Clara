@@ -22,6 +22,11 @@ class Lead(Base):
         nullable=True,
         index=True,
     )
+    customer_profile_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("customer_profiles.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     source: Mapped[str] = mapped_column(String(50), nullable=False, default="unknown")
@@ -60,6 +65,7 @@ class Lead(Base):
 
     organization = relationship("Organization", back_populates="leads")
     assigned_user = relationship("User", back_populates="assigned_leads")
+    customer_profile = relationship("CustomerProfile", back_populates="leads")
     conversations = relationship("Conversation", back_populates="lead")
     tasks = relationship(
         "LeadTask",

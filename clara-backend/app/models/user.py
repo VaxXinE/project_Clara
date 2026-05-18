@@ -60,6 +60,11 @@ class User(Base):
         back_populates="assigned_user",
         foreign_keys="Lead.assigned_user_id",
     )
+    customer_profiles = relationship(
+        "CustomerProfile",
+        foreign_keys="CustomerProfile.assigned_user_id",
+        back_populates="assigned_user",
+    )
     assigned_tasks = relationship(
         "LeadTask",
         foreign_keys="LeadTask.assigned_user_id",

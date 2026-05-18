@@ -2,6 +2,7 @@ from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
 from app.models.audit_log import AuditLog
 from app.models.conversation import Conversation
+from app.models.customer_profile import CustomerProfile
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
@@ -23,6 +24,7 @@ __all__ = [
     "ApprovalLog",
     "AuditLog",
     "Conversation",
+    "CustomerProfile",
     "KpiAlertRecord",
     "KpiCommandSnapshot",
     "Lead",

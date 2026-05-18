@@ -8,12 +8,14 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.conversation import Conversation
+from app.models.customer_profile import CustomerProfile
 from app.models.lead import Lead
 from app.models.lead_activity_event import LeadActivityEvent
 from app.models.lead_deal import LeadDeal
 from app.models.lead_task import LeadTask
 from app.models.user import User
 from app.schemas.lead_schema import (
+    CustomerProfileSummaryItem,
     LeadActivityEventItem,
     LeadDealItem,
     LeadDealUpsertRequest,
@@ -24,6 +26,10 @@ from app.schemas.lead_schema import (
 from app.services.lead_activity_service import (
     create_lead_activity_event,
     list_lead_activity_events,
+)
+from app.services.customer_profile_service import (
+    build_customer_profile_summary,
+    ensure_customer_profile_for_lead,
 )
 from app.services.access_control_service import can_access_all_conversations
 from app.services.lead_task_service import (
@@ -109,6 +115,7 @@ def ensure_conversation_lead(
         actor_user_id=conversation.sales_user_id,
         to_value=lead.display_name,
     )
+    ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
 
     return lead
 
@@ -179,6 +186,7 @@ def sync_lead_from_conversation(
 
     db.add(lead)
     db.flush()
+    ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
     if next_follow_up_at is not None:
         upsert_follow_up_task_for_lead(db=db, lead=lead)
     return lead
@@ -200,6 +208,8 @@ def build_lead_list_item(lead: Lead) -> LeadListItem:
         organization_id=lead.organization_id,
         assigned_user_id=lead.assigned_user_id,
         assigned_user_name=lead.assigned_user.name if lead.assigned_user else None,
+        customer_profile_id=lead.customer_profile_id,
+        customer_profile_name=lead.customer_profile.display_name if lead.customer_profile else None,
         display_name=lead.display_name,
         source=lead.source,
         source_channel=normalize_source_channel(lead.source),
@@ -237,7 +247,23 @@ def build_lead_deal_item(deal: LeadDeal) -> LeadDealItem:
 
 
 def build_lead_detail(db: Session, lead: Lead) -> LeadDetail:
+    return build_lead_detail_for_user(db=db, lead=lead, current_user=None)
+
+
+def build_lead_detail_for_user(
+    db: Session,
+    *,
+    lead: Lead,
+    current_user: User | None,
+) -> LeadDetail:
     list_item = build_lead_list_item(lead)
+    visible_customer_leads = None
+    if lead.customer_profile and current_user is not None and not can_access_all_conversations(current_user):
+        visible_customer_leads = [
+            related_lead
+            for related_lead in lead.customer_profile.leads
+            if related_lead.assigned_user_id == current_user.id
+        ]
     return LeadDetail(
         **list_item.model_dump(),
         conversation_ids=[
@@ -247,6 +273,16 @@ def build_lead_detail(db: Session, lead: Lead) -> LeadDetail:
                 key=lambda item: item.created_at,
             )
         ],
+        customer_profile=(
+            CustomerProfileSummaryItem(
+                **build_customer_profile_summary(
+                    lead.customer_profile,
+                    visible_leads=visible_customer_leads,
+                )
+            )
+            if lead.customer_profile
+            else None
+        ),
         deal=build_lead_deal_item(lead.deal) if lead.deal else None,
         tasks=list_tasks_for_lead(lead),
         timeline=list_lead_activity_events(db=db, lead_id=lead.id),
@@ -265,6 +301,11 @@ def get_lead_model_for_user(
         .options(
             selectinload(Lead.conversations),
             selectinload(Lead.assigned_user),
+            selectinload(Lead.customer_profile)
+            .selectinload(CustomerProfile.assigned_user),
+            selectinload(Lead.customer_profile)
+            .selectinload(CustomerProfile.leads)
+            .selectinload(Lead.conversations),
             selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
             selectinload(Lead.deal).selectinload(LeadDeal.owner_user),
             selectinload(Lead.activity_events).selectinload(LeadActivityEvent.actor_user),
@@ -308,6 +349,7 @@ def get_leads_for_user(
         .options(
             selectinload(Lead.conversations),
             selectinload(Lead.assigned_user),
+            selectinload(Lead.customer_profile),
         )
         .order_by(desc(Lead.last_contact_at), desc(Lead.created_at))
     )
@@ -320,6 +362,13 @@ def get_leads_for_user(
         for lead in db.scalars(statement).all()
         if matches_source_channel(lead.source, source_channel)
     ]
+    backfilled = False
+    for lead in leads:
+        if lead.customer_profile_id is None:
+            ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
+            backfilled = True
+    if backfilled:
+        db.commit()
     return [build_lead_list_item(lead) for lead in leads]
 
 
@@ -334,7 +383,11 @@ def get_lead_for_user(
         lead_id=lead_id,
         current_user=current_user,
     )
-    return build_lead_detail(db, lead)
+    if lead.customer_profile_id is None:
+        ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
+        db.commit()
+        db.refresh(lead)
+    return build_lead_detail_for_user(db=db, lead=lead, current_user=current_user)
 
 
 def get_lead_timeline_for_user(
@@ -494,7 +547,7 @@ def update_lead_for_user(
     db.commit()
     db.refresh(lead)
 
-    return build_lead_detail(db, lead)
+    return build_lead_detail_for_user(db=db, lead=lead, current_user=current_user)
 
 
 def get_lead_deal_for_user(

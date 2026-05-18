@@ -261,6 +261,10 @@ export default function CrmPage() {
                             <p>Last contact: {formatDateTime(lead.last_contact_at)}</p>
                             <p>Conversation: {lead.conversation_count}</p>
                             <p>
+                              Customer profile:{" "}
+                              {lead.customer_profile_name ?? "Belum terhubung"}
+                            </p>
+                            <p>
                               Source: {lead.source_label} ({lead.source_channel})
                             </p>
                             <p>

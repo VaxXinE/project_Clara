@@ -22,6 +22,7 @@ class Organization(Base):
     )
 
     users = relationship("User", back_populates="organization")
+    customer_profiles = relationship("CustomerProfile", back_populates="organization")
     leads = relationship("Lead", back_populates="organization")
     lead_deals = relationship("LeadDeal", back_populates="organization")
     lead_activity_events = relationship(

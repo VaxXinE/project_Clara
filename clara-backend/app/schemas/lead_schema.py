@@ -76,11 +76,41 @@ class LeadActivityEventItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CustomerRelatedLeadItem(BaseModel):
+    id: UUID
+    display_name: str
+    source_channel: str
+    source_label: str
+    current_stage: str
+    lead_temperature: str
+    last_contact_at: datetime | None
+    latest_conversation_id: UUID | None
+
+
+class CustomerProfileSummaryItem(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    assigned_user_id: UUID | None
+    assigned_user_name: str | None
+    display_name: str
+    canonical_key: str
+    lead_count: int
+    conversation_count: int
+    source_channels: list[str]
+    source_labels: list[str]
+    last_contact_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    related_leads: list[CustomerRelatedLeadItem]
+
+
 class LeadListItem(BaseModel):
     id: UUID
     organization_id: UUID | None
     assigned_user_id: UUID | None
     assigned_user_name: str | None
+    customer_profile_id: UUID | None
+    customer_profile_name: str | None
     display_name: str
     source: str
     source_channel: str
@@ -101,6 +131,7 @@ class LeadListItem(BaseModel):
 
 class LeadDetail(LeadListItem):
     conversation_ids: list[UUID]
+    customer_profile: CustomerProfileSummaryItem | None
     deal: LeadDealItem | None
     tasks: list[LeadTaskItem]
     timeline: list[LeadActivityEventItem]

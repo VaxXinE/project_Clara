@@ -330,14 +330,24 @@ export default function LeadDetailPage() {
       backHref="/dashboard/crm"
       backLabel="Kembali ke Lead Pipeline"
       actions={
-        lead?.latest_conversation_id ? (
-          <Link
-            href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
-            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
-          >
-            Buka Conversation
-          </Link>
-        ) : null
+        <div className="flex flex-wrap gap-3">
+          {lead?.customer_profile_id ? (
+            <Link
+              href={`/dashboard/customers/${lead.customer_profile_id}`}
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            >
+              Buka Customer Profile
+            </Link>
+          ) : null}
+          {lead?.latest_conversation_id ? (
+            <Link
+              href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
+              className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+            >
+              Buka Conversation
+            </Link>
+          ) : null}
+        </div>
       }
     >
       <div className="space-y-6">
@@ -494,6 +504,121 @@ export default function LeadDetailPage() {
             </section>
 
             <aside className="space-y-6">
+              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-950">
+                    Unified Customer Identity
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Clara sekarang mengikat banyak lead lintas channel ke satu profil customer agar konteks tidak pecah antara WhatsApp dan Telegram.
+                  </p>
+                </div>
+
+                {lead.customer_profile ? (
+                  <div className="mt-5 space-y-4">
+                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-950">
+                            {lead.customer_profile.display_name}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-500">
+                            PIC customer: {lead.customer_profile.assigned_user_name ?? "Belum ada"}
+                          </p>
+                        </div>
+                        <Link
+                          href={`/dashboard/customers/${lead.customer_profile.id}`}
+                          className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400"
+                        >
+                          Detail Profil
+                        </Link>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        <Metric
+                          label="Total Leads"
+                          value={String(lead.customer_profile.lead_count)}
+                        />
+                        <Metric
+                          label="Total Conversations"
+                          value={String(lead.customer_profile.conversation_count)}
+                        />
+                        <Metric
+                          label="Last contact"
+                          value={formatDateTime(lead.customer_profile.last_contact_at)}
+                        />
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {lead.customer_profile.source_labels.map((label) => (
+                          <span
+                            key={label}
+                            className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {lead.customer_profile.related_leads.map((relatedLead) => (
+                        <article
+                          key={relatedLead.id}
+                          className="rounded-[24px] border border-slate-200 bg-white p-4"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-semibold text-slate-950">
+                              {relatedLead.display_name}
+                            </h3>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getLeadBadgeClass(
+                                relatedLead.lead_temperature
+                              )}`}
+                            >
+                              {relatedLead.lead_temperature.toUpperCase()}
+                            </span>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                              {relatedLead.source_label}
+                            </span>
+                          </div>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <Metric
+                              label="Stage"
+                              value={relatedLead.current_stage.replaceAll("_", " ")}
+                            />
+                            <Metric
+                              label="Last contact"
+                              value={formatDateTime(relatedLead.last_contact_at)}
+                            />
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Link
+                              href={`/dashboard/crm/${relatedLead.id}`}
+                              className="inline-flex rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                            >
+                              Buka Lead
+                            </Link>
+                            {relatedLead.latest_conversation_id ? (
+                              <Link
+                                href={`/dashboard/sales/conversations/${relatedLead.latest_conversation_id}`}
+                                className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                              >
+                                Buka Conversation
+                              </Link>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    Lead ini belum punya customer profile terpadu.
+                  </div>
+                )}
+              </section>
+
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>

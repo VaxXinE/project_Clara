@@ -34,6 +34,7 @@ from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
 from app.models.audit_log import AuditLog
 from app.models.conversation import Conversation
+from app.models.customer_profile import CustomerProfile
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
@@ -75,6 +76,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
         tables=[
             Organization.__table__,
             User.__table__,
+            CustomerProfile.__table__,
             KpiCommandSnapshot.__table__,
             KpiAlertRecord.__table__,
             Lead.__table__,
@@ -127,6 +129,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             LeadDeal.__table__,
             MarketingExecutionItem.__table__,
             Lead.__table__,
+            CustomerProfile.__table__,
             KpiAlertRecord.__table__,
             KpiCommandSnapshot.__table__,
             User.__table__,
@@ -258,9 +261,20 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
     db.add(owned_conversation)
     db.flush()
 
+    owned_customer_profile = CustomerProfile(
+        organization_id=org_a.id,
+        assigned_user_id=marketing_b.id,
+        display_name="Owned Customer",
+        canonical_key="owned customer",
+        last_contact_at=owned_conversation.created_at,
+    )
+    db.add(owned_customer_profile)
+    db.flush()
+
     owned_lead = Lead(
         organization_id=org_a.id,
         assigned_user_id=marketing_b.id,
+        customer_profile_id=owned_customer_profile.id,
         display_name="Owned Customer",
         source="whatsapp_txt",
         current_stage="qualification",
@@ -291,6 +305,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
     db.refresh(marketing_other_org)
     db.refresh(inactive_user)
     db.refresh(owned_conversation)
+    db.refresh(owned_customer_profile)
     db.refresh(owned_lead)
     db.refresh(global_knowledge)
 
@@ -305,6 +320,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         "marketing_other_org": marketing_other_org,
         "inactive_user": inactive_user,
         "owned_conversation": owned_conversation,
+        "owned_customer_profile": owned_customer_profile,
         "owned_lead": owned_lead,
         "global_knowledge": global_knowledge,
     }

@@ -84,6 +84,8 @@ export type LeadListItem = {
   organization_id: string | null;
   assigned_user_id: string | null;
   assigned_user_name: string | null;
+  customer_profile_id: string | null;
+  customer_profile_name: string | null;
   display_name: string;
   source: string;
   source_channel: string;
@@ -150,8 +152,37 @@ export type LeadDealItem = {
   updated_at: string;
 };
 
+export type CustomerRelatedLeadItem = {
+  id: string;
+  display_name: string;
+  source_channel: string;
+  source_label: string;
+  current_stage: string;
+  lead_temperature: string;
+  last_contact_at: string | null;
+  latest_conversation_id: string | null;
+};
+
+export type CustomerProfileSummaryItem = {
+  id: string;
+  organization_id: string | null;
+  assigned_user_id: string | null;
+  assigned_user_name: string | null;
+  display_name: string;
+  canonical_key: string;
+  lead_count: number;
+  conversation_count: number;
+  source_channels: string[];
+  source_labels: string[];
+  last_contact_at: string | null;
+  created_at: string;
+  updated_at: string;
+  related_leads: CustomerRelatedLeadItem[];
+};
+
 export type LeadDetail = LeadListItem & {
   conversation_ids: string[];
+  customer_profile: CustomerProfileSummaryItem | null;
   deal: LeadDealItem | null;
   tasks: LeadTaskItem[];
   timeline: LeadActivityEventItem[];
