@@ -17,11 +17,44 @@ import type {
 
 const EXECUTION_STATUS_OPTIONS = ["draft", "assigned", "in_progress", "done"];
 
+type ExecutionOutcomeDraft = {
+  campaign_name: string;
+  published_at: string;
+  leads_generated: string;
+  qualified_leads: string;
+  won_leads: string;
+  attributed_pipeline_value: string;
+  attributed_won_value: string;
+  attributed_deposit_amount: string;
+  result_notes: string;
+};
+
+function formatIdr(value: number): string {
+  return `IDR ${value.toLocaleString("id-ID")}`;
+}
+
+function toDateTimeLocal(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
 export default function MarketingInsightsPage() {
   const [insights, setInsights] = useState<MarketingInsightsPreview | null>(null);
   const [snapshots, setSnapshots] = useState<MarketingInsightSnapshot[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [users, setUsers] = useState<CurrentUser[]>([]);
+  const [outcomeDrafts, setOutcomeDrafts] = useState<
+    Record<string, ExecutionOutcomeDraft>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingSnapshot, setIsGeneratingSnapshot] = useState(false);
   const [isCreatingExecutionItem, setIsCreatingExecutionItem] = useState(false);
@@ -69,6 +102,30 @@ export default function MarketingInsightsPage() {
 
     void loadInsights();
   }, []);
+
+  useEffect(() => {
+    if (!insights) {
+      return;
+    }
+
+    setOutcomeDrafts((current) => {
+      const next = { ...current };
+      for (const item of insights.execution_items) {
+        next[item.id] = {
+          campaign_name: item.campaign_name ?? "",
+          published_at: toDateTimeLocal(item.published_at),
+          leads_generated: String(item.leads_generated),
+          qualified_leads: String(item.qualified_leads),
+          won_leads: String(item.won_leads),
+          attributed_pipeline_value: String(item.attributed_pipeline_value),
+          attributed_won_value: String(item.attributed_won_value),
+          attributed_deposit_amount: String(item.attributed_deposit_amount),
+          result_notes: item.result_notes ?? "",
+        };
+      }
+      return next;
+    });
+  }, [insights]);
 
   async function handleGenerateSnapshot() {
     setIsGeneratingSnapshot(true);
@@ -231,6 +288,29 @@ export default function MarketingInsightsPage() {
                 label="High Risk Conversations"
                 value={String(insights.kpi_summary.high_risk_conversation_count)}
                 tone="red"
+              />
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Execution Items"
+                value={String(insights.execution_summary.total_items)}
+                tone="slate"
+              />
+              <MetricCard
+                label="Leads Generated"
+                value={String(insights.execution_summary.leads_generated)}
+                tone="blue"
+              />
+              <MetricCard
+                label="Won Leads"
+                value={String(insights.execution_summary.won_leads)}
+                tone="green"
+              />
+              <MetricCard
+                label="Attributed Won"
+                value={formatIdr(insights.execution_summary.attributed_won_value)}
+                tone="green"
               />
             </section>
 
@@ -476,6 +556,187 @@ export default function MarketingInsightsPage() {
                                 ))}
                               </select>
                             </label>
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Campaign Name
+                              </span>
+                              <input
+                                type="text"
+                                value={outcomeDrafts[item.id]?.campaign_name ?? ""}
+                                onChange={(event) =>
+                                  setOutcomeDrafts((current) => ({
+                                    ...current,
+                                    [item.id]: {
+                                      ...current[item.id],
+                                      campaign_name: event.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Published At
+                              </span>
+                              <input
+                                type="datetime-local"
+                                value={outcomeDrafts[item.id]?.published_at ?? ""}
+                                onChange={(event) =>
+                                  setOutcomeDrafts((current) => ({
+                                    ...current,
+                                    [item.id]: {
+                                      ...current[item.id],
+                                      published_at: event.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-3">
+                            <OutcomeNumberField
+                              label="Leads Generated"
+                              value={outcomeDrafts[item.id]?.leads_generated ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: { ...current[item.id], leads_generated: value },
+                                }))
+                              }
+                            />
+                            <OutcomeNumberField
+                              label="Qualified Leads"
+                              value={outcomeDrafts[item.id]?.qualified_leads ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: { ...current[item.id], qualified_leads: value },
+                                }))
+                              }
+                            />
+                            <OutcomeNumberField
+                              label="Won Leads"
+                              value={outcomeDrafts[item.id]?.won_leads ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: { ...current[item.id], won_leads: value },
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-3">
+                            <OutcomeNumberField
+                              label="Attributed Pipeline"
+                              value={outcomeDrafts[item.id]?.attributed_pipeline_value ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    attributed_pipeline_value: value,
+                                  },
+                                }))
+                              }
+                            />
+                            <OutcomeNumberField
+                              label="Attributed Won"
+                              value={outcomeDrafts[item.id]?.attributed_won_value ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    attributed_won_value: value,
+                                  },
+                                }))
+                              }
+                            />
+                            <OutcomeNumberField
+                              label="Attributed Deposit"
+                              value={outcomeDrafts[item.id]?.attributed_deposit_amount ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    attributed_deposit_amount: value,
+                                  },
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <label className="mt-4 block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Result Notes
+                            </span>
+                            <textarea
+                              value={outcomeDrafts[item.id]?.result_notes ?? ""}
+                              onChange={(event) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    result_notes: event.target.value,
+                                  },
+                                }))
+                              }
+                              rows={3}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                            />
+                          </label>
+
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              disabled={updatingExecutionItemId === item.id}
+                              onClick={() =>
+                                void handleUpdateExecutionItem(item.id, {
+                                  campaign_name:
+                                    outcomeDrafts[item.id]?.campaign_name || null,
+                                  published_at:
+                                    outcomeDrafts[item.id]?.published_at
+                                      ? new Date(
+                                          outcomeDrafts[item.id].published_at
+                                        ).toISOString()
+                                      : null,
+                                  result_notes:
+                                    outcomeDrafts[item.id]?.result_notes || null,
+                                  leads_generated: Number(
+                                    outcomeDrafts[item.id]?.leads_generated || 0
+                                  ),
+                                  qualified_leads: Number(
+                                    outcomeDrafts[item.id]?.qualified_leads || 0
+                                  ),
+                                  won_leads: Number(
+                                    outcomeDrafts[item.id]?.won_leads || 0
+                                  ),
+                                  attributed_pipeline_value: Number(
+                                    outcomeDrafts[item.id]?.attributed_pipeline_value || 0
+                                  ),
+                                  attributed_won_value: Number(
+                                    outcomeDrafts[item.id]?.attributed_won_value || 0
+                                  ),
+                                  attributed_deposit_amount: Number(
+                                    outcomeDrafts[item.id]?.attributed_deposit_amount || 0
+                                  ),
+                                })
+                              }
+                              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {updatingExecutionItemId === item.id
+                                ? "Menyimpan..."
+                                : "Simpan Outcome"}
+                            </button>
                           </div>
 
                           {item.notes && (
@@ -866,5 +1127,31 @@ function TrendRow({
         </p>
       )}
     </div>
+  );
+}
+
+function OutcomeNumberField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+      />
+    </label>
   );
 }

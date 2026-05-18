@@ -280,6 +280,31 @@ export default function KpiCommandCenterPage() {
               />
             </section>
 
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Marketing Leads Generated"
+                value={String(kpi.marketing_execution_summary.leads_generated)}
+                hint="Jumlah lead yang secara manual diatribusikan dari execution marketing."
+              />
+              <MetricCard
+                label="Marketing Won Leads"
+                value={String(kpi.marketing_execution_summary.won_leads)}
+                hint="Lead won yang dikaitkan langsung ke output marketing."
+              />
+              <MetricCard
+                label="Marketing Attributed Won"
+                value={formatIdr(kpi.marketing_execution_summary.attributed_won_value)}
+                hint="Won value yang diatribusikan ke campaign atau execution item marketing."
+              />
+              <MetricCard
+                label="Marketing Attributed Deposit"
+                value={formatIdr(
+                  kpi.marketing_execution_summary.attributed_deposit_amount
+                )}
+                hint="Deposit yang sudah tercatat sebagai hasil dari execution marketing."
+              />
+            </section>
+
             <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
                 <div className="flex items-center justify-between gap-4">

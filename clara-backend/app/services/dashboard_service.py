@@ -43,6 +43,7 @@ from app.schemas.dashboard_schema import (
     MarketingContentRecommendation,
     MarketingExecutionItem,
     MarketingExecutionItemCreateRequest,
+    MarketingExecutionSummary,
     MarketingExecutionItemUpdateRequest,
     OrganizationPerformanceRow,
     OpsAuditLogRow,
@@ -1105,6 +1106,7 @@ def get_marketing_insights_preview(
     current_user: User,
 ) -> MarketingInsightsPreview:
     can_view_global = current_user.role == "owner"
+    organization_ids: set[UUID] | None = None
 
     if current_user.organization_id is None and not can_view_global:
         return MarketingInsightsPreview(
@@ -1121,6 +1123,17 @@ def get_marketing_insights_preview(
             ads_signals=[],
             monthly_content_plan=[],
             execution_items=[],
+            execution_summary=MarketingExecutionSummary(
+                total_items=0,
+                done_items=0,
+                published_items=0,
+                leads_generated=0,
+                qualified_leads=0,
+                won_leads=0,
+                attributed_pipeline_value=0,
+                attributed_won_value=0,
+                attributed_deposit_amount=0,
+            ),
             kpi_summary=MarketingKpiSummary(
                 reply_sent_rate=0,
                 analysis_coverage_rate=0,
@@ -1129,6 +1142,13 @@ def get_marketing_insights_preview(
             ),
             generated_at=datetime.now(timezone.utc),
         )
+
+    if can_view_global:
+        organization_ids = {
+            organization_id
+            for organization_id in db.scalars(select(Organization.id)).all()
+            if organization_id is not None
+        }
 
     total_conversations_statement = select(func.count(Conversation.id))
     if not can_view_global:
@@ -1232,10 +1252,15 @@ def get_marketing_insights_preview(
         sentiment_counter=sentiment_counter,
         buying_intent_counter=buying_intent_counter,
     )
-    execution_items = list_marketing_execution_items(
+    execution_item_models = get_marketing_execution_item_models(
         db=db,
-        current_user=current_user,
+        organization_id=None if can_view_global else current_user.organization_id,
+        organization_ids=organization_ids if can_view_global else None,
     )
+    execution_items = [
+        build_marketing_execution_item(item)
+        for item in execution_item_models
+    ]
 
     return MarketingInsightsPreview(
         total_conversations=total_conversations,
@@ -1251,6 +1276,7 @@ def get_marketing_insights_preview(
         ads_signals=ads_signals,
         monthly_content_plan=monthly_content_plan,
         execution_items=execution_items,
+        execution_summary=build_marketing_execution_summary(execution_item_models),
         kpi_summary=MarketingKpiSummary(
             reply_sent_rate=safe_ratio(reply_sent_count, total_conversations),
             analysis_coverage_rate=safe_ratio(
@@ -1272,6 +1298,34 @@ VALID_MARKETING_EXECUTION_STATUS = {"draft", "assigned", "in_progress", "done"}
 VALID_MARKETING_EXECUTION_PRIORITY = {"low", "medium", "high"}
 
 
+def get_marketing_execution_item_models(
+    db: Session,
+    *,
+    organization_id: UUID | None,
+    organization_ids: set[UUID] | None = None,
+) -> list[MarketingExecutionItemModel]:
+    if organization_id is None and not organization_ids:
+        return []
+
+    statement = select(MarketingExecutionItemModel).options(
+        selectinload(MarketingExecutionItemModel.created_by_user),
+        selectinload(MarketingExecutionItemModel.assigned_user),
+    )
+    if organization_ids:
+        statement = statement.where(
+            MarketingExecutionItemModel.organization_id.in_(organization_ids)
+        )
+    else:
+        statement = statement.where(
+            MarketingExecutionItemModel.organization_id == organization_id
+        )
+    statement = statement.order_by(
+        MarketingExecutionItemModel.status.asc(),
+        desc(MarketingExecutionItemModel.updated_at),
+    )
+    return list(db.scalars(statement).all())
+
+
 def build_marketing_execution_item(
     item: MarketingExecutionItemModel,
 ) -> MarketingExecutionItem:
@@ -1289,9 +1343,43 @@ def build_marketing_execution_item(
         title=item.title,
         summary=item.summary,
         recommended_action=item.recommended_action,
+        campaign_name=item.campaign_name,
         notes=item.notes,
+        result_notes=item.result_notes,
+        published_at=item.published_at,
+        leads_generated=item.leads_generated,
+        qualified_leads=item.qualified_leads,
+        won_leads=item.won_leads,
+        attributed_pipeline_value=float(item.attributed_pipeline_value or 0),
+        attributed_won_value=float(item.attributed_won_value or 0),
+        attributed_deposit_amount=float(item.attributed_deposit_amount or 0),
         created_at=item.created_at,
         updated_at=item.updated_at,
+    )
+
+
+def build_marketing_execution_summary(
+    items: list[MarketingExecutionItemModel],
+) -> MarketingExecutionSummary:
+    return MarketingExecutionSummary(
+        total_items=len(items),
+        done_items=sum(1 for item in items if item.status == "done"),
+        published_items=sum(1 for item in items if item.published_at is not None),
+        leads_generated=sum(item.leads_generated for item in items),
+        qualified_leads=sum(item.qualified_leads for item in items),
+        won_leads=sum(item.won_leads for item in items),
+        attributed_pipeline_value=round(
+            sum(float(item.attributed_pipeline_value or 0) for item in items),
+            2,
+        ),
+        attributed_won_value=round(
+            sum(float(item.attributed_won_value or 0) for item in items),
+            2,
+        ),
+        attributed_deposit_amount=round(
+            sum(float(item.attributed_deposit_amount or 0) for item in items),
+            2,
+        ),
     )
 
 
@@ -1317,22 +1405,10 @@ def list_marketing_execution_items(
     *,
     current_user: User,
 ) -> list[MarketingExecutionItem]:
-    if current_user.organization_id is None:
-        return []
-
-    statement = (
-        select(MarketingExecutionItemModel)
-        .where(MarketingExecutionItemModel.organization_id == current_user.organization_id)
-        .options(
-            selectinload(MarketingExecutionItemModel.created_by_user),
-            selectinload(MarketingExecutionItemModel.assigned_user),
-        )
-        .order_by(
-            MarketingExecutionItemModel.status.asc(),
-            desc(MarketingExecutionItemModel.updated_at),
-        )
+    items = get_marketing_execution_item_models(
+        db=db,
+        organization_id=current_user.organization_id,
     )
-    items = list(db.scalars(statement).all())
     return [build_marketing_execution_item(item) for item in items]
 
 
@@ -1366,6 +1442,7 @@ def create_marketing_execution_item(
         title=payload.title.strip(),
         summary=payload.summary.strip(),
         recommended_action=payload.recommended_action.strip(),
+        campaign_name=payload.campaign_name.strip() if payload.campaign_name else None,
         notes=payload.notes.strip() if payload.notes else None,
     )
     db.add(item)
@@ -1416,8 +1493,30 @@ def update_marketing_execution_item(
         elif item.assigned_user_id is not None and item.status == "draft":
             item.status = "assigned"
 
+    if "campaign_name" in payload.model_fields_set:
+        item.campaign_name = payload.campaign_name.strip() if payload.campaign_name else None
+
     if payload.notes is not None:
         item.notes = payload.notes.strip() or None
+    if payload.result_notes is not None:
+        item.result_notes = payload.result_notes.strip() or None
+    if "published_at" in payload.model_fields_set:
+        item.published_at = payload.published_at
+
+    numeric_fields = {
+        "leads_generated": payload.leads_generated,
+        "qualified_leads": payload.qualified_leads,
+        "won_leads": payload.won_leads,
+        "attributed_pipeline_value": payload.attributed_pipeline_value,
+        "attributed_won_value": payload.attributed_won_value,
+        "attributed_deposit_amount": payload.attributed_deposit_amount,
+    }
+    for field_name, value in numeric_fields.items():
+        if value is None:
+            continue
+        if value < 0:
+            raise ValueError(f"{field_name} must be zero or positive.")
+        setattr(item, field_name, value)
 
     db.add(item)
     db.commit()
@@ -1776,6 +1875,7 @@ def get_ops_database_overview(
 def build_kpi_observations(
     *,
     summary: KpiSummaryCard,
+    marketing_execution_summary: MarketingExecutionSummary,
     top_sales_rows: list[SalesPerformanceRow],
     top_org_rows: list[OrganizationPerformanceRow],
 ) -> list[str]:
@@ -1799,6 +1899,11 @@ def build_kpi_observations(
     if summary.won_value > 0 or summary.deposit_amount > 0:
         observations.append(
             f"Nilai deal yang sudah dimenangkan saat ini {summary.won_value:,.0f} IDR dengan deposit tercatat {summary.deposit_amount:,.0f} IDR."
+        )
+
+    if marketing_execution_summary.attributed_won_value > 0:
+        observations.append(
+            f"Execution marketing yang sudah ditandai menghasilkan won value {marketing_execution_summary.attributed_won_value:,.0f} IDR dari {marketing_execution_summary.won_leads} lead won."
         )
 
     if top_sales_rows:
@@ -1915,6 +2020,7 @@ def build_kpi_alerts(
 def build_executive_recommendations(
     *,
     summary: KpiSummaryCard,
+    marketing_execution_summary: MarketingExecutionSummary,
     alerts: list[KpiAlertItem],
     sales_rows: list[SalesPerformanceRow],
     organization_rows: list[OrganizationPerformanceRow],
@@ -1929,6 +2035,17 @@ def build_executive_recommendations(
                 owner_role="admin",
                 next_step="Pantau AI Worklist setiap pagi dan pastikan overdue item turun sebelum siang.",
                 target_href="/dashboard/follow-up",
+            )
+        )
+
+    if marketing_execution_summary.total_items > 0 and marketing_execution_summary.attributed_won_value == 0:
+        recommendations.append(
+            ExecutiveRecommendationItem(
+                title="Tutup loop hasil marketing ke angka bisnis",
+                rationale="Execution item sudah berjalan, tapi belum ada won value yang diatribusikan sehingga owner belum bisa membaca ROI lapangan dengan jelas.",
+                owner_role="admin",
+                next_step="Minta tim marketing mengisi leads generated, qualified leads, dan won value pada execution item yang sudah selesai.",
+                target_href="/dashboard/marketing",
             )
         )
 
@@ -2083,6 +2200,17 @@ def build_kpi_command_center_data(
                 "sales_performance": [],
                 "organization_performance": [],
                 "source_performance": [],
+                "marketing_execution_summary": MarketingExecutionSummary(
+                    total_items=0,
+                    done_items=0,
+                    published_items=0,
+                    leads_generated=0,
+                    qualified_leads=0,
+                    won_leads=0,
+                    attributed_pipeline_value=0,
+                    attributed_won_value=0,
+                    attributed_deposit_amount=0,
+                ),
                 "organization_id": scoped_organization_id,
             }
         organizations_statement = organizations_statement.where(
@@ -2296,6 +2424,16 @@ def build_kpi_command_center_data(
     } | {
         normalize_source_key(conversation.source) for conversation in conversations
     }
+    marketing_execution_statement = select(MarketingExecutionItemModel)
+    if not can_view_global:
+        marketing_execution_statement = marketing_execution_statement.where(
+            MarketingExecutionItemModel.organization_id == scoped_organization_id
+        )
+    elif organization_ids:
+        marketing_execution_statement = marketing_execution_statement.where(
+            MarketingExecutionItemModel.organization_id.in_(organization_ids)
+        )
+    marketing_execution_items = list(db.scalars(marketing_execution_statement).all())
     source_rows: list[SourcePerformanceRow] = []
     for source_key in sorted(source_keys):
         source_leads = [
@@ -2354,6 +2492,9 @@ def build_kpi_command_center_data(
         ),
         reverse=True,
     )
+    marketing_execution_summary = build_marketing_execution_summary(
+        marketing_execution_items
+    )
 
     summary = KpiSummaryCard(
         total_organizations=len(organizations),
@@ -2407,11 +2548,13 @@ def build_kpi_command_center_data(
     )
     observations = build_kpi_observations(
         summary=summary,
+        marketing_execution_summary=marketing_execution_summary,
         top_sales_rows=sales_rows[:3],
         top_org_rows=organization_rows[:3],
     )
     recommendations = build_executive_recommendations(
         summary=summary,
+        marketing_execution_summary=marketing_execution_summary,
         alerts=alerts,
         sales_rows=sales_rows,
         organization_rows=organization_rows,
@@ -2427,6 +2570,7 @@ def build_kpi_command_center_data(
         "sales_performance": sales_rows,
         "organization_performance": organization_rows,
         "source_performance": source_rows,
+        "marketing_execution_summary": marketing_execution_summary,
         "organization_id": scoped_organization_id,
     }
 
@@ -2672,6 +2816,7 @@ def refresh_kpi_command_center(
         sales_performance=data["sales_performance"],
         organization_performance=data["organization_performance"],
         source_performance=data["source_performance"],
+        marketing_execution_summary=data["marketing_execution_summary"],
     )
 
 
@@ -2699,6 +2844,7 @@ def get_kpi_command_center(
         sales_performance=data["sales_performance"],
         organization_performance=data["organization_performance"],
         source_performance=data["source_performance"],
+        marketing_execution_summary=data["marketing_execution_summary"],
     )
 
 

@@ -397,6 +397,7 @@ export type KpiCommandCenterResponse = {
   sales_performance: SalesPerformanceRow[];
   organization_performance: OrganizationPerformanceRow[];
   source_performance: SourcePerformanceRow[];
+  marketing_execution_summary: MarketingExecutionSummary;
 };
 
 export type PersistedKpiAlertRecord = {
@@ -501,6 +502,7 @@ export type MarketingInsightsPreview = {
     urgency: string;
   }[];
   execution_items: MarketingExecutionItem[];
+  execution_summary: MarketingExecutionSummary;
   monthly_content_plan: {
     window_label: string;
     theme: string;
@@ -517,6 +519,18 @@ export type MarketingInsightsPreview = {
   generated_at: string;
 };
 
+export type MarketingExecutionSummary = {
+  total_items: number;
+  done_items: number;
+  published_items: number;
+  leads_generated: number;
+  qualified_leads: number;
+  won_leads: number;
+  attributed_pipeline_value: number;
+  attributed_won_value: number;
+  attributed_deposit_amount: number;
+};
+
 export type MarketingExecutionItem = {
   id: string;
   organization_id: string | null;
@@ -531,7 +545,16 @@ export type MarketingExecutionItem = {
   title: string;
   summary: string;
   recommended_action: string;
+  campaign_name: string | null;
   notes: string | null;
+  result_notes: string | null;
+  published_at: string | null;
+  leads_generated: number;
+  qualified_leads: number;
+  won_leads: number;
+  attributed_pipeline_value: number;
+  attributed_won_value: number;
+  attributed_deposit_amount: number;
   created_at: string;
   updated_at: string;
 };
@@ -544,13 +567,23 @@ export type MarketingExecutionItemCreateRequest = {
   recommended_action: string;
   priority?: string;
   assigned_user_id?: string | null;
+  campaign_name?: string | null;
   notes?: string | null;
 };
 
 export type MarketingExecutionItemUpdateRequest = {
   status?: string;
   assigned_user_id?: string | null;
+  campaign_name?: string | null;
   notes?: string | null;
+  result_notes?: string | null;
+  published_at?: string | null;
+  leads_generated?: number | null;
+  qualified_leads?: number | null;
+  won_leads?: number | null;
+  attributed_pipeline_value?: number | null;
+  attributed_won_value?: number | null;
+  attributed_deposit_amount?: number | null;
 };
 
 export type MarketingInsightSnapshot = {

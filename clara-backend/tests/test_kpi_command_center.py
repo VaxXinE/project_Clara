@@ -14,6 +14,7 @@ from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.lead import Lead
 from app.models.lead_deal import LeadDeal
+from app.models.marketing_execution_item import MarketingExecutionItem
 from app.models.organization import Organization
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
@@ -152,6 +153,28 @@ def seed_kpi_data(
             deposit_amount=0,
         )
     )
+    db.add(
+        MarketingExecutionItem(
+            organization_id=lead_a.organization_id,
+            created_by_user_id=lead_a.assigned_user_id,
+            assigned_user_id=lead_a.assigned_user_id,
+            item_type="content_brief",
+            source_kind="content_brief",
+            status="done",
+            priority="high",
+            title="Trust campaign",
+            summary="Konten edukasi trust",
+            recommended_action="Publish dan ukur hasil",
+            campaign_name="Trust Campaign Week 1",
+            result_notes="Konten perform baik",
+            leads_generated=9,
+            qualified_leads=4,
+            won_leads=1,
+            attributed_pipeline_value=4500000,
+            attributed_won_value=1500000,
+            attributed_deposit_amount=500000,
+        )
+    )
 
     conversation_b = Conversation(
         organization_id=org_b_record.id,
@@ -224,6 +247,9 @@ def test_owner_kpi_command_center_returns_global_view(
     assert len(payload["recommendations"]) >= 1
     assert len(payload["organization_performance"]) == 2
     assert len(payload["source_performance"]) == 2
+    assert payload["marketing_execution_summary"]["total_items"] >= 1
+    assert payload["marketing_execution_summary"]["leads_generated"] >= 9
+    assert payload["marketing_execution_summary"]["attributed_won_value"] >= 1500000
     assert {row["source_channel"] for row in payload["source_performance"]} == {
         "whatsapp",
         "telegram",
@@ -262,6 +288,7 @@ def test_admin_kpi_command_center_is_scoped_to_own_organization(
     assert len(payload["recommendations"]) >= 1
     assert len(payload["organization_performance"]) == 1
     assert len(payload["source_performance"]) == 1
+    assert payload["marketing_execution_summary"]["total_items"] >= 1
     assert payload["source_performance"][0]["source_channel"] == "whatsapp"
     assert payload["organization_performance"][0]["organization_name"] == "Org Alpha"
     assert all(
