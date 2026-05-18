@@ -50,6 +50,7 @@ from app.schemas.dashboard_schema import (
     OpsAuditLogRow,
     OpsConversationRow,
     OpsNotificationItem,
+    OpsNotificationResolveRequest,
     OpsNotificationResponse,
     OpsDatabaseOverviewResponse,
     OpsOrganizationRow,
@@ -124,8 +125,9 @@ def ensure_aware_utc(value: datetime | None) -> datetime | None:
     return value.astimezone(timezone.utc)
 
 
-def get_age_bucket(created_at: datetime, now: datetime) -> str:
-    age_seconds = max((now - ensure_aware_utc(created_at)).total_seconds(), 0)
+def get_age_bucket(created_at: datetime | None, now: datetime) -> str:
+    created_at_utc = ensure_aware_utc(created_at) or now
+    age_seconds = max((now - created_at_utc).total_seconds(), 0)
 
     if age_seconds >= 72 * 60 * 60:
         return "stale"
@@ -135,6 +137,7 @@ def get_age_bucket(created_at: datetime, now: datetime) -> str:
 
 
 def build_ops_notification_item(notification: OpsNotification) -> OpsNotificationItem:
+    now = datetime.now(timezone.utc)
     return OpsNotificationItem(
         id=notification.id,
         organization_id=notification.organization_id,
@@ -146,8 +149,15 @@ def build_ops_notification_item(notification: OpsNotification) -> OpsNotificatio
         body=notification.body,
         target_href=notification.target_href,
         status=notification.status,
+        delivery_channel=notification.delivery_channel,
+        delivery_status=notification.delivery_status,
+        escalation_level=notification.escalation_level,
+        resolution_note=notification.resolution_note,
+        age_bucket=get_age_bucket(notification.created_at, now),
         acknowledged_by_user_id=notification.acknowledged_by_user_id,
         acknowledged_at=notification.acknowledged_at,
+        delivered_at=notification.delivered_at,
+        escalated_at=notification.escalated_at,
         resolved_at=notification.resolved_at,
         created_at=notification.created_at,
         updated_at=notification.updated_at,
@@ -1026,6 +1036,10 @@ def sync_ops_notifications(
                 body=str(item["body"]),
                 target_href=str(item["target_href"]) if item["target_href"] else None,
                 status="active",
+                delivery_channel="in_app",
+                delivery_status="delivered",
+                delivered_at=now,
+                escalation_level="none",
             )
         else:
             notification.severity = str(item["severity"])
@@ -1037,6 +1051,19 @@ def sync_ops_notifications(
             if notification.status == "resolved":
                 notification.status = "active"
                 notification.resolved_at = None
+                notification.resolution_note = None
+            if notification.delivery_status == "pending":
+                notification.delivery_status = "delivered"
+                notification.delivered_at = now
+
+        if notification.severity == "high":
+            age_bucket = get_age_bucket(notification.created_at, now)
+            if age_bucket == "aging":
+                notification.escalation_level = "team_lead"
+                notification.escalated_at = notification.escalated_at or now
+            elif age_bucket == "stale":
+                notification.escalation_level = "owner"
+                notification.escalated_at = notification.escalated_at or now
 
         db.add(notification)
 
@@ -1071,6 +1098,7 @@ def list_ops_notifications(
             1 for item in notifications if item.status == "acknowledged"
         ),
         resolved_count=sum(1 for item in notifications if item.status == "resolved"),
+        escalated_count=sum(1 for item in notifications if item.escalation_level != "none"),
         items=[build_ops_notification_item(item) for item in notifications],
     )
 
@@ -1097,6 +1125,88 @@ def acknowledge_ops_notification(
     notification.status = "acknowledged"
     notification.acknowledged_by_user_id = current_user.id
     notification.acknowledged_at = datetime.now(timezone.utc)
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    return build_ops_notification_item(notification)
+
+
+def resolve_ops_notification(
+    db: Session,
+    notification_id: UUID,
+    payload: OpsNotificationResolveRequest | None,
+    current_user: User,
+) -> OpsNotificationItem:
+    notification = db.get(OpsNotification, notification_id)
+    if notification is None:
+        raise ValueError("Notification not found.")
+
+    if (
+        notification.organization_id != current_user.organization_id
+        or (
+            notification.user_id is not None
+            and notification.user_id != current_user.id
+            and current_user.role != "owner"
+        )
+    ):
+        raise ValueError("Notification not found.")
+
+    notification.status = "resolved"
+    notification.resolved_at = datetime.now(timezone.utc)
+    notification.resolution_note = payload.resolution_note.strip() if payload and payload.resolution_note and payload.resolution_note.strip() else None
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    return build_ops_notification_item(notification)
+
+
+def reopen_ops_notification(
+    db: Session,
+    notification_id: UUID,
+    current_user: User,
+) -> OpsNotificationItem:
+    notification = db.get(OpsNotification, notification_id)
+    if notification is None:
+        raise ValueError("Notification not found.")
+
+    if (
+        notification.organization_id != current_user.organization_id
+        or (
+            notification.user_id is not None
+            and notification.user_id != current_user.id
+            and current_user.role != "owner"
+        )
+    ):
+        raise ValueError("Notification not found.")
+
+    notification.status = "active"
+    notification.resolved_at = None
+    notification.resolution_note = None
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    return build_ops_notification_item(notification)
+
+
+def escalate_ops_notification(
+    db: Session,
+    notification_id: UUID,
+    current_user: User,
+) -> OpsNotificationItem:
+    notification = db.get(OpsNotification, notification_id)
+    if notification is None:
+        raise ValueError("Notification not found.")
+
+    if current_user.role not in {"admin", "owner"}:
+        raise ValueError("Notification not found.")
+    if notification.organization_id != current_user.organization_id and current_user.role != "owner":
+        raise ValueError("Notification not found.")
+
+    if notification.escalation_level == "none":
+        notification.escalation_level = "team_lead"
+    elif notification.escalation_level == "team_lead":
+        notification.escalation_level = "owner"
+    notification.escalated_at = datetime.now(timezone.utc)
     db.add(notification)
     db.commit()
     db.refresh(notification)

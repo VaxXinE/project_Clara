@@ -93,6 +93,33 @@ def test_admin_can_list_and_acknowledge_ops_notifications(
     assert ack_response.status_code == 200, ack_response.text
     ack_payload = ack_response.json()
     assert ack_payload["status"] == "acknowledged"
+    assert ack_payload["delivery_status"] == "delivered"
+
+    resolve_response = client.patch(
+        f"/dashboard/notifications/{notification_id}/resolve",
+        json={"resolution_note": "Sudah ditindak oleh tim sales."},
+        headers=csrf_headers(client),
+    )
+    assert resolve_response.status_code == 200, resolve_response.text
+    resolve_payload = resolve_response.json()
+    assert resolve_payload["status"] == "resolved"
+    assert resolve_payload["resolution_note"] == "Sudah ditindak oleh tim sales."
+
+    reopen_response = client.patch(
+        f"/dashboard/notifications/{notification_id}/reopen",
+        headers=csrf_headers(client),
+    )
+    assert reopen_response.status_code == 200, reopen_response.text
+    reopen_payload = reopen_response.json()
+    assert reopen_payload["status"] == "active"
+
+    escalate_response = client.patch(
+        f"/dashboard/notifications/{notification_id}/escalate",
+        headers=csrf_headers(client),
+    )
+    assert escalate_response.status_code == 200, escalate_response.text
+    escalate_payload = escalate_response.json()
+    assert escalate_payload["escalation_level"] in {"team_lead", "owner"}
 
 
 def test_approval_queue_filters_by_risk_level(

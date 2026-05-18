@@ -364,8 +364,15 @@ export type OpsNotificationItem = {
   body: string;
   target_href: string | null;
   status: string;
+  delivery_channel: string;
+  delivery_status: string;
+  escalation_level: string;
+  resolution_note: string | null;
+  age_bucket: string;
   acknowledged_by_user_id: string | null;
   acknowledged_at: string | null;
+  delivered_at: string | null;
+  escalated_at: string | null;
   resolved_at: string | null;
   created_at: string;
   updated_at: string;
@@ -376,7 +383,12 @@ export type OpsNotificationResponse = {
   active_count: number;
   acknowledged_count: number;
   resolved_count: number;
+  escalated_count: number;
   items: OpsNotificationItem[];
+};
+
+export type OpsNotificationResolveRequest = {
+  resolution_note?: string | null;
 };
 
 export type KpiSummaryCard = {

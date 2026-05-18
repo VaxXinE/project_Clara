@@ -153,8 +153,15 @@ class OpsNotificationItem(BaseModel):
     body: str
     target_href: str | None
     status: str
+    delivery_channel: str
+    delivery_status: str
+    escalation_level: str
+    resolution_note: str | None
+    age_bucket: str
     acknowledged_by_user_id: UUID | None
     acknowledged_at: datetime | None
+    delivered_at: datetime | None
+    escalated_at: datetime | None
     resolved_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -165,7 +172,12 @@ class OpsNotificationResponse(BaseModel):
     active_count: int
     acknowledged_count: int
     resolved_count: int
+    escalated_count: int
     items: list[OpsNotificationItem]
+
+
+class OpsNotificationResolveRequest(BaseModel):
+    resolution_note: str | None = None
 
 
 class MarketingObjectionInsight(BaseModel):

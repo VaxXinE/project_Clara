@@ -17,6 +17,7 @@ from app.schemas.dashboard_schema import (
     MarketingInsightsPreview,
     OpsDatabaseOverviewResponse,
     OpsNotificationItem,
+    OpsNotificationResolveRequest,
     OpsNotificationResponse,
     PersistedKpiAlertRecord,
     SalesApprovalQueueResponse,
@@ -28,6 +29,7 @@ from app.schemas.channel_schema import ChannelOverviewResponse
 from app.services.audit_service import create_audit_log
 from app.services.dashboard_service import (
     acknowledge_ops_notification,
+    escalate_ops_notification,
     acknowledge_kpi_alert,
     create_marketing_execution_item,
     get_channel_overview,
@@ -35,6 +37,7 @@ from app.services.dashboard_service import (
     get_marketing_insights_preview,
     get_ops_database_overview,
     list_ops_notifications,
+    reopen_ops_notification,
     get_sales_approval_queue,
     get_sales_conversation_detail,
     get_sales_inbox,
@@ -43,6 +46,7 @@ from app.services.dashboard_service import (
     list_kpi_snapshots,
     list_marketing_execution_items,
     refresh_kpi_command_center,
+    resolve_ops_notification,
     reopen_kpi_alert,
     resolve_kpi_alert,
     update_marketing_execution_item,
@@ -140,6 +144,110 @@ def acknowledge_ops_notification_endpoint(
         current_user=current_user,
         request=request,
         metadata={"status": notification.status, "source_type": notification.source_type},
+    )
+    return notification
+
+
+@router.patch(
+    "/notifications/{notification_id}/resolve",
+    response_model=OpsNotificationItem,
+)
+def resolve_ops_notification_endpoint(
+    notification_id: UUID,
+    payload: OpsNotificationResolveRequest | None,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+):
+    try:
+        notification = resolve_ops_notification(
+            db=db,
+            notification_id=notification_id,
+            payload=payload,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="ops_notification.resolve",
+        resource_type="ops_notification",
+        resource_id=str(notification.id),
+        current_user=current_user,
+        request=request,
+        metadata={"status": notification.status, "escalation_level": notification.escalation_level},
+    )
+    return notification
+
+
+@router.patch(
+    "/notifications/{notification_id}/reopen",
+    response_model=OpsNotificationItem,
+)
+def reopen_ops_notification_endpoint(
+    notification_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+):
+    try:
+        notification = reopen_ops_notification(
+            db=db,
+            notification_id=notification_id,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="ops_notification.reopen",
+        resource_type="ops_notification",
+        resource_id=str(notification.id),
+        current_user=current_user,
+        request=request,
+        metadata={"status": notification.status},
+    )
+    return notification
+
+
+@router.patch(
+    "/notifications/{notification_id}/escalate",
+    response_model=OpsNotificationItem,
+)
+def escalate_ops_notification_endpoint(
+    notification_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin", "owner")),
+):
+    try:
+        notification = escalate_ops_notification(
+            db=db,
+            notification_id=notification_id,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="ops_notification.escalate",
+        resource_type="ops_notification",
+        resource_id=str(notification.id),
+        current_user=current_user,
+        request=request,
+        metadata={"escalation_level": notification.escalation_level},
     )
     return notification
 
