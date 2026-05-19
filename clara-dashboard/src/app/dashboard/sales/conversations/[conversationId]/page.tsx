@@ -39,7 +39,7 @@ export default function SalesConversationDetailPage() {
     try {
       const [data, me] = await Promise.all([
         apiFetch<SalesConversationDetail>(
-          `/dashboard/sales/conversations/${conversationId}`
+          `/dashboard/sales/conversations/${conversationId}`,
         ),
         apiFetch<CurrentUser>("/auth/me"),
       ]);
@@ -50,7 +50,7 @@ export default function SalesConversationDetailPage() {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal memuat detail conversation."
+          : "Gagal memuat detail conversation.",
       );
     } finally {
       setIsLoading(false);
@@ -74,7 +74,10 @@ export default function SalesConversationDetailPage() {
       backHref="/dashboard/sales"
       backLabel="Kembali ke inbox"
       actions={
-        <Link href="/dashboard/follow-up" className="clara-button clara-button-ghost">
+        <Link
+          href="/dashboard/follow-up"
+          className="clara-button clara-button-ghost"
+        >
           Buka Worklist
         </Link>
       }
@@ -99,6 +102,7 @@ export default function SalesConversationDetailPage() {
         {detail && !isLoading && !errorMessage && (
           <>
             <ConversationDetailHeader detail={detail} />
+            <ConversationUsageGuide detail={detail} />
             <ConversationDetailContent
               detail={detail}
               onUpdated={loadConversationDetail}
@@ -133,7 +137,7 @@ function ConversationDetailHeader({
           {extraction && (
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                extraction.lead_temperature
+                extraction.lead_temperature,
               )}`}
             >
               {extraction.lead_temperature.toUpperCase()}
@@ -143,7 +147,7 @@ function ConversationDetailHeader({
           {extraction && (
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${getRiskBadgeClass(
-                extraction.risk_level
+                extraction.risk_level,
               )}`}
             >
               Risk {extraction.risk_level}
@@ -222,7 +226,9 @@ function ConversationDetailContent({
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-xs font-semibold">{message.sender_name}</p>
+                    <p className="text-xs font-semibold">
+                      {message.sender_name}
+                    </p>
                     <p
                       className={`text-xs ${
                         isSales ? "text-slate-300" : "text-slate-500"
@@ -304,7 +310,8 @@ function ConversationDetailContent({
             suggestedReplies={suggestion.suggested_replies}
             approvalStatus={suggestion.approval_status}
             hasBeenSent={detail.sent_messages.some(
-              (sentMessage) => sentMessage.reply_suggestion_id === suggestion.id
+              (sentMessage) =>
+                sentMessage.reply_suggestion_id === suggestion.id,
             )}
             onUpdated={onUpdated}
           />
@@ -314,7 +321,8 @@ function ConversationDetailContent({
               Belum ada reply suggestion
             </h2>
             <p className="mt-2 text-sm text-slate-600">
-              Generate reply suggestion dari backend dulu untuk MVP ini.
+              Generate reply suggestion dulu, lalu review approval status
+              sebelum memutuskan kirim balasan.
             </p>
           </div>
         )}
@@ -336,7 +344,8 @@ function ConversationDetailContent({
                     Sent by {sentMessage.sent_by_name}
                   </p>
                   <p className="mt-1 text-xs text-green-700">
-                    {formatDateTime(sentMessage.sent_at)} &bull; {sentMessage.send_mode}
+                    {formatDateTime(sentMessage.sent_at)} &bull;{" "}
+                    {sentMessage.send_mode}
                   </p>
                   <p className="mt-3 whitespace-pre-wrap leading-6">
                     {sentMessage.message_text}
@@ -346,7 +355,8 @@ function ConversationDetailContent({
             </div>
           ) : (
             <p className="mt-3 text-sm text-slate-600">
-              Belum ada message yang ditandai terkirim.
+              Belum ada pesan yang ditandai terkirim. Kalau balasan sudah
+              benar-benar dikirim, pastikan status ini ikut tercatat.
             </p>
           )}
         </div>
@@ -370,7 +380,9 @@ function MetaPill({
         dark ? "bg-white/7 text-slate-100" : "bg-slate-50 text-slate-900"
       }`}
     >
-      <span className={dark ? "text-slate-300" : "text-slate-600"}>{label}</span>
+      <span className={dark ? "text-slate-300" : "text-slate-600"}>
+        {label}
+      </span>
       <span className="font-semibold">{value}</span>
     </div>
   );

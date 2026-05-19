@@ -122,7 +122,7 @@ export default function CrmPage() {
             href="/dashboard/sales"
             className="clara-button clara-button-ghost"
           >
-            Conversation Inbox
+            Chat Masuk
           </Link>
           <Link
             href="/dashboard/upload"
@@ -148,6 +148,54 @@ export default function CrmPage() {
 
         {!isLoading && !errorMessage && (
           <>
+            <section className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#ecfeff_0%,#ffffff_45%,#f8fafc_100%)] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Langkah Berikutnya
+                  </p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                    {leads.length === 0
+                      ? "Belum ada lead yang bisa dibaca"
+                      : "Buka detail lead yang paling panas atau paling dekat closing"}
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    {leads.length === 0
+                      ? "Kalau pipeline masih kosong, kembali ke Import Chat atau Chat Masuk lebih dulu. Lead akan muncul setelah conversation mulai terbentuk dan diproses."
+                      : "CRM paling berguna saat dipakai untuk membaca konteks yang lebih stabil: stage, follow-up, deal, task, dan identity customer. Jangan berhenti di board saja kalau lead-nya sudah mulai serius."}
+                  </p>
+                </div>
+                <Link
+                  href={
+                    leads[0] ? `/dashboard/crm/${leads[0].id}` : "/dashboard/upload"
+                  }
+                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                >
+                  {leads[0] ? "Buka Lead Pertama" : "Import Chat"}
+                </Link>
+              </div>
+            </section>
+
+            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Cara Pakai Halaman Ini
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <UsageHint
+                  title="1. Baca stage dulu"
+                  description="Board ini dipakai untuk membaca posisi lead saat ini, bukan untuk membalas chat langsung."
+                />
+                <UsageHint
+                  title="2. Ubah stage seperlunya"
+                  description="Pindahkan stage jika status lead memang berubah, misalnya dari education ke objection atau closing."
+                />
+                <UsageHint
+                  title="3. Buka detail lead"
+                  description="Masuk ke detail lead untuk edit follow-up, notes, task, deal, dan customer identity."
+                />
+              </div>
+            </section>
+
             <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
               <BoardMetric
                 label="Total Leads"
@@ -335,6 +383,21 @@ export default function CrmPage() {
         )}
       </div>
     </WorkspaceShell>
+  );
+}
+
+function UsageHint({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
   );
 }
 

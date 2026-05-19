@@ -73,7 +73,7 @@ export default function ApprovalQueuePage() {
       title="Approval Queue"
       description="Antrian ini mengumpulkan draft yang masih pending approval atau escalation, supaya tim tidak perlu membuka conversation satu per satu."
       backHref="/dashboard/sales"
-      backLabel="Kembali ke Sales Inbox"
+      backLabel="Kembali ke Chat Masuk"
       actions={
         <Link
           href="/dashboard/follow-up"
@@ -96,6 +96,56 @@ export default function ApprovalQueuePage() {
 
         {queue && !isLoading && !errorMessage && (
           <>
+            <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_45%,#f8fafc_100%)] p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Langkah Berikutnya
+                  </p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                    {queue.items.length === 0
+                      ? "Queue sedang bersih"
+                      : "Review draft paling berisiko atau paling lama dulu"}
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    {queue.items.length === 0
+                      ? "Kalau approval queue kosong, lanjutkan operasional lewat Chat Masuk atau AI Worklist."
+                      : "Halaman ini dipakai reviewer untuk mengambil keputusan cepat. Fokus ke item high risk, escalation, atau draft yang sudah terlalu lama menunggu."}
+                  </p>
+                </div>
+                <Link
+                  href={
+                    queue.items[0]
+                      ? `/dashboard/sales/conversations/${queue.items[0].conversation_id}`
+                      : "/dashboard/sales"
+                  }
+                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                >
+                  {queue.items[0] ? "Review Item Teratas" : "Buka Chat Masuk"}
+                </Link>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Cara Pakai Halaman Ini
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <UsageHint
+                  title="1. Filter seperlunya"
+                  description="Gunakan filter risk, action mode, dan age hanya kalau queue sudah ramai."
+                />
+                <UsageHint
+                  title="2. Baca draft dan recommended action"
+                  description="Jangan langsung buka conversation kalau preview draft dan saran tindakan sudah cukup jelas."
+                />
+                <UsageHint
+                  title="3. Naikkan ke lead bila konteks bisnis perlu dicek"
+                  description="Gunakan Lead Detail kalau Anda butuh melihat stage, notes, follow-up, atau deal sebelum approve."
+                />
+              </div>
+            </section>
+
             <section className="grid gap-4 md:grid-cols-3">
               <QueueMetric
                 label="Pending approvals"
@@ -264,6 +314,21 @@ export default function ApprovalQueuePage() {
         )}
       </div>
     </WorkspaceShell>
+  );
+}
+
+function UsageHint({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
   );
 }
 

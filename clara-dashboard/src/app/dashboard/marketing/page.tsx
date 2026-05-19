@@ -16,11 +16,44 @@ import type {
 
 const EXECUTION_STATUS_OPTIONS = ["draft", "assigned", "in_progress", "done"];
 
+type ExecutionOutcomeDraft = {
+  campaign_name: string;
+  published_at: string;
+  leads_generated: string;
+  qualified_leads: string;
+  won_leads: string;
+  attributed_pipeline_value: string;
+  attributed_won_value: string;
+  attributed_deposit_amount: string;
+  result_notes: string;
+};
+
+function formatIdr(value: number): string {
+  return `IDR ${value.toLocaleString("id-ID")}`;
+}
+
+function toDateTimeLocal(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
 export default function MarketingInsightsPage() {
   const [insights, setInsights] = useState<MarketingInsightsPreview | null>(null);
   const [snapshots, setSnapshots] = useState<MarketingInsightSnapshot[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [users, setUsers] = useState<CurrentUser[]>([]);
+  const [outcomeDrafts, setOutcomeDrafts] = useState<
+    Record<string, ExecutionOutcomeDraft>
+  >({});
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingSnapshot, setIsGeneratingSnapshot] = useState(false);
   const [isCreatingExecutionItem, setIsCreatingExecutionItem] = useState(false);
@@ -68,6 +101,30 @@ export default function MarketingInsightsPage() {
 
     void loadInsights();
   }, []);
+
+  useEffect(() => {
+    if (!insights) {
+      return;
+    }
+
+    setOutcomeDrafts((current) => {
+      const next = { ...current };
+      for (const item of insights.execution_items) {
+        next[item.id] = {
+          campaign_name: item.campaign_name ?? "",
+          published_at: toDateTimeLocal(item.published_at),
+          leads_generated: String(item.leads_generated),
+          qualified_leads: String(item.qualified_leads),
+          won_leads: String(item.won_leads),
+          attributed_pipeline_value: String(item.attributed_pipeline_value),
+          attributed_won_value: String(item.attributed_won_value),
+          attributed_deposit_amount: String(item.attributed_deposit_amount),
+          result_notes: item.result_notes ?? "",
+        };
+      }
+      return next;
+    });
+  }, [insights]);
 
   async function handleGenerateSnapshot() {
     setIsGeneratingSnapshot(true);
@@ -210,6 +267,54 @@ export default function MarketingInsightsPage() {
 
         {insights && !isLoading && !errorMessage && (
           <>
+            <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_45%,#f8fafc_100%)] p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Langkah Berikutnya
+                  </p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                    {insights.execution_items.length === 0
+                      ? "Mulai dari insight yang paling siap dieksekusi"
+                      : "Periksa execution item yang belum selesai lebih dulu"}
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    {insights.execution_items.length === 0
+                      ? "Kalau belum ada item kerja marketing, ubah content brief atau ads signal menjadi execution item supaya insight tidak berhenti sebagai bacaan."
+                      : "Halaman ini paling berguna saat dipakai untuk menurunkan insight menjadi kerja nyata: assign PIC, ubah status, lalu isi outcome saat campaign atau konten sudah berjalan."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleGenerateSnapshot()}
+                  disabled={isGeneratingSnapshot}
+                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isGeneratingSnapshot ? "Menyegarkan..." : "Segarkan Insight"}
+                </button>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Cara Pakai Halaman Ini
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <UsageHint
+                  title="1. Baca objection dan angle dulu"
+                  description="Itu membantu Anda memahami kenapa brief atau signal tertentu muncul."
+                />
+                <UsageHint
+                  title="2. Turunkan jadi execution item"
+                  description="Begitu ada insight yang cukup jelas, ubah jadi item kerja agar bisa di-assign dan dilacak."
+                />
+                <UsageHint
+                  title="3. Isi outcome setelah jalan"
+                  description="Bagian outcome dipakai untuk menutup loop dari ide marketing ke hasil bisnis."
+                />
+              </div>
+            </section>
+
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Total Conversations"
@@ -230,6 +335,29 @@ export default function MarketingInsightsPage() {
                 label="High Risk Conversations"
                 value={String(insights.kpi_summary.high_risk_conversation_count)}
                 tone="red"
+              />
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Execution Items"
+                value={String(insights.execution_summary.total_items)}
+                tone="slate"
+              />
+              <MetricCard
+                label="Leads Generated"
+                value={String(insights.execution_summary.leads_generated)}
+                tone="blue"
+              />
+              <MetricCard
+                label="Won Leads"
+                value={String(insights.execution_summary.won_leads)}
+                tone="green"
+              />
+              <MetricCard
+                label="Attributed Won"
+                value={formatIdr(insights.execution_summary.attributed_won_value)}
+                tone="green"
               />
             </section>
 
@@ -477,6 +605,187 @@ export default function MarketingInsightsPage() {
                             </label>
                           </div>
 
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Campaign Name
+                              </span>
+                              <input
+                                type="text"
+                                value={outcomeDrafts[item.id]?.campaign_name ?? ""}
+                                onChange={(event) =>
+                                  setOutcomeDrafts((current) => ({
+                                    ...current,
+                                    [item.id]: {
+                                      ...current[item.id],
+                                      campaign_name: event.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                              />
+                            </label>
+
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Published At
+                              </span>
+                              <input
+                                type="datetime-local"
+                                value={outcomeDrafts[item.id]?.published_at ?? ""}
+                                onChange={(event) =>
+                                  setOutcomeDrafts((current) => ({
+                                    ...current,
+                                    [item.id]: {
+                                      ...current[item.id],
+                                      published_at: event.target.value,
+                                    },
+                                  }))
+                                }
+                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-3">
+                            <OutcomeNumberField
+                              label="Leads Generated"
+                              value={outcomeDrafts[item.id]?.leads_generated ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: { ...current[item.id], leads_generated: value },
+                                }))
+                              }
+                            />
+                            <OutcomeNumberField
+                              label="Qualified Leads"
+                              value={outcomeDrafts[item.id]?.qualified_leads ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: { ...current[item.id], qualified_leads: value },
+                                }))
+                              }
+                            />
+                            <OutcomeNumberField
+                              label="Won Leads"
+                              value={outcomeDrafts[item.id]?.won_leads ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: { ...current[item.id], won_leads: value },
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-3">
+                            <OutcomeNumberField
+                              label="Attributed Pipeline"
+                              value={outcomeDrafts[item.id]?.attributed_pipeline_value ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    attributed_pipeline_value: value,
+                                  },
+                                }))
+                              }
+                            />
+                            <OutcomeNumberField
+                              label="Attributed Won"
+                              value={outcomeDrafts[item.id]?.attributed_won_value ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    attributed_won_value: value,
+                                  },
+                                }))
+                              }
+                            />
+                            <OutcomeNumberField
+                              label="Attributed Deposit"
+                              value={outcomeDrafts[item.id]?.attributed_deposit_amount ?? "0"}
+                              onChange={(value) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    attributed_deposit_amount: value,
+                                  },
+                                }))
+                              }
+                            />
+                          </div>
+
+                          <label className="mt-4 block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Result Notes
+                            </span>
+                            <textarea
+                              value={outcomeDrafts[item.id]?.result_notes ?? ""}
+                              onChange={(event) =>
+                                setOutcomeDrafts((current) => ({
+                                  ...current,
+                                  [item.id]: {
+                                    ...current[item.id],
+                                    result_notes: event.target.value,
+                                  },
+                                }))
+                              }
+                              rows={3}
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                            />
+                          </label>
+
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              disabled={updatingExecutionItemId === item.id}
+                              onClick={() =>
+                                void handleUpdateExecutionItem(item.id, {
+                                  campaign_name:
+                                    outcomeDrafts[item.id]?.campaign_name || null,
+                                  published_at:
+                                    outcomeDrafts[item.id]?.published_at
+                                      ? new Date(
+                                          outcomeDrafts[item.id].published_at
+                                        ).toISOString()
+                                      : null,
+                                  result_notes:
+                                    outcomeDrafts[item.id]?.result_notes || null,
+                                  leads_generated: Number(
+                                    outcomeDrafts[item.id]?.leads_generated || 0
+                                  ),
+                                  qualified_leads: Number(
+                                    outcomeDrafts[item.id]?.qualified_leads || 0
+                                  ),
+                                  won_leads: Number(
+                                    outcomeDrafts[item.id]?.won_leads || 0
+                                  ),
+                                  attributed_pipeline_value: Number(
+                                    outcomeDrafts[item.id]?.attributed_pipeline_value || 0
+                                  ),
+                                  attributed_won_value: Number(
+                                    outcomeDrafts[item.id]?.attributed_won_value || 0
+                                  ),
+                                  attributed_deposit_amount: Number(
+                                    outcomeDrafts[item.id]?.attributed_deposit_amount || 0
+                                  ),
+                                })
+                              }
+                              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {updatingExecutionItemId === item.id
+                                ? "Menyimpan..."
+                                : "Simpan Outcome"}
+                            </button>
+                          </div>
+
                           {item.notes && (
                             <div className="mt-4 rounded-2xl bg-slate-50 p-4">
                               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -717,6 +1026,21 @@ export default function MarketingInsightsPage() {
   );
 }
 
+function UsageHint({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
+  );
+}
+
 function Panel({
   title,
   description,
@@ -865,5 +1189,31 @@ function TrendRow({
         </p>
       )}
     </div>
+  );
+}
+
+function OutcomeNumberField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </span>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+      />
+    </label>
   );
 }

@@ -5,6 +5,51 @@ export type DashboardLatestMessage = {
   message_timestamp: string;
 };
 
+export type ChannelDefinitionItem = {
+  key: string;
+  label: string;
+  description: string;
+  supports_file_upload: boolean;
+  supports_text_paste: boolean;
+  supports_live_sync: boolean;
+  file_endpoint: string | null;
+  text_endpoint: string | null;
+  supported_sources: string[];
+  sample_hint: string;
+};
+
+export type ChannelDetectCandidate = {
+  channel: string;
+  label: string;
+  confidence: number;
+  matched_message_count: number;
+  reason: string;
+};
+
+export type ChannelDetectResponse = {
+  detected_channel: string | null;
+  candidates: ChannelDetectCandidate[];
+};
+
+export type ChannelOverviewItem = {
+  key: string;
+  label: string;
+  description: string;
+  supports_file_upload: boolean;
+  supports_text_paste: boolean;
+  supports_live_sync: boolean;
+  supported_sources: string[];
+  conversation_count: number;
+  lead_count: number;
+  latest_activity_at: string | null;
+};
+
+export type ChannelOverviewResponse = {
+  generated_at: string;
+  scope_type: string;
+  items: ChannelOverviewItem[];
+};
+
 export type DashboardAIExtractionSummary = {
   id: string;
   lead_temperature: string;
@@ -163,6 +208,20 @@ export type CustomerRelatedLeadItem = {
   latest_conversation_id: string | null;
 };
 
+export type CustomerMergeCandidateItem = {
+  id: string;
+  display_name: string;
+  canonical_key: string;
+  identity_confidence: number;
+  match_strategy: string;
+  match_score: number;
+  overlap_reason: string;
+  lead_count: number;
+  conversation_count: number;
+  source_labels: string[];
+  last_contact_at: string | null;
+};
+
 export type CustomerProfileSummaryItem = {
   id: string;
   organization_id: string | null;
@@ -170,6 +229,10 @@ export type CustomerProfileSummaryItem = {
   assigned_user_name: string | null;
   display_name: string;
   canonical_key: string;
+  identity_confidence: number;
+  match_strategy: string;
+  merge_notes: string | null;
+  merged_into_profile_id: string | null;
   lead_count: number;
   conversation_count: number;
   source_channels: string[];
@@ -177,7 +240,14 @@ export type CustomerProfileSummaryItem = {
   last_contact_at: string | null;
   created_at: string;
   updated_at: string;
+  merge_candidates: CustomerMergeCandidateItem[];
   related_leads: CustomerRelatedLeadItem[];
+};
+
+export type CustomerProfileMergeRequest = {
+  source_profile_id: string;
+  target_profile_id: string;
+  merge_notes?: string | null;
 };
 
 export type LeadDetail = LeadListItem & {
@@ -294,8 +364,15 @@ export type OpsNotificationItem = {
   body: string;
   target_href: string | null;
   status: string;
+  delivery_channel: string;
+  delivery_status: string;
+  escalation_level: string;
+  resolution_note: string | null;
+  age_bucket: string;
   acknowledged_by_user_id: string | null;
   acknowledged_at: string | null;
+  delivered_at: string | null;
+  escalated_at: string | null;
   resolved_at: string | null;
   created_at: string;
   updated_at: string;
@@ -306,7 +383,12 @@ export type OpsNotificationResponse = {
   active_count: number;
   acknowledged_count: number;
   resolved_count: number;
+  escalated_count: number;
   items: OpsNotificationItem[];
+};
+
+export type OpsNotificationResolveRequest = {
+  resolution_note?: string | null;
 };
 
 export type KpiSummaryCard = {
@@ -397,6 +479,7 @@ export type KpiCommandCenterResponse = {
   sales_performance: SalesPerformanceRow[];
   organization_performance: OrganizationPerformanceRow[];
   source_performance: SourcePerformanceRow[];
+  marketing_execution_summary: MarketingExecutionSummary;
 };
 
 export type PersistedKpiAlertRecord = {
@@ -501,6 +584,7 @@ export type MarketingInsightsPreview = {
     urgency: string;
   }[];
   execution_items: MarketingExecutionItem[];
+  execution_summary: MarketingExecutionSummary;
   monthly_content_plan: {
     window_label: string;
     theme: string;
@@ -517,6 +601,18 @@ export type MarketingInsightsPreview = {
   generated_at: string;
 };
 
+export type MarketingExecutionSummary = {
+  total_items: number;
+  done_items: number;
+  published_items: number;
+  leads_generated: number;
+  qualified_leads: number;
+  won_leads: number;
+  attributed_pipeline_value: number;
+  attributed_won_value: number;
+  attributed_deposit_amount: number;
+};
+
 export type MarketingExecutionItem = {
   id: string;
   organization_id: string | null;
@@ -531,7 +627,16 @@ export type MarketingExecutionItem = {
   title: string;
   summary: string;
   recommended_action: string;
+  campaign_name: string | null;
   notes: string | null;
+  result_notes: string | null;
+  published_at: string | null;
+  leads_generated: number;
+  qualified_leads: number;
+  won_leads: number;
+  attributed_pipeline_value: number;
+  attributed_won_value: number;
+  attributed_deposit_amount: number;
   created_at: string;
   updated_at: string;
 };
@@ -544,13 +649,23 @@ export type MarketingExecutionItemCreateRequest = {
   recommended_action: string;
   priority?: string;
   assigned_user_id?: string | null;
+  campaign_name?: string | null;
   notes?: string | null;
 };
 
 export type MarketingExecutionItemUpdateRequest = {
   status?: string;
   assigned_user_id?: string | null;
+  campaign_name?: string | null;
   notes?: string | null;
+  result_notes?: string | null;
+  published_at?: string | null;
+  leads_generated?: number | null;
+  qualified_leads?: number | null;
+  won_leads?: number | null;
+  attributed_pipeline_value?: number | null;
+  attributed_won_value?: number | null;
+  attributed_deposit_amount?: number | null;
 };
 
 export type MarketingInsightSnapshot = {

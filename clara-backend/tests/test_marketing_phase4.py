@@ -144,6 +144,7 @@ def test_admin_can_create_and_update_marketing_execution_item(
             "recommended_action": "Assign ke content creator untuk video edukasi.",
             "priority": "high",
             "assigned_user_id": str(marketing_b.id),
+            "campaign_name": "Trust Reels Week 1",
         },
         headers=csrf_headers(client),
     )
@@ -151,6 +152,7 @@ def test_admin_can_create_and_update_marketing_execution_item(
     payload = create_response.json()
     assert payload["status"] == "assigned"
     assert payload["assigned_user_id"] == str(marketing_b.id)
+    assert payload["campaign_name"] == "Trust Reels Week 1"
 
     list_response = client.get("/dashboard/marketing/execution-items")
     assert list_response.status_code == 200, list_response.text
@@ -161,9 +163,24 @@ def test_admin_can_create_and_update_marketing_execution_item(
         json={
             "status": "in_progress",
             "notes": "Sudah masuk antrian produksi.",
+            "result_notes": "CTR awal bagus.",
+            "leads_generated": 14,
+            "qualified_leads": 6,
+            "won_leads": 2,
+            "attributed_pipeline_value": 12500000,
+            "attributed_won_value": 3500000,
+            "attributed_deposit_amount": 1000000,
         },
         headers=csrf_headers(client),
     )
     assert update_response.status_code == 200, update_response.text
     assert update_response.json()["status"] == "in_progress"
     assert update_response.json()["notes"] == "Sudah masuk antrian produksi."
+    assert update_response.json()["leads_generated"] == 14
+    assert update_response.json()["attributed_won_value"] == 3500000
+
+    preview_response = client.get("/dashboard/marketing/insights-preview")
+    assert preview_response.status_code == 200, preview_response.text
+    preview_payload = preview_response.json()
+    assert preview_payload["execution_summary"]["total_items"] >= 1
+    assert preview_payload["execution_summary"]["leads_generated"] >= 14

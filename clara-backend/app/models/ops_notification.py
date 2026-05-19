@@ -35,8 +35,20 @@ class OpsNotification(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     target_href: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    delivery_channel: Mapped[str] = mapped_column(String(30), nullable=False, default="in_app")
+    delivery_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    escalation_level: Mapped[str] = mapped_column(String(20), nullable=False, default="none")
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    escalated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

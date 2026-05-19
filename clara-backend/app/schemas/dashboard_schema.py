@@ -153,8 +153,15 @@ class OpsNotificationItem(BaseModel):
     body: str
     target_href: str | None
     status: str
+    delivery_channel: str
+    delivery_status: str
+    escalation_level: str
+    resolution_note: str | None
+    age_bucket: str
     acknowledged_by_user_id: UUID | None
     acknowledged_at: datetime | None
+    delivered_at: datetime | None
+    escalated_at: datetime | None
     resolved_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -165,7 +172,12 @@ class OpsNotificationResponse(BaseModel):
     active_count: int
     acknowledged_count: int
     resolved_count: int
+    escalated_count: int
     items: list[OpsNotificationItem]
+
+
+class OpsNotificationResolveRequest(BaseModel):
+    resolution_note: str | None = None
 
 
 class MarketingObjectionInsight(BaseModel):
@@ -217,7 +229,16 @@ class MarketingExecutionItem(BaseModel):
     title: str
     summary: str
     recommended_action: str
+    campaign_name: str | None
     notes: str | None
+    result_notes: str | None
+    published_at: datetime | None
+    leads_generated: int
+    qualified_leads: int
+    won_leads: int
+    attributed_pipeline_value: float
+    attributed_won_value: float
+    attributed_deposit_amount: float
     created_at: datetime
     updated_at: datetime
 
@@ -230,13 +251,35 @@ class MarketingExecutionItemCreateRequest(BaseModel):
     recommended_action: str
     priority: str = "medium"
     assigned_user_id: UUID | None = None
+    campaign_name: str | None = None
     notes: str | None = None
 
 
 class MarketingExecutionItemUpdateRequest(BaseModel):
     status: str | None = None
     assigned_user_id: UUID | None = None
+    campaign_name: str | None = None
     notes: str | None = None
+    result_notes: str | None = None
+    published_at: datetime | None = None
+    leads_generated: int | None = None
+    qualified_leads: int | None = None
+    won_leads: int | None = None
+    attributed_pipeline_value: float | None = None
+    attributed_won_value: float | None = None
+    attributed_deposit_amount: float | None = None
+
+
+class MarketingExecutionSummary(BaseModel):
+    total_items: int
+    done_items: int
+    published_items: int
+    leads_generated: int
+    qualified_leads: int
+    won_leads: int
+    attributed_pipeline_value: float
+    attributed_won_value: float
+    attributed_deposit_amount: float
 
 
 class MarketingPlanningItem(BaseModel):
@@ -268,6 +311,7 @@ class MarketingInsightsPreview(BaseModel):
     ads_signals: list[MarketingAdsSignal]
     monthly_content_plan: list[MarketingPlanningItem]
     execution_items: list[MarketingExecutionItem]
+    execution_summary: MarketingExecutionSummary
     kpi_summary: MarketingKpiSummary
     generated_at: datetime
 
@@ -412,6 +456,7 @@ class KpiCommandCenterResponse(BaseModel):
     sales_performance: list[SalesPerformanceRow]
     organization_performance: list[OrganizationPerformanceRow]
     source_performance: list[SourcePerformanceRow]
+    marketing_execution_summary: MarketingExecutionSummary
 
 
 class MarketingInsightSnapshotComparison(BaseModel):

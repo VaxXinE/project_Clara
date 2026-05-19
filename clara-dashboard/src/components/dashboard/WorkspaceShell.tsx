@@ -115,7 +115,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
         label: "KPI Center",
         icon: faChartColumn,
         description: "Performa tim dan org",
-      }
+      },
     );
 
     adminItems.push(
@@ -130,7 +130,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
         label: "User Access",
         icon: faUsersGear,
         description: "Kelola struktur akses",
-      }
+      },
     );
   }
 
@@ -249,7 +249,10 @@ export function WorkspaceShell({
                               : "border border-white/10 bg-white/6 text-slate-200 group-hover:bg-white/10"
                           }`}
                         >
-                          <FontAwesomeIcon icon={item.icon} className="h-4 w-4" />
+                          <FontAwesomeIcon
+                            icon={item.icon}
+                            className="h-4 w-4"
+                          />
                         </span>
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-semibold">
@@ -286,7 +289,10 @@ export function WorkspaceShell({
                         href={backHref}
                         className="clara-button clara-button-ghost px-3 py-1.5 text-sm font-semibold"
                       >
-                        <FontAwesomeIcon icon={faChevronLeft} className="h-3 w-3" />
+                        <FontAwesomeIcon
+                          icon={faChevronLeft}
+                          className="h-3 w-3"
+                        />
                         {backLabel}
                       </Link>
                     ) : null}

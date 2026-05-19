@@ -29,8 +29,87 @@ def normalize_customer_identity_name(name: str | None) -> str:
         return "unknown-customer"
 
     normalized = re.sub(r"[^a-z0-9]+", " ", name.strip().lower())
+    normalized = re.sub(r"\b(customer|cust|buyer|lead|prospect|client|calon)\b", " ", normalized)
     normalized = " ".join(part for part in normalized.split() if part)
     return normalized or "unknown-customer"
+
+
+def compute_identity_metadata(
+    *,
+    display_name: str,
+    canonical_key: str,
+) -> tuple[float, str]:
+    if canonical_key == "unknown-customer":
+        return 0.35, "fallback_unknown"
+
+    token_count = len(canonical_key.split())
+    if token_count >= 2 and display_name.strip() != canonical_key:
+        return 0.9, "name_normalized"
+    if token_count == 1:
+        return 0.74, "single_token_name"
+    return 0.92, "name_exact"
+
+
+def calculate_profile_match_score(
+    source_profile: CustomerProfile,
+    candidate_profile: CustomerProfile,
+) -> tuple[float, str]:
+    source_tokens = set(source_profile.canonical_key.split())
+    candidate_tokens = set(candidate_profile.canonical_key.split())
+    if not source_tokens or not candidate_tokens:
+        return 0.0, "Tidak ada token identitas yang cukup."
+
+    overlap = source_tokens & candidate_tokens
+    union = source_tokens | candidate_tokens
+    overlap_ratio = len(overlap) / max(len(union), 1)
+
+    score = overlap_ratio
+    reasons: list[str] = []
+    if overlap:
+        reasons.append(f"Overlap token: {', '.join(sorted(overlap))}.")
+    if source_profile.assigned_user_id and source_profile.assigned_user_id == candidate_profile.assigned_user_id:
+        score += 0.15
+        reasons.append("PIC yang sama.")
+    if source_profile.display_name.lower() == candidate_profile.display_name.lower():
+        score += 0.2
+        reasons.append("Nama display identik.")
+
+    score = min(round(score, 2), 0.99)
+    return score, " ".join(reasons) if reasons else "Kecocokan dasar dari canonical key."
+
+
+def build_merge_candidates(
+    profile: CustomerProfile,
+    *,
+    visible_profiles: list[CustomerProfile],
+) -> list[dict]:
+    candidates: list[dict] = []
+    for candidate in visible_profiles:
+        if candidate.id == profile.id or candidate.merged_into_profile_id is not None:
+            continue
+
+        match_score, overlap_reason = calculate_profile_match_score(profile, candidate)
+        if match_score < 0.45:
+            continue
+
+        candidate_leads = list(candidate.leads)
+        candidates.append(
+            {
+                "id": candidate.id,
+                "display_name": candidate.display_name,
+                "canonical_key": candidate.canonical_key,
+                "identity_confidence": candidate.identity_confidence,
+                "match_strategy": candidate.match_strategy,
+                "match_score": match_score,
+                "overlap_reason": overlap_reason,
+                "lead_count": len(candidate_leads),
+                "conversation_count": sum(len(lead.conversations) for lead in candidate_leads),
+                "source_labels": sorted({build_source_label(lead.source) for lead in candidate_leads}),
+                "last_contact_at": candidate.last_contact_at,
+            }
+        )
+
+    return sorted(candidates, key=lambda item: item["match_score"], reverse=True)[:5]
 
 
 def resolve_customer_profile_name(
@@ -67,11 +146,16 @@ def ensure_customer_profile_for_lead(
 ) -> CustomerProfile:
     display_name = resolve_customer_profile_name(lead=lead, preferred_name=preferred_name)
     canonical_key = normalize_customer_identity_name(display_name)
+    identity_confidence, match_strategy = compute_identity_metadata(
+        display_name=display_name,
+        canonical_key=canonical_key,
+    )
 
     existing_profile = db.scalars(
         select(CustomerProfile).where(
             CustomerProfile.organization_id == lead.organization_id,
             CustomerProfile.canonical_key == canonical_key,
+            CustomerProfile.merged_into_profile_id.is_(None),
         )
     ).first()
 
@@ -81,6 +165,8 @@ def ensure_customer_profile_for_lead(
             assigned_user_id=lead.assigned_user_id,
             display_name=display_name,
             canonical_key=canonical_key,
+            identity_confidence=identity_confidence,
+            match_strategy=match_strategy,
             last_contact_at=lead.last_contact_at,
         )
         db.add(existing_profile)
@@ -96,6 +182,8 @@ def ensure_customer_profile_for_lead(
             existing_profile.last_contact_at = lead_last_contact
         if len(display_name.strip()) > len(existing_profile.display_name.strip()):
             existing_profile.display_name = display_name
+        existing_profile.identity_confidence = max(existing_profile.identity_confidence, identity_confidence)
+        existing_profile.match_strategy = match_strategy
         db.add(existing_profile)
         db.flush()
 
@@ -109,6 +197,7 @@ def build_customer_profile_summary(
     profile: CustomerProfile,
     *,
     visible_leads: list[Lead] | None = None,
+    merge_candidates: list[dict] | None = None,
 ) -> dict:
     leads = visible_leads if visible_leads is not None else list(profile.leads)
     ordered_leads = sorted(
@@ -154,6 +243,10 @@ def build_customer_profile_summary(
         "assigned_user_name": profile.assigned_user.name if profile.assigned_user else None,
         "display_name": profile.display_name,
         "canonical_key": profile.canonical_key,
+        "identity_confidence": profile.identity_confidence,
+        "match_strategy": profile.match_strategy,
+        "merge_notes": profile.merge_notes,
+        "merged_into_profile_id": profile.merged_into_profile_id,
         "lead_count": len(leads),
         "conversation_count": conversation_count,
         "source_channels": source_channels,
@@ -161,6 +254,7 @@ def build_customer_profile_summary(
         "last_contact_at": profile.last_contact_at,
         "created_at": profile.created_at,
         "updated_at": profile.updated_at,
+        "merge_candidates": merge_candidates or [],
         "related_leads": related_leads,
     }
 
@@ -176,8 +270,7 @@ def get_customer_profile_model_for_user(
         .where(CustomerProfile.id == customer_profile_id)
         .options(
             selectinload(CustomerProfile.assigned_user),
-            selectinload(CustomerProfile.leads)
-            .selectinload(Lead.conversations),
+            selectinload(CustomerProfile.leads).selectinload(Lead.conversations),
         )
     ).first()
 
@@ -215,9 +308,129 @@ def get_customer_profile_for_user(
         customer_profile_id=customer_profile_id,
         current_user=current_user,
     )
+    if profile.merged_into_profile_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Customer profile sudah digabung ke profil lain.",
+        )
     visible_leads = (
         list(profile.leads)
         if can_access_all_conversations(current_user)
         else [lead for lead in profile.leads if lead.assigned_user_id == current_user.id]
     )
-    return build_customer_profile_summary(profile, visible_leads=visible_leads)
+    visible_profiles = db.scalars(
+        select(CustomerProfile)
+        .where(
+            CustomerProfile.organization_id == profile.organization_id,
+        )
+        .options(selectinload(CustomerProfile.leads).selectinload(Lead.conversations))
+    ).all()
+    if not can_access_all_conversations(current_user):
+        visible_profiles = [
+            candidate
+            for candidate in visible_profiles
+            if any(lead.assigned_user_id == current_user.id for lead in candidate.leads)
+        ]
+    merge_candidates = build_merge_candidates(profile, visible_profiles=visible_profiles)
+    return build_customer_profile_summary(
+        profile,
+        visible_leads=visible_leads,
+        merge_candidates=merge_candidates,
+    )
+
+
+def merge_customer_profiles(
+    db: Session,
+    *,
+    source_profile_id: UUID,
+    target_profile_id: UUID,
+    merge_notes: str | None,
+    current_user: User,
+) -> dict:
+    source_profile = get_customer_profile_model_for_user(
+        db=db,
+        customer_profile_id=source_profile_id,
+        current_user=current_user,
+    )
+    target_profile = get_customer_profile_model_for_user(
+        db=db,
+        customer_profile_id=target_profile_id,
+        current_user=current_user,
+    )
+
+    if source_profile.id == target_profile.id:
+        raise ValueError("Source dan target customer profile tidak boleh sama.")
+    if source_profile.merged_into_profile_id is not None:
+        raise ValueError("Source customer profile sudah pernah digabung.")
+    if target_profile.merged_into_profile_id is not None:
+        raise ValueError("Target customer profile sudah digabung ke profil lain.")
+    if source_profile.organization_id != target_profile.organization_id:
+        raise ValueError("Customer profile harus berasal dari organization yang sama.")
+
+    source_leads = list(source_profile.leads)
+    target_last_contact = ensure_aware_utc(target_profile.last_contact_at)
+    source_last_contact = ensure_aware_utc(source_profile.last_contact_at)
+    if source_last_contact and (
+        target_last_contact is None or source_last_contact > target_last_contact
+    ):
+        target_profile.last_contact_at = source_last_contact
+
+    if len(source_profile.display_name.strip()) > len(target_profile.display_name.strip()):
+        target_profile.display_name = source_profile.display_name
+        target_profile.canonical_key = source_profile.canonical_key
+
+    target_profile.identity_confidence = max(
+        target_profile.identity_confidence,
+        source_profile.identity_confidence,
+        0.95,
+    )
+    target_profile.match_strategy = "manual_merge"
+    if merge_notes and merge_notes.strip():
+        target_profile.merge_notes = merge_notes.strip()
+
+    source_profile.merged_into_profile_id = target_profile.id
+    source_profile.merge_notes = merge_notes.strip() if merge_notes and merge_notes.strip() else "Merged manually"
+    source_profile.match_strategy = "merged_manual"
+
+    for lead in source_leads:
+        lead.customer_profile_id = target_profile.id
+        db.add(lead)
+
+    db.add(source_profile)
+    db.add(target_profile)
+    db.commit()
+    db.expire_all()
+    refreshed_target_profile = get_customer_profile_model_for_user(
+        db=db,
+        customer_profile_id=target_profile.id,
+        current_user=current_user,
+    )
+
+    visible_leads = (
+        list(refreshed_target_profile.leads)
+        if can_access_all_conversations(current_user)
+        else [
+            lead
+            for lead in refreshed_target_profile.leads
+            if lead.assigned_user_id == current_user.id
+        ]
+    )
+    visible_profiles = db.scalars(
+        select(CustomerProfile)
+        .where(CustomerProfile.organization_id == refreshed_target_profile.organization_id)
+        .options(selectinload(CustomerProfile.leads).selectinload(Lead.conversations))
+    ).all()
+    if not can_access_all_conversations(current_user):
+        visible_profiles = [
+            candidate
+            for candidate in visible_profiles
+            if any(lead.assigned_user_id == current_user.id for lead in candidate.leads)
+        ]
+    return build_customer_profile_summary(
+        refreshed_target_profile,
+        visible_leads=visible_leads,
+        merge_candidates=build_merge_candidates(
+            refreshed_target_profile,
+            visible_profiles=visible_profiles,
+        ),
+    )

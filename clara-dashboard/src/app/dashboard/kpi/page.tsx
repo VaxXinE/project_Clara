@@ -212,6 +212,48 @@ export default function KpiCommandCenterPage() {
 
         {kpi && !isLoading && !errorMessage && (
           <>
+            <section className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#eff6ff_100%)] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Langkah Berikutnya
+                  </p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                    Mulai dari alert dan observation, bukan dari semua angka sekaligus
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    KPI Command Center ini paling berguna kalau dibaca berurutan: lihat alert aktif, baca observation utama, lalu turun ke leaderboard, source performance, dan snapshot history hanya saat perlu verifikasi lebih dalam.
+                  </p>
+                </div>
+                <Link
+                  href="/dashboard/notifications"
+                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                >
+                  Buka Notification Center
+                </Link>
+              </div>
+            </section>
+
+            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Cara Pakai Halaman Ini
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <UsageHint
+                  title="1. Baca health summary dulu"
+                  description="Angka paling atas memberi gambaran cepat apakah pipeline sehat atau butuh intervensi."
+                />
+                <UsageHint
+                  title="2. Fokus ke alert dan executive action"
+                  description="Dua blok ini adalah bagian yang paling dekat ke keputusan nyata, bukan hanya observasi."
+                />
+                <UsageHint
+                  title="3. Gunakan history untuk validasi tren"
+                  description="Snapshot history dan persistent alert dipakai saat Anda ingin memastikan apakah masalahnya insidental atau berulang."
+                />
+              </div>
+            </section>
+
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Total Leads"
@@ -290,6 +332,31 @@ export default function KpiCommandCenterPage() {
                 label="Win Rate"
                 value={formatPercent(kpi.summary.win_rate)}
                 hint="Persentase deal won dibanding deal yang sudah benar-benar closed."
+              />
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
+                label="Marketing Leads Generated"
+                value={String(kpi.marketing_execution_summary.leads_generated)}
+                hint="Jumlah lead yang secara manual diatribusikan dari execution marketing."
+              />
+              <MetricCard
+                label="Marketing Won Leads"
+                value={String(kpi.marketing_execution_summary.won_leads)}
+                hint="Lead won yang dikaitkan langsung ke output marketing."
+              />
+              <MetricCard
+                label="Marketing Attributed Won"
+                value={formatIdr(kpi.marketing_execution_summary.attributed_won_value)}
+                hint="Won value yang diatribusikan ke campaign atau execution item marketing."
+              />
+              <MetricCard
+                label="Marketing Attributed Deposit"
+                value={formatIdr(
+                  kpi.marketing_execution_summary.attributed_deposit_amount
+                )}
+                hint="Deposit yang sudah tercatat sebagai hasil dari execution marketing."
               />
             </section>
 
@@ -933,6 +1000,21 @@ export default function KpiCommandCenterPage() {
         )}
       </div>
     </WorkspaceShell>
+  );
+}
+
+function UsageHint({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
   );
 }
 
