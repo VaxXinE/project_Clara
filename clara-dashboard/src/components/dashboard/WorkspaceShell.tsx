@@ -3,6 +3,7 @@
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
   faArrowTrendUp,
+  faBars,
   faBookOpen,
   faBriefcase,
   faBuildingShield,
@@ -15,10 +16,12 @@ import {
   faGaugeHigh,
   faUsersGear,
   faWandSparkles,
+  faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { formatStatusLabel } from "@/lib/format";
 import type { CurrentUser } from "@/types/dashboard";
@@ -185,15 +188,59 @@ export function WorkspaceShell({
   const pathname = usePathname();
   const navGroups = buildNavGroups(currentUser);
   const todayLabel = getTodayLabel();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (!mobileNavOpen) {
+      document.body.style.removeProperty("overflow");
+
+      return;
+    }
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.removeProperty("overflow");
+    };
+  }, [mobileNavOpen]);
 
   return (
     <main className="min-h-screen bg-transparent text-slate-900">
-      <div className="min-h-screen xl:grid xl:grid-cols-[292px_minmax(0,1fr)] xl:items-start">
-        <aside className="relative overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#0f162c_0%,#15203b_48%,#10172d_100%)] text-white xl:sticky xl:top-0 xl:flex xl:h-screen xl:flex-col">
+      <div className="relative min-h-screen xl:grid xl:grid-cols-[292px_minmax(0,1fr)] xl:items-start">
+        <div
+          className={`fixed inset-0 z-40 bg-slate-950/44 backdrop-blur-[2px] transition-opacity duration-300 xl:hidden ${
+            mobileNavOpen
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0"
+          }`}
+          aria-hidden="true"
+          onClick={() => setMobileNavOpen(false)}
+        />
+
+        <aside
+          id="clara-mobile-sidebar"
+          className={`fixed inset-y-0 left-0 z-50 flex w-[292px] max-w-[86vw] flex-col overflow-hidden border-r border-white/10 bg-[linear-gradient(180deg,#0f162c_0%,#15203b_48%,#10172d_100%)] text-white shadow-[0_24px_48px_rgba(15,23,42,0.34)] transition-transform duration-300 xl:sticky xl:top-0 xl:z-auto xl:h-screen xl:w-auto xl:max-w-none xl:translate-x-0 xl:shadow-none ${
+            mobileNavOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
           <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top,_rgba(212,176,123,0.34),_transparent_70%)] opacity-90" />
           <div className="absolute inset-y-0 right-0 hidden w-px bg-white/8 xl:block" />
 
           <div className="relative shrink-0 border-b border-white/10 px-5 py-5">
+            <div className="mb-4 flex items-center justify-between xl:hidden">
+              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#d4b07b]">
+                Navigation
+              </p>
+              <button
+                type="button"
+                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/8 text-slate-100"
+                onClick={() => setMobileNavOpen(false)}
+                aria-label="Tutup menu"
+              >
+                <FontAwesomeIcon icon={faXmark} className="h-4 w-4" />
+              </button>
+            </div>
+
             <div className="rounded-[28px] border border-white/10 bg-white/6 p-4 shadow-[0_18px_34px_rgba(3,7,18,0.22)] backdrop-blur-sm">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f8ead2_0%,#d4b07b_100%)] text-[#10172d] shadow-[0_12px_22px_rgba(0,0,0,0.18)]">
@@ -236,6 +283,7 @@ export function WorkspaceShell({
                       <Link
                         key={item.href}
                         href={item.href}
+                        onClick={() => setMobileNavOpen(false)}
                         className={`group flex items-center gap-3 rounded-[22px] px-3 py-3 transition ${
                           active
                             ? "bg-[linear-gradient(135deg,#fff7ea_0%,#ecd4af_100%)] text-[#10172d] shadow-[0_14px_28px_rgba(0,0,0,0.18)]"
@@ -276,6 +324,30 @@ export function WorkspaceShell({
         </aside>
 
         <section className="min-w-0">
+          <div className="sticky top-0 z-30 px-4 pt-4 sm:px-6 xl:hidden">
+            <div className="clara-surface flex items-center justify-between rounded-[24px] border px-4 py-3 shadow-[0_14px_30px_rgba(22,31,54,0.08)] backdrop-blur-xl">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8e6b3f]">
+                  Clara Workspace
+                </p>
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {getWorkspaceTitle(currentUser)}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#10172d] text-white shadow-[0_12px_24px_rgba(16,23,45,0.22)]"
+                onClick={() => setMobileNavOpen(true)}
+                aria-label="Buka menu"
+                aria-expanded={mobileNavOpen}
+                aria-controls="clara-mobile-sidebar"
+              >
+                <FontAwesomeIcon icon={faBars} className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
           <div className="px-4 pb-7 pt-4 sm:px-6 xl:px-8 xl:pt-6">
             <div className="clara-surface overflow-hidden rounded-[32px] border px-5 py-5 shadow-[0_18px_40px_rgba(22,31,54,0.06)] sm:px-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
