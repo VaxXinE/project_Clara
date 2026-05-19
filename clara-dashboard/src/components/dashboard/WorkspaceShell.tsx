@@ -14,6 +14,7 @@ import {
   faCloudArrowUp,
   faComments,
   faGaugeHigh,
+  faRightFromBracket,
   faUsersGear,
   faWandSparkles,
   faXmark,
@@ -23,6 +24,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { apiFetch } from "@/lib/api";
 import { formatStatusLabel } from "@/lib/format";
 import type { CurrentUser } from "@/types/dashboard";
 
@@ -48,6 +50,39 @@ type NavGroup = {
   title: string;
   items: NavItem[];
 };
+
+function getRolePrinciples(role?: string) {
+  if (role === "owner") {
+    return {
+      title: "Mode Owner",
+      items: [
+        "Mulai dari KPI, alert, dan notification untuk membaca kesehatan bisnis lebih dulu.",
+        "Turun ke marketing, pipeline, atau identity hanya saat ada sinyal yang perlu intervensi.",
+        "Gunakan halaman operasional untuk verifikasi, bukan sebagai titik pantau utama harian.",
+      ],
+    };
+  }
+
+  if (role === "admin") {
+    return {
+      title: "Mode Admin",
+      items: [
+        "Mulai dari notification, approvals, dan KPI agar bottleneck tim cepat terlihat.",
+        "Pastikan workflow sales dan lead pipeline tetap rapi sebelum masuk ke area insight.",
+        "Users dan Admin Ops dipakai saat ada masalah akses atau kontrol organisasi.",
+      ],
+    };
+  }
+
+  return {
+    title: "Mode Marketing",
+    items: [
+      "Mulai dari import chat atau Chat Masuk, lalu bergerak ke lead dan follow-up.",
+      "Gunakan AI analysis dan draft sebagai alat bantu, bukan pengganti pengecekan konteks chat.",
+      "Naikkan ke approvals, notifications, atau CRM saat conversation sudah butuh tindakan lanjutan.",
+    ],
+  };
+}
 
 function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   if (!currentUser) {
@@ -187,8 +222,10 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   const pathname = usePathname();
   const navGroups = buildNavGroups(currentUser);
+  const rolePrinciples = getRolePrinciples(currentUser?.role);
   const todayLabel = getTodayLabel();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     if (!mobileNavOpen) {
@@ -203,6 +240,18 @@ export function WorkspaceShell({
       document.body.style.removeProperty("overflow");
     };
   }, [mobileNavOpen]);
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+
+    try {
+      await apiFetch<void>("/auth/logout", { method: "POST" });
+    } catch {
+      // Ignore logout API failure and still force redirect to login.
+    } finally {
+      window.location.href = "/login";
+    }
+  }
 
   return (
     <main className="min-h-screen bg-transparent text-slate-900">
@@ -321,11 +370,32 @@ export function WorkspaceShell({
               </div>
             ))}
           </div>
+
+          <div className="relative mt-auto border-t border-white/10 px-4 py-4">
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              disabled={isLoggingOut}
+              className="flex w-full items-center gap-3 rounded-[22px] border border-red-500/10 bg-red-500/6 px-3 py-3 text-left text-red-100 hover:border-red-500/16 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-red-500/10 bg-red-500/8 text-red-100">
+                <FontAwesomeIcon
+                  icon={faRightFromBracket}
+                  className="h-4 w-4"
+                />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">
+                  {isLoggingOut ? "Keluar..." : "Logout"}
+                </span>
+              </span>
+            </button>
+          </div>
         </aside>
 
-        <section className="min-w-0">
-          <div className="sticky top-0 z-30 px-4 pt-4 sm:px-6 xl:hidden">
-            <div className="clara-surface flex items-center justify-between rounded-[24px] border px-4 py-3 shadow-[0_14px_30px_rgba(22,31,54,0.08)] backdrop-blur-xl">
+        <section className="min-w-0 px-5 pb-5 pt-24 sm:px-7 sm:pb-7 sm:pt-28 xl:py-7">
+          <div className="fixed inset-x-0 top-1 z-30 px-5 pt-3 sm:px-7 sm:pt-4 xl:hidden">
+            <div className="clara-surface flex items-center justify-between rounded-[24px] border px-4 py-3 shadow-xl backdrop-blur-xl">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8e6b3f]">
                   Clara Workspace
@@ -348,57 +418,36 @@ export function WorkspaceShell({
             </div>
           </div>
 
-          <div className="px-4 pb-7 pt-4 sm:px-6 xl:px-8 xl:pt-6">
-            <div className="clara-surface overflow-hidden rounded-[32px] border px-5 py-5 shadow-[0_18px_40px_rgba(22,31,54,0.06)] sm:px-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                    <span className="font-semibold uppercase tracking-[0.24em] text-[#8e6b3f]">
-                      {eyebrow}
-                    </span>
-                    {backHref && backLabel ? (
-                      <Link
-                        href={backHref}
-                        className="clara-button clara-button-ghost px-3 py-1.5 text-sm font-semibold"
-                      >
-                        <FontAwesomeIcon
-                          icon={faChevronLeft}
-                          className="h-3 w-3"
-                        />
-                        {backLabel}
-                      </Link>
-                    ) : null}
-                  </div>
-                  <h1 className="mt-2 text-[1.85rem] font-bold tracking-[-0.04em] text-slate-950 sm:text-[2.2rem]">
-                    {title}
-                  </h1>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-[15px]">
-                    {description}
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-start gap-2.5 lg:min-w-[280px] lg:items-end">
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 lg:justify-end">
-                    <span className="rounded-full border border-white/70 bg-white/82 px-3 py-1.5 font-medium text-slate-700 shadow-sm">
-                      {todayLabel}
-                    </span>
-                    {currentUser ? (
-                      <span className="clara-chip">
-                        {formatStatusLabel(currentUser.role)}
-                      </span>
-                    ) : null}
-                  </div>
-                  {actions ? (
-                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                      {actions}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
+          <div className="mb-6 grid gap-4 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.035),rgba(255,255,255,0.85)_45%,rgba(184,138,90,0.08))] p-5 sm:grid-cols-[1.2fr_0.8fr] sm:p-6">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">
+                {eyebrow}
+              </p>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                {title}
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">
+                {description}
+              </p>
             </div>
-
-            <div className="pt-6">{children}</div>
+            <div className="rounded-[24px] border border-white/80 bg-white/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  {rolePrinciples.title}
+                </p>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                  {todayLabel}
+                </span>
+              </div>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                {rolePrinciples.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
           </div>
+
+          <div className="pt-6">{children}</div>
         </section>
       </div>
     </main>

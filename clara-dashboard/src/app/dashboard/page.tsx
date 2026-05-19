@@ -19,6 +19,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { RoleBasedStartGuide } from "@/components/dashboard/RoleBasedStartGuide";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import {
@@ -237,19 +238,19 @@ export default function DashboardHomePage() {
           </Link>
           <Link
             href="/dashboard/sales"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-secondary"
           >
             Buka Chat Masuk
           </Link>
           <Link
             href="/dashboard/channels"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-secondary"
           >
             Channels
           </Link>
           <Link
             href="/dashboard/notifications"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-secondary"
           >
             Notifications
           </Link>
@@ -437,56 +438,7 @@ export default function DashboardHomePage() {
           />
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Cara Pakai Clara
-              </p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
-                Gunakan Clara dalam 4 langkah
-              </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-                Kalau Anda bingung harus mulai dari mana, jangan lompat ke semua menu sekaligus.
-                Clara paling mudah dipakai dengan alur ini: masukkan chat, review chat masuk,
-                ubah jadi lead kerja, lalu eksekusi follow-up harian.
-              </p>
-            </div>
-            <Link
-              href="/dashboard/start"
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
-            >
-              Buka Panduan Lengkap
-            </Link>
-          </div>
-
-          <div className="mt-5 grid gap-4 xl:grid-cols-4">
-            <WorkflowStepCard
-              step="1"
-              title="Import Chat"
-              description="Upload TXT atau paste chat ke Clara."
-              href="/dashboard/upload"
-            />
-            <WorkflowStepCard
-              step="2"
-              title="Review Chat Masuk"
-              description="Buka percakapan, jalankan AI analysis, dan siapkan draft."
-              href="/dashboard/sales"
-            />
-            <WorkflowStepCard
-              step="3"
-              title="Kelola Lead"
-              description="Pindahkan stage, atur follow-up, dan baca identity customer."
-              href="/dashboard/crm"
-            />
-            <WorkflowStepCard
-              step="4"
-              title="Eksekusi Tindakan"
-              description="Gunakan worklist, approvals, dan notifications untuk aksi harian."
-              href="/dashboard/follow-up"
-            />
-          </div>
-        </section>
+        <RoleBasedStartGuide currentUser={currentUser} compact />
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <PanelFrame
@@ -495,93 +447,10 @@ export default function DashboardHomePage() {
             actionLabel="Lihat inbox"
             actionHref="/dashboard/sales"
           >
-            <div className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                {quickLinks.map((item) => (
-                  <ActionCard key={item.href} item={item} />
-                ))}
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  Paling Sering Dipakai
-                </p>
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  <ActionCard
-                    href="/dashboard/start"
-                    title="Mulai dari Sini"
-                    description="Panduan langkah demi langkah supaya user baru tidak bingung membaca alur Clara."
-                  />
-                  <ActionCard
-                    href="/dashboard/sales"
-                    title="Chat Masuk"
-                    description="Masuk ke antrian percakapan, buka detail customer, dan lanjutkan follow-up."
-                  />
-                  <ActionCard
-                    href="/dashboard/upload"
-                    title="Import Chat"
-                    description="Masukkan export chat baru atau paste chat langsung untuk diparse menjadi conversation."
-                  />
-                  <ActionCard
-                    href="/dashboard/crm"
-                    title="Lead Pipeline"
-                    description="Lihat lead yang sudah terbentuk dari conversation dan mulai atur stage CRM dasarnya."
-                  />
-                  <ActionCard
-                    href="/dashboard/follow-up"
-                    title="AI Worklist"
-                    description="Buka daftar follow-up harian yang sudah diprioritaskan Clara dari hot lead, overdue, dan draft siap kirim."
-                  />
-                  <ActionCard
-                    href="/dashboard/approvals"
-                    title="Approval Queue"
-                    description="Lihat draft pending approval dan escalation tanpa buka conversation satu per satu."
-                  />
-                </div>
-
-                <div className="mt-6 border-t border-slate-200 pt-6">
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    Tools Tambahan
-                  </p>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <ActionCard
-                      href="/dashboard/knowledge"
-                      title="Product Knowledge"
-                      description="Kelola fakta produk, legalitas, dan policy supaya reply AI tetap grounded."
-                    />
-                    <ActionCard
-                      href={canAccessInsights ? "/dashboard/marketing" : "/dashboard/sales"}
-                      title={canAccessInsights ? "Marketing Insights" : "Operational Flow"}
-                      description={
-                        canAccessInsights
-                          ? "Baca tren objection, insight snapshot, dan sinyal market dari percakapan customer."
-                          : "Lanjutkan alur operasional harian dari inbox, analisis, hingga reply."
-                      }
-                    />
-                    {canAccessAdmin && (
-                      <ActionCard
-                        href="/dashboard/kpi"
-                        title="KPI Command Center"
-                        description="Baca leaderboard sales, health pipeline per organization, dan KPI foundation untuk owner/admin."
-                      />
-                    )}
-                    {canAccessAdmin && (
-                      <ActionCard
-                        href="/dashboard/admin/access"
-                        title="User Management"
-                        description="Kelola akses user dan organization sesuai role yang berwenang."
-                      />
-                    )}
-                    {canAccessAdmin && (
-                      <ActionCard
-                        href="/dashboard/admin/ops"
-                        title="Admin Ops"
-                        description="Lihat overview database dan metadata sistem tanpa buka PostgreSQL client."
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {quickLinks.map((item) => (
+                <ActionCard key={item.href} item={item} />
+              ))}
             </div>
           </PanelFrame>
 
@@ -1129,31 +998,6 @@ function NoteCard({
         </div>
       </div>
     </div>
-  );
-}
-
-function WorkflowStepCard({
-  step,
-  title,
-  description,
-  href,
-}: {
-  step: string;
-  title: string;
-  description: string;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5 transition hover:border-slate-300 hover:bg-white"
-    >
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
-        {step}
-      </span>
-      <h3 className="mt-4 text-lg font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-    </Link>
   );
 }
 

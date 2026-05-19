@@ -193,56 +193,58 @@ function ConversationUsageGuide({
 }) {
   const extraction = detail.latest_ai_extraction;
   const suggestion = detail.latest_reply_suggestion;
+  const sentCount = detail.sent_messages.length;
+
+  const nextStep = !extraction
+    ? {
+        title: "Jalankan AI analysis dulu",
+        description:
+          "Tanpa AI analysis, Anda belum punya ringkasan stage, risiko, objection, dan next best action. Ini langkah pertama yang paling masuk akal.",
+      }
+    : !suggestion
+      ? {
+          title: "Buat draft balasan",
+          description:
+            "Analisis sudah ada. Langkah berikutnya adalah menghasilkan reply suggestion supaya conversation ini bisa ditindaklanjuti dengan cepat.",
+        }
+      : sentCount === 0
+        ? {
+            title: "Review lalu kirim atau approve draft",
+            description:
+              "Draft sudah tersedia. Sekarang fokus Anda adalah mengecek kesesuaian bahasa, approval status, dan apakah balasan sudah siap dikirim.",
+          }
+        : {
+            title: "Naikkan konteksnya ke lead dan follow-up",
+            description:
+              "Percakapan ini sudah punya jejak balasan. Pastikan lead stage, task, dan follow-up berikutnya di CRM sudah ikut rapi.",
+          };
 
   return (
-    <section className="clara-card-soft rounded-[28px] p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section className="clara-card rounded-[30px] p-5 sm:p-6">
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <div>
-          <p className="clara-kicker">Cara Baca Conversation</p>
-          <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-            Fokus kerja yang disarankan di halaman ini
+          <p className="clara-kicker">Langkah Berikutnya</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+            {nextStep.title}
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Mulai dari timeline chat, cek hasil analisis AI, lalu review draft
-            balasan sebelum Anda mengirim follow-up ke customer.
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+            {nextStep.description}
           </p>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[360px]">
-          <MetaPill label="Source" value={detail.source_label} />
-          <MetaPill label="Status" value={formatStatusLabel(detail.status)} />
-          <MetaPill
-            label="Started"
-            value={detail.started_at ? formatDateTime(detail.started_at) : "-"}
+        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+          <UsageCard
+            title="1. Baca chat dulu"
+            description="Pahami konteks terbaru sebelum melihat analisis atau draft."
           />
-          <MetaPill
-            label="Reply draft"
-            value={suggestion ? formatStatusLabel(suggestion.approval_status) : "Belum ada"}
+          <UsageCard
+            title="2. Lihat AI analysis"
+            description="Gunakan stage, risk, objection, dan next action sebagai panduan keputusan."
+          />
+          <UsageCard
+            title="3. Putuskan aksi"
+            description="Entah generate draft, approve/kirim, atau pindah ke lead detail untuk follow-up."
           />
         </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        <InfoBlock
-          label="1. Pahami konteks"
-          value="Baca 3-5 pesan terakhir untuk memastikan kebutuhan customer, urgensi, dan siapa yang terakhir berbicara."
-        />
-        <InfoBlock
-          label="2. Validasi AI"
-          value={
-            extraction
-              ? `Clara membaca stage ${formatStatusLabel(extraction.pipeline_stage)} dengan aksi ${extraction.next_best_action}. Pastikan ini masih relevan.`
-              : "Jalankan AI analysis dulu agar Clara bisa membaca sentiment, stage, objection, dan next best action."
-          }
-        />
-        <InfoBlock
-          label="3. Putuskan tindakan"
-          value={
-            suggestion
-              ? "Review reply suggestion, cek approval status, lalu kirim atau revisi sesuai kebutuhan customer."
-              : "Kalau arahnya sudah jelas, generate reply suggestion untuk menyiapkan draft follow-up yang lebih cepat."
-          }
-        />
       </div>
     </section>
   );
@@ -455,6 +457,21 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
     <div className="clara-card-soft rounded-[22px] p-4">
       <p className="clara-kicker text-[11px]">{label}</p>
       <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
+    </div>
+  );
+}
+
+function UsageCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="clara-card-soft rounded-[22px] p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
     </div>
   );
 }
