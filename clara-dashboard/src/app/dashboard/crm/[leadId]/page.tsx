@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -105,11 +105,11 @@ export default function LeadDetailPage() {
 
   const canReassignLead = currentUser?.role === "admin" || currentUser?.role === "owner";
 
-  async function fetchLeadDetail(): Promise<LeadDetail> {
+  const fetchLeadDetail = useCallback(async (): Promise<LeadDetail> => {
     return apiFetch<LeadDetail>(`/leads/${leadId}`);
-  }
+  }, [leadId]);
 
-  async function loadLeadDetail() {
+  const loadLeadDetail = useCallback(async () => {
     if (!leadId) {
       setErrorMessage("Lead ID tidak valid.");
       setIsLoading(false);
@@ -152,7 +152,7 @@ export default function LeadDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [fetchLeadDetail, leadId]);
 
   async function handleSaveDeal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -206,8 +206,12 @@ export default function LeadDetailPage() {
   }
 
   useEffect(() => {
-    void loadLeadDetail();
-  }, [leadId]);
+    const timer = setTimeout(() => {
+      void loadLeadDetail();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [loadLeadDetail]);
 
   const openTasks = useMemo(
     () => (lead?.tasks ?? []).filter((task) => task.status === "open" || task.status === "snoozed"),

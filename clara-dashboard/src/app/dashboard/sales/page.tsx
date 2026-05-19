@@ -33,7 +33,7 @@ export default function SalesInboxPage() {
           sourceChannelFilter === "all"
             ? "/dashboard/sales/inbox"
             : `/dashboard/sales/inbox?source_channel=${encodeURIComponent(
-                sourceChannelFilter
+                sourceChannelFilter,
               )}`;
         const [data, me] = await Promise.all([
           apiFetch<SalesInboxItem[]>(inboxPath),
@@ -44,7 +44,7 @@ export default function SalesInboxPage() {
         setErrorMessage("");
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Failed to load inbox."
+          error instanceof Error ? error.message : "Failed to load inbox.",
         );
       } finally {
         setIsLoading(false);
@@ -52,7 +52,7 @@ export default function SalesInboxPage() {
     }
 
     void loadInbox();
-  }, [sourceChannelFilter]);
+  }, []);
 
   const canAccessMarketing =
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
@@ -62,11 +62,13 @@ export default function SalesInboxPage() {
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
 
   const analyzedCount = inboxItems.filter(
-    (item) => item.latest_ai_extraction !== null
+    (item) => item.latest_ai_extraction !== null,
   ).length;
-  const sentCount = inboxItems.filter((item) => item.latest_sent_message).length;
+  const sentCount = inboxItems.filter(
+    (item) => item.latest_sent_message,
+  ).length;
   const highRiskCount = inboxItems.filter(
-    (item) => item.latest_ai_extraction?.risk_level === "high"
+    (item) => item.latest_ai_extraction?.risk_level === "high",
   ).length;
 
   async function handleLogout() {
@@ -92,33 +94,33 @@ export default function SalesInboxPage() {
           {canAccessMarketing && (
             <Link
               href="/dashboard/marketing"
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              className="clara-button clara-button-ghost"
             >
               Marketing Insights
             </Link>
           )}
           <Link
             href="/dashboard/crm"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-ghost"
           >
             Lead Pipeline
           </Link>
           <Link
             href="/dashboard/follow-up"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-ghost"
           >
             AI Worklist
           </Link>
           <Link
             href="/dashboard/approvals"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-ghost"
           >
             Approval Queue
           </Link>
           {canAccessKnowledge && (
             <Link
               href="/dashboard/knowledge"
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              className="clara-button clara-button-ghost"
             >
               Product Knowledge
             </Link>
@@ -126,7 +128,7 @@ export default function SalesInboxPage() {
           {canAccessAdminOps && (
             <Link
               href="/dashboard/admin/ops"
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              className="clara-button clara-button-ghost"
             >
               Admin Ops
             </Link>
@@ -134,14 +136,14 @@ export default function SalesInboxPage() {
           {canAccessAdminOps && (
             <Link
               href="/dashboard/admin/access"
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              className="clara-button clara-button-ghost"
             >
               Manage Users
             </Link>
           )}
           <Link
             href="/dashboard/upload"
-            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+            className="clara-button clara-button-primary"
           >
             Upload Chat Baru
           </Link>
@@ -150,7 +152,7 @@ export default function SalesInboxPage() {
             onClick={() => {
               void handleLogout();
             }}
-            className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+            className="clara-button clara-button-ghost"
           >
             Logout
           </button>
@@ -159,13 +161,13 @@ export default function SalesInboxPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-slate-600">
             Loading inbox...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div className="clara-alert clara-alert-danger">
             {errorMessage}. Coba login ulang di{" "}
             <Link href="/login" className="font-semibold underline">
               halaman login
@@ -236,17 +238,17 @@ export default function SalesInboxPage() {
 
             <section className="grid gap-4">
               {inboxItems.length === 0 ? (
-                <div className="rounded-[28px] border border-dashed border-slate-300 bg-white p-10 text-center shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+                <div className="clara-empty-state">
                   <h2 className="text-xl font-semibold text-slate-900">
                     Belum ada conversation
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Workspace ini akan mulai terasa hidup setelah chat WhatsApp atau Telegram pertama
-                    di-upload dan diparse menjadi conversation.
+                    Workspace ini akan mulai terasa hidup setelah chat WhatsApp
+                    pertama di-upload dan diparse menjadi conversation.
                   </p>
                   <Link
                     href="/dashboard/upload"
-                    className="mt-5 inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
+                    className="clara-button clara-button-primary mt-5"
                   >
                     Upload Chat Pertama
                   </Link>
@@ -254,13 +256,12 @@ export default function SalesInboxPage() {
               ) : (
                 inboxItems.map((item) => {
                   const extraction = item.latest_ai_extraction;
-                  const suggestion = item.latest_reply_suggestion;
 
                   return (
                     <Link
                       key={item.conversation_id}
                       href={`/dashboard/sales/conversations/${item.conversation_id}`}
-                      className="group block rounded-[28px] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#fbfcfe_100%)] p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+                      className="clara-card group block rounded-[30px] p-5 transition hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(15,23,42,0.09)]"
                     >
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0 flex-1">
@@ -272,7 +273,7 @@ export default function SalesInboxPage() {
                             {extraction && (
                               <span
                                 className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                                  extraction.lead_temperature
+                                  extraction.lead_temperature,
                                 )}`}
                               >
                                 {extraction.lead_temperature.toUpperCase()}
@@ -282,7 +283,7 @@ export default function SalesInboxPage() {
                             {extraction && (
                               <span
                                 className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
-                                  extraction.risk_level
+                                  extraction.risk_level,
                                 )}`}
                               >
                                 Risk {extraction.risk_level}
@@ -303,20 +304,19 @@ export default function SalesInboxPage() {
                           </p>
 
                           <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
-                            <span>Source: {item.source_label}</span>
-                            <span>•</span>
                             <span>
-                              Pesan terakhir: {formatDateTime(item.last_message_at)}
+                              Pesan terakhir:{" "}
+                              {formatDateTime(item.last_message_at)}
                             </span>
-                            <span>•</span>
+                            <span>&bull;</span>
                             <span>Priority: {item.priority_score}</span>
-                            <span>•</span>
+                            <span>&bull;</span>
                             <span>{formatStatusLabel(item.ui_status)}</span>
                           </div>
                         </div>
 
-                        <div className="w-full rounded-[24px] border border-slate-200 bg-slate-50/90 p-4 md:w-80">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                        <div className="clara-card-soft w-full rounded-[24px] p-4 md:w-80">
+                          <p className="clara-kicker text-[11px]">
                             Langkah berikutnya
                           </p>
                           <p className="mt-3 text-sm leading-6 text-slate-700">
@@ -324,7 +324,7 @@ export default function SalesInboxPage() {
                               "Belum dianalisis. Jalankan AI analysis dulu."}
                           </p>
 
-                          <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                          <p className="clara-kicker mt-5 text-[11px]">
                             Status balasan
                           </p>
                           <p className="mt-2 text-sm font-medium text-slate-800">
@@ -364,11 +364,9 @@ function OverviewTile({
 
   return (
     <article
-      className={`rounded-[24px] border border-slate-200 bg-gradient-to-br p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)] ${toneClass}`}
+      className={`clara-card rounded-[26px] bg-gradient-to-br p-5 ${toneClass}`}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-        {label}
-      </p>
+      <p className="clara-kicker text-[11px] text-slate-500">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
         {value}
       </p>

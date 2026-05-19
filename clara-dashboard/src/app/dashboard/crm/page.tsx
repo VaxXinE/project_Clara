@@ -64,7 +64,7 @@ export default function CrmPage() {
       setErrorMessage("");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat CRM board."
+        error instanceof Error ? error.message : "Gagal memuat CRM board.",
       );
     } finally {
       setIsLoading(false);
@@ -72,8 +72,12 @@ export default function CrmPage() {
   }
 
   useEffect(() => {
-    void loadCrmBoard();
-  }, [sourceChannelFilter]);
+    const timer = setTimeout(() => {
+      void loadCrmBoard();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const stageBuckets = useMemo(() => {
     return STAGE_ORDER.map((stage) => ({
@@ -93,11 +97,11 @@ export default function CrmPage() {
       });
 
       setLeads((previous) =>
-        previous.map((lead) => (lead.id === leadId ? updatedLead : lead))
+        previous.map((lead) => (lead.id === leadId ? updatedLead : lead)),
       );
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal mengubah stage lead."
+        error instanceof Error ? error.message : "Gagal mengubah stage lead.",
       );
     } finally {
       setUpdatingLeadId(null);
@@ -116,13 +120,13 @@ export default function CrmPage() {
         <>
           <Link
             href="/dashboard/sales"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-ghost"
           >
             Conversation Inbox
           </Link>
           <Link
             href="/dashboard/upload"
-            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+            className="clara-button clara-button-primary"
           >
             Upload Chat Baru
           </Link>
@@ -154,24 +158,28 @@ export default function CrmPage() {
                 label="Perlu Ditindak"
                 value={String(
                   leads.filter((lead) =>
-                    ["new_lead", "qualification", "objection", "closing"].includes(
-                      lead.current_stage
-                    )
-                  ).length
+                    [
+                      "new_lead",
+                      "qualification",
+                      "objection",
+                      "closing",
+                    ].includes(lead.current_stage),
+                  ).length,
                 )}
                 hint="Lead yang masih aktif di pipeline."
               />
               <BoardMetric
                 label="Hot Leads"
                 value={String(
-                  leads.filter((lead) => lead.lead_temperature === "hot").length
+                  leads.filter((lead) => lead.lead_temperature === "hot")
+                    .length,
                 )}
                 hint="Lead dengan urgensi tertinggi saat ini."
               />
               <BoardMetric
                 label="Won"
                 value={String(
-                  leads.filter((lead) => lead.current_stage === "won").length
+                  leads.filter((lead) => lead.current_stage === "won").length,
                 )}
                 hint="Lead yang sudah masuk tahap berhasil."
               />
@@ -184,7 +192,8 @@ export default function CrmPage() {
                     Filter Channel
                   </p>
                   <p className="mt-1 text-sm text-slate-600">
-                    Lihat pipeline per channel supaya lead WhatsApp dan Telegram tidak tercampur.
+                    Lihat pipeline per channel supaya lead WhatsApp dan Telegram
+                    tidak tercampur.
                   </p>
                 </div>
 
@@ -231,7 +240,7 @@ export default function CrmPage() {
 
                   <div className="mt-4 space-y-3">
                     {bucket.items.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                      <div className="clara-empty-state p-4 text-sm text-slate-500">
                         Belum ada lead di stage ini.
                       </div>
                     ) : (
@@ -246,7 +255,7 @@ export default function CrmPage() {
                             </h2>
                             <span
                               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                                lead.lead_temperature
+                                lead.lead_temperature,
                               )}`}
                             >
                               {lead.lead_temperature.toUpperCase()}
@@ -254,18 +263,23 @@ export default function CrmPage() {
                           </div>
 
                           <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
-                            {lead.summary ?? "Belum ada summary lead. Jalankan AI analysis dulu."}
+                            {lead.summary ??
+                              "Belum ada summary lead. Jalankan AI analysis dulu."}
                           </p>
 
                           <div className="mt-4 space-y-2 text-xs text-slate-500">
-                            <p>Last contact: {formatDateTime(lead.last_contact_at)}</p>
+                            <p>
+                              Last contact:{" "}
+                              {formatDateTime(lead.last_contact_at)}
+                            </p>
                             <p>Conversation: {lead.conversation_count}</p>
                             <p>
                               Customer profile:{" "}
                               {lead.customer_profile_name ?? "Belum terhubung"}
                             </p>
                             <p>
-                              Source: {lead.source_label} ({lead.source_channel})
+                              Source: {lead.source_label} ({lead.source_channel}
+                              )
                             </p>
                             <p>
                               Owner:{" "}
@@ -279,10 +293,13 @@ export default function CrmPage() {
                           <select
                             value={lead.current_stage}
                             onChange={(event) => {
-                              void handleStageChange(lead.id, event.target.value);
+                              void handleStageChange(
+                                lead.id,
+                                event.target.value,
+                              );
                             }}
                             disabled={updatingLeadId === lead.id}
-                            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-400"
+                            className="clara-select mt-2"
                           >
                             {STAGE_ORDER.map((stage) => (
                               <option key={stage} value={stage}>
@@ -294,14 +311,14 @@ export default function CrmPage() {
                           <div className="mt-4 flex flex-wrap gap-2">
                             <Link
                               href={`/dashboard/crm/${lead.id}`}
-                              className="inline-flex rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                              className="clara-button clara-button-ghost px-3 py-2 text-xs"
                             >
                               Detail Lead
                             </Link>
                             {lead.latest_conversation_id && (
                               <Link
                                 href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
-                                className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                                className="clara-button clara-button-primary px-3 py-2 text-xs"
                               >
                                 Buka Conversation
                               </Link>
@@ -331,10 +348,8 @@ function BoardMetric({
   hint: string;
 }) {
   return (
-    <article className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-        {label}
-      </p>
+    <article className="clara-card rounded-[24px] p-5">
+      <p className="clara-kicker text-[11px] text-slate-500">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
         {value}
       </p>

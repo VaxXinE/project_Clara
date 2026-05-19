@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { ConversationAiActions } from "@/components/dashboard/ConversationAiActions";
 import { ReplySuggestionActions } from "@/components/dashboard/ReplySuggestionActions";
+import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import {
   formatDateTime,
@@ -13,17 +14,18 @@ import {
   getLeadBadgeClass,
   getRiskBadgeClass,
 } from "@/lib/format";
-import type { SalesConversationDetail } from "@/types/dashboard";
+import type { CurrentUser, SalesConversationDetail } from "@/types/dashboard";
 
 export default function SalesConversationDetailPage() {
   const params = useParams<{ conversationId: string }>();
   const conversationId = params.conversationId;
 
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [detail, setDetail] = useState<SalesConversationDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
-  async function loadConversationDetail() {
+  const loadConversationDetail = useCallback(async () => {
     if (!conversationId) {
       setDetail(null);
       setErrorMessage("Conversation ID tidak valid.");
@@ -35,10 +37,14 @@ export default function SalesConversationDetailPage() {
     setIsLoading(true);
 
     try {
-      const data = await apiFetch<SalesConversationDetail>(
-        `/dashboard/sales/conversations/${conversationId}`
-      );
+      const [data, me] = await Promise.all([
+        apiFetch<SalesConversationDetail>(
+          `/dashboard/sales/conversations/${conversationId}`
+        ),
+        apiFetch<CurrentUser>("/auth/me"),
+      ]);
       setDetail(data);
+      setCurrentUser(me);
     } catch (error) {
       setDetail(null);
       setErrorMessage(
@@ -49,32 +55,39 @@ export default function SalesConversationDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }
-
-  useEffect(() => {
-    void loadConversationDetail();
   }, [conversationId]);
 
-  return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section>
-          <Link
-            href="/dashboard/sales"
-            className="text-sm font-medium text-slate-600 hover:text-slate-950"
-          >
-            ← Back to Sales Inbox
-          </Link>
-        </section>
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void loadConversationDetail();
+    }, 0);
 
+    return () => clearTimeout(timer);
+  }, [loadConversationDetail]);
+
+  return (
+    <WorkspaceShell
+      currentUser={currentUser}
+      eyebrow="Conversation detail"
+      title={detail?.title ?? "Detail percakapan"}
+      description="Baca timeline chat, cek hasil analisis AI, dan review draft balasan dari satu layar kerja yang konsisten."
+      backHref="/dashboard/sales"
+      backLabel="Kembali ke inbox"
+      actions={
+        <Link href="/dashboard/follow-up" className="clara-button clara-button-ghost">
+          Buka Worklist
+        </Link>
+      }
+    >
+      <div className="space-y-6">
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-slate-600">
             Loading conversation...
           </div>
         )}
 
         {errorMessage && !isLoading && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div className="clara-alert clara-alert-danger">
             {errorMessage}. Coba kembali ke{" "}
             <Link href="/dashboard/sales" className="font-semibold underline">
               sales inbox
@@ -93,7 +106,7 @@ export default function SalesConversationDetailPage() {
           </>
         )}
       </div>
-    </main>
+    </WorkspaceShell>
   );
 }
 
@@ -106,21 +119,17 @@ function ConversationDetailHeader({
   const suggestion = detail.latest_reply_suggestion;
 
   return (
-    <section>
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-500">
-            Conversation Detail
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-            {detail.title}
-          </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Last message: {formatDateTime(detail.last_message_at)}
-          </p>
-        </div>
+    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="clara-card rounded-[30px] p-6">
+        <p className="clara-kicker">Conversation Signal</p>
+        <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+          Ringkasan kondisi percakapan saat ini
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Last message: {formatDateTime(detail.last_message_at)}
+        </p>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-2">
           {extraction && (
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
@@ -148,6 +157,27 @@ function ConversationDetailHeader({
           )}
         </div>
       </div>
+
+      <div className="clara-card-dark rounded-[30px] p-6">
+        <p className="clara-kicker text-[#d4b07b]">Snapshot</p>
+        <div className="mt-4 space-y-3">
+          <MetaPill
+            label="Messages"
+            value={String(detail.messages.length)}
+            dark
+          />
+          <MetaPill
+            label="Sent logs"
+            value={String(detail.sent_messages.length)}
+            dark
+          />
+          <MetaPill
+            label="AI status"
+            value={extraction ? "Analyzed" : "Pending"}
+            dark
+          />
+        </div>
+      </div>
     </section>
   );
 }
@@ -164,17 +194,18 @@ function ConversationDetailContent({
 
   return (
     <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="clara-card rounded-[30px] p-5 sm:p-6">
         <div>
-          <h2 className="text-lg font-semibold text-slate-950">
-            Chat Timeline
+          <p className="clara-kicker">Chat Timeline</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+            Timeline percakapan
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-slate-600">
             Pesan hasil parsing dari export WhatsApp.
           </p>
         </div>
 
-        <div className="space-y-3">
+        <div className="mt-5 space-y-3">
           {detail.messages.map((message) => {
             const isSales = message.sender_type === "sales";
 
@@ -184,10 +215,10 @@ function ConversationDetailContent({
                 className={`flex ${isSales ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl p-4 ${
+                  className={`max-w-[88%] rounded-[24px] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${
                     isSales
-                      ? "bg-slate-950 text-white"
-                      : "bg-slate-100 text-slate-900"
+                      ? "bg-[#10172d] text-white"
+                      : "bg-[rgba(255,248,239,0.92)] text-slate-900"
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
@@ -200,7 +231,7 @@ function ConversationDetailContent({
                       {formatDateTime(message.message_timestamp)}
                     </p>
                   </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
                     {message.message_text}
                   </p>
                 </div>
@@ -218,33 +249,30 @@ function ConversationDetailContent({
           onUpdated={onUpdated}
         />
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-950">AI Analysis</h2>
+        <div className="clara-card rounded-[30px] p-5">
+          <p className="clara-kicker">AI Analysis</p>
+          <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+            Hasil pembacaan Clara
+          </h2>
 
           {extraction ? (
-            <div className="mt-4 space-y-4 text-sm">
-              <div>
-                <p className="font-semibold text-slate-900">Pipeline stage</p>
-                <p className="mt-1 text-slate-600">
-                  {formatStatusLabel(extraction.pipeline_stage)}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-semibold text-slate-900">Sentiment</p>
-                <p className="mt-1 text-slate-600">
-                  {formatStatusLabel(extraction.sentiment)}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-semibold text-slate-900">Main objections</p>
-                <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-4 space-y-3 text-sm">
+              <InfoBlock
+                label="Pipeline stage"
+                value={formatStatusLabel(extraction.pipeline_stage)}
+              />
+              <InfoBlock
+                label="Sentiment"
+                value={formatStatusLabel(extraction.sentiment)}
+              />
+              <div className="clara-card-soft rounded-[22px] p-4">
+                <p className="clara-kicker text-[11px]">Main objections</p>
+                <div className="mt-3 flex flex-wrap gap-2">
                   {extraction.main_objections.length > 0 ? (
                     extraction.main_objections.map((objection) => (
                       <span
                         key={objection}
-                        className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                        className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
                       >
                         {objection}
                       </span>
@@ -254,25 +282,19 @@ function ConversationDetailContent({
                   )}
                 </div>
               </div>
-
-              <div>
-                <p className="font-semibold text-slate-900">Next best action</p>
-                <p className="mt-1 text-slate-600">
-                  {extraction.next_best_action}
-                </p>
-              </div>
-
-              <div>
-                <p className="font-semibold text-slate-900">Confidence</p>
-                <p className="mt-1 text-slate-600">
-                  {(extraction.confidence_score * 100).toFixed(0)}%
-                </p>
-              </div>
+              <InfoBlock
+                label="Next best action"
+                value={extraction.next_best_action}
+              />
+              <InfoBlock
+                label="Confidence"
+                value={`${(extraction.confidence_score * 100).toFixed(0)}%`}
+              />
             </div>
           ) : (
-            <p className="mt-3 text-sm text-slate-600">
+            <div className="clara-card-outline mt-4 rounded-[24px] p-4 text-sm text-slate-600">
               Conversation ini belum dianalisis AI.
-            </p>
+            </div>
           )}
         </div>
 
@@ -287,7 +309,7 @@ function ConversationDetailContent({
             onUpdated={onUpdated}
           />
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5">
+          <div className="clara-card-outline rounded-[30px] p-5">
             <h2 className="text-lg font-semibold text-slate-950">
               Belum ada reply suggestion
             </h2>
@@ -297,9 +319,10 @@ function ConversationDetailContent({
           </div>
         )}
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-950">
-            Sent Messages
+        <div className="clara-card rounded-[30px] p-5">
+          <p className="clara-kicker">Sent Messages</p>
+          <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+            Riwayat balasan terkirim
           </h2>
 
           {detail.sent_messages.length > 0 ? (
@@ -307,15 +330,15 @@ function ConversationDetailContent({
               {detail.sent_messages.map((sentMessage) => (
                 <div
                   key={sentMessage.id}
-                  className="rounded-xl bg-green-50 p-4 text-sm text-green-900"
+                  className="rounded-[22px] border border-green-200/80 bg-green-50/88 p-4 text-sm text-green-900"
                 >
                   <p className="font-semibold">
                     Sent by {sentMessage.sent_by_name}
                   </p>
                   <p className="mt-1 text-xs text-green-700">
-                    {formatDateTime(sentMessage.sent_at)} • {sentMessage.send_mode}
+                    {formatDateTime(sentMessage.sent_at)} &bull; {sentMessage.send_mode}
                   </p>
-                  <p className="mt-3 whitespace-pre-wrap">
+                  <p className="mt-3 whitespace-pre-wrap leading-6">
                     {sentMessage.message_text}
                   </p>
                 </div>
@@ -329,5 +352,35 @@ function ConversationDetailContent({
         </div>
       </aside>
     </section>
+  );
+}
+
+function MetaPill({
+  label,
+  value,
+  dark = false,
+}: {
+  label: string;
+  value: string;
+  dark?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between rounded-2xl px-4 py-3 ${
+        dark ? "bg-white/7 text-slate-100" : "bg-slate-50 text-slate-900"
+      }`}
+    >
+      <span className={dark ? "text-slate-300" : "text-slate-600"}>{label}</span>
+      <span className="font-semibold">{value}</span>
+    </div>
+  );
+}
+
+function InfoBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="clara-card-soft rounded-[22px] p-4">
+      <p className="clara-kicker text-[11px]">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
+    </div>
   );
 }

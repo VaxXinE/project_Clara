@@ -136,28 +136,29 @@ def main() -> int:
         return 0
 
     db = SessionLocal()
+    result_message: str | None = None
 
     try:
         status, organization, owner = ensure_owner_bootstrap(db=db, config=config)
+        if status == "owner_exists" and owner is not None:
+            result_message = (
+                "Bootstrap owner di-skip. "
+                f"User owner {owner.email} sudah ada."
+            )
+        elif organization is not None and owner is not None:
+            result_message = (
+                "Bootstrap owner berhasil. "
+                f"Organization={organization.name} ({organization.slug}), "
+                f"Owner={owner.email}"
+            )
     except (BootstrapError, AuthError, OrganizationError) as exc:
         print(f"Bootstrap gagal: {exc}")
         return 1
     finally:
         db.close()
 
-    if status == "owner_exists" and owner is not None:
-        print(
-            "Bootstrap owner di-skip. "
-            f"User owner {owner.email} sudah ada."
-        )
-        return 0
-
-    if organization is not None and owner is not None:
-        print(
-            "Bootstrap owner berhasil. "
-            f"Organization={organization.name} ({organization.slug}), "
-            f"Owner={owner.email}"
-        )
+    if result_message:
+        print(result_message)
 
     return 0
 

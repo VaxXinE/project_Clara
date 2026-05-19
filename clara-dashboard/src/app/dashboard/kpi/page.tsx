@@ -34,9 +34,13 @@ function formatPercent(value: number | undefined | null): string {
 export default function KpiCommandCenterPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
-  const [alertHistory, setAlertHistory] = useState<KpiAlertHistoryResponse | null>(null);
-  const [snapshotHistory, setSnapshotHistory] = useState<KpiSnapshotHistoryResponse | null>(null);
-  const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
+  const [alertHistory, setAlertHistory] =
+    useState<KpiAlertHistoryResponse | null>(null);
+  const [snapshotHistory, setSnapshotHistory] =
+    useState<KpiSnapshotHistoryResponse | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState<
+    Record<string, string>
+  >({});
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -48,7 +52,7 @@ export default function KpiCommandCenterPage() {
         sourceChannelFilter === "all"
           ? "/dashboard/kpi/command-center"
           : `/dashboard/kpi/command-center?source_channel=${encodeURIComponent(
-              sourceChannelFilter
+              sourceChannelFilter,
             )}`;
       const [me, kpiResponse, alertsResponse, snapshotsResponse] =
         await Promise.all([
@@ -63,7 +67,9 @@ export default function KpiCommandCenterPage() {
       setSnapshotHistory(snapshotsResponse);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat KPI command center."
+        error instanceof Error
+          ? error.message
+          : "Gagal memuat KPI command center.",
       );
     } finally {
       setIsLoading(false);
@@ -71,11 +77,17 @@ export default function KpiCommandCenterPage() {
   }
 
   useEffect(() => {
-    void loadKpiPage();
-  }, [sourceChannelFilter]);
+    const timer = setTimeout(() => {
+      void loadKpiPage();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   async function reloadAlertHistory() {
-    const alertsResponse = await apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts");
+    const alertsResponse = await apiFetch<KpiAlertHistoryResponse>(
+      "/dashboard/kpi/alerts",
+    );
     setAlertHistory(alertsResponse);
   }
 
@@ -88,12 +100,11 @@ export default function KpiCommandCenterPage() {
         sourceChannelFilter === "all"
           ? "/dashboard/kpi/command-center/refresh"
           : `/dashboard/kpi/command-center/refresh?source_channel=${encodeURIComponent(
-              sourceChannelFilter
+              sourceChannelFilter,
             )}`;
-      const refreshed = await apiFetch<KpiCommandCenterResponse>(
-        refreshPath,
-        { method: "POST" }
-      );
+      const refreshed = await apiFetch<KpiCommandCenterResponse>(refreshPath, {
+        method: "POST",
+      });
       setKpi(refreshed);
       const [alertsResponse, snapshotsResponse] = await Promise.all([
         apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts"),
@@ -103,7 +114,9 @@ export default function KpiCommandCenterPage() {
       setSnapshotHistory(snapshotsResponse);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal me-refresh snapshot KPI."
+        error instanceof Error
+          ? error.message
+          : "Gagal me-refresh snapshot KPI.",
       );
     } finally {
       setIsRefreshing(false);
@@ -118,7 +131,7 @@ export default function KpiCommandCenterPage() {
       await reloadAlertHistory();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal acknowledge alert."
+        error instanceof Error ? error.message : "Gagal acknowledge alert.",
       );
     }
   }
@@ -138,7 +151,7 @@ export default function KpiCommandCenterPage() {
       await reloadAlertHistory();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal resolve alert."
+        error instanceof Error ? error.message : "Gagal resolve alert.",
       );
     }
   }
@@ -151,7 +164,7 @@ export default function KpiCommandCenterPage() {
       await reloadAlertHistory();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal reopen alert."
+        error instanceof Error ? error.message : "Gagal reopen alert.",
       );
     }
   }
@@ -395,18 +408,41 @@ export default function KpiCommandCenterPage() {
                             <p className="text-xs uppercase tracking-[0.16em] text-slate-300">
                               Replies Sent
                             </p>
-                            <p className="mt-1 text-2xl font-bold">{row.replies_sent}</p>
+                            <p className="mt-1 text-2xl font-bold">
+                              {row.replies_sent}
+                            </p>
                           </div>
                         </div>
 
                         <div className="mt-4 grid gap-3 md:grid-cols-3">
-                          <SummaryTile label="Assigned Leads" value={String(row.assigned_leads)} />
-                          <SummaryTile label="Hot Leads" value={String(row.hot_leads)} />
-                          <SummaryTile label="Closing Leads" value={String(row.closing_leads)} />
-                          <SummaryTile label="Won Leads" value={String(row.won_leads)} />
-                          <SummaryTile label="Owned Conversations" value={String(row.conversations_owned)} />
-                          <SummaryTile label="Analyzed" value={String(row.analyzed_conversations)} />
-                          <SummaryTile label="Overdue Follow-up" value={String(row.overdue_follow_ups)} />
+                          <SummaryTile
+                            label="Assigned Leads"
+                            value={String(row.assigned_leads)}
+                          />
+                          <SummaryTile
+                            label="Hot Leads"
+                            value={String(row.hot_leads)}
+                          />
+                          <SummaryTile
+                            label="Closing Leads"
+                            value={String(row.closing_leads)}
+                          />
+                          <SummaryTile
+                            label="Won Leads"
+                            value={String(row.won_leads)}
+                          />
+                          <SummaryTile
+                            label="Owned Conversations"
+                            value={String(row.conversations_owned)}
+                          />
+                          <SummaryTile
+                            label="Analyzed"
+                            value={String(row.analyzed_conversations)}
+                          />
+                          <SummaryTile
+                            label="Overdue Follow-up"
+                            value={String(row.overdue_follow_ups)}
+                          />
                           <SummaryTile
                             label="Pipeline Value"
                             value={formatIdr(row.pipeline_value)}
@@ -616,7 +652,9 @@ export default function KpiCommandCenterPage() {
                     <div className="flex flex-wrap gap-2">
                       <Badge label={`Active ${alertHistory.active_count}`} />
                       <Badge label={`Ack ${alertHistory.acknowledged_count}`} />
-                      <Badge label={`Resolved ${alertHistory.resolved_count}`} />
+                      <Badge
+                        label={`Resolved ${alertHistory.resolved_count}`}
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -713,7 +751,10 @@ export default function KpiCommandCenterPage() {
                         ) : (
                           <div className="mt-4 flex flex-wrap items-center gap-3">
                             <p className="text-xs text-slate-500">
-                              Resolved: {alert.resolved_at ? formatDateTime(alert.resolved_at) : "-"}
+                              Resolved:{" "}
+                              {alert.resolved_at
+                                ? formatDateTime(alert.resolved_at)
+                                : "-"}
                             </p>
                             <button
                               type="button"
@@ -727,8 +768,9 @@ export default function KpiCommandCenterPage() {
                           </div>
                         )}
                         <p className="mt-3 text-xs text-slate-500">
-                          First detected: {formatDateTime(alert.first_detected_at)} • Last detected:{" "}
-                          {formatDateTime(alert.last_detected_at)}
+                          First detected:{" "}
+                          {formatDateTime(alert.first_detected_at)} • Last
+                          detected: {formatDateTime(alert.last_detected_at)}
                         </p>
                       </article>
                     ))
@@ -776,11 +818,15 @@ export default function KpiCommandCenterPage() {
                           />
                           <SummaryTile
                             label="Reply Sent Rate"
-                            value={formatPercent(snapshot.metrics_json.reply_sent_rate)}
+                            value={formatPercent(
+                              snapshot.metrics_json.reply_sent_rate,
+                            )}
                           />
                           <SummaryTile
                             label="Overdue"
-                            value={String(snapshot.metrics_json.overdue_follow_ups)}
+                            value={String(
+                              snapshot.metrics_json.overdue_follow_ups,
+                            )}
                           />
                           <SummaryTile
                             label="Won Value"
@@ -788,7 +834,9 @@ export default function KpiCommandCenterPage() {
                           />
                           <SummaryTile
                             label="Deposit"
-                            value={formatIdr(snapshot.metrics_json.deposit_amount)}
+                            value={formatIdr(
+                              snapshot.metrics_json.deposit_amount,
+                            )}
                           />
                         </div>
                       </article>
@@ -839,9 +887,18 @@ export default function KpiCommandCenterPage() {
                       </div>
 
                       <div className="mt-4 grid gap-3 md:grid-cols-4 xl:grid-cols-7">
-                        <SummaryTile label="Conversations" value={String(row.conversations)} />
-                        <SummaryTile label="Analyzed" value={String(row.analyzed_conversations)} />
-                        <SummaryTile label="Won Leads" value={String(row.won_leads)} />
+                        <SummaryTile
+                          label="Conversations"
+                          value={String(row.conversations)}
+                        />
+                        <SummaryTile
+                          label="Analyzed"
+                          value={String(row.analyzed_conversations)}
+                        />
+                        <SummaryTile
+                          label="Won Leads"
+                          value={String(row.won_leads)}
+                        />
                         <SummaryTile
                           label="Reply Sent Rate"
                           value={formatPercent(row.reply_sent_rate)}
@@ -850,7 +907,10 @@ export default function KpiCommandCenterPage() {
                           label="Approved Reply Rate"
                           value={formatPercent(row.approved_reply_rate)}
                         />
-                        <SummaryTile label="Overdue" value={String(row.overdue_follow_ups)} />
+                        <SummaryTile
+                          label="Overdue"
+                          value={String(row.overdue_follow_ups)}
+                        />
                         <SummaryTile
                           label="Pipeline Value"
                           value={formatIdr(row.pipeline_value)}
@@ -886,11 +946,11 @@ function MetricCard({
   hint: string;
 }) {
   return (
-    <article className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
+    <article className="clara-card rounded-[24px] p-5">
+      <p className="clara-kicker text-xs text-slate-500">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+        {value}
       </p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">{value}</p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{hint}</p>
     </article>
   );
@@ -898,7 +958,7 @@ function MetricCard({
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+    <div className="clara-card-soft flex items-center justify-between rounded-2xl px-4 py-3">
       <span className="text-sm text-slate-600">{label}</span>
       <span className="text-sm font-semibold text-slate-950">{value}</span>
     </div>
@@ -907,10 +967,8 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 
 function SummaryTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {label}
-      </p>
+    <div className="clara-card-soft rounded-2xl px-4 py-3">
+      <p className="clara-kicker text-xs text-slate-500">{label}</p>
       <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
     </div>
   );
@@ -918,7 +976,7 @@ function SummaryTile({ label, value }: { label: string; value: string }) {
 
 function Badge({ label }: { label: string }) {
   return (
-    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+    <span className="clara-chip clara-chip-neutral px-3 py-1 text-xs">
       {label}
     </span>
   );
@@ -926,8 +984,6 @@ function Badge({ label }: { label: string }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-      {text}
-    </div>
+    <div className="clara-empty-state p-5 text-sm text-slate-600">{text}</div>
   );
 }

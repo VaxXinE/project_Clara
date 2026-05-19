@@ -150,37 +150,23 @@ export function WhatsAppUploadForm() {
   return (
     <form
       onSubmit={handleUpload}
-      className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+      className="clara-card space-y-5 rounded-[30px] p-5 sm:p-6"
     >
       <div>
-        <label
-          htmlFor="channelType"
-          className="text-sm font-semibold text-slate-900"
-        >
-          Channel
-        </label>
-        <select
-          id="channelType"
-          value={selectedChannel}
-          onChange={(event) => {
-            setSelectedChannel(
-              event.target.value as (typeof CHANNEL_OPTIONS)[number]["value"]
-            );
-          }}
-          className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
-        >
-          {CHANNEL_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <p className="clara-kicker">Chat Import</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+          Upload file WhatsApp
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Upload export `.txt` untuk membentuk conversation baru dan memulai
+          analisis Clara dari data mentah yang lebih rapi.
+        </p>
       </div>
 
       <div>
         <label
-          htmlFor="inputMode"
-          className="text-sm font-semibold text-slate-900"
+          htmlFor="whatsappFile"
+          className="clara-label"
         >
           Input Mode
         </label>
@@ -212,65 +198,23 @@ export function WhatsAppUploadForm() {
             File Chat .txt
           </label>
 
-          <input
-            ref={fileInputRef}
-            id="whatsappFile"
-            type="file"
-            accept=".txt,text/plain"
-            onChange={handleFileChange}
-            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-          />
+        <input
+          ref={fileInputRef}
+          id="whatsappFile"
+          type="file"
+          accept=".txt,text/plain"
+          onChange={handleFileChange}
+          className="clara-file-input mt-2 block"
+        />
 
-          <p className="mt-2 text-xs text-slate-500">
-            Maksimal 5MB. Pilih channel yang sesuai sebelum upload supaya parser
-            Clara memakai format yang benar.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="conversationTitle"
-              className="text-sm font-semibold text-slate-900"
-            >
-              Judul Conversation (opsional)
-            </label>
-            <input
-              id="conversationTitle"
-              type="text"
-              value={conversationTitle}
-              onChange={(event) => {
-                setConversationTitle(event.target.value);
-              }}
-              placeholder="Contoh: Chat Leoni Telegram"
-              className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="pastedText"
-              className="text-sm font-semibold text-slate-900"
-            >
-              Paste Chat
-            </label>
-            <textarea
-              id="pastedText"
-              value={pastedText}
-              onChange={(event) => {
-                setPastedText(event.target.value);
-              }}
-              placeholder="Paste export chat di sini..."
-              className="mt-2 min-h-[220px] w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
-            />
-            <p className="mt-2 text-xs text-slate-500">
-              Cocok untuk user yang tidak ingin menyimpan file .txt dulu.
-            </p>
-          </div>
-        </div>
-      )}
+        <p className="clara-helper mt-2">
+          Maksimal 5MB. Jangan upload file berisi data yang tidak boleh
+          dianalisis.
+        </p>
+      </div>
 
-      {inputMode === "file" && selectedFile && (
-        <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+      {selectedFile && (
+        <div className="clara-card-soft rounded-[24px] p-4 text-sm text-slate-700">
           <p>
             <span className="font-semibold">Selected:</span> {selectedFile.name}
           </p>
@@ -282,18 +226,13 @@ export function WhatsAppUploadForm() {
       )}
 
       {errorMessage && (
-        <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
-          {errorMessage}
-        </p>
+        <p className="clara-alert clara-alert-danger">{errorMessage}</p>
       )}
 
       <button
         type="submit"
-        disabled={
-          isUploading ||
-          (inputMode === "file" ? !selectedFile : pastedText.trim().length === 0)
-        }
-        className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={isUploading || !selectedFile}
+        className="clara-button clara-button-primary"
       >
         {isUploading
           ? "Uploading..."

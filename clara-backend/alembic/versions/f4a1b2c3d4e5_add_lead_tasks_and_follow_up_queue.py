@@ -1,7 +1,7 @@
 """add lead tasks and follow up queue
 
 Revision ID: f4a1b2c3d4e5
-Revises: f3d2c9a1e0b4
+Revises: e7f8a9b0c1d2
 Create Date: 2026-05-18 12:00:00.000000
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 revision: str = "f4a1b2c3d4e5"
-down_revision: str | Sequence[str] | None = "f3d2c9a1e0b4"
+down_revision: str | Sequence[str] | None = "e7f8a9b0c1d2"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

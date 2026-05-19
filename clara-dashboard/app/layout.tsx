@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import { config } from "@fortawesome/fontawesome-svg-core";
+import "@fortawesome/fontawesome-svg-core/styles.css";
 import { IBM_Plex_Mono, Manrope } from "next/font/google";
 import "./globals.css";
+
+config.autoAddCss = false;
 
 const manrope = Manrope({
   variable: "--font-manrope",

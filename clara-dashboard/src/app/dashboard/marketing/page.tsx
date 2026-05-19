@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
@@ -187,7 +186,7 @@ export default function MarketingInsightsPage() {
               type="button"
               onClick={() => void handleGenerateSnapshot()}
               disabled={isGeneratingSnapshot}
-              className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="clara-button clara-button-primary"
             >
               {isGeneratingSnapshot ? "Generating..." : "Generate Snapshot"}
             </button>
@@ -198,13 +197,13 @@ export default function MarketingInsightsPage() {
       <div className="space-y-6">
 
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-slate-600">
             Loading marketing insights...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         )}
@@ -728,7 +727,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+    <section className="clara-card rounded-[28px] p-5">
       <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
       <p className="mt-1 text-sm text-slate-600">{description}</p>
       <div className="mt-4">{children}</div>
@@ -753,7 +752,7 @@ function MetricCard({
   }[tone];
 
   return (
-    <div className={`rounded-[24px] border p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)] ${toneClass}`}>
+    <div className={`clara-card rounded-[24px] p-5 ${toneClass}`}>
       <p className="text-sm font-medium">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight">{value}</p>
     </div>
@@ -779,7 +778,7 @@ function BreakdownGroup({
           {items.map((item) => (
             <div
               key={`${title}-${item.label}`}
-              className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
+              className="clara-card-soft flex items-center justify-between rounded-xl px-3 py-2"
             >
               <span className="text-sm text-slate-700">
                 {formatStatusLabel(item.label)}
@@ -797,7 +796,7 @@ function BreakdownGroup({
 
 function KpiRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+    <div className="clara-card-soft flex items-center justify-between rounded-xl px-4 py-3">
       <span className="text-sm text-slate-600">{label}</span>
       <span className="text-sm font-semibold text-slate-950">{value}</span>
     </div>
@@ -810,7 +809,7 @@ function EmptyText({ text }: { text: string }) {
 
 function BriefRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+    <div className="clara-card-soft rounded-2xl px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
@@ -821,7 +820,7 @@ function BriefRow({ label, value }: { label: string; value: string }) {
 
 function SignalBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4">
+    <div className="clara-card-soft rounded-2xl p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
@@ -846,7 +845,7 @@ function TrendRow({
   const negative = hasDelta && delta < 0;
 
   return (
-    <div className="rounded-xl bg-slate-50 px-4 py-3">
+    <div className="clara-card-soft rounded-xl px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-slate-600">{label}</span>
         <span className="text-sm font-semibold text-slate-950">{value}</span>

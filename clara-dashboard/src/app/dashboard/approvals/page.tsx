@@ -5,7 +5,12 @@ import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, formatStatusLabel, getLeadBadgeClass, getRiskBadgeClass } from "@/lib/format";
+import {
+  formatDateTime,
+  formatStatusLabel,
+  getLeadBadgeClass,
+  getRiskBadgeClass,
+} from "@/lib/format";
 import type {
   CurrentUser,
   SalesApprovalQueueResponse,
@@ -46,7 +51,7 @@ export default function ApprovalQueuePage() {
       setQueue(data);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat approval queue."
+        error instanceof Error ? error.message : "Gagal memuat approval queue.",
       );
     } finally {
       setIsLoading(false);
@@ -54,8 +59,12 @@ export default function ApprovalQueuePage() {
   }
 
   useEffect(() => {
-    void loadQueue();
-  }, [riskLevelFilter, actionModeFilter, ageBucketFilter]);
+    const timer = setTimeout(() => {
+      void loadQueue();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <WorkspaceShell
@@ -68,7 +77,7 @@ export default function ApprovalQueuePage() {
       actions={
         <Link
           href="/dashboard/follow-up"
-          className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+          className="clara-button clara-button-primary"
         >
           AI Worklist
         </Link>
@@ -76,15 +85,13 @@ export default function ApprovalQueuePage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-slate-600">
             Loading approval queue...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-            {errorMessage}
-          </div>
+          <div className="clara-alert clara-alert-danger">{errorMessage}</div>
         )}
 
         {queue && !isLoading && !errorMessage && (
@@ -141,7 +148,9 @@ export default function ApprovalQueuePage() {
                 >
                   <option value="all">Semua mode</option>
                   <option value="escalate_to_human">Escalate to human</option>
-                  <option value="human_approval_required">Human approval required</option>
+                  <option value="human_approval_required">
+                    Human approval required
+                  </option>
                   <option value="auto_approved">Auto approved</option>
                 </select>
               </label>
@@ -163,14 +172,14 @@ export default function ApprovalQueuePage() {
 
             <section className="space-y-4">
               {queue.items.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                <div className="clara-empty-state text-sm text-slate-500">
                   Tidak ada draft yang menunggu approval saat ini.
                 </div>
               ) : (
                 queue.items.map((item) => (
                   <article
                     key={item.reply_suggestion_id}
-                    className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+                    className="clara-card rounded-[28px] p-6"
                   >
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -180,21 +189,22 @@ export default function ApprovalQueuePage() {
                           </h2>
                           <span
                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                              item.lead_temperature
+                              item.lead_temperature,
                             )}`}
                           >
                             {item.lead_temperature.toUpperCase()}
                           </span>
                           <span
                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
-                              item.risk_level
+                              item.risk_level,
                             )}`}
                           >
                             Risk {item.risk_level}
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-slate-600">
-                          {item.conversation_title} • {formatStatusLabel(item.current_stage)}
+                          {item.conversation_title} &bull;{" "}
+                          {formatStatusLabel(item.current_stage)}
                         </p>
                       </div>
 
@@ -209,17 +219,16 @@ export default function ApprovalQueuePage() {
                     </div>
 
                     <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Draft Preview
-                        </p>
+                      <div className="clara-card-soft rounded-2xl p-4">
+                        <p className="clara-kicker text-xs">Draft Preview</p>
                         <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
-                          {item.suggested_reply_preview ?? "Belum ada preview draft."}
+                          {item.suggested_reply_preview ??
+                            "Belum ada preview draft."}
                         </p>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <div className="clara-card-soft rounded-2xl p-4">
+                        <p className="clara-kicker text-xs">
                           Recommended Action
                         </p>
                         <p className="mt-3 text-sm leading-7 text-slate-700">
@@ -234,14 +243,14 @@ export default function ApprovalQueuePage() {
                     <div className="mt-5 flex flex-wrap gap-3">
                       <Link
                         href={`/dashboard/sales/conversations/${item.conversation_id}`}
-                        className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                        className="clara-button clara-button-primary"
                       >
                         Review Conversation
                       </Link>
                       {item.lead_id && (
                         <Link
                           href={`/dashboard/crm/${item.lead_id}`}
-                          className="inline-flex rounded-full border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                          className="clara-button clara-button-ghost"
                         >
                           Buka Lead Detail
                         </Link>
@@ -268,10 +277,8 @@ function QueueMetric({
   hint: string;
 }) {
   return (
-    <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </p>
+    <article className="clara-card rounded-[28px] p-6">
+      <p className="clara-kicker text-xs text-slate-500">{label}</p>
       <p className="mt-3 text-3xl font-bold text-slate-950">{value}</p>
       <p className="mt-2 text-sm text-slate-600">{hint}</p>
     </article>

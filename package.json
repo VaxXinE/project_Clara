@@ -1,0 +1,17 @@
+{
+  "name": "project-clara",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:dashboard": "npm run dev --prefix clara-dashboard",
+    "dev:extension": "npm run dev --prefix clara-extension",
+    "prod": "node scripts/prod.mjs",
+    "build": "npm run build:dashboard && npm run build:extension",
+    "build:dashboard": "npm run build --prefix clara-dashboard",
+    "build:extension": "npm run build --prefix clara-extension",
+    "package:extension": "npm run package --prefix clara-extension",
+    "start": "npm run start:dashboard",
+    "start:dashboard": "npm run start --prefix clara-dashboard",
+    "start:extension-proxy": "npm run proxy --prefix clara-extension"
+  }
+}

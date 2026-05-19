@@ -14,7 +14,7 @@ export default function UploadWhatsAppPage() {
       actions={
         <Link
           href="/dashboard/sales"
-          className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+          className="clara-button clara-button-ghost"
         >
           Lihat Inbox
         </Link>
@@ -23,8 +23,9 @@ export default function UploadWhatsAppPage() {
       <div className="mx-auto max-w-3xl space-y-6">
         <WhatsAppUploadForm />
 
-        <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
-          <h2 className="text-lg font-semibold text-slate-950">
+        <section className="clara-card rounded-[28px] p-5 sm:p-6">
+          <p className="clara-kicker">Supported Format</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
             Format yang Didukung
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -32,7 +33,7 @@ export default function UploadWhatsAppPage() {
             Telegram TXT yang eksplisit seperti contoh berikut.
           </p>
 
-          <pre className="mt-4 overflow-x-auto rounded-[22px] bg-slate-950 p-4 text-sm text-slate-100">
+          <pre className="mt-4 overflow-x-auto rounded-[24px] bg-[#10172d] p-4 text-sm leading-7 text-slate-100 shadow-[0_18px_34px_rgba(16,23,45,0.2)]">
 {`12/04/26, 09.12 - Customer: Kak, ini programnya legal nggak?
 12/04/26, 09.13 - Sales Ani: Legal kak, nanti saya kirim dokumen resminya.
 

@@ -103,7 +103,7 @@ export function ReplySuggestionActions({
 
   if (hasBeenSent) {
     return (
-      <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+      <div className="clara-alert rounded-[24px] border border-green-200 bg-green-50/92 p-4">
         <p className="text-sm font-semibold text-green-800">
           Reply sudah ditandai terkirim.
         </p>
@@ -117,7 +117,7 @@ export function ReplySuggestionActions({
 
   if (!isPending && !isApproved) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="clara-card-soft rounded-[24px] p-4">
         <p className="text-sm font-medium text-slate-700">
           Suggestion status: {approvalStatus}
         </p>
@@ -127,28 +127,27 @@ export function ReplySuggestionActions({
 
   if (isApproved) {
     return (
-      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="clara-card space-y-4 rounded-[30px] p-5">
         <div>
-          <h3 className="text-lg font-semibold text-slate-950">
+          <p className="clara-kicker">Reply Approved</p>
+          <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
             Reply Approved
           </h3>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-slate-600">
             Balasan sudah approved. Setelah sales mengirimnya ke WhatsApp,
             tandai sebagai sent.
           </p>
         </div>
 
         {errorMessage && (
-          <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
-            {errorMessage}
-          </p>
+          <p className="clara-alert clara-alert-danger">{errorMessage}</p>
         )}
 
         <button
           type="button"
           onClick={handleMarkSent}
           disabled={isMarkingSent}
-          className="rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="clara-button clara-button-success"
         >
           {isMarkingSent ? "Marking..." : "Mark as Sent"}
         </button>
@@ -157,12 +156,13 @@ export function ReplySuggestionActions({
   }
 
   return (
-    <div className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="clara-card space-y-5 rounded-[30px] p-5">
       <div>
-        <h3 className="text-lg font-semibold text-slate-950">
+        <p className="clara-kicker">Reply Review</p>
+        <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
           Review Draft Balasan
         </h3>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-slate-600">
           Pilih salah satu draft, edit kalau perlu, lalu approve atau reject.
         </p>
       </div>
@@ -171,7 +171,7 @@ export function ReplySuggestionActions({
         {suggestedReplies.map((reply, index) => (
           <label
             key={`${reply.tone}-${index}`}
-            className="block cursor-pointer rounded-xl border border-slate-200 p-4 hover:border-slate-300"
+            className="clara-card-soft block cursor-pointer rounded-[24px] p-4 hover:border-[rgba(141,103,55,0.24)]"
           >
             <div className="flex items-start gap-3">
               <input
@@ -203,7 +203,7 @@ export function ReplySuggestionActions({
       <div>
         <label
           htmlFor="finalReply"
-          className="text-sm font-semibold text-slate-900"
+          className="clara-label"
         >
           Final reply
         </label>
@@ -212,14 +212,14 @@ export function ReplySuggestionActions({
           value={finalText}
           onChange={(event) => setFinalText(event.target.value)}
           rows={5}
-          className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+          className="clara-textarea mt-2"
         />
       </div>
 
       <div>
         <label
           htmlFor="rejectReason"
-          className="text-sm font-semibold text-slate-900"
+          className="clara-label"
         >
           Reject reason
         </label>
@@ -228,14 +228,12 @@ export function ReplySuggestionActions({
           value={rejectReason}
           onChange={(event) => setRejectReason(event.target.value)}
           placeholder="Contoh: Draft terlalu umum / kurang sesuai tone brand"
-          className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+          className="clara-input mt-2"
         />
       </div>
 
       {errorMessage && (
-        <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
-          {errorMessage}
-        </p>
+        <p className="clara-alert clara-alert-danger">{errorMessage}</p>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -243,7 +241,7 @@ export function ReplySuggestionActions({
           type="button"
           onClick={handleApprove}
           disabled={isSubmitting || finalText.trim().length === 0}
-          className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="clara-button clara-button-primary"
         >
           Approve Reply
         </button>
@@ -252,7 +250,7 @@ export function ReplySuggestionActions({
           type="button"
           onClick={handleReject}
           disabled={isSubmitting}
-          className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="clara-button clara-button-ghost"
         >
           Reject
         </button>

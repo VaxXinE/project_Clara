@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import {
   formatDateTime,
@@ -68,7 +69,8 @@ export default function AdminAccessPage() {
     password: "",
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmittingOrganization, setIsSubmittingOrganization] = useState(false);
+  const [isSubmittingOrganization, setIsSubmittingOrganization] =
+    useState(false);
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -288,67 +290,67 @@ export default function AdminAccessPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
+    <WorkspaceShell
+      currentUser={currentUser}
+      eyebrow="Access management"
+      title="User & Organization Setup"
+      description="Kelola struktur organisasi, akses user, dan boundary role untuk menjaga operasional tetap aman dan rapi."
+      backHref="/dashboard"
+      backLabel="Kembali ke overview"
+      actions={
+        <Link
+          href="/dashboard/admin/ops"
+          className="clara-button clara-button-ghost"
+        >
+          Buka Admin Ops
+        </Link>
+      }
+    >
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <Link
-              href="/dashboard/sales"
-              className="text-sm font-medium text-slate-600 hover:text-slate-950"
-            >
-              ← Back to Sales Inbox
-            </Link>
-            <p className="mt-6 text-sm font-medium text-slate-500">
-              Clara Access Management
-            </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-              User & Organization Setup
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Owner bisa mengelola global. Admin dibatasi hanya untuk
-              organization miliknya sendiri. Hard delete user sengaja tidak
-              disediakan agar histori conversation dan audit tetap aman.
-            </p>
-          </div>
-
-          {currentUser && (
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
-              <p>
-                Login as: <span className="font-semibold">{currentUser.email}</span>
-              </p>
-              <p className="mt-1">
-                Role:{" "}
-                <span className="font-semibold">
-                  {formatStatusLabel(currentUser.role)}
-                </span>
-              </p>
-              <p className="mt-1">
-                Org:{" "}
-                <span className="font-semibold">
-                  {getOrganizationLabel(
-                    currentUser.organization_id,
-                    organizations
-                  )}
-                </span>
-              </p>
-            </div>
-          )}
+        <section className="grid gap-4 md:grid-cols-3">
+          <InfoCard
+            label="Operator"
+            value={currentUser ? formatStatusLabel(currentUser.role) : "..."}
+            description={
+              currentUser
+                ? `Login sebagai ${currentUser.email}`
+                : "Memuat profil operator."
+            }
+          />
+          <InfoCard
+            label="Boundary"
+            value={isAdminScoped ? "Scoped" : "Global"}
+            description={
+              isAdminScoped
+                ? "Admin dibatasi pada organization miliknya sendiri."
+                : "Owner bisa melihat dan mengelola semua organization."
+            }
+          />
+          <InfoCard
+            label="Current Org"
+            value={
+              currentUser
+                ? getOrganizationLabel(currentUser.organization_id, organizations)
+                : "..."
+            }
+            description="Histori user dipertahankan agar audit trail dan conversation tetap aman."
+          />
         </section>
 
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-slate-600">
             Loading access management...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         )}
 
         {successMessage && (
-          <div className="rounded-2xl border border-green-200 bg-green-50 p-5 text-sm text-green-700">
+          <div className="clara-alert clara-alert-success">
             {successMessage}
           </div>
         )}
@@ -358,7 +360,7 @@ export default function AdminAccessPage() {
             <section className="grid gap-6 lg:grid-cols-2">
               <form
                 onSubmit={handleCreateOrganization}
-                className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                className="clara-card space-y-5 rounded-[30px] p-5"
               >
                 <div>
                   <h2 className="text-lg font-semibold text-slate-950">
@@ -382,7 +384,7 @@ export default function AdminAccessPage() {
                       }))
                     }
                     disabled={!canManageOrganizations || isSubmittingOrganization}
-                    className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                    className="clara-input mt-2"
                     placeholder="Contoh: Clara Demo"
                   />
                 </div>
@@ -400,13 +402,13 @@ export default function AdminAccessPage() {
                       }))
                     }
                     disabled={!canManageOrganizations || isSubmittingOrganization}
-                    className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                    className="clara-input mt-2"
                     placeholder="clara-demo"
                   />
                 </div>
 
                 {!canManageOrganizations && (
-                  <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-700">
+                  <p className="clara-card-soft rounded-xl p-3 text-sm text-amber-700">
                     Admin tidak bisa membuat organization baru dari UI ini.
                   </p>
                 )}
@@ -414,7 +416,7 @@ export default function AdminAccessPage() {
                 <button
                   type="submit"
                   disabled={!canManageOrganizations || isSubmittingOrganization}
-                  className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="clara-button clara-button-primary"
                 >
                   {isSubmittingOrganization
                     ? "Creating organization..."
@@ -424,7 +426,7 @@ export default function AdminAccessPage() {
 
               <form
                 onSubmit={handleCreateUser}
-                className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                className="clara-card space-y-5 rounded-[30px] p-5"
               >
                 <div>
                   <h2 className="text-lg font-semibold text-slate-950">
@@ -450,7 +452,7 @@ export default function AdminAccessPage() {
                   onChange={(value) =>
                     setUserForm((current) => ({ ...current, email: value }))
                   }
-                    placeholder="marketing@clara.local"
+                  placeholder="marketing@clara.local"
                   type="email"
                 />
 
@@ -503,7 +505,7 @@ export default function AdminAccessPage() {
                 <button
                   type="submit"
                   disabled={isSubmittingUser}
-                  className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="clara-button clara-button-primary"
                 >
                   {isSubmittingUser ? "Creating user..." : "Create User"}
                 </button>
@@ -541,7 +543,7 @@ export default function AdminAccessPage() {
 
               <Panel
                 title="Manage Users"
-                description="Edit profil user, ubah role, dan aktif/nonaktifkan akun tanpa menghapus histori."
+                description="Edit profil user, ubah role, dan aktif atau nonaktifkan akun tanpa menghapus histori."
               >
                 {users.length === 0 ? (
                   <EmptyText text="Belum ada user." />
@@ -799,7 +801,27 @@ export default function AdminAccessPage() {
           </>
         )}
       </div>
-    </main>
+    </WorkspaceShell>
+  );
+}
+
+function InfoCard({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: string;
+  description: string;
+}) {
+  return (
+    <article className="clara-card rounded-[24px] p-5">
+      <p className="clara-kicker text-xs text-slate-500">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+        {value}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </article>
   );
 }
 
@@ -813,7 +835,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="clara-card rounded-[28px] p-5">
       <div>
         <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
         <p className="mt-1 text-sm text-slate-600">{description}</p>
@@ -847,7 +869,7 @@ function InputField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         type={type}
-        className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+        className="clara-input mt-2"
         placeholder={placeholder}
       />
     </div>
@@ -874,7 +896,7 @@ function SelectField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+        className="clara-select mt-2"
       >
         {options.map((option) => (
           <option key={`${label}-${option.value}`} value={option.value}>
@@ -895,14 +917,14 @@ function PasswordStrengthHint({
 }) {
   if (!password) {
     return (
-      <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+      <p className="clara-card-soft rounded-xl p-3 text-xs text-slate-600">
         Hint: gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol.
       </p>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+    <div className="clara-card-soft rounded-xl p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
           Password Strength

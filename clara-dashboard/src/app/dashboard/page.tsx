@@ -1,5 +1,21 @@
 "use client";
 
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import {
+  faArrowRight,
+  faBookOpen,
+  faBriefcase,
+  faBullseye,
+  faCalendarCheck,
+  faChartLine,
+  faCloudArrowUp,
+  faComments,
+  faShieldHalved,
+  faTriangleExclamation,
+  faUsersGear,
+  faWandSparkles,
+} from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -26,6 +42,14 @@ type OverviewMetrics = {
   highRiskCount: number;
 };
 
+type QuickLink = {
+  href: string;
+  title: string;
+  description: string;
+  eyebrow: string;
+  icon: IconDefinition;
+};
+
 const EMPTY_METRICS: OverviewMetrics = {
   inboxCount: 0,
   analyzedCount: 0,
@@ -38,21 +62,39 @@ const EMPTY_CHANGE_PASSWORD_FORM: ChangePasswordRequest = {
   new_password: "",
 };
 
-const roleCopy: Record<string, { title: string; summary: string }> = {
+const roleCopy: Record<
+  string,
+  { title: string; summary: string; focus: string[] }
+> = {
   owner: {
     title: "Global Command Center",
     summary:
-      "Lihat kesehatan operasional, quality insight, dan arah market signal lintas organization.",
+      "Lihat kesehatan operasional, quality insight, dan arah market signal lintas organization dari satu control room yang ringkas.",
+    focus: [
+      "Pantau conversation berisiko tinggi sebelum mengganggu closing.",
+      "Validasi insight mingguan agar tim sales dan marketing bergerak sinkron.",
+      "Jaga knowledge base tetap rapi supaya balasan Clara tetap grounded.",
+    ],
   },
   admin: {
     title: "Organization Control Room",
     summary:
-      "Pantau aktivitas organization, kualitas follow-up, dan akses operasional tim dengan satu pintu masuk.",
+      "Atur ritme kerja tim, follow-up, dan akses operasional tanpa harus lompat dari satu modul ke modul lain.",
+    focus: [
+      "Pastikan worklist tim tetap bergerak untuk lead panas dan overdue.",
+      "Jaga akses user dan pipeline supaya tidak ada bottleneck operasional.",
+      "Gunakan preview KPI untuk memutuskan prioritas tim hari ini.",
+    ],
   },
   marketing: {
     title: "Operational Workspace",
     summary:
-      "Masuk ke inbox, upload chat baru, dan lanjutkan analisis percakapan customer tanpa harus lompat-lompat halaman.",
+      "Masuk ke inbox, upload percakapan baru, lalu teruskan analisis customer dengan alur yang lebih fokus dan minim distraksi.",
+    focus: [
+      "Upload chat baru dan cek parsing agar tidak ada data yang tertinggal.",
+      "Lanjutkan follow-up conversation yang sudah aktif kembali hari ini.",
+      "Gunakan knowledge resmi saat menghadapi legalitas, harga, atau klaim sensitif.",
+    ],
   },
 };
 
@@ -167,6 +209,7 @@ export default function DashboardHomePage() {
   const canAccessAdmin =
     currentUser !== null && ["owner", "admin"].includes(currentUser.role);
   const passwordStrength = getPasswordStrength(changePasswordForm.new_password);
+  const quickLinks = buildQuickLinks(canAccessInsights, canAccessAdmin);
 
   return (
     <WorkspaceShell
@@ -181,13 +224,13 @@ export default function DashboardHomePage() {
         <>
           <Link
             href="/dashboard/sales"
-            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+            className="clara-button clara-button-primary"
           >
             Buka Inbox
           </Link>
           <Link
             href="/dashboard/upload"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-secondary"
           >
             Upload Chat
           </Link>
@@ -202,7 +245,7 @@ export default function DashboardHomePage() {
             onClick={() => {
               void handleLogout();
             }}
-            className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+            className="clara-button clara-button-ghost"
           >
             Logout
           </button>
@@ -210,154 +253,203 @@ export default function DashboardHomePage() {
       }
     >
       <div className="space-y-6">
-
         {errorMessage && (
-          <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <section className="clara-alert clara-alert-danger">
             {errorMessage}
           </section>
         )}
 
         {successMessage && (
-          <section className="rounded-2xl border border-green-200 bg-green-50 p-5 text-sm text-green-700">
+          <section className="clara-alert clara-alert-success">
             {successMessage}
           </section>
         )}
+
+        <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.45fr)_360px]">
+          <div className="clara-panel overflow-hidden rounded-[34px] p-6 sm:p-8">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_250px]">
+              <div>
+                <span className="inline-flex rounded-full border border-[#e5d2b3] bg-[#fff5e5] px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-[#8d6737]">
+                  {roleLabel?.title ?? "Workspace"}
+                </span>
+                <h2 className="mt-5 max-w-3xl text-3xl font-bold tracking-[-0.05em] text-slate-950 sm:text-[2.85rem]">
+                  Dashboard yang lebih fokus untuk operasional, insight, dan eksekusi harian.
+                </h2>
+                <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">
+                  {roleLabel?.summary ??
+                    "Semua titik kerja penting Clara dikumpulkan dalam satu workspace yang lebih tenang, lebih jelas, dan lebih cepat dipindai."}
+                </p>
+
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <SignalPill
+                    label="Percakapan"
+                    value={isLoading ? "..." : String(metrics.inboxCount)}
+                  />
+                  <SignalPill
+                    label="AI Analyzed"
+                    value={isLoading ? "..." : String(metrics.analyzedCount)}
+                  />
+                  <SignalPill
+                    label="High Risk"
+                    value={isLoading ? "..." : String(metrics.highRiskCount)}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-[30px] bg-[linear-gradient(180deg,#10172d_0%,#172241_100%)] p-5 text-white shadow-[0_20px_40px_rgba(16,23,45,0.22)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d4b07b]">
+                  Fokus Hari Ini
+                </p>
+                <ul className="mt-4 space-y-3">
+                  {(roleLabel?.focus ?? []).map((item) => (
+                    <li
+                      key={item}
+                      className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm leading-6 text-slate-100"
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <section className="clara-panel-soft rounded-[28px] p-5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#10172d] text-[#f4e7d3]">
+                  <FontAwesomeIcon icon={faBullseye} className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8d6737]">
+                    System Pulse
+                  </p>
+                  <h3 className="mt-1 text-lg font-semibold text-slate-950">
+                    Ringkas, tapi langsung berguna
+                  </h3>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3 text-sm text-slate-600">
+                <PulseRow
+                  label="Conversation aktif"
+                  value={isLoading ? "..." : String(metrics.inboxCount)}
+                />
+                <PulseRow
+                  label="Insight coverage"
+                  value={isLoading ? "..." : String(metrics.insightConversationCount)}
+                />
+                <PulseRow
+                  label="Status workspace"
+                  value={canAccessInsights ? "Extended view" : "Operational view"}
+                />
+              </div>
+            </section>
+
+            <section className="clara-panel-soft rounded-[28px] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8d6737]">
+                Aktivitas Terakhir
+              </p>
+              {latestConversation ? (
+                <div className="mt-4 rounded-[24px] border border-white/80 bg-white/80 p-4">
+                  <p className="text-base font-semibold text-slate-950">
+                    {latestConversation.title}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {latestConversation.latest_message?.message_text ??
+                      "Belum ada pesan terakhir yang bisa ditampilkan."}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                    <span>
+                      Last update: {formatDateTime(latestConversation.last_message_at)}
+                    </span>
+                    <span>&bull;</span>
+                    <span>
+                      Status: {formatStatusLabel(latestConversation.ui_status)}
+                    </span>
+                  </div>
+                  <Link
+                    href={`/dashboard/sales/conversations/${latestConversation.conversation_id}`}
+                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                  >
+                    Buka Conversation
+                    <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3" />
+                  </Link>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-white/70 p-5 text-sm text-slate-600">
+                  Belum ada conversation yang tampil. Kalau baru mulai, upload
+                  chat WhatsApp pertama dulu agar workspace ini mulai terasa
+                  hidup.
+                </div>
+              )}
+            </section>
+          </div>
+        </section>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             label="Percakapan Aktif"
             value={isLoading ? "..." : String(metrics.inboxCount)}
-            hint="Jumlah percakapan yang saat ini bisa Anda tindak lanjuti dari workspace."
+            hint="Jumlah percakapan yang sedang bisa ditindak lanjuti dari workspace."
+            icon={faComments}
+            accent="from-[#fff4e5] to-[#f5dcc0]"
           />
           <MetricCard
             label="Sudah Dianalisis"
             value={isLoading ? "..." : String(metrics.analyzedCount)}
-            hint="Conversation yang sudah punya hasil pembacaan AI dan next action."
+            hint="Conversation yang sudah punya pembacaan AI dan next action."
+            icon={faWandSparkles}
+            accent="from-[#eef4ff] to-[#dfe8fb]"
           />
           <MetricCard
             label="Cakupan Insight"
             value={isLoading ? "..." : String(metrics.insightConversationCount)}
-            hint="Total percakapan yang ikut membentuk marketing insight saat ini."
+            hint="Percakapan yang ikut membentuk insight marketing saat ini."
+            icon={faChartLine}
+            accent="from-[#ebfaf4] to-[#d5eedf]"
           />
           <MetricCard
             label="Risiko Tinggi"
             value={isLoading ? "..." : String(metrics.highRiskCount)}
             hint="Percakapan sensitif yang sebaiknya ditangani atau ditinjau lebih cepat."
+            icon={faTriangleExclamation}
+            accent="from-[#fff0ea] to-[#f7d7c8]"
           />
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Quick Actions
-            </p>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <ActionCard
-                href="/dashboard/sales"
-                title="Conversation Inbox"
-                description="Masuk ke antrian percakapan, buka detail customer, dan lanjutkan follow-up."
-              />
-              <ActionCard
-                href="/dashboard/upload"
-                title="Upload WhatsApp TXT"
-                description="Masukkan export chat baru untuk diparse menjadi conversation dan message."
-              />
-              <ActionCard
-                href="/dashboard/crm"
-                title="Lead Pipeline"
-                description="Lihat lead yang sudah terbentuk dari conversation dan mulai atur stage CRM dasarnya."
-              />
-              <ActionCard
-                href="/dashboard/follow-up"
-                title="AI Worklist"
-                description="Buka daftar follow-up harian yang sudah diprioritaskan Clara dari hot lead, overdue, dan draft siap kirim."
-              />
-              <ActionCard
-                href="/dashboard/approvals"
-                title="Approval Queue"
-                description="Lihat draft pending approval dan escalation tanpa buka conversation satu per satu."
-              />
-              <ActionCard
-                href="/dashboard/knowledge"
-                title="Product Knowledge"
-                description="Kelola fakta produk, legalitas, dan policy supaya reply AI tetap grounded."
-              />
-              <ActionCard
-                href={canAccessInsights ? "/dashboard/marketing" : "/dashboard/sales"}
-                title={canAccessInsights ? "Marketing Insights" : "Operational Flow"}
-                description={
-                  canAccessInsights
-                    ? "Baca tren objection, insight snapshot, dan sinyal market dari percakapan customer."
-                    : "Lanjutkan alur operasional harian dari inbox, analisis, hingga reply."
-                }
-              />
-              {canAccessAdmin && (
-                <ActionCard
-                  href="/dashboard/kpi"
-                  title="KPI Command Center"
-                  description="Baca leaderboard sales, health pipeline per organization, dan KPI foundation untuk owner/admin."
-                />
-              )}
-              {canAccessAdmin && (
-                <ActionCard
-                  href="/dashboard/admin/access"
-                  title="User Management"
-                  description="Kelola akses user dan organization sesuai role yang berwenang."
-                />
-              )}
-              {canAccessAdmin && (
-                <ActionCard
-                  href="/dashboard/admin/ops"
-                  title="Admin Ops"
-                  description="Lihat overview database dan metadata sistem tanpa buka PostgreSQL client."
-                />
-              )}
+          <PanelFrame
+            eyebrow="Quick Routes"
+            title="Akses modul yang paling sering dipakai"
+            actionLabel="Lihat inbox"
+            actionHref="/dashboard/sales"
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              {quickLinks.map((item) => (
+                <ActionCard key={item.href} item={item} />
+              ))}
             </div>
-          </div>
+          </PanelFrame>
 
           <div className="space-y-6">
-            <section className="rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_18px_45px_rgba(15,23,42,0.16)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
-                Fokus Hari Ini
-              </p>
-              <h2 className="mt-4 text-2xl font-bold tracking-tight">
-                {roleLabel?.title ?? "Team Workspace"}
-              </h2>
-              <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-200">
-                <li>Prioritaskan upload chat baru dan pastikan parsing berjalan bersih.</li>
-                <li>Jalankan AI analysis lebih cepat pada conversation yang sudah aktif lagi.</li>
-                <li>Gunakan product knowledge saat menangani legalitas, harga, atau klaim sensitif.</li>
-              </ul>
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    AI Worklist
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    Prioritas follow-up hari ini
-                  </h2>
-                </div>
-                <Link
-                  href="/dashboard/follow-up"
-                  className="inline-flex rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
-                >
-                  Lihat Semua
-                </Link>
-              </div>
-
-              <div className="mt-4 space-y-3">
+            <PanelFrame
+              eyebrow="AI Worklist"
+              title="Prioritas follow-up hari ini"
+              actionLabel="Lihat semua"
+              actionHref="/dashboard/follow-up"
+            >
+              <div className="space-y-3">
                 {worklist && worklist.items.length > 0 ? (
                   worklist.items.slice(0, 3).map((item) => (
                     <div
                       key={`${item.lead_id}-${item.task_type}`}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      className="rounded-[24px] border border-slate-200/80 bg-[#fffdf8] p-4"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-semibold text-slate-950">{item.lead_name}</p>
-                        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <p className="font-semibold text-slate-950">
+                          {item.lead_name}
+                        </p>
+                        <span className="rounded-full bg-[#fff0da] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6737]">
                           {item.task_label}
                         </span>
                       </div>
@@ -367,66 +459,48 @@ export default function DashboardHomePage() {
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                  <div className="rounded-[24px] border border-dashed border-slate-300 bg-[#fffdf8] p-5 text-sm text-slate-600">
                     Belum ada follow-up yang mendesak.
                   </div>
                 )}
               </div>
-            </section>
+            </PanelFrame>
 
             {canAccessAdmin && (
-              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      KPI Preview
-                    </p>
-                    <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                      Health pipeline & sales snapshot
-                    </h2>
-                  </div>
-                  <Link
-                    href="/dashboard/kpi"
-                    className="inline-flex rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
-                  >
-                    Buka KPI Center
-                  </Link>
-                </div>
-
+              <PanelFrame
+                eyebrow="KPI Preview"
+                title="Health pipeline & sales snapshot"
+                actionLabel="Buka KPI Center"
+                actionHref="/dashboard/kpi"
+              >
                 {kpi ? (
-                  <div className="mt-5 space-y-4">
+                  <div className="space-y-4">
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Top Sales
-                        </p>
-                        <p className="mt-2 text-base font-semibold text-slate-950">
-                          {kpi.sales_performance[0]?.user_name ?? "Belum ada data"}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-600">
-                          {kpi.sales_performance[0]
-                            ? `${kpi.sales_performance[0].replies_sent} replies sent • ${kpi.sales_performance[0].closing_leads} closing leads`
-                            : "Tambahkan lebih banyak activity untuk mulai melihat ranking."}
-                        </p>
-                      </div>
-                      <div className="rounded-2xl bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Top Organization
-                        </p>
-                        <p className="mt-2 text-base font-semibold text-slate-950">
-                          {kpi.organization_performance[0]?.organization_name ??
-                            "Belum ada data"}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-600">
-                          {kpi.organization_performance[0]
-                            ? `${kpi.organization_performance[0].hot_leads} hot leads • ${(kpi.organization_performance[0].reply_sent_rate * 100).toFixed(0)}% reply sent rate`
-                            : "Organization performance akan muncul ketika data pipeline mulai cukup."}
-                        </p>
-                      </div>
+                      <MiniInsightCard
+                        label="Top Sales"
+                        title={kpi.sales_performance[0]?.user_name ?? "Belum ada data"}
+                        description={
+                          kpi.sales_performance[0]
+                            ? `${kpi.sales_performance[0].replies_sent} replies sent / ${kpi.sales_performance[0].closing_leads} closing leads`
+                            : "Tambahkan lebih banyak activity untuk mulai melihat ranking."
+                        }
+                      />
+                      <MiniInsightCard
+                        label="Top Organization"
+                        title={
+                          kpi.organization_performance[0]?.organization_name ??
+                          "Belum ada data"
+                        }
+                        description={
+                          kpi.organization_performance[0]
+                            ? `${kpi.organization_performance[0].hot_leads} hot leads / ${(kpi.organization_performance[0].reply_sent_rate * 100).toFixed(0)}% reply sent rate`
+                            : "Organization performance akan muncul ketika data pipeline mulai cukup."
+                        }
+                      />
                     </div>
 
-                    <div className="rounded-2xl bg-slate-950 p-4 text-white">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+                    <div className="rounded-[24px] bg-[linear-gradient(180deg,#10172d_0%,#172241_100%)] p-4 text-white">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#d4b07b]">
                         Observation
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-100">
@@ -436,62 +510,39 @@ export default function DashboardHomePage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                    KPI preview belum tersedia untuk role ini atau data pipeline masih tipis.
+                  <div className="rounded-[24px] border border-dashed border-slate-300 bg-[#fffdf8] p-5 text-sm text-slate-600">
+                    KPI preview belum tersedia untuk role ini atau data pipeline
+                    masih tipis.
                   </div>
                 )}
-              </section>
+              </PanelFrame>
             )}
+          </div>
+        </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Aktivitas Terakhir
-              </p>
-              {latestConversation ? (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-base font-semibold text-slate-950">
-                    {latestConversation.title}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-600">
-                    {latestConversation.latest_message?.message_text ??
-                      "Belum ada pesan terakhir yang bisa ditampilkan."}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                    <span>
-                    Last update: {formatDateTime(latestConversation.last_message_at)}
+        <section className="grid gap-6 xl:grid-cols-[1fr_0.92fr]">
+          <PanelFrame eyebrow="Security" title="Jaga akses akun tetap aman">
+            <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+              <div className="rounded-[24px] bg-[linear-gradient(180deg,#10172d_0%,#172241_100%)] p-5 text-white">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#f4e7d3]">
+                    <FontAwesomeIcon icon={faShieldHalved} className="h-4 w-4" />
                   </span>
-                  <span>•</span>
-                    <span>Status: {formatStatusLabel(latestConversation.ui_status)}</span>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#d4b07b]">
+                      Account Safety
+                    </p>
+                    <h3 className="mt-1 text-xl font-semibold">Keamanan akun Clara</h3>
                   </div>
-                  <Link
-                    href={`/dashboard/sales/conversations/${latestConversation.conversation_id}`}
-                    className="mt-4 inline-flex rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
-                  >
-                    Buka Conversation
-                  </Link>
                 </div>
-              ) : (
-                <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                  Belum ada conversation yang tampil. Kalau baru mulai, upload
-                  chat WhatsApp pertama dulu agar workspace ini mulai terasa
-                  hidup.
-                </div>
-              )}
-            </section>
+                <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-200">
+                  <li>Gunakan kombinasi password yang kuat dan unik.</li>
+                  <li>Jangan berbagi akses dashboard lintas role tanpa kebutuhan operasional.</li>
+                  <li>Update password ketika ada pergantian personel atau device.</li>
+                </ul>
+              </div>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Keamanan Akun
-              </p>
-              <h2 className="mt-3 text-xl font-bold tracking-tight text-slate-950">
-                Ganti Password Akun
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Gunakan password baru yang cukup kuat agar sesi dashboard dan
-                akses data customer tidak mudah diambil alih.
-              </p>
-
-              <form onSubmit={handleChangePassword} className="mt-5 space-y-4">
+              <form onSubmit={handleChangePassword} className="space-y-4">
                 <PasswordField
                   label="Current Password"
                   value={changePasswordForm.current_password}
@@ -521,16 +572,122 @@ export default function DashboardHomePage() {
                 <button
                   type="submit"
                   disabled={isChangingPassword}
-                  className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full bg-[#10172d] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(16,23,45,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isChangingPassword ? "Saving..." : "Update Password"}
                 </button>
               </form>
-            </section>
-          </div>
+            </div>
+          </PanelFrame>
+
+          <PanelFrame eyebrow="Operating Notes" title="Pegangan harian tim">
+            <div className="space-y-3">
+              <NoteCard
+                icon={faComments}
+                title="Conversation first"
+                description="Buka inbox lebih dulu saat mulai kerja agar semua lead aktif langsung terlihat."
+              />
+              <NoteCard
+                icon={faCloudArrowUp}
+                title="Raw chat discipline"
+                description="Setelah upload, cek parsing dan status data sebelum analisis lanjutan dijalankan."
+              />
+              <NoteCard
+                icon={faBookOpen}
+                title="Grounded replies"
+                description="Saat ada pembahasan legalitas, policy, atau harga sensitif, selalu rujuk knowledge resmi."
+              />
+            </div>
+          </PanelFrame>
         </section>
       </div>
     </WorkspaceShell>
+  );
+}
+
+function buildQuickLinks(
+  canAccessInsights: boolean,
+  canAccessAdmin: boolean
+): QuickLink[] {
+  const links: QuickLink[] = [
+    {
+      href: "/dashboard/sales",
+      title: "Conversation Inbox",
+      description: "Masuk ke antrian percakapan dan lanjutkan follow-up customer.",
+      eyebrow: "Sales",
+      icon: faComments,
+    },
+    {
+      href: "/dashboard/upload",
+      title: "Upload WhatsApp TXT",
+      description: "Masukkan export chat baru untuk diparse menjadi conversation dan message.",
+      eyebrow: "Input",
+      icon: faCloudArrowUp,
+    },
+    {
+      href: "/dashboard/crm",
+      title: "Lead Pipeline",
+      description: "Lihat lead yang terbentuk dari percakapan dan atur tahap CRM dasarnya.",
+      eyebrow: "CRM",
+      icon: faBriefcase,
+    },
+    {
+      href: "/dashboard/follow-up",
+      title: "AI Worklist",
+      description: "Pantau hot lead, overdue follow-up, dan draft siap kirim.",
+      eyebrow: "AI Tasks",
+      icon: faCalendarCheck,
+    },
+  ];
+
+  if (canAccessInsights) {
+    links.push({
+      href: "/dashboard/marketing",
+      title: "Marketing Insights",
+      description: "Baca tren objection, snapshot insight, dan sinyal market dari customer.",
+      eyebrow: "Insights",
+      icon: faChartLine,
+    });
+  } else {
+    links.push({
+      href: "/dashboard/knowledge",
+      title: "Product Knowledge",
+      description: "Kelola fakta produk, legalitas, dan policy agar reply AI tetap grounded.",
+      eyebrow: "Knowledge",
+      icon: faBookOpen,
+    });
+  }
+
+  if (canAccessAdmin) {
+    links.push({
+      href: "/dashboard/admin/access",
+      title: "User Access",
+      description: "Kelola akses user dan organization sesuai role yang berwenang.",
+      eyebrow: "Administration",
+      icon: faUsersGear,
+    });
+  }
+
+  return links;
+}
+
+function SignalPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="clara-card-soft rounded-2xl px-4 py-3">
+      <p className="clara-kicker text-xs">{label}</p>
+      <p className="mt-1.5 text-xl font-bold tracking-tight text-slate-950">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function PulseRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="clara-card-soft flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
+      <span className="text-slate-600">{label}</span>
+      <span className="font-semibold text-slate-950">{value}</span>
+    </div>
   );
 }
 
@@ -538,43 +695,141 @@ function MetricCard({
   label,
   value,
   hint,
+  icon,
+  accent,
 }: {
   label: string;
   value: string;
   hint: string;
+  icon: IconDefinition;
+  accent: string;
 }) {
   return (
-    <article className="rounded-[24px] border border-slate-200/90 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
-        {value}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{hint}</p>
+    <article className="clara-card rounded-[28px] p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="clara-kicker text-xs">{label}</p>
+          <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+            {value}
+          </p>
+        </div>
+        <span
+          className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-slate-900`}
+        >
+          <FontAwesomeIcon icon={icon} className="h-4 w-4" />
+        </span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{hint}</p>
     </article>
   );
 }
 
-function ActionCard({
-  href,
+function PanelFrame({
+  eyebrow,
+  title,
+  children,
+  actionHref,
+  actionLabel,
+}: {
+  eyebrow: string;
+  title: string;
+  children: React.ReactNode;
+  actionHref?: string;
+  actionLabel?: string;
+}) {
+  return (
+    <section className="clara-card rounded-[32px] p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="clara-kicker text-xs">{eyebrow}</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+            {title}
+          </h2>
+        </div>
+
+        {actionHref && actionLabel ? (
+          <Link
+            href={actionHref}
+            className="clara-button clara-button-ghost"
+          >
+            {actionLabel}
+            <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3" />
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function ActionCard({ item }: { item: QuickLink }) {
+  return (
+    <Link
+      href={item.href}
+      className="clara-card-soft group rounded-[26px] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(16,23,45,0.08)]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="clara-kicker text-xs">{item.eyebrow}</p>
+          <h3 className="mt-2 text-base font-semibold text-slate-950">
+            {item.title}
+          </h3>
+        </div>
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#10172d] text-[#f4e7d3]">
+          <FontAwesomeIcon icon={item.icon} className="h-4 w-4" />
+        </span>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
+      <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#7d5b32]">
+        Buka modul
+        <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3 transition group-hover:translate-x-0.5" />
+      </span>
+    </Link>
+  );
+}
+
+function MiniInsightCard({
+  label,
   title,
   description,
 }: {
-  href: string;
+  label: string;
   title: string;
   description: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="group rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_14px_28px_rgba(15,23,42,0.08)]"
-    >
-      <h3 className="text-base font-semibold text-slate-950 group-hover:text-slate-800">
-        {title}
-      </h3>
+    <div className="clara-card-soft rounded-[24px] p-4">
+      <p className="clara-kicker text-xs">{label}</p>
+      <p className="mt-2 text-base font-semibold text-slate-950">{title}</p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-    </Link>
+    </div>
+  );
+}
+
+function NoteCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: IconDefinition;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="clara-card-soft rounded-[24px] p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#10172d] text-[#f4e7d3]">
+          <FontAwesomeIcon icon={icon} className="h-4 w-4" />
+        </span>
+        <div>
+          <h3 className="text-base font-semibold text-slate-950">{title}</h3>
+          <p className="mt-1.5 text-sm leading-6 text-slate-600">
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -594,7 +849,7 @@ function PasswordField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         type="password"
-        className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+        className="mt-2 w-full rounded-2xl border border-slate-300/90 bg-white/85 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#cdae7c]"
         placeholder="Minimum 8 karakter"
       />
     </div>
@@ -610,16 +865,16 @@ function PasswordStrengthHint({
 }) {
   if (!password) {
     return (
-      <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+      <p className="rounded-2xl border border-slate-200/80 bg-[#fffdf8] p-3 text-xs text-slate-600">
         Hint: gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol.
       </p>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+    <div className="rounded-2xl border border-slate-200/80 bg-[#fffdf8] p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6737]">
           Password Strength
         </p>
         <span

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type {
@@ -188,40 +189,49 @@ export default function ProductKnowledgePage() {
     await loadKnowledge(nextFilters);
   }
 
-  return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <Link
-              href="/dashboard/sales"
-              className="text-sm font-medium text-slate-600 hover:text-slate-950"
-            >
-              ← Back to Sales Inbox
-            </Link>
+  const activeItemsCount = items.filter((item) => item.is_active).length;
 
-            <p className="mt-6 text-sm font-medium text-slate-500">
-              Clara Knowledge Base
-            </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-              Product Knowledge
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Product knowledge digunakan sebagai sumber fakta resmi agar AI
-              reply tidak mengarang saat membalas customer.
-            </p>
-            <p className="mt-2 max-w-3xl text-xs text-slate-500">
-              Sekarang hanya owner yang boleh menambah, mengubah, dan menghapus
-              knowledge entry. Role lain tetap bisa membaca entry yang tersedia.
-            </p>
-          </div>
+  return (
+    <WorkspaceShell
+      currentUser={currentUser}
+      eyebrow="Knowledge base"
+      title="Product Knowledge"
+      description="Kelola sumber fakta resmi untuk menjaga jawaban Clara tetap akurat, aman, dan grounded."
+      backHref="/dashboard"
+      backLabel="Kembali ke overview"
+      actions={
+        <Link
+          href="/dashboard/sales"
+          className="clara-button clara-button-ghost"
+        >
+          Buka Inbox
+        </Link>
+      }
+    >
+      <div className="mx-auto max-w-7xl space-y-6">
+        <section className="grid gap-4 md:grid-cols-3">
+          <InfoCard
+            label="Total Entry"
+            value={isLoading ? "..." : String(items.length)}
+            description="Seluruh knowledge yang tersedia untuk dibaca dari workspace."
+          />
+          <InfoCard
+            label="Entry Aktif"
+            value={isLoading ? "..." : String(activeItemsCount)}
+            description="Entry aktif akan dipakai Clara sebagai grounding jawaban."
+          />
+          <InfoCard
+            label="Hak Akses"
+            value={canManageKnowledge ? "Owner" : "Read Only"}
+            description="Owner bisa menambah dan mengubah isi, role lain tetap bisa membaca."
+          />
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           {canManageKnowledge && (
             <form
               onSubmit={handleSubmit}
-              className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              className="clara-card space-y-5 rounded-[30px] p-5"
             >
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">
@@ -230,6 +240,10 @@ export default function ProductKnowledgePage() {
                 <p className="mt-1 text-sm text-slate-600">
                   Gunakan bahasa faktual. Hindari isi yang ambigu atau belum
                   diverifikasi.
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  Entry yang aktif akan otomatis tersedia sebagai sumber fakta
+                  saat Clara menyiapkan draft balasan.
                 </p>
               </div>
 
@@ -245,7 +259,7 @@ export default function ProductKnowledgePage() {
                       title: event.target.value,
                     }))
                   }
-                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                  className="clara-input mt-2"
                   placeholder="Contoh: Legalitas SGB Mini"
                 />
               </div>
@@ -263,7 +277,7 @@ export default function ProductKnowledgePage() {
                         category: event.target.value,
                       }))
                     }
-                    className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                    className="clara-input mt-2"
                     placeholder="legalitas / promo / policy"
                   />
                 </div>
@@ -280,7 +294,7 @@ export default function ProductKnowledgePage() {
                         source_type: event.target.value,
                       }))
                     }
-                    className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                    className="clara-input mt-2"
                     placeholder="manual_note"
                   />
                 </div>
@@ -299,12 +313,12 @@ export default function ProductKnowledgePage() {
                     }))
                   }
                   rows={8}
-                  className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                  className="clara-textarea mt-2"
                   placeholder="Tuliskan fakta produk yang boleh dipakai AI saat generate reply."
                 />
               </div>
 
-              <label className="flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+              <label className="clara-card-soft flex items-center gap-3 rounded-xl p-3 text-sm text-slate-700">
                 <input
                   type="checkbox"
                   checked={form.is_active}
@@ -319,15 +333,11 @@ export default function ProductKnowledgePage() {
               </label>
 
               {errorMessage && (
-                <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
-                  {errorMessage}
-                </p>
+                <p className="clara-alert clara-alert-danger">{errorMessage}</p>
               )}
 
               {successMessage && (
-                <p className="rounded-xl bg-green-50 p-3 text-sm text-green-700">
-                  {successMessage}
-                </p>
+                <p className="clara-alert clara-alert-success">{successMessage}</p>
               )}
 
               <div className="flex flex-col gap-3 sm:flex-row">
@@ -340,7 +350,7 @@ export default function ProductKnowledgePage() {
                     form.content.trim().length === 0 ||
                     form.source_type.trim().length === 0
                   }
-                  className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="clara-button clara-button-primary"
                 >
                   {isSubmitting
                     ? "Saving..."
@@ -353,7 +363,7 @@ export default function ProductKnowledgePage() {
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                    className="clara-button clara-button-ghost"
                   >
                     Cancel Edit
                   </button>
@@ -363,7 +373,7 @@ export default function ProductKnowledgePage() {
           )}
 
           <section className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="clara-card rounded-[30px] p-5">
               <h2 className="text-lg font-semibold text-slate-950">
                 Current Knowledge Entries
               </h2>
@@ -383,7 +393,7 @@ export default function ProductKnowledgePage() {
                       q: event.target.value,
                     }))
                   }
-                  className="rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                  className="clara-input"
                   placeholder="Cari title, kategori, atau isi"
                 />
 
@@ -395,7 +405,7 @@ export default function ProductKnowledgePage() {
                       category: event.target.value,
                     }))
                   }
-                  className="rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                  className="clara-input"
                   placeholder="Filter kategori"
                 />
 
@@ -414,7 +424,7 @@ export default function ProductKnowledgePage() {
                           : event.target.value === "true",
                     }))
                   }
-                  className="rounded-xl border border-slate-300 p-3 text-sm text-slate-900 outline-none focus:border-slate-500"
+                  className="clara-select"
                 >
                   <option value="">All status</option>
                   <option value="true">Active only</option>
@@ -424,14 +434,14 @@ export default function ProductKnowledgePage() {
                 <div className="flex gap-2">
                   <button
                     type="submit"
-                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
+                    className="clara-button clara-button-primary"
                   >
                     Apply
                   </button>
                   <button
                     type="button"
                     onClick={handleResetFilters}
-                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                    className="clara-button clara-button-ghost"
                   >
                     Reset
                   </button>
@@ -439,14 +449,26 @@ export default function ProductKnowledgePage() {
               </form>
             </div>
 
+            {!canManageKnowledge && errorMessage && (
+              <div className="clara-alert clara-alert-danger">
+                {errorMessage}
+              </div>
+            )}
+
+            {!canManageKnowledge && successMessage && (
+              <div className="clara-alert clara-alert-success">
+                {successMessage}
+              </div>
+            )}
+
             {isLoading && (
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+              <div className="clara-empty-state text-sm text-slate-600">
                 Loading product knowledge...
               </div>
             )}
 
             {!isLoading && items.length === 0 && !errorMessage && (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+              <div className="clara-empty-state">
                 <h2 className="text-lg font-semibold text-slate-900">
                   Belum ada knowledge entry
                 </h2>
@@ -460,7 +482,7 @@ export default function ProductKnowledgePage() {
               items.map((item) => (
                 <article
                   key={item.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                  className="clara-card rounded-[28px] p-5"
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -497,9 +519,9 @@ export default function ProductKnowledgePage() {
 
                       <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
                         <span>Source: {item.source_type}</span>
-                        <span>•</span>
+                        <span>&bull;</span>
                         <span>Created by: {item.created_by_user_name ?? "-"}</span>
-                        <span>•</span>
+                        <span>&bull;</span>
                         <span>Updated: {formatDateTime(item.updated_at)}</span>
                       </div>
                     </div>
@@ -509,7 +531,7 @@ export default function ProductKnowledgePage() {
                         type="button"
                         onClick={() => startEdit(item)}
                         disabled={!canManageKnowledge}
-                        className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="clara-button clara-button-ghost"
                       >
                         Edit
                       </button>
@@ -517,7 +539,7 @@ export default function ProductKnowledgePage() {
                         type="button"
                         onClick={() => void handleDelete(item.id)}
                         disabled={deletingId === item.id || !canManageKnowledge}
-                        className="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="clara-button border border-red-200 bg-white/70 text-red-700"
                       >
                         {deletingId === item.id ? "Deleting..." : "Delete"}
                       </button>
@@ -528,6 +550,26 @@ export default function ProductKnowledgePage() {
           </section>
         </section>
       </div>
-    </main>
+    </WorkspaceShell>
+  );
+}
+
+function InfoCard({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: string;
+  description: string;
+}) {
+  return (
+    <article className="clara-card rounded-[24px] p-5">
+      <p className="clara-kicker text-xs text-slate-500">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+        {value}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </article>
   );
 }

@@ -442,6 +442,31 @@ Jika backend utama gagal, extension masih bisa fallback ke proxy lokal `9898`.
 
 ## Command Penting
 
+### Root monorepo
+
+```bash
+npm install
+npm run dev
+npm run prod
+npm run build
+npm run start
+npm run package:extension
+```
+
+Keterangan:
+
+- `npm run dev` -> jalankan dashboard + extension sekaligus untuk local development
+- `npm run prod` -> build dashboard, jalankan migration/bootstrap/import backend, lalu start backend + dashboard untuk server
+- `npm run build` -> build dashboard + extension dari root repo
+- `npm run start` -> jalankan dashboard dalam mode production
+- `npm run package:extension` -> package extension untuk distribusi
+- backend tetap dijalankan/deploy terpisah dari folder `clara-backend`
+
+Opsional untuk `npm run prod`:
+
+- `BACKEND_HOST` dan `BACKEND_PORT` untuk bind FastAPI
+- `DASHBOARD_HOST` dan `DASHBOARD_PORT` untuk bind Next.js production server
+
 ### Backend
 
 ```bash

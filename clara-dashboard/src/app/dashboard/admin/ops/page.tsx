@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import type { CurrentUser, OpsDatabaseOverview } from "@/types/dashboard";
@@ -37,68 +38,53 @@ export default function AdminOpsPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
+    <WorkspaceShell
+      currentUser={currentUser}
+      eyebrow="Admin operations"
+      title="Database Overview"
+      description="Pantau metadata sistem penting secara read-only tanpa harus membuka database client secara manual."
+      backHref="/dashboard"
+      backLabel="Kembali ke overview"
+      actions={
+        <Link
+          href="/dashboard/admin/access"
+          className="clara-button clara-button-ghost"
+        >
+          Manage Users
+        </Link>
+      }
+    >
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <Link
-              href="/dashboard/sales"
-              className="text-sm font-medium text-slate-600 hover:text-slate-950"
-            >
-              ← Back to Sales Inbox
-            </Link>
-            <div className="mt-4">
-              <Link
-                href="/dashboard/admin/access"
-                className="inline-flex rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
-              >
-                Manage Users & Organizations
-              </Link>
-            </div>
-            <p className="mt-6 text-sm font-medium text-slate-500">
-              Clara Admin Operations
-            </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-              Database Overview
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Tampilan read-only untuk melihat metadata database penting tanpa
-              membuka client PostgreSQL langsung. Halaman ini sengaja tidak
-              menampilkan password hash atau raw chat penuh.
-            </p>
-          </div>
-
-          {currentUser && (
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
-              <p>
-                Login as: <span className="font-semibold">{currentUser.email}</span>
-              </p>
-              <p className="mt-1">
-                Role:{" "}
-                <span className="font-semibold">
-                  {formatStatusLabel(currentUser.role)}
-                </span>
-              </p>
-              {overview && (
-                <p className="mt-1">
-                  Scope:{" "}
-                  <span className="font-semibold">
-                    {formatStatusLabel(overview.scope_type)}
-                  </span>
-                </p>
-              )}
-            </div>
-          )}
+        <section className="grid gap-4 md:grid-cols-3">
+          <InfoCard
+            label="Akses"
+            value={currentUser ? formatStatusLabel(currentUser.role) : "..."}
+            description={
+              currentUser
+                ? `Login sebagai ${currentUser.email}`
+                : "Memuat profil operator."
+            }
+          />
+          <InfoCard
+            label="Scope Data"
+            value={overview ? formatStatusLabel(overview.scope_type) : "..."}
+            description="Batas data yang sedang ditampilkan pada overview ini."
+          />
+          <InfoCard
+            label="Mode"
+            value="Read Only"
+            description="Halaman ini hanya untuk observasi dan tidak menampilkan data sensitif mentah."
+          />
         </section>
 
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-slate-600">
             Loading database overview...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         )}
@@ -257,7 +243,7 @@ export default function AdminOpsPage() {
             <section className="grid gap-6 xl:grid-cols-2">
               <Panel
                 title="Recent Product Knowledge"
-                description="Knowledge base terbaru yang aktif/nonaktif."
+                description="Knowledge base terbaru yang aktif maupun nonaktif."
               >
                 {overview.recent_product_knowledge.length === 0 ? (
                   <EmptyText text="Belum ada product knowledge." />
@@ -333,7 +319,27 @@ export default function AdminOpsPage() {
           </>
         )}
       </div>
-    </main>
+    </WorkspaceShell>
+  );
+}
+
+function InfoCard({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: string;
+  description: string;
+}) {
+  return (
+    <article className="clara-card rounded-[24px] p-5">
+      <p className="clara-kicker text-xs text-slate-500">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+        {value}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+    </article>
   );
 }
 
@@ -345,7 +351,7 @@ function MetricCard({
   value: string;
 }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="clara-card rounded-2xl p-5">
       <p className="text-sm font-medium text-slate-500">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
         {value}
@@ -364,7 +370,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="clara-card rounded-[28px] p-5">
       <div>
         <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
         <p className="mt-1 text-sm text-slate-600">{description}</p>
