@@ -1,6 +1,8 @@
 const API_BASE_URL = "/api";
 const CSRF_COOKIE_NAME =
   process.env.NEXT_PUBLIC_CSRF_COOKIE_NAME ?? "clara_csrf_token";
+const BACKEND_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
 type RequestOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -70,6 +72,7 @@ export async function apiFetch<T>(
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
+    let responseText = "";
 
     try {
       const errorBody = await response.json();
@@ -97,7 +100,28 @@ export async function apiFetch<T>(
         message = JSON.stringify(detail);
       }
     } catch {
-      // Ignore JSON parse error.
+      try {
+        responseText = await response.text();
+      } catch {
+        // Ignore plain text parse error too.
+      }
+    }
+
+    if (
+      response.status >= 500 &&
+      message === `Request failed with status ${response.status}`
+    ) {
+      const lowerText = responseText.toLowerCase();
+      if (
+        lowerText.includes("failed to proxy") ||
+        lowerText.includes("aggregateerror") ||
+        lowerText.includes("ecconnrefused")
+      ) {
+        message = `Clara backend belum bisa dijangkau. Pastikan service backend aktif di ${BACKEND_BASE_URL}.`;
+      } else {
+        message =
+          "Server Clara sedang bermasalah. Coba beberapa saat lagi atau cek service backend.";
+      }
     }
 
     if (response.status === 401 && typeof window !== "undefined") {

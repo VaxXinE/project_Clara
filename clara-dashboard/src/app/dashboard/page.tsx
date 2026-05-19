@@ -230,10 +230,8 @@ export default function DashboardHomePage() {
       actions={
         <>
           <Link
-            href="/dashboard/sales"
-            className="clara-button clara-button-primary"
             href="/dashboard/start"
-            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+            className="clara-button clara-button-primary"
           >
             Mulai dari Sini
           </Link>
@@ -242,12 +240,6 @@ export default function DashboardHomePage() {
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
           >
             Buka Chat Masuk
-          </Link>
-          <Link
-            href="/dashboard/upload"
-            className="clara-button clara-button-secondary"
-          >
-            Channels
           </Link>
           <Link
             href="/dashboard/channels"
@@ -503,87 +495,92 @@ export default function DashboardHomePage() {
             actionLabel="Lihat inbox"
             actionHref="/dashboard/sales"
           >
-            <div className="grid gap-4 sm:grid-cols-2">
-              {quickLinks.map((item) => (
-                <ActionCard key={item.href} item={item} />
-              ))}
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Paling Sering Dipakai
-            </p>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <ActionCard
-                href="/dashboard/start"
-                title="Mulai dari Sini"
-                description="Panduan langkah demi langkah supaya user baru tidak bingung membaca alur Clara."
-              />
-              <ActionCard
-                href="/dashboard/sales"
-                title="Chat Masuk"
-                description="Masuk ke antrian percakapan, buka detail customer, dan lanjutkan follow-up."
-              />
-              <ActionCard
-                href="/dashboard/upload"
-                title="Import Chat"
-                description="Masukkan export chat baru atau paste chat langsung untuk diparse menjadi conversation."
-              />
-              <ActionCard
-                href="/dashboard/crm"
-                title="Lead Pipeline"
-                description="Lihat lead yang sudah terbentuk dari conversation dan mulai atur stage CRM dasarnya."
-              />
-              <ActionCard
-                href="/dashboard/follow-up"
-                title="AI Worklist"
-                description="Buka daftar follow-up harian yang sudah diprioritaskan Clara dari hot lead, overdue, dan draft siap kirim."
-              />
-              <ActionCard
-                href="/dashboard/approvals"
-                title="Approval Queue"
-                description="Lihat draft pending approval dan escalation tanpa buka conversation satu per satu."
-              />
-            </div>
+            <div className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {quickLinks.map((item) => (
+                  <ActionCard key={item.href} item={item} />
+                ))}
+              </div>
 
-            <div className="mt-6 border-t border-slate-200 pt-6">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Tools Tambahan
-              </p>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <ActionCard
-                href="/dashboard/knowledge"
-                title="Product Knowledge"
-                description="Kelola fakta produk, legalitas, dan policy supaya reply AI tetap grounded."
-              />
-              <ActionCard
-                href={canAccessInsights ? "/dashboard/marketing" : "/dashboard/sales"}
-                title={canAccessInsights ? "Marketing Insights" : "Operational Flow"}
-                description={
-                  canAccessInsights
-                    ? "Baca tren objection, insight snapshot, dan sinyal market dari percakapan customer."
-                    : "Lanjutkan alur operasional harian dari inbox, analisis, hingga reply."
-                }
-              />
-              {canAccessAdmin && (
-                <ActionCard
-                  href="/dashboard/kpi"
-                  title="KPI Command Center"
-                  description="Baca leaderboard sales, health pipeline per organization, dan KPI foundation untuk owner/admin."
-                />
-              )}
-              {canAccessAdmin && (
-                <ActionCard
-                  href="/dashboard/admin/access"
-                  title="User Management"
-                  description="Kelola akses user dan organization sesuai role yang berwenang."
-                />
-              )}
-              {canAccessAdmin && (
-                <ActionCard
-                  href="/dashboard/admin/ops"
-                  title="Admin Ops"
-                  description="Lihat overview database dan metadata sistem tanpa buka PostgreSQL client."
-                />
-              )}
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Paling Sering Dipakai
+                </p>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <ActionCard
+                    href="/dashboard/start"
+                    title="Mulai dari Sini"
+                    description="Panduan langkah demi langkah supaya user baru tidak bingung membaca alur Clara."
+                  />
+                  <ActionCard
+                    href="/dashboard/sales"
+                    title="Chat Masuk"
+                    description="Masuk ke antrian percakapan, buka detail customer, dan lanjutkan follow-up."
+                  />
+                  <ActionCard
+                    href="/dashboard/upload"
+                    title="Import Chat"
+                    description="Masukkan export chat baru atau paste chat langsung untuk diparse menjadi conversation."
+                  />
+                  <ActionCard
+                    href="/dashboard/crm"
+                    title="Lead Pipeline"
+                    description="Lihat lead yang sudah terbentuk dari conversation dan mulai atur stage CRM dasarnya."
+                  />
+                  <ActionCard
+                    href="/dashboard/follow-up"
+                    title="AI Worklist"
+                    description="Buka daftar follow-up harian yang sudah diprioritaskan Clara dari hot lead, overdue, dan draft siap kirim."
+                  />
+                  <ActionCard
+                    href="/dashboard/approvals"
+                    title="Approval Queue"
+                    description="Lihat draft pending approval dan escalation tanpa buka conversation satu per satu."
+                  />
+                </div>
+
+                <div className="mt-6 border-t border-slate-200 pt-6">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Tools Tambahan
+                  </p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <ActionCard
+                      href="/dashboard/knowledge"
+                      title="Product Knowledge"
+                      description="Kelola fakta produk, legalitas, dan policy supaya reply AI tetap grounded."
+                    />
+                    <ActionCard
+                      href={canAccessInsights ? "/dashboard/marketing" : "/dashboard/sales"}
+                      title={canAccessInsights ? "Marketing Insights" : "Operational Flow"}
+                      description={
+                        canAccessInsights
+                          ? "Baca tren objection, insight snapshot, dan sinyal market dari percakapan customer."
+                          : "Lanjutkan alur operasional harian dari inbox, analisis, hingga reply."
+                      }
+                    />
+                    {canAccessAdmin && (
+                      <ActionCard
+                        href="/dashboard/kpi"
+                        title="KPI Command Center"
+                        description="Baca leaderboard sales, health pipeline per organization, dan KPI foundation untuk owner/admin."
+                      />
+                    )}
+                    {canAccessAdmin && (
+                      <ActionCard
+                        href="/dashboard/admin/access"
+                        title="User Management"
+                        description="Kelola akses user dan organization sesuai role yang berwenang."
+                      />
+                    )}
+                    {canAccessAdmin && (
+                      <ActionCard
+                        href="/dashboard/admin/ops"
+                        title="Admin Ops"
+                        description="Lihat overview database dan metadata sistem tanpa buka PostgreSQL client."
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </PanelFrame>
@@ -1033,24 +1030,45 @@ function PanelFrame({
   );
 }
 
-function ActionCard({ item }: { item: QuickLink }) {
+function ActionCard({
+  item,
+  href,
+  title,
+  description,
+  eyebrow,
+  icon,
+}: {
+  item?: QuickLink;
+  href?: string;
+  title?: string;
+  description?: string;
+  eyebrow?: string;
+  icon?: IconDefinition;
+}) {
+  const resolvedHref = item?.href ?? href ?? "/dashboard";
+  const resolvedTitle = item?.title ?? title ?? "Workspace";
+  const resolvedDescription =
+    item?.description ?? description ?? "Buka modul Clara yang relevan.";
+  const resolvedEyebrow = item?.eyebrow ?? eyebrow ?? "Clara";
+  const resolvedIcon = item?.icon ?? icon ?? faArrowRight;
+
   return (
     <Link
-      href={item.href}
+      href={resolvedHref}
       className="clara-card-soft group rounded-[26px] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(16,23,45,0.08)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="clara-kicker text-xs">{item.eyebrow}</p>
+          <p className="clara-kicker text-xs">{resolvedEyebrow}</p>
           <h3 className="mt-2 text-base font-semibold text-slate-950">
-            {item.title}
+            {resolvedTitle}
           </h3>
         </div>
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#10172d] text-[#f4e7d3]">
-          <FontAwesomeIcon icon={item.icon} className="h-4 w-4" />
+          <FontAwesomeIcon icon={resolvedIcon} className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>
+      <p className="mt-3 text-sm leading-6 text-slate-600">{resolvedDescription}</p>
       <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#7d5b32]">
         Buka modul
         <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3 transition group-hover:translate-x-0.5" />
@@ -1063,10 +1081,12 @@ function MiniInsightCard({
   label,
   title,
   description,
+  icon = faBullseye,
 }: {
   label: string;
   title: string;
   description: string;
+  icon?: IconDefinition;
 }) {
   return (
     <div className="clara-card-soft rounded-[24px] p-4">
@@ -1075,32 +1095,13 @@ function MiniInsightCard({
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />
         </span>
         <div>
+          <p className="clara-kicker text-xs">{label}</p>
           <h3 className="text-base font-semibold text-slate-950">{title}</h3>
           <p className="mt-1.5 text-sm leading-6 text-slate-600">
             {description}
           </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function WorkflowStepCard({
-  step,
-  title,
-  description,
-  href,
-}: {
-  step: string;
-  title: string;
-  description: string;
-  href: string;
-}) {
-  return (
-    <div className="clara-card-soft rounded-[24px] p-4">
-      <p className="clara-kicker text-xs">{label}</p>
-      <p className="mt-2 text-base font-semibold text-slate-950">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
     </div>
   );
 }
