@@ -46,6 +46,39 @@ type NavGroup = {
   items: NavItem[];
 };
 
+function getRolePrinciples(role?: string) {
+  if (role === "owner") {
+    return {
+      title: "Mode Owner",
+      items: [
+        "Mulai dari KPI, alert, dan notification untuk membaca kesehatan bisnis lebih dulu.",
+        "Turun ke marketing, pipeline, atau identity hanya saat ada sinyal yang perlu intervensi.",
+        "Gunakan halaman operasional untuk verifikasi, bukan sebagai titik pantau utama harian.",
+      ],
+    };
+  }
+
+  if (role === "admin") {
+    return {
+      title: "Mode Admin",
+      items: [
+        "Mulai dari notification, approvals, dan KPI agar bottleneck tim cepat terlihat.",
+        "Pastikan workflow sales dan lead pipeline tetap rapi sebelum masuk ke area insight.",
+        "Users dan Admin Ops dipakai saat ada masalah akses atau kontrol organisasi.",
+      ],
+    };
+  }
+
+  return {
+    title: "Mode Marketing",
+    items: [
+      "Mulai dari import chat atau Chat Masuk, lalu bergerak ke lead dan follow-up.",
+      "Gunakan AI analysis dan draft sebagai alat bantu, bukan pengganti pengecekan konteks chat.",
+      "Naikkan ke approvals, notifications, atau CRM saat conversation sudah butuh tindakan lanjutan.",
+    ],
+  };
+}
+
 function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   if (!currentUser) {
     return [];
@@ -184,7 +217,7 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   const pathname = usePathname();
   const navGroups = buildNavGroups(currentUser);
-  const todayLabel = getTodayLabel();
+  const rolePrinciples = getRolePrinciples(currentUser?.role);
 
   return (
     <main className="min-h-screen bg-transparent text-slate-900">
@@ -275,58 +308,32 @@ export function WorkspaceShell({
           </div>
         </aside>
 
-        <section className="min-w-0">
-          <div className="px-4 pb-7 pt-4 sm:px-6 xl:px-8 xl:pt-6">
-            <div className="clara-surface overflow-hidden rounded-[32px] border px-5 py-5 shadow-[0_18px_40px_rgba(22,31,54,0.06)] sm:px-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                    <span className="font-semibold uppercase tracking-[0.24em] text-[#8e6b3f]">
-                      {eyebrow}
-                    </span>
-                    {backHref && backLabel ? (
-                      <Link
-                        href={backHref}
-                        className="clara-button clara-button-ghost px-3 py-1.5 text-sm font-semibold"
-                      >
-                        <FontAwesomeIcon
-                          icon={faChevronLeft}
-                          className="h-3 w-3"
-                        />
-                        {backLabel}
-                      </Link>
-                    ) : null}
-                  </div>
-                  <h1 className="mt-2 text-[1.85rem] font-bold tracking-[-0.04em] text-slate-950 sm:text-[2.2rem]">
-                    {title}
-                  </h1>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-[15px]">
-                    {description}
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-start gap-2.5 lg:min-w-[280px] lg:items-end">
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 lg:justify-end">
-                    <span className="rounded-full border border-white/70 bg-white/82 px-3 py-1.5 font-medium text-slate-700 shadow-sm">
-                      {todayLabel}
-                    </span>
-                    {currentUser ? (
-                      <span className="clara-chip">
-                        {formatStatusLabel(currentUser.role)}
-                      </span>
-                    ) : null}
-                  </div>
-                  {actions ? (
-                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                      {actions}
-                    </div>
-                  ) : null}
-                </div>
+        <section className="px-5 py-5 sm:px-7 sm:py-7">
+            <div className="mb-6 grid gap-4 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.035),rgba(255,255,255,0.85)_45%,rgba(184,138,90,0.08))] p-5 sm:grid-cols-[1.2fr_0.8fr] sm:p-6">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">
+                  {eyebrow}
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                  {title}
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">
+                  {description}
+                </p>
+              </div>
+              <div className="rounded-[24px] border border-white/80 bg-white/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  {rolePrinciples.title}
+                </p>
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                  {rolePrinciples.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
               </div>
             </div>
 
             <div className="pt-6">{children}</div>
-          </div>
         </section>
       </div>
     </main>

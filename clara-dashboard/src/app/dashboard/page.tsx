@@ -19,6 +19,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { RoleBasedStartGuide } from "@/components/dashboard/RoleBasedStartGuide";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import {
@@ -230,26 +231,35 @@ export default function DashboardHomePage() {
       actions={
         <>
           <Link
+<<<<<<< HEAD
             href="/dashboard/start"
             className="clara-button clara-button-primary"
+=======
+            className="clara-button clara-button-primary"
+            href="/dashboard/start"
+>>>>>>> 62b92f0 (feat: add role-based UX for overview, onboarding, and workspace guidance)
           >
             Mulai dari Sini
           </Link>
           <Link
             href="/dashboard/sales"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-secondary"
           >
             Buka Chat Masuk
           </Link>
           <Link
             href="/dashboard/channels"
+<<<<<<< HEAD
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+=======
+            className="clara-button clara-button-secondary"
+>>>>>>> 62b92f0 (feat: add role-based UX for overview, onboarding, and workspace guidance)
           >
             Channels
           </Link>
           <Link
             href="/dashboard/notifications"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            className="clara-button clara-button-secondary"
           >
             Notifications
           </Link>
@@ -437,56 +447,7 @@ export default function DashboardHomePage() {
           />
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Cara Pakai Clara
-              </p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
-                Gunakan Clara dalam 4 langkah
-              </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-                Kalau Anda bingung harus mulai dari mana, jangan lompat ke semua menu sekaligus.
-                Clara paling mudah dipakai dengan alur ini: masukkan chat, review chat masuk,
-                ubah jadi lead kerja, lalu eksekusi follow-up harian.
-              </p>
-            </div>
-            <Link
-              href="/dashboard/start"
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
-            >
-              Buka Panduan Lengkap
-            </Link>
-          </div>
-
-          <div className="mt-5 grid gap-4 xl:grid-cols-4">
-            <WorkflowStepCard
-              step="1"
-              title="Import Chat"
-              description="Upload TXT atau paste chat ke Clara."
-              href="/dashboard/upload"
-            />
-            <WorkflowStepCard
-              step="2"
-              title="Review Chat Masuk"
-              description="Buka percakapan, jalankan AI analysis, dan siapkan draft."
-              href="/dashboard/sales"
-            />
-            <WorkflowStepCard
-              step="3"
-              title="Kelola Lead"
-              description="Pindahkan stage, atur follow-up, dan baca identity customer."
-              href="/dashboard/crm"
-            />
-            <WorkflowStepCard
-              step="4"
-              title="Eksekusi Tindakan"
-              description="Gunakan worklist, approvals, dan notifications untuk aksi harian."
-              href="/dashboard/follow-up"
-            />
-          </div>
-        </section>
+        <RoleBasedStartGuide currentUser={currentUser} compact />
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <PanelFrame
@@ -495,6 +456,7 @@ export default function DashboardHomePage() {
             actionLabel="Lihat inbox"
             actionHref="/dashboard/sales"
           >
+<<<<<<< HEAD
             <div className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 {quickLinks.map((item) => (
@@ -582,6 +544,12 @@ export default function DashboardHomePage() {
                   </div>
                 </div>
               </div>
+=======
+            <div className="grid gap-4 sm:grid-cols-2">
+              {quickLinks.map((item) => (
+                <ActionCard key={item.href} item={item} />
+              ))}
+>>>>>>> 62b92f0 (feat: add role-based UX for overview, onboarding, and workspace guidance)
             </div>
           </PanelFrame>
 
@@ -1090,6 +1058,7 @@ function MiniInsightCard({
 }) {
   return (
     <div className="clara-card-soft rounded-[24px] p-4">
+<<<<<<< HEAD
       <div className="flex items-start gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#10172d] text-[#f4e7d3]">
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />
@@ -1101,6 +1070,14 @@ function MiniInsightCard({
             {description}
           </p>
         </div>
+=======
+      <p className="clara-kicker text-xs">{label}</p>
+      <div className="mt-3">
+        <h3 className="text-base font-semibold text-slate-950">{title}</h3>
+        <p className="mt-1.5 text-sm leading-6 text-slate-600">
+          {description}
+        </p>
+>>>>>>> 62b92f0 (feat: add role-based UX for overview, onboarding, and workspace guidance)
       </div>
     </div>
   );
@@ -1129,31 +1106,6 @@ function NoteCard({
         </div>
       </div>
     </div>
-  );
-}
-
-function WorkflowStepCard({
-  step,
-  title,
-  description,
-  href,
-}: {
-  step: string;
-  title: string;
-  description: string;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5 transition hover:border-slate-300 hover:bg-white"
-    >
-      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
-        {step}
-      </span>
-      <h3 className="mt-4 text-lg font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-    </Link>
   );
 }
 

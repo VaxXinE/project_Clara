@@ -193,6 +193,7 @@ function ConversationUsageGuide({
 }) {
   const extraction = detail.latest_ai_extraction;
   const suggestion = detail.latest_reply_suggestion;
+<<<<<<< HEAD
 
   return (
     <section className="clara-card-soft rounded-[28px] p-5">
@@ -244,6 +245,61 @@ function ConversationUsageGuide({
           }
         />
       </div>
+=======
+  const sentCount = detail.sent_messages.length;
+
+  const nextStep = !extraction
+    ? {
+        title: "Jalankan AI analysis dulu",
+        description:
+          "Tanpa AI analysis, Anda belum punya ringkasan stage, risiko, objection, dan next best action. Ini langkah pertama yang paling masuk akal.",
+      }
+    : !suggestion
+      ? {
+          title: "Buat draft balasan",
+          description:
+            "Analisis sudah ada. Langkah berikutnya adalah menghasilkan reply suggestion supaya conversation ini bisa ditindaklanjuti dengan cepat.",
+        }
+      : sentCount === 0
+        ? {
+            title: "Review lalu kirim atau approve draft",
+            description:
+              "Draft sudah tersedia. Sekarang fokus Anda adalah mengecek kesesuaian bahasa, approval status, dan apakah balasan sudah siap dikirim.",
+          }
+        : {
+            title: "Naikkan konteksnya ke lead dan follow-up",
+            description:
+              "Percakapan ini sudah punya jejak balasan. Pastikan lead stage, task, dan follow-up berikutnya di CRM sudah ikut rapi.",
+          };
+
+  return (
+    <section className="clara-card rounded-[30px] p-5 sm:p-6">
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <div>
+          <p className="clara-kicker">Langkah Berikutnya</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+            {nextStep.title}
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+            {nextStep.description}
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+          <UsageCard
+            title="1. Baca chat dulu"
+            description="Pahami konteks terbaru sebelum melihat analisis atau draft."
+          />
+          <UsageCard
+            title="2. Lihat AI analysis"
+            description="Gunakan stage, risk, objection, dan next action sebagai panduan keputusan."
+          />
+          <UsageCard
+            title="3. Putuskan aksi"
+            description="Entah generate draft, approve/kirim, atau pindah ke lead detail untuk follow-up."
+          />
+        </div>
+      </div>
+>>>>>>> 62b92f0 (feat: add role-based UX for overview, onboarding, and workspace guidance)
     </section>
   );
 }
@@ -455,6 +511,21 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
     <div className="clara-card-soft rounded-[22px] p-4">
       <p className="clara-kicker text-[11px]">{label}</p>
       <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
+    </div>
+  );
+}
+
+function UsageCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="clara-card-soft rounded-[22px] p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
     </div>
   );
 }
