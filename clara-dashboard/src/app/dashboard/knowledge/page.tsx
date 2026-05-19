@@ -63,7 +63,7 @@ export default function ProductKnowledgePage() {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal memuat product knowledge."
+          : "Gagal memuat product knowledge.",
       );
     } finally {
       setIsLoading(false);
@@ -123,10 +123,13 @@ export default function ProductKnowledgePage() {
 
     try {
       if (editingId) {
-        await apiFetch<ProductKnowledgeItem>(`/product-knowledge/${editingId}`, {
-          method: "PATCH",
-          body: form,
-        });
+        await apiFetch<ProductKnowledgeItem>(
+          `/product-knowledge/${editingId}`,
+          {
+            method: "PATCH",
+            body: form,
+          },
+        );
         setSuccessMessage("Knowledge base berhasil diupdate.");
       } else {
         await apiFetch<ProductKnowledgeItem>("/product-knowledge", {
@@ -142,7 +145,7 @@ export default function ProductKnowledgePage() {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal menyimpan product knowledge."
+          : "Gagal menyimpan product knowledge.",
       );
     } finally {
       setIsSubmitting(false);
@@ -169,7 +172,7 @@ export default function ProductKnowledgePage() {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal menghapus product knowledge."
+          : "Gagal menghapus product knowledge.",
       );
     } finally {
       setDeletingId(null);
@@ -208,7 +211,7 @@ export default function ProductKnowledgePage() {
         </Link>
       }
     >
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto space-y-6">
         <section className="grid gap-4 md:grid-cols-3">
           <InfoCard
             label="Total Entry"
@@ -235,7 +238,9 @@ export default function ProductKnowledgePage() {
             >
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">
-                  {editingId ? "Edit Knowledge Entry" : "Tambah Knowledge Entry"}
+                  {editingId
+                    ? "Edit Knowledge Entry"
+                    : "Tambah Knowledge Entry"}
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
                   Gunakan bahasa faktual. Hindari isi yang ambigu atau belum
@@ -337,7 +342,9 @@ export default function ProductKnowledgePage() {
               )}
 
               {successMessage && (
-                <p className="clara-alert clara-alert-success">{successMessage}</p>
+                <p className="clara-alert clara-alert-success">
+                  {successMessage}
+                </p>
               )}
 
               <div className="flex flex-col gap-3 sm:flex-row">
@@ -520,7 +527,9 @@ export default function ProductKnowledgePage() {
                       <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
                         <span>Source: {item.source_type}</span>
                         <span>&bull;</span>
-                        <span>Created by: {item.created_by_user_name ?? "-"}</span>
+                        <span>
+                          Created by: {item.created_by_user_name ?? "-"}
+                        </span>
                         <span>&bull;</span>
                         <span>Updated: {formatDateTime(item.updated_at)}</span>
                       </div>

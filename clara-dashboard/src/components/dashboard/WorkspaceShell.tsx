@@ -24,6 +24,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
 import { apiFetch } from "@/lib/api";
 import { formatStatusLabel } from "@/lib/format";
 import type { CurrentUser } from "@/types/dashboard";
@@ -85,10 +86,6 @@ function getRolePrinciples(role?: string) {
 }
 
 function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
-  if (!currentUser) {
-    return [];
-  }
-
   const workspaceItems: NavItem[] = [
     {
       href: "/dashboard",
@@ -131,7 +128,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   const insightItems: NavItem[] = [];
   const adminItems: NavItem[] = [];
 
-  if (currentUser.role === "owner") {
+  if (currentUser?.role === "owner") {
     insightItems.push({
       href: "/dashboard/knowledge",
       label: "Knowledge",
@@ -140,7 +137,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     });
   }
 
-  if (["owner", "admin"].includes(currentUser.role)) {
+  if (currentUser && ["owner", "admin"].includes(currentUser.role)) {
     insightItems.push(
       {
         href: "/dashboard/marketing",
@@ -221,11 +218,21 @@ export function WorkspaceShell({
   children,
 }: WorkspaceShellProps) {
   const pathname = usePathname();
-  const navGroups = buildNavGroups(currentUser);
-  const rolePrinciples = getRolePrinciples(currentUser?.role);
+  const dashboardUser = useDashboardUser();
+  const resolvedCurrentUser = currentUser ?? dashboardUser?.currentUser ?? null;
+  const navGroups = buildNavGroups(resolvedCurrentUser);
+  const rolePrinciples = getRolePrinciples(resolvedCurrentUser?.role);
   const todayLabel = getTodayLabel();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    dashboardUser?.syncCurrentUser(currentUser);
+  }, [currentUser, dashboardUser]);
 
   useEffect(() => {
     if (!mobileNavOpen) {
@@ -297,18 +304,18 @@ export function WorkspaceShell({
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-base font-semibold text-white">
-                    {getWorkspaceTitle(currentUser)}
+                    {getWorkspaceTitle(resolvedCurrentUser)}
                   </p>
                   <p className="truncate text-sm text-slate-300">
-                    {currentUser?.organization_name ?? "Clara Workspace"}
+                    {resolvedCurrentUser?.organization_name ?? "Clara Workspace"}
                   </p>
                 </div>
               </div>
 
-              {currentUser ? (
+              {resolvedCurrentUser ? (
                 <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-200">
                   <span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1">
-                    {formatStatusLabel(currentUser.role)}
+                    {formatStatusLabel(resolvedCurrentUser.role)}
                   </span>
                   <span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1">
                     Internal workspace
@@ -318,7 +325,7 @@ export function WorkspaceShell({
             </div>
           </div>
 
-          <div className="relative space-y-8 px-4 py-6 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+          <div className="clara-scrollbar relative min-h-0 flex-1 space-y-8 overflow-y-auto px-4 py-6">
             {navGroups.map((group) => (
               <div key={group.title}>
                 <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#d4b07b]">
@@ -401,7 +408,7 @@ export function WorkspaceShell({
                   Clara Workspace
                 </p>
                 <p className="truncate text-sm font-semibold text-slate-900">
-                  {getWorkspaceTitle(currentUser)}
+                  {getWorkspaceTitle(resolvedCurrentUser)}
                 </p>
               </div>
 

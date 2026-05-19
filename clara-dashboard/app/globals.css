@@ -41,6 +41,8 @@ body {
     radial-gradient(circle at top left, rgba(212, 176, 123, 0.18), transparent 24%),
     radial-gradient(circle at top right, rgba(33, 50, 92, 0.12), transparent 20%),
     linear-gradient(180deg, #f7f2ea 0%, #f4efe6 32%, #efe7da 100%);
+  background-attachment: fixed;
+  background-size: cover;
   color: var(--foreground);
   font-family: var(--font-manrope), sans-serif;
   text-rendering: optimizeLegibility;
@@ -305,4 +307,29 @@ textarea:focus-visible {
 
 .clara-divider {
   border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.clara-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 176, 123, 0.72) rgba(255, 255, 255, 0.08);
+  scrollbar-gutter: stable;
+}
+
+.clara-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.clara-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 9999px;
+}
+
+.clara-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(244, 231, 211, 0.95) 0%, rgba(212, 176, 123, 0.72) 100%);
+  border: 2px solid rgba(17, 24, 39, 0.2);
+  border-radius: 9999px;
+}
+
+.clara-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(250, 239, 219, 0.98) 0%, rgba(212, 176, 123, 0.9) 100%);
 }

@@ -109,7 +109,7 @@ export default function HomePage() {
         </header>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_380px]">
-          <div className="">
+          <div className="space-y-6">
             <article className="clara-card rounded-[36px] p-6 sm:p-8 h-fit">
               <span className="clara-chip">Internal AI CRM Intelligence</span>
               <h2 className="mt-5 max-w-4xl text-4xl font-bold tracking-[-0.06em] text-slate-950 sm:text-[3.5rem] sm:leading-[1.02]">

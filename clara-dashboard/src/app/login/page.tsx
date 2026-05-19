@@ -1,5 +1,7 @@
 "use client";
 
+import { faEye, faEyeSlash } from "@fortawesome/free-regular-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -10,6 +12,10 @@ type LoginResponse = {
   token_type: string;
   user: CurrentUser;
 };
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 function getDashboardPathForRole(role: string): string {
   switch (role) {
@@ -28,20 +34,38 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("owner@clara.local");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const normalizedEmail = email.trim().toLowerCase();
     setErrorMessage("");
+
+    if (!normalizedEmail) {
+      setErrorMessage("Email wajib diisi.");
+      return;
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      setErrorMessage("Format email belum valid.");
+      return;
+    }
+
+    if (!password.trim()) {
+      setErrorMessage("Password wajib diisi.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const response = await apiFetch<LoginResponse>("/auth/login", {
         method: "POST",
         body: {
-          email,
+          email: normalizedEmail,
           password,
         },
       });
@@ -62,7 +86,7 @@ export default function LoginPage() {
       <div className="relative grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="clara-card-dark rounded-[34px] p-7 sm:p-8">
           <span className="clara-chip clara-chip-dark">Clara Workspace</span>
-          <h1 className="mt-5 max-w-xl text-4xl font-bold tracking-[-0.05em] text-white sm:text-[3.3rem]">
+          <h1 className="mt-5 max-w-xl text-4xl font-bold tracking-[-0.05em] text-white sm:text-3xl">
             Satu pintu untuk inbox operasional, insight, dan kontrol tim.
           </h1>
           <p className="mt-4 max-w-lg text-sm leading-7 text-slate-200 sm:text-[15px]">
@@ -122,24 +146,49 @@ export default function LoginPage() {
                 type="email"
                 className="clara-input mt-2"
                 placeholder="owner@clara.local"
+                autoComplete="email"
               />
             </div>
 
             <div>
               <label className="clara-label">Password</label>
-              <input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                type="password"
-                className="clara-input mt-2"
-                placeholder="Masukkan password akun"
-              />
+              <div className="relative mt-2">
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type={showPassword ? "text" : "password"}
+                  className="clara-input pr-28"
+                  placeholder="Masukkan password akun"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                  aria-label={
+                    showPassword ? "Sembunyikan password" : "Tampilkan password"
+                  }
+                >
+                  {showPassword ? (
+                    <FontAwesomeIcon icon={faEyeSlash} className="h-4 w-4" />
+                  ) : (
+                    <FontAwesomeIcon icon={faEye} className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
           {errorMessage && (
-            <p className="clara-alert clara-alert-danger mt-5">{errorMessage}</p>
+            <p className="clara-alert clara-alert-danger mt-5">
+              {errorMessage}
+            </p>
           )}
+
+          <p className="clara-helper mt-4">
+            Kalau email belum terdaftar, minta admin Clara untuk membuatkan akun
+            Anda terlebih dulu.
+          </p>
 
           <button
             type="submit"

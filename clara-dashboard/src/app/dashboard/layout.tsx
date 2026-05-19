@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { DashboardUserProvider } from "@/components/dashboard/DashboardUserProvider";
+
 const AUTH_COOKIE_NAME =
   process.env.AUTH_COOKIE_NAME ??
   process.env.NEXT_PUBLIC_AUTH_COOKIE_NAME ??
@@ -18,5 +20,5 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return children;
+  return <DashboardUserProvider>{children}</DashboardUserProvider>;
 }

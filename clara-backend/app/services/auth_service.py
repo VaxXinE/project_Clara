@@ -81,13 +81,13 @@ def authenticate_user(db: Session, email: str, password: str) -> User:
     user = get_user_by_email(db=db, email=email)
 
     if user is None:
-        raise AuthError("Invalid email or password.")
+        raise AuthError("User dengan email ini belum terdaftar.")
 
     if not user.is_active:
-        raise AuthError("User is inactive.")
+        raise AuthError("Akun user ini sedang nonaktif.")
 
     if not verify_password(password, user.hashed_password):
-        raise AuthError("Invalid email or password.")
+        raise AuthError("Password yang Anda masukkan salah.")
 
     return user
 

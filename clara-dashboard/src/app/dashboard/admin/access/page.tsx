@@ -41,7 +41,7 @@ const EMPTY_EDIT_FORM: UpdateUserRequest = {
 
 function getOrganizationLabel(
   organizationId: string | null,
-  organizations: OrganizationItem[]
+  organizations: OrganizationItem[],
 ): string {
   if (!organizationId) {
     return "-";
@@ -114,7 +114,7 @@ export default function AdminAccessPage() {
 
         if (!["owner", "admin"].includes(me.role)) {
           setErrorMessage(
-            "Halaman ini hanya bisa diakses oleh owner atau admin."
+            "Halaman ini hanya bisa diakses oleh owner atau admin.",
           );
           return;
         }
@@ -124,7 +124,7 @@ export default function AdminAccessPage() {
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : "Gagal memuat halaman user management."
+            : "Gagal memuat halaman user management.",
         );
       } finally {
         setIsLoading(false);
@@ -165,7 +165,7 @@ export default function AdminAccessPage() {
   }
 
   async function handleCreateOrganization(
-    event: React.FormEvent<HTMLFormElement>
+    event: React.FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
     setErrorMessage("");
@@ -182,7 +182,7 @@ export default function AdminAccessPage() {
       await loadPageData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat organization."
+        error instanceof Error ? error.message : "Gagal membuat organization.",
       );
     } finally {
       setIsSubmittingOrganization(false);
@@ -204,14 +204,14 @@ export default function AdminAccessPage() {
         ...EMPTY_USER_FORM,
         role: "marketing",
         organization_id: isAdminScoped
-          ? currentUser?.organization_id ?? null
-          : organizations[0]?.id ?? null,
+          ? (currentUser?.organization_id ?? null)
+          : (organizations[0]?.id ?? null),
       });
       setSuccessMessage("User berhasil dibuat.");
       await loadPageData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat user."
+        error instanceof Error ? error.message : "Gagal membuat user.",
       );
     } finally {
       setIsSubmittingUser(false);
@@ -233,7 +233,7 @@ export default function AdminAccessPage() {
       await loadPageData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal update user."
+        error instanceof Error ? error.message : "Gagal update user.",
       );
     } finally {
       setActionUserId(null);
@@ -248,19 +248,17 @@ export default function AdminAccessPage() {
     try {
       await apiFetch<CurrentUser>(
         `/auth/users/${user.id}/${user.is_active ? "deactivate" : "activate"}`,
-        { method: "POST" }
+        { method: "POST" },
       );
       setSuccessMessage(
         user.is_active
           ? "User berhasil dinonaktifkan."
-          : "User berhasil diaktifkan."
+          : "User berhasil diaktifkan.",
       );
       await loadPageData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal mengubah status user."
+        error instanceof Error ? error.message : "Gagal mengubah status user.",
       );
     } finally {
       setActionUserId(null);
@@ -282,7 +280,9 @@ export default function AdminAccessPage() {
       await loadPageData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal mengubah password user."
+        error instanceof Error
+          ? error.message
+          : "Gagal mengubah password user.",
       );
     } finally {
       setActionUserId(null);
@@ -306,7 +306,7 @@ export default function AdminAccessPage() {
         </Link>
       }
     >
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto space-y-6">
         <section className="grid gap-4 md:grid-cols-3">
           <InfoCard
             label="Operator"
@@ -330,7 +330,10 @@ export default function AdminAccessPage() {
             label="Current Org"
             value={
               currentUser
-                ? getOrganizationLabel(currentUser.organization_id, organizations)
+                ? getOrganizationLabel(
+                    currentUser.organization_id,
+                    organizations,
+                  )
                 : "..."
             }
             description="Histori user dipertahankan agar audit trail dan conversation tetap aman."
@@ -344,9 +347,7 @@ export default function AdminAccessPage() {
         )}
 
         {errorMessage && (
-          <div className="clara-alert clara-alert-danger">
-            {errorMessage}
-          </div>
+          <div className="clara-alert clara-alert-danger">{errorMessage}</div>
         )}
 
         {successMessage && (
@@ -355,451 +356,479 @@ export default function AdminAccessPage() {
           </div>
         )}
 
-        {!isLoading && currentUser && ["owner", "admin"].includes(currentUser.role) && (
-          <>
-            <section className="grid gap-6 lg:grid-cols-2">
-              <form
-                onSubmit={handleCreateOrganization}
-                className="clara-card space-y-5 rounded-[30px] p-5"
-              >
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-950">
-                    Organization Management
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Create organization hanya dibuka untuk owner.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-900">
-                    Name
-                  </label>
-                  <input
-                    value={organizationForm.name}
-                    onChange={(event) =>
-                      setOrganizationForm((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                    disabled={!canManageOrganizations || isSubmittingOrganization}
-                    className="clara-input mt-2"
-                    placeholder="Contoh: Clara Demo"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-900">
-                    Slug
-                  </label>
-                  <input
-                    value={organizationForm.slug}
-                    onChange={(event) =>
-                      setOrganizationForm((current) => ({
-                        ...current,
-                        slug: event.target.value,
-                      }))
-                    }
-                    disabled={!canManageOrganizations || isSubmittingOrganization}
-                    className="clara-input mt-2"
-                    placeholder="clara-demo"
-                  />
-                </div>
-
-                {!canManageOrganizations && (
-                  <p className="clara-card-soft rounded-xl p-3 text-sm text-amber-700">
-                    Admin tidak bisa membuat organization baru dari UI ini.
-                  </p>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={!canManageOrganizations || isSubmittingOrganization}
-                  className="clara-button clara-button-primary"
+        {!isLoading &&
+          currentUser &&
+          ["owner", "admin"].includes(currentUser.role) && (
+            <>
+              <section className="grid gap-6 lg:grid-cols-2">
+                <form
+                  onSubmit={handleCreateOrganization}
+                  className="clara-card space-y-5 rounded-[30px] p-5"
                 >
-                  {isSubmittingOrganization
-                    ? "Creating organization..."
-                    : "Create Organization"}
-                </button>
-              </form>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-950">
+                      Organization Management
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Create organization hanya dibuka untuk owner.
+                    </p>
+                  </div>
 
-              <form
-                onSubmit={handleCreateUser}
-                className="clara-card space-y-5 rounded-[30px] p-5"
-              >
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-950">
-                    Create User
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Admin otomatis terikat ke organization miliknya sendiri.
-                  </p>
-                </div>
+                  <div>
+                    <label className="text-sm font-semibold text-slate-900">
+                      Name
+                    </label>
+                    <input
+                      value={organizationForm.name}
+                      onChange={(event) =>
+                        setOrganizationForm((current) => ({
+                          ...current,
+                          name: event.target.value,
+                        }))
+                      }
+                      disabled={
+                        !canManageOrganizations || isSubmittingOrganization
+                      }
+                      className="clara-input mt-2"
+                      placeholder="Contoh: Clara Demo"
+                    />
+                  </div>
 
-                <InputField
-                  label="Name"
-                  value={userForm.name}
-                  onChange={(value) =>
-                    setUserForm((current) => ({ ...current, name: value }))
-                  }
-                  placeholder="Sales A"
-                />
+                  <div>
+                    <label className="text-sm font-semibold text-slate-900">
+                      Slug
+                    </label>
+                    <input
+                      value={organizationForm.slug}
+                      onChange={(event) =>
+                        setOrganizationForm((current) => ({
+                          ...current,
+                          slug: event.target.value,
+                        }))
+                      }
+                      disabled={
+                        !canManageOrganizations || isSubmittingOrganization
+                      }
+                      className="clara-input mt-2"
+                      placeholder="clara-demo"
+                    />
+                  </div>
 
-                <InputField
-                  label="Email"
-                  value={userForm.email}
-                  onChange={(value) =>
-                    setUserForm((current) => ({ ...current, email: value }))
-                  }
-                  placeholder="marketing@clara.local"
-                  type="email"
-                />
+                  {!canManageOrganizations && (
+                    <p className="clara-card-soft rounded-xl p-3 text-sm text-amber-700">
+                      Admin tidak bisa membuat organization baru dari UI ini.
+                    </p>
+                  )}
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <InputField
-                    label="Password"
-                    value={userForm.password}
-                    onChange={(value) =>
-                      setUserForm((current) => ({ ...current, password: value }))
+                  <button
+                    type="submit"
+                    disabled={
+                      !canManageOrganizations || isSubmittingOrganization
                     }
-                    placeholder="Minimum 8 karakter"
-                    type="password"
+                    className="clara-button clara-button-primary"
+                  >
+                    {isSubmittingOrganization
+                      ? "Creating organization..."
+                      : "Create Organization"}
+                  </button>
+                </form>
+
+                <form
+                  onSubmit={handleCreateUser}
+                  className="clara-card space-y-5 rounded-[30px] p-5"
+                >
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-950">
+                      Create User
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Admin otomatis terikat ke organization miliknya sendiri.
+                    </p>
+                  </div>
+
+                  <InputField
+                    label="Name"
+                    value={userForm.name}
+                    onChange={(value) =>
+                      setUserForm((current) => ({ ...current, name: value }))
+                    }
+                    placeholder="Sales A"
                   />
+
+                  <InputField
+                    label="Email"
+                    value={userForm.email}
+                    onChange={(value) =>
+                      setUserForm((current) => ({ ...current, email: value }))
+                    }
+                    placeholder="marketing@clara.local"
+                    type="email"
+                  />
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <InputField
+                      label="Password"
+                      value={userForm.password}
+                      onChange={(value) =>
+                        setUserForm((current) => ({
+                          ...current,
+                          password: value,
+                        }))
+                      }
+                      placeholder="Minimum 8 karakter"
+                      type="password"
+                    />
+
+                    <SelectField
+                      label="Role"
+                      value={userForm.role}
+                      onChange={(value) =>
+                        setUserForm((current) => ({ ...current, role: value }))
+                      }
+                      options={[
+                        { value: "marketing", label: "marketing" },
+                        { value: "admin", label: "admin" },
+                        ...(currentUser.role === "owner"
+                          ? [{ value: "owner", label: "owner" }]
+                          : []),
+                      ]}
+                    />
+                  </div>
 
                   <SelectField
-                    label="Role"
-                    value={userForm.role}
+                    label="Organization"
+                    value={userForm.organization_id ?? ""}
                     onChange={(value) =>
-                      setUserForm((current) => ({ ...current, role: value }))
+                      setUserForm((current) => ({
+                        ...current,
+                        organization_id: value || null,
+                      }))
                     }
                     options={[
-                      { value: "marketing", label: "marketing" },
-                      { value: "admin", label: "admin" },
-                      ...(currentUser.role === "owner"
-                        ? [{ value: "owner", label: "owner" }]
-                        : []),
+                      { value: "", label: "Pilih organization" },
+                      ...organizations.map((organization) => ({
+                        value: organization.id,
+                        label: `${organization.name} (${organization.slug})`,
+                      })),
                     ]}
+                    disabled={isAdminScoped}
                   />
-                </div>
 
-                <SelectField
-                  label="Organization"
-                  value={userForm.organization_id ?? ""}
-                  onChange={(value) =>
-                    setUserForm((current) => ({
-                      ...current,
-                      organization_id: value || null,
-                    }))
-                  }
-                  options={[
-                    { value: "", label: "Pilih organization" },
-                    ...organizations.map((organization) => ({
-                      value: organization.id,
-                      label: `${organization.name} (${organization.slug})`,
-                    })),
-                  ]}
-                  disabled={isAdminScoped}
-                />
+                  <button
+                    type="submit"
+                    disabled={isSubmittingUser}
+                    className="clara-button clara-button-primary"
+                  >
+                    {isSubmittingUser ? "Creating user..." : "Create User"}
+                  </button>
+                </form>
+              </section>
 
-                <button
-                  type="submit"
-                  disabled={isSubmittingUser}
-                  className="clara-button clara-button-primary"
+              <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+                <Panel
+                  title="Available Organizations"
+                  description="Owner melihat semua organization. Admin hanya organization miliknya."
                 >
-                  {isSubmittingUser ? "Creating user..." : "Create User"}
-                </button>
-              </form>
-            </section>
-
-            <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-              <Panel
-                title="Available Organizations"
-                description="Owner melihat semua organization. Admin hanya organization miliknya."
-              >
-                {organizations.length === 0 ? (
-                  <EmptyText text="Belum ada organization." />
-                ) : (
-                  <div className="space-y-3">
-                    {organizations.map((organization) => (
-                      <div
-                        key={organization.id}
-                        className="rounded-xl border border-slate-200 p-4"
-                      >
-                        <p className="text-sm font-semibold text-slate-950">
-                          {organization.name}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          slug: {organization.slug}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          created: {formatDateTime(organization.created_at)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Panel>
-
-              <Panel
-                title="Manage Users"
-                description="Edit profil user, ubah role, dan aktif atau nonaktifkan akun tanpa menghapus histori."
-              >
-                {users.length === 0 ? (
-                  <EmptyText text="Belum ada user." />
-                ) : (
-                  <div className="space-y-4">
-                    {users.map((user) => {
-                      const isEditing = editingUserId === user.id;
-                      const isResettingPassword =
-                        resettingPasswordUserId === user.id;
-                      const isSelf = currentUser.id === user.id;
-                      const canResetPassword =
-                        currentUser.role === "owner" ||
-                        user.created_by_user_id === currentUser.id;
-                      const passwordStrength = getPasswordStrength(
-                        passwordForm.password
-                      );
-
-                      return (
-                        <article
-                          key={user.id}
-                          className="rounded-2xl border border-slate-200 p-4"
+                  {organizations.length === 0 ? (
+                    <EmptyText text="Belum ada organization." />
+                  ) : (
+                    <div className="space-y-3">
+                      {organizations.map((organization) => (
+                        <div
+                          key={organization.id}
+                          className="rounded-xl border border-slate-200 p-4"
                         >
-                          {isEditing ? (
-                            <div className="space-y-4">
-                              <div className="grid gap-4 sm:grid-cols-2">
-                                <InputField
-                                  label="Name"
-                                  value={editForm.name ?? ""}
-                                  onChange={(value) =>
-                                    setEditForm((current) => ({
-                                      ...current,
-                                      name: value,
-                                    }))
-                                  }
-                                  placeholder="Name"
-                                />
-                                <InputField
-                                  label="Email"
-                                  value={editForm.email ?? ""}
-                                  onChange={(value) =>
-                                    setEditForm((current) => ({
-                                      ...current,
-                                      email: value,
-                                    }))
-                                  }
-                                  placeholder="Email"
-                                  type="email"
-                                />
-                              </div>
+                          <p className="text-sm font-semibold text-slate-950">
+                            {organization.name}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            slug: {organization.slug}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            created: {formatDateTime(organization.created_at)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
 
-                              <div className="grid gap-4 sm:grid-cols-2">
-                                <SelectField
-                                  label="Role"
-                                  value={editForm.role ?? "marketing"}
-                                  onChange={(value) =>
-                                    setEditForm((current) => ({
-                                      ...current,
-                                      role: value,
-                                    }))
-                                  }
-                                  options={[
-                                    { value: "marketing", label: "marketing" },
-                                    { value: "admin", label: "admin" },
-                                    ...(currentUser.role === "owner"
-                                      ? [{ value: "owner", label: "owner" }]
-                                      : []),
-                                  ]}
-                                  disabled={isSelf}
-                                />
-                                <SelectField
-                                  label="Organization"
-                                  value={editForm.organization_id ?? ""}
-                                  onChange={(value) =>
-                                    setEditForm((current) => ({
-                                      ...current,
-                                      organization_id: value || null,
-                                    }))
-                                  }
-                                  options={[
-                                    { value: "", label: "Pilih organization" },
-                                    ...organizations.map((organization) => ({
-                                      value: organization.id,
-                                      label: `${organization.name} (${organization.slug})`,
-                                    })),
-                                  ]}
-                                  disabled={isAdminScoped}
-                                />
-                              </div>
+                <Panel
+                  title="Manage Users"
+                  description="Edit profil user, ubah role, dan aktif atau nonaktifkan akun tanpa menghapus histori."
+                >
+                  {users.length === 0 ? (
+                    <EmptyText text="Belum ada user." />
+                  ) : (
+                    <div className="space-y-4">
+                      {users.map((user) => {
+                        const isEditing = editingUserId === user.id;
+                        const isResettingPassword =
+                          resettingPasswordUserId === user.id;
+                        const isSelf = currentUser.id === user.id;
+                        const canResetPassword =
+                          currentUser.role === "owner" ||
+                          user.created_by_user_id === currentUser.id;
+                        const passwordStrength = getPasswordStrength(
+                          passwordForm.password,
+                        );
 
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleSaveEdit(user.id)}
-                                  disabled={actionUserId === user.id}
-                                  className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  {actionUserId === user.id
-                                    ? "Saving..."
-                                    : "Save Changes"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={cancelEdit}
-                                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : isResettingPassword ? (
-                            <div className="space-y-4">
-                              <div>
-                                <p className="text-sm font-semibold text-slate-950">
-                                  Reset password untuk {user.email}
-                                </p>
-                                <p className="mt-1 text-sm text-slate-600">
-                                  Owner bisa mengganti semua password user.
-                                  Admin hanya bisa mengganti password user yang
-                                  dia buat sendiri.
-                                </p>
-                              </div>
+                        return (
+                          <article
+                            key={user.id}
+                            className="rounded-2xl border border-slate-200 p-4"
+                          >
+                            {isEditing ? (
+                              <div className="space-y-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  <InputField
+                                    label="Name"
+                                    value={editForm.name ?? ""}
+                                    onChange={(value) =>
+                                      setEditForm((current) => ({
+                                        ...current,
+                                        name: value,
+                                      }))
+                                    }
+                                    placeholder="Name"
+                                  />
+                                  <InputField
+                                    label="Email"
+                                    value={editForm.email ?? ""}
+                                    onChange={(value) =>
+                                      setEditForm((current) => ({
+                                        ...current,
+                                        email: value,
+                                      }))
+                                    }
+                                    placeholder="Email"
+                                    type="email"
+                                  />
+                                </div>
 
-                              <InputField
-                                label="New Password"
-                                value={passwordForm.password}
-                                onChange={(value) =>
-                                  setPasswordForm({ password: value })
-                                }
-                                placeholder="Minimum 8 karakter"
-                                type="password"
-                              />
-
-                              <PasswordStrengthHint
-                                password={passwordForm.password}
-                                strength={passwordStrength}
-                              />
-
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleResetPassword(user.id)}
-                                  disabled={actionUserId === user.id}
-                                  className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  {actionUserId === user.id
-                                    ? "Saving..."
-                                    : "Save New Password"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={cancelPasswordReset}
-                                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                <div>
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-sm font-semibold text-slate-950">
-                                      {user.email}
-                                    </p>
-                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                      {formatStatusLabel(user.role)}
-                                    </span>
-                                    <span
-                                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                        user.is_active
-                                          ? "bg-green-100 text-green-700"
-                                          : "bg-red-100 text-red-700"
-                                      }`}
-                                    >
-                                      {user.is_active ? "active" : "inactive"}
-                                    </span>
-                                  </div>
-                                  <p className="mt-1 text-sm text-slate-600">
-                                    {user.name}
-                                  </p>
-                                  <div className="mt-2 grid gap-1 text-xs text-slate-500">
-                                    <p>
-                                      org:{" "}
-                                      {getOrganizationLabel(
-                                        user.organization_id,
-                                        organizations
-                                      )}
-                                    </p>
-                                    <p>
-                                      created by:{" "}
-                                      {user.created_by_user_name ?? "-"}
-                                    </p>
-                                    <p>created: {formatDateTime(user.created_at)}</p>
-                                  </div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  <SelectField
+                                    label="Role"
+                                    value={editForm.role ?? "marketing"}
+                                    onChange={(value) =>
+                                      setEditForm((current) => ({
+                                        ...current,
+                                        role: value,
+                                      }))
+                                    }
+                                    options={[
+                                      {
+                                        value: "marketing",
+                                        label: "marketing",
+                                      },
+                                      { value: "admin", label: "admin" },
+                                      ...(currentUser.role === "owner"
+                                        ? [{ value: "owner", label: "owner" }]
+                                        : []),
+                                    ]}
+                                    disabled={isSelf}
+                                  />
+                                  <SelectField
+                                    label="Organization"
+                                    value={editForm.organization_id ?? ""}
+                                    onChange={(value) =>
+                                      setEditForm((current) => ({
+                                        ...current,
+                                        organization_id: value || null,
+                                      }))
+                                    }
+                                    options={[
+                                      {
+                                        value: "",
+                                        label: "Pilih organization",
+                                      },
+                                      ...organizations.map((organization) => ({
+                                        value: organization.id,
+                                        label: `${organization.name} (${organization.slug})`,
+                                      })),
+                                    ]}
+                                    disabled={isAdminScoped}
+                                  />
                                 </div>
 
                                 <div className="flex flex-wrap gap-2">
                                   <button
                                     type="button"
-                                    onClick={() => beginEdit(user)}
-                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => beginPasswordReset(user.id)}
-                                    disabled={!canResetPassword}
-                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    Reset Password
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleToggleActive(user)}
-                                    disabled={actionUserId === user.id || isSelf}
-                                    className={`rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
-                                      user.is_active
-                                        ? "border border-red-300 text-red-700"
-                                        : "border border-green-300 text-green-700"
-                                    }`}
+                                    onClick={() => void handleSaveEdit(user.id)}
+                                    disabled={actionUserId === user.id}
+                                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                                   >
                                     {actionUserId === user.id
-                                      ? "Processing..."
-                                      : user.is_active
-                                        ? "Deactivate"
-                                        : "Activate"}
+                                      ? "Saving..."
+                                      : "Save Changes"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={cancelEdit}
+                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                                  >
+                                    Cancel
                                   </button>
                                 </div>
                               </div>
+                            ) : isResettingPassword ? (
+                              <div className="space-y-4">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-950">
+                                    Reset password untuk {user.email}
+                                  </p>
+                                  <p className="mt-1 text-sm text-slate-600">
+                                    Owner bisa mengganti semua password user.
+                                    Admin hanya bisa mengganti password user
+                                    yang dia buat sendiri.
+                                  </p>
+                                </div>
 
-                              {isSelf && (
-                                <p className="mt-3 rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
-                                  Akun yang sedang Anda pakai tidak bisa
-                                  dinonaktifkan dari sesi ini sendiri.
-                                </p>
-                              )}
+                                <InputField
+                                  label="New Password"
+                                  value={passwordForm.password}
+                                  onChange={(value) =>
+                                    setPasswordForm({ password: value })
+                                  }
+                                  placeholder="Minimum 8 karakter"
+                                  type="password"
+                                />
 
-                              {!canResetPassword && (
-                                <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
-                                  Admin hanya bisa mengganti password user yang
-                                  dibuat dari akunnya sendiri.
-                                </p>
-                              )}
-                            </>
-                          )}
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </Panel>
-            </section>
-          </>
-        )}
+                                <PasswordStrengthHint
+                                  password={passwordForm.password}
+                                  strength={passwordStrength}
+                                />
+
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleResetPassword(user.id)
+                                    }
+                                    disabled={actionUserId === user.id}
+                                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {actionUserId === user.id
+                                      ? "Saving..."
+                                      : "Save New Password"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={cancelPasswordReset}
+                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                  <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="text-sm font-semibold text-slate-950">
+                                        {user.email}
+                                      </p>
+                                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                        {formatStatusLabel(user.role)}
+                                      </span>
+                                      <span
+                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                          user.is_active
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-red-100 text-red-700"
+                                        }`}
+                                      >
+                                        {user.is_active ? "active" : "inactive"}
+                                      </span>
+                                    </div>
+                                    <p className="mt-1 text-sm text-slate-600">
+                                      {user.name}
+                                    </p>
+                                    <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                                      <p>
+                                        org:{" "}
+                                        {getOrganizationLabel(
+                                          user.organization_id,
+                                          organizations,
+                                        )}
+                                      </p>
+                                      <p>
+                                        created by:{" "}
+                                        {user.created_by_user_name ?? "-"}
+                                      </p>
+                                      <p>
+                                        created:{" "}
+                                        {formatDateTime(user.created_at)}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => beginEdit(user)}
+                                      className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        beginPasswordReset(user.id)
+                                      }
+                                      disabled={!canResetPassword}
+                                      className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      Reset Password
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void handleToggleActive(user)
+                                      }
+                                      disabled={
+                                        actionUserId === user.id || isSelf
+                                      }
+                                      className={`rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+                                        user.is_active
+                                          ? "border border-red-300 text-red-700"
+                                          : "border border-green-300 text-green-700"
+                                      }`}
+                                    >
+                                      {actionUserId === user.id
+                                        ? "Processing..."
+                                        : user.is_active
+                                          ? "Deactivate"
+                                          : "Activate"}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {isSelf && (
+                                  <p className="mt-3 rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
+                                    Akun yang sedang Anda pakai tidak bisa
+                                    dinonaktifkan dari sesi ini sendiri.
+                                  </p>
+                                )}
+
+                                {!canResetPassword && (
+                                  <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
+                                    Admin hanya bisa mengganti password user
+                                    yang dibuat dari akunnya sendiri.
+                                  </p>
+                                )}
+                              </>
+                            )}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Panel>
+              </section>
+            </>
+          )}
       </div>
     </WorkspaceShell>
   );

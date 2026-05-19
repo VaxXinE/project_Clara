@@ -27,7 +27,7 @@ export default function AdminOpsPage() {
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : "Gagal memuat admin ops overview."
+            : "Gagal memuat admin ops overview.",
         );
       } finally {
         setIsLoading(false);
@@ -54,7 +54,7 @@ export default function AdminOpsPage() {
         </Link>
       }
     >
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto space-y-6">
         <section className="grid gap-4 md:grid-cols-3">
           <InfoCard
             label="Akses"
@@ -84,9 +84,7 @@ export default function AdminOpsPage() {
         )}
 
         {errorMessage && (
-          <div className="clara-alert clara-alert-danger">
-            {errorMessage}
-          </div>
+          <div className="clara-alert clara-alert-danger">{errorMessage}</div>
         )}
 
         {overview && !isLoading && !errorMessage && (
@@ -123,7 +121,9 @@ export default function AdminOpsPage() {
                             {formatStatusLabel(user.role)}
                           </span>
                         </div>
-                        <p className="mt-1 text-sm text-slate-600">{user.name}</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {user.name}
+                        </p>
                         <p className="mt-2 text-xs text-slate-500">
                           org: {user.organization_id ?? "-"}
                         </p>
@@ -201,7 +201,9 @@ export default function AdminOpsPage() {
                             last message:{" "}
                             {formatDateTime(conversation.last_message_at)}
                           </p>
-                          <p>created: {formatDateTime(conversation.created_at)}</p>
+                          <p>
+                            created: {formatDateTime(conversation.created_at)}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -343,13 +345,7 @@ function InfoCard({
   );
 }
 
-function MetricCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <article className="clara-card rounded-2xl p-5">
       <p className="text-sm font-medium text-slate-500">{label}</p>

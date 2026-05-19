@@ -1,11 +1,32 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { WhatsAppUploadForm } from "@/components/dashboard/WhatsAppUploadForm";
+import { apiFetch } from "@/lib/api";
+import type { CurrentUser } from "@/types/dashboard";
 
 export default function UploadWhatsAppPage() {
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const me = await apiFetch<CurrentUser>("/auth/me");
+        setCurrentUser(me);
+      } catch {
+        // WorkspaceShell already has a safe fallback menu for protected pages.
+      }
+    }
+
+    void loadUser();
+  }, []);
+
   return (
     <WorkspaceShell
+      currentUser={currentUser}
       eyebrow="Data ingestion"
       title="Upload Chat Multi-Channel"
       description="Masukkan export chat dalam format .txt atau paste chat langsung. Clara sekarang membaca registry channel dari backend, bisa membantu auto-detect channel untuk paste chat, lalu membuat conversation baru yang siap dianalisis."
@@ -28,7 +49,7 @@ export default function UploadWhatsAppPage() {
         </>
       }
     >
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="mx-auto space-y-6">
         <WhatsAppUploadForm />
 
         <section className="clara-card rounded-[28px] p-5 sm:p-6">
