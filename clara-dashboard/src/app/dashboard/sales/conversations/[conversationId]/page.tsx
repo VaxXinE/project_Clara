@@ -193,59 +193,6 @@ function ConversationUsageGuide({
 }) {
   const extraction = detail.latest_ai_extraction;
   const suggestion = detail.latest_reply_suggestion;
-<<<<<<< HEAD
-
-  return (
-    <section className="clara-card-soft rounded-[28px] p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="clara-kicker">Cara Baca Conversation</p>
-          <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-            Fokus kerja yang disarankan di halaman ini
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Mulai dari timeline chat, cek hasil analisis AI, lalu review draft
-            balasan sebelum Anda mengirim follow-up ke customer.
-          </p>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[360px]">
-          <MetaPill label="Source" value={detail.source_label} />
-          <MetaPill label="Status" value={formatStatusLabel(detail.status)} />
-          <MetaPill
-            label="Started"
-            value={detail.started_at ? formatDateTime(detail.started_at) : "-"}
-          />
-          <MetaPill
-            label="Reply draft"
-            value={suggestion ? formatStatusLabel(suggestion.approval_status) : "Belum ada"}
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        <InfoBlock
-          label="1. Pahami konteks"
-          value="Baca 3-5 pesan terakhir untuk memastikan kebutuhan customer, urgensi, dan siapa yang terakhir berbicara."
-        />
-        <InfoBlock
-          label="2. Validasi AI"
-          value={
-            extraction
-              ? `Clara membaca stage ${formatStatusLabel(extraction.pipeline_stage)} dengan aksi ${extraction.next_best_action}. Pastikan ini masih relevan.`
-              : "Jalankan AI analysis dulu agar Clara bisa membaca sentiment, stage, objection, dan next best action."
-          }
-        />
-        <InfoBlock
-          label="3. Putuskan tindakan"
-          value={
-            suggestion
-              ? "Review reply suggestion, cek approval status, lalu kirim atau revisi sesuai kebutuhan customer."
-              : "Kalau arahnya sudah jelas, generate reply suggestion untuk menyiapkan draft follow-up yang lebih cepat."
-          }
-        />
-      </div>
-=======
   const sentCount = detail.sent_messages.length;
 
   const nextStep = !extraction
@@ -299,7 +246,6 @@ function ConversationUsageGuide({
           />
         </div>
       </div>
->>>>>>> 62b92f0 (feat: add role-based UX for overview, onboarding, and workspace guidance)
     </section>
   );
 }
