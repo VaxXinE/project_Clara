@@ -58,7 +58,7 @@ function getRolePrinciples(role?: string) {
       title: "Mode Superadmin",
       items: [
         "Mulai dari ops dashboard, alert, dan action center untuk membaca kesehatan eksekusi lebih dulu.",
-        "Turun ke queue, lead management, atau review queue hanya saat ada sinyal yang perlu intervensi.",
+        "Turun ke queue, lead management, atau chat review center hanya saat ada sinyal yang perlu intervensi.",
         "Gunakan halaman operasional untuk verifikasi lapangan, bukan sebagai titik pantau utama harian.",
       ],
     };
@@ -68,7 +68,7 @@ function getRolePrinciples(role?: string) {
     return {
       title: "Mode Head",
       items: [
-        "Mulai dari action center, review queue, dan ops dashboard agar bottleneck tim cepat terlihat.",
+        "Mulai dari action center, chat review center, dan ops dashboard agar bottleneck tim cepat terlihat.",
         "Pastikan queue dan lead management tetap rapi sebelum masuk ke area insight yang lebih luas.",
         "Access control dan system ops dipakai saat ada masalah governance atau boundary user.",
       ],
@@ -80,7 +80,7 @@ function getRolePrinciples(role?: string) {
     items: [
       "Mulai dari lead capture atau queue, lalu bergerak ke lead management dan follow-up.",
       "Gunakan AI analysis dan draft sebagai alat bantu, bukan pengganti pengecekan konteks chat.",
-      "Naikkan ke review queue, action center, atau lead detail saat conversation sudah butuh tindakan lanjutan.",
+      "Naikkan ke chat review center, action center, atau lead detail saat conversation sudah butuh tindakan lanjutan.",
     ],
   };
 }
@@ -119,9 +119,9 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     },
     {
       href: "/dashboard/approvals",
-      label: "Review Queue",
+      label: "Chat Review Center",
       icon: faWandSparkles,
-      description: "Draft dan eskalasi yang perlu review",
+      description: "Triase chat, draft, dan escalation",
     },
   ];
 
@@ -311,17 +311,6 @@ export function WorkspaceShell({
                   </p>
                 </div>
               </div>
-
-              {resolvedCurrentUser ? (
-                <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-200">
-                  <span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1">
-                    {getRoleDisplayLabel(resolvedCurrentUser.role)}
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1">
-                    Operational workspace
-                  </span>
-                </div>
-              ) : null}
             </div>
           </div>
 

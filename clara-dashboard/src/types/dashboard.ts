@@ -360,6 +360,43 @@ export type SalesApprovalQueueResponse = {
   items: SalesApprovalQueueItem[];
 };
 
+export type ChatReviewQueueItem = {
+  conversation_id: string;
+  lead_id: string | null;
+  lead_name: string;
+  conversation_title: string;
+  sales_user_id: string | null;
+  sales_owner_name: string | null;
+  source_channel: string;
+  source_label: string;
+  current_stage: string;
+  lead_temperature: string;
+  risk_level: string | null;
+  review_bucket: string;
+  review_label: string;
+  recommended_action: string;
+  latest_message_preview: string | null;
+  latest_message_at: string | null;
+  queue_since_at: string | null;
+  age_bucket: string;
+  priority_score: number;
+  latest_ai_extraction: DashboardAIExtractionSummary | null;
+  latest_reply_suggestion: DashboardReplySuggestionSummary | null;
+  latest_sent_message: DashboardSentMessageSummary | null;
+};
+
+export type ChatReviewCenterResponse = {
+  generated_at: string;
+  total_items: number;
+  needs_analysis_count: number;
+  needs_reply_suggestion_count: number;
+  pending_approval_count: number;
+  escalation_count: number;
+  ready_to_send_count: number;
+  stale_count: number;
+  items: ChatReviewQueueItem[];
+};
+
 export type OpsNotificationItem = {
   id: string;
   organization_id: string | null;

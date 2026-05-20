@@ -6,6 +6,7 @@ from app.core.security import require_roles
 from app.models.user import User
 from app.db.session import get_db
 from app.schemas.dashboard_schema import (
+    ChatReviewCenterResponse,
     KpiAlertHistoryResponse,
     KpiAlertResolveRequest,
     KpiCommandCenterResponse,
@@ -36,6 +37,7 @@ from app.services.dashboard_service import (
     get_kpi_command_center,
     get_marketing_insights_preview,
     get_ops_database_overview,
+    get_sales_chat_review_center,
     list_ops_notifications,
     reopen_ops_notification,
     get_sales_approval_queue,
@@ -103,6 +105,25 @@ def sales_approval_queue(
         risk_level=risk_level,
         action_mode=action_mode,
         age_bucket=age_bucket,
+    )
+
+
+@router.get("/sales/chat-review-center", response_model=ChatReviewCenterResponse)
+def sales_chat_review_center(
+    review_bucket: str | None = Query(default=None),
+    risk_level: str | None = Query(default=None),
+    age_bucket: str | None = Query(default=None),
+    source_channel: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+):
+    return get_sales_chat_review_center(
+        db=db,
+        current_user=current_user,
+        review_bucket=review_bucket,
+        risk_level=risk_level,
+        age_bucket=age_bucket,
+        source_channel=source_channel,
     )
 
 

@@ -142,6 +142,43 @@ class SalesApprovalQueueResponse(BaseModel):
     items: list[SalesApprovalQueueItem]
 
 
+class ChatReviewQueueItem(BaseModel):
+    conversation_id: UUID
+    lead_id: UUID | None
+    lead_name: str
+    conversation_title: str
+    sales_user_id: UUID | None
+    sales_owner_name: str | None
+    source_channel: str
+    source_label: str
+    current_stage: str
+    lead_temperature: str
+    risk_level: str | None
+    review_bucket: str
+    review_label: str
+    recommended_action: str
+    latest_message_preview: str | None
+    latest_message_at: datetime | None
+    queue_since_at: datetime | None
+    age_bucket: str
+    priority_score: int
+    latest_ai_extraction: DashboardAIExtractionSummary | None
+    latest_reply_suggestion: DashboardReplySuggestionSummary | None
+    latest_sent_message: DashboardSentMessageSummary | None
+
+
+class ChatReviewCenterResponse(BaseModel):
+    generated_at: datetime
+    total_items: int
+    needs_analysis_count: int
+    needs_reply_suggestion_count: int
+    pending_approval_count: int
+    escalation_count: int
+    ready_to_send_count: int
+    stale_count: int
+    items: list[ChatReviewQueueItem]
+
+
 class OpsNotificationItem(BaseModel):
     id: UUID
     organization_id: UUID | None

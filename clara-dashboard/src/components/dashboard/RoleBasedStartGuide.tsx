@@ -34,7 +34,7 @@ const SALES_WORKFLOW_STEPS = [
     step: "4",
     title: "Pantau Tindakan Harian",
     description:
-      "Gunakan Action Center dan Review Queue untuk tahu item mana yang overdue, panas, atau butuh review manusia.",
+      "Gunakan Action Center dan Chat Review Center untuk tahu item mana yang overdue, panas, atau butuh review manusia.",
     href: "/dashboard/follow-up",
     cta: "Buka Action Center",
   },
@@ -51,11 +51,11 @@ const HEAD_WORKFLOW_STEPS = [
   },
   {
     step: "2",
-    title: "Review Queue dan Eskalasi",
+    title: "Chat Review dan Eskalasi",
     description:
-      "Pastikan bottleneck tim terlihat dari review queue dan worklist sebelum Anda masuk ke insight yang lebih luas.",
+      "Pastikan bottleneck tim terlihat dari chat review center dan worklist sebelum Anda masuk ke insight yang lebih luas.",
     href: "/dashboard/approvals",
-    cta: "Buka Review Queue",
+    cta: "Buka Chat Review",
   },
   {
     step: "3",
@@ -177,11 +177,11 @@ function buildRoleStartCopy(role?: string) {
       eyebrow: "Head flow",
       title: "Mulai dari bottleneck tim, lalu rapikan lead dan kontrol akses",
       description:
-        "Sebagai head, workspace ini paling efektif saat Anda memakai action center, review queue, dan dashboard KPI untuk melihat titik macet tim sebelum masuk ke lead dan kontrol akses.",
+        "Sebagai head, workspace ini paling efektif saat Anda memakai action center, chat review center, dan dashboard KPI untuk melihat titik macet tim sebelum masuk ke lead dan kontrol akses.",
       primaryHref: "/dashboard/notifications",
       primaryLabel: "Buka Action Center",
       secondaryHref: "/dashboard/approvals",
-      secondaryLabel: "Buka Review Queue",
+      secondaryLabel: "Buka Chat Review",
     };
   }
 
@@ -310,8 +310,8 @@ export function RoleBasedStartGuide({
                 daftar tekanan operasional harian, bukan arsip semua lead.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Review Queue</span>:
-                antrian draft atau eskalasi yang perlu review manusia.
+                <span className="font-semibold text-slate-950">Chat Review Center</span>:
+                antrian triase chat, draft, atau eskalasi yang perlu review manusia.
               </p>
               <p>
                 <span className="font-semibold text-slate-950">Notifications</span>:

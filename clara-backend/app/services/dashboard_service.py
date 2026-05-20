@@ -26,6 +26,8 @@ from app.models.sent_message import SentMessage
 from app.models.user import User
 from app.schemas.channel_schema import ChannelOverviewItem, ChannelOverviewResponse
 from app.schemas.dashboard_schema import (
+    ChatReviewCenterResponse,
+    ChatReviewQueueItem,
     DashboardAIExtractionSummary,
     DashboardLatestMessage,
     DashboardReplySuggestionSummary,
@@ -330,6 +332,185 @@ def determine_ui_status(
         return "reply_rejected"
 
     return "unknown"
+
+
+def get_review_queue_timestamp(
+    ui_status: str,
+    latest_message: Message | None,
+    extraction: AIExtraction | None,
+    suggestion: ReplySuggestion | None,
+) -> datetime | None:
+    if ui_status in {"needs_analysis", "needs_reply_suggestion"}:
+        return latest_message.message_timestamp if latest_message is not None else None
+
+    if ui_status in {
+        "needs_escalation",
+        "needs_approval",
+        "draft_ready",
+        "approved_ready_to_send",
+        "reply_rejected",
+    }:
+        return suggestion.created_at if suggestion is not None else None
+
+    if extraction is not None:
+        return extraction.created_at
+
+    return latest_message.message_timestamp if latest_message is not None else None
+
+
+def derive_chat_review_bucket(
+    *,
+    ui_status: str,
+    latest_extraction: AIExtraction | None,
+    latest_suggestion: ReplySuggestion | None,
+) -> tuple[str | None, str | None, str | None, int]:
+    if ui_status == "needs_analysis":
+        return (
+            "needs_analysis",
+            "Butuh AI Analysis",
+            "Jalankan AI analysis ulang agar stage, risiko, dan next action sinkron dengan chat terbaru.",
+            40,
+        )
+
+    if ui_status == "needs_reply_suggestion":
+        return (
+            "needs_reply_suggestion",
+            "Butuh Draft Baru",
+            "Generate reply suggestion baru supaya chat ini siap ditindak dari workspace review.",
+            30,
+        )
+
+    if ui_status == "needs_escalation":
+        return (
+            "human_escalation",
+            "Butuh Review Head",
+            "Conversation ini ditandai high risk atau butuh intervensi manusia sebelum ada respons final.",
+            60,
+        )
+
+    if ui_status == "needs_approval":
+        return (
+            "pending_approval",
+            "Menunggu Approval",
+            "Buka detail conversation, cek draft balasan, lalu approve atau reject dengan alasan yang jelas.",
+            35,
+        )
+
+    if ui_status == "draft_ready":
+        return (
+            "draft_review",
+            "Draft Siap Direview",
+            "Draft sudah ada. Validasi tone, fakta, dan arahan aksi sebelum dipakai sales.",
+            25,
+        )
+
+    if ui_status == "approved_ready_to_send":
+        return (
+            "ready_to_send",
+            "Siap Dikirim",
+            "Balasan sudah approved. Pastikan sales mengirim respons dan menutup loop follow-up-nya.",
+            20,
+        )
+
+    if ui_status == "reply_rejected":
+        return (
+            "needs_rework",
+            "Perlu Rework",
+            "Draft sebelumnya ditolak. Generate ulang atau revisi strategi respons sebelum lanjut.",
+            25,
+        )
+
+    if latest_extraction is not None and latest_extraction.risk_level == "high":
+        return (
+            "human_escalation",
+            "Butuh Review Head",
+            "Tidak ada draft pending, tapi sinyal risiko percakapan masih tinggi dan perlu ditinjau manual.",
+            45,
+        )
+
+    if latest_suggestion is not None and latest_suggestion.approval_status == "pending":
+        return (
+            "pending_approval",
+            "Menunggu Approval",
+            "Draft pending masih menunggu keputusan reviewer.",
+            35,
+        )
+
+    return (None, None, None, 0)
+
+
+def build_chat_review_item(
+    *,
+    conversation: Conversation,
+    latest_message: Message | None,
+    latest_extraction: AIExtraction | None,
+    latest_suggestion: ReplySuggestion | None,
+    latest_sent_message: SentMessage | None,
+    now: datetime,
+) -> ChatReviewQueueItem | None:
+    current_sent_state = resolve_current_sent_message(latest_message, latest_sent_message)
+    ui_status = determine_ui_status(
+        latest_message,
+        latest_extraction,
+        latest_suggestion,
+        current_sent_state,
+    )
+    review_bucket, review_label, recommended_action, review_bonus = derive_chat_review_bucket(
+        ui_status=ui_status,
+        latest_extraction=latest_extraction,
+        latest_suggestion=latest_suggestion,
+    )
+
+    if (
+        review_bucket is None
+        or review_label is None
+        or recommended_action is None
+    ):
+        return None
+
+    queue_since_at = get_review_queue_timestamp(
+        ui_status,
+        latest_message,
+        latest_extraction,
+        latest_suggestion,
+    )
+    risk_level = latest_suggestion.risk_level if latest_suggestion else None
+    if risk_level is None and latest_extraction is not None:
+        risk_level = latest_extraction.risk_level
+
+    return ChatReviewQueueItem(
+        conversation_id=conversation.id,
+        lead_id=conversation.lead_id,
+        lead_name=(
+            conversation.lead.display_name
+            if conversation.lead is not None
+            else conversation.title
+        ),
+        conversation_title=conversation.title,
+        sales_user_id=conversation.sales_user_id,
+        sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
+        source_channel=normalize_source_channel(conversation.source),
+        source_label=build_source_label(conversation.source),
+        current_stage=conversation.current_stage,
+        lead_temperature=conversation.lead_temperature,
+        risk_level=risk_level,
+        review_bucket=review_bucket,
+        review_label=review_label,
+        recommended_action=recommended_action,
+        latest_message_preview=(
+            latest_message.message_text[:240].strip()
+            if latest_message is not None and latest_message.message_text
+            else None
+        ),
+        latest_message_at=latest_message.message_timestamp if latest_message else None,
+        queue_since_at=queue_since_at,
+        age_bucket=get_age_bucket(queue_since_at, now) if queue_since_at else "fresh",
+        priority_score=calculate_priority_score(latest_extraction, latest_suggestion)
+        + review_bonus,
+        latest_ai_extraction=build_ai_summary(latest_extraction),
+        latest_reply_suggestion=build_reply_summary(latest_suggestion),
+        latest_sent_message=build_sent_message_summary(latest_sent_message),
+    )
 
 
 def get_sales_inbox(
@@ -922,6 +1103,124 @@ def get_sales_approval_queue(
         pending_count=len(items),
         escalation_count=escalation_count,
         high_risk_count=high_risk_count,
+        stale_count=stale_count,
+        items=items,
+    )
+
+
+def get_sales_chat_review_center(
+    db: Session,
+    current_user: User,
+    *,
+    review_bucket: str | None = None,
+    risk_level: str | None = None,
+    age_bucket: str | None = None,
+    source_channel: str | None = None,
+) -> ChatReviewCenterResponse:
+    now = datetime.now(timezone.utc)
+
+    if current_user.organization_id is None:
+        return ChatReviewCenterResponse(
+            generated_at=now,
+            total_items=0,
+            needs_analysis_count=0,
+            needs_reply_suggestion_count=0,
+            pending_approval_count=0,
+            escalation_count=0,
+            ready_to_send_count=0,
+            stale_count=0,
+            items=[],
+        )
+
+    statement = (
+        select(Conversation)
+        .where(Conversation.organization_id == current_user.organization_id)
+        .options(
+            selectinload(Conversation.lead),
+            selectinload(Conversation.sales_user),
+            selectinload(Conversation.messages),
+            selectinload(Conversation.ai_extractions),
+            selectinload(Conversation.reply_suggestions),
+            selectinload(Conversation.sent_messages),
+        )
+        .order_by(desc(Conversation.last_message_at), desc(Conversation.created_at))
+    )
+
+    if not can_access_all_conversations(current_user):
+        statement = statement.where(Conversation.sales_user_id == current_user.id)
+
+    conversations = list(db.scalars(statement).all())
+    items: list[ChatReviewQueueItem] = []
+
+    needs_analysis_count = 0
+    needs_reply_suggestion_count = 0
+    pending_approval_count = 0
+    escalation_count = 0
+    ready_to_send_count = 0
+    stale_count = 0
+
+    for conversation in conversations:
+        if source_channel and not matches_source_channel(conversation.source, source_channel):
+            continue
+
+        latest_message = get_latest_message(conversation)
+        latest_extraction = get_latest_extraction(conversation)
+        latest_suggestion = get_latest_reply_suggestion(conversation)
+        latest_sent_message = get_latest_sent_message(conversation)
+
+        item = build_chat_review_item(
+            conversation=conversation,
+            latest_message=latest_message,
+            latest_extraction=latest_extraction,
+            latest_suggestion=latest_suggestion,
+            latest_sent_message=latest_sent_message,
+            now=now,
+        )
+
+        if item is None:
+            continue
+
+        if review_bucket and item.review_bucket != review_bucket:
+            continue
+        if risk_level and item.risk_level != risk_level:
+            continue
+        if age_bucket and item.age_bucket != age_bucket:
+            continue
+
+        if item.review_bucket == "needs_analysis":
+            needs_analysis_count += 1
+        elif item.review_bucket == "needs_reply_suggestion":
+            needs_reply_suggestion_count += 1
+        elif item.review_bucket in {"pending_approval", "draft_review", "needs_rework"}:
+            pending_approval_count += 1
+        elif item.review_bucket == "human_escalation":
+            escalation_count += 1
+        elif item.review_bucket == "ready_to_send":
+            ready_to_send_count += 1
+
+        if item.age_bucket == "stale":
+            stale_count += 1
+
+        items.append(item)
+
+    items.sort(
+        key=lambda item: (
+            1 if item.review_bucket == "human_escalation" else 0,
+            1 if item.risk_level == "high" else 0,
+            item.priority_score,
+            item.queue_since_at or now,
+        ),
+        reverse=True,
+    )
+
+    return ChatReviewCenterResponse(
+        generated_at=now,
+        total_items=len(items),
+        needs_analysis_count=needs_analysis_count,
+        needs_reply_suggestion_count=needs_reply_suggestion_count,
+        pending_approval_count=pending_approval_count,
+        escalation_count=escalation_count,
+        ready_to_send_count=ready_to_send_count,
         stale_count=stale_count,
         items=items,
     )
