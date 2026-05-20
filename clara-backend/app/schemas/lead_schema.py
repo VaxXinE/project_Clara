@@ -188,6 +188,13 @@ class LeadTaskUpdateRequest(BaseModel):
     notes: str | None = None
 
 
+class LeadQueueActionRequest(BaseModel):
+    action: str
+    duration: str | None = None
+    reason_tag: str
+    reason_note: str | None = None
+
+
 class LeadDealUpsertRequest(BaseModel):
     status: str | None = None
     currency: str | None = None

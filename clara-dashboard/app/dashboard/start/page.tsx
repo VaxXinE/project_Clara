@@ -1,1 +1,1 @@
-export { default } from "@/app/dashboard/start/page";
+export { default } from "../../../src/app/dashboard/(workspace)/start/page";

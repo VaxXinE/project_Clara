@@ -1,4 +1,40 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+PLACEHOLDER_ENV_VALUES = {
+    "",
+    "API_KEY_KAMU",
+    "OPENAI_API_KEY_KAMU",
+    "YOUR_OPENAI_API_KEY",
+    "test-key",
+}
+
+
+def is_placeholder_env_value(value: str | None) -> bool:
+    return (value or "").strip() in PLACEHOLDER_ENV_VALUES
+
+
+def read_env_file_value(env_file_path: Path, key: str) -> str | None:
+    if not env_file_path.exists():
+        return None
+
+    for line in env_file_path.read_text(encoding="utf-8").splitlines():
+        trimmed_line = line.strip()
+
+        if not trimmed_line or trimmed_line.startswith("#") or "=" not in trimmed_line:
+            continue
+
+        current_key, raw_value = trimmed_line.split("=", 1)
+
+        if current_key.strip() != key:
+            continue
+
+        normalized_value = raw_value.strip().strip("\"'")
+        return normalized_value or None
+
+    return None
 
 
 class Settings(BaseSettings):
@@ -26,6 +62,18 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
     )
+
+    def model_post_init(self, __context: object) -> None:
+        env_file_path = Path(self.model_config.get("env_file", ".env"))
+        env_file_openai_key = read_env_file_value(env_file_path, "OPENAI_API_KEY")
+
+        if is_placeholder_env_value(self.openai_api_key) and env_file_openai_key:
+            if not is_placeholder_env_value(env_file_openai_key):
+                object.__setattr__(self, "openai_api_key", env_file_openai_key)
+                return
+
+        if is_placeholder_env_value(self.openai_api_key):
+            object.__setattr__(self, "openai_api_key", None)
 
     @property
     def allowed_origins_list(self) -> list[str]:

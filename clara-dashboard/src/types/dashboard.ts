@@ -284,6 +284,13 @@ export type LeadTaskUpdateRequest = {
   notes?: string | null;
 };
 
+export type LeadQueueActionRequest = {
+  action: "done" | "snooze" | "dismiss" | "reopen";
+  duration?: "30m" | "2h" | "tomorrow" | null;
+  reason_tag: string;
+  reason_note?: string | null;
+};
+
 export type LeadDealUpsertRequest = {
   status?: string;
   currency?: string;

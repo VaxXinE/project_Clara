@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.models.user import User
 from app.schemas.auth_schema import CreateUserRequest, UpdateUserRequest
 from app.models.organization import Organization
+from app.services.role_service import normalize_role
 
 
 
@@ -20,7 +21,7 @@ class AuthError(RuntimeError):
     pass
 
 
-ALLOWED_ROLES = {"owner", "admin", "marketing"}
+ALLOWED_ROLES = {"owner", "admin", "marketing", "super_admin"}
 
 
 def hash_password(password: str) -> str:
@@ -49,7 +50,7 @@ def create_access_token(user: User) -> str:
     payload = {
         "sub": str(user.id),
         "email": user.email,
-        "role": user.role,
+        "role": normalize_role(user.role),
         "organization_id": (
             str(user.organization_id) if user.organization_id is not None else None
         ),
@@ -97,8 +98,9 @@ def create_user(
     created_by_user: User | None = None,
 ) -> User:
     normalized_email = payload.email.strip().lower()
+    normalized_role = normalize_role(payload.role)
 
-    if payload.role not in ALLOWED_ROLES:
+    if normalized_role not in ALLOWED_ROLES:
         raise AuthError(f"Invalid role. Allowed roles: {', '.join(sorted(ALLOWED_ROLES))}")
 
     existing_user = get_user_by_email(db=db, email=normalized_email)
@@ -118,7 +120,7 @@ def create_user(
         name=payload.name.strip(),
         email=normalized_email,
         hashed_password=hash_password(payload.password),
-        role=payload.role,
+        role=normalized_role,
         is_active=True,
     )
 
@@ -144,7 +146,9 @@ def update_user(
     user: User,
     payload: UpdateUserRequest,
 ) -> User:
-    if payload.role is not None and payload.role not in ALLOWED_ROLES:
+    normalized_role = normalize_role(payload.role) if payload.role is not None else None
+
+    if normalized_role is not None and normalized_role not in ALLOWED_ROLES:
         raise AuthError(f"Invalid role. Allowed roles: {', '.join(sorted(ALLOWED_ROLES))}")
 
     if payload.email is not None:
@@ -157,8 +161,8 @@ def update_user(
     if payload.name is not None:
         user.name = payload.name.strip()
 
-    if payload.role is not None:
-        user.role = payload.role
+    if normalized_role is not None:
+        user.role = normalized_role
 
     if payload.organization_id is not None:
         organization = db.get(Organization, payload.organization_id)

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { getRoleDisplayLabel } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 type LoginResponse = {
@@ -85,19 +86,19 @@ export default function LoginPage() {
 
       <div className="relative grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="clara-card-dark rounded-[34px] p-7 sm:p-8">
-          <span className="clara-chip clara-chip-dark">Clara Workspace</span>
+          <span className="clara-chip clara-chip-dark">SGB SCC</span>
           <h1 className="mt-5 max-w-xl text-4xl font-bold tracking-[-0.05em] text-white sm:text-3xl">
-            Satu pintu untuk inbox operasional, insight, dan kontrol tim.
+            Satu pintu untuk queue operasional, lead management, dan kontrol tim.
           </h1>
           <p className="mt-4 max-w-lg text-sm leading-7 text-slate-200 sm:text-[15px]">
-            Masuk ke dashboard Clara untuk memantau percakapan pelanggan,
+            Masuk ke Sales Command Center untuk memantau percakapan pelanggan,
             meninjau rekomendasi AI, dan menjaga workflow tim tetap rapi.
           </p>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <div className="rounded-[24px] border border-white/10 bg-white/7 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4b07b]">
-                Inbox
+                Queue
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-100">
                 Percakapan dan prioritas harian ada di satu alur kerja.
@@ -129,10 +130,10 @@ export default function LoginPage() {
           <div>
             <p className="clara-kicker">Login Dashboard</p>
             <h2 className="mt-3 text-3xl font-bold tracking-[-0.04em] text-slate-950">
-              Masuk ke workspace Clara
+              Masuk ke workspace SCC
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Gunakan akun internal untuk membuka inbox, review balasan AI, dan
+              Gunakan akun internal untuk membuka queue, review balasan AI, dan
               workspace operasional lainnya.
             </p>
           </div>
@@ -186,8 +187,8 @@ export default function LoginPage() {
           )}
 
           <p className="clara-helper mt-4">
-            Kalau email belum terdaftar, minta admin Clara untuk membuatkan akun
-            Anda terlebih dulu.
+            Kalau email belum terdaftar, minta {getRoleDisplayLabel("admin")} atau{" "}
+            {getRoleDisplayLabel("owner")} untuk membuatkan akun Anda terlebih dulu.
           </p>
 
           <button

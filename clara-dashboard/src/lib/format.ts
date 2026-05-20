@@ -1,3 +1,5 @@
+import { getRoleDisplayLabel, normalizeWorkspaceRole } from "@/lib/roles";
+
 export function formatDateTime(value: string | null): string {
   if (!value) return "-";
 
@@ -8,6 +10,17 @@ export function formatDateTime(value: string | null): string {
 }
 
 export function formatStatusLabel(value: string): string {
+  const normalizedRole = normalizeWorkspaceRole(value);
+
+  if (
+    normalizedRole === "marketing" ||
+    normalizedRole === "admin" ||
+    normalizedRole === "owner" ||
+    normalizedRole === "super_admin"
+  ) {
+    return getRoleDisplayLabel(value);
+  }
+
   return value.replaceAll("_", " ");
 }
 

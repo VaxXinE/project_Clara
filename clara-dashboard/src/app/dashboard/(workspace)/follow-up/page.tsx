@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass, formatStatusLabel } from "@/lib/format";
 import type {
   CurrentUser,
+  LeadQueueActionRequest,
   SalesWorklistItem,
   SalesWorklistResponse,
 } from "@/types/dashboard";
@@ -46,35 +47,15 @@ export default function FollowUpPage() {
 
   async function handleTaskAction(
     item: SalesWorklistItem,
-    action: "done" | "snooze" | "reopen"
+    payload: LeadQueueActionRequest
   ) {
-    if (!item.task_id) {
-      return;
-    }
-
-    setUpdatingTaskId(item.task_id);
+    setUpdatingTaskId(item.task_id ?? item.lead_id);
     setErrorMessage("");
 
     try {
-      const body =
-        action === "done"
-          ? { status: "done", notes: "Task diselesaikan dari AI Follow-up Worklist." }
-          : action === "reopen"
-            ? { status: "open", notes: "Task dibuka lagi dari AI Follow-up Worklist." }
-            : {
-                status: "snoozed",
-                due_at: new Date(
-                  (item.next_follow_up_at
-                    ? new Date(item.next_follow_up_at).getTime()
-                    : Date.now()) +
-                    24 * 60 * 60 * 1000
-                ).toISOString(),
-                notes: "Task di-snooze 1 hari dari AI Follow-up Worklist.",
-              };
-
-      await apiFetch(`/leads/${item.lead_id}/tasks/${item.task_id}`, {
-        method: "PATCH",
-        body,
+      await apiFetch(`/leads/${item.lead_id}/queue-action`, {
+        method: "POST",
+        body: payload,
       });
       await loadWorklist();
     } catch (error) {
@@ -89,9 +70,9 @@ export default function FollowUpPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Daily workflow"
-      title="AI Follow-up Worklist"
-      description="Halaman ini menjawab pertanyaan operasional paling penting: hari ini siapa yang harus dihubungi dulu, kenapa, dan langkah konkret apa yang harus dilakukan."
+      eyebrow="Action center"
+      title="Queue Action Center"
+      description="Halaman ini menjawab pertanyaan operasional paling penting: hari ini lead mana yang harus dieksekusi dulu, kenapa, dan lifecycle action apa yang harus dilakukan sekarang."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
@@ -106,13 +87,13 @@ export default function FollowUpPage() {
             href="/dashboard/sales"
             className="clara-button clara-button-ghost"
           >
-            Chat Masuk
+            Queue
           </Link>
           <Link
             href="/dashboard/crm"
             className="clara-button clara-button-ghost"
           >
-            Lead Pipeline
+            Lead Management
           </Link>
         </>
       }
@@ -120,7 +101,7 @@ export default function FollowUpPage() {
       <div className="space-y-6">
         {isLoading && (
           <div className="clara-empty-state text-sm text-slate-600">
-            Loading worklist...
+            Loading action center...
           </div>
         )}
 
@@ -140,13 +121,13 @@ export default function FollowUpPage() {
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                     {worklist.items.length === 0
-                      ? "Worklist sedang relatif aman"
+                      ? "Queue sedang relatif aman"
                       : "Kerjakan item urutan teratas lebih dulu"}
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                     {worklist.items.length === 0
-                      ? "Kalau tidak ada item prioritas, kembali cek Chat Masuk atau Lead Pipeline. Bisa jadi tidak ada task yang jatuh tempo hari ini."
-                      : "Halaman ini bukan untuk membaca semua detail dari awal. Fungsinya adalah memilih tindakan harian tercepat: buka conversation, snooze task, atau tandai selesai."}
+                      ? "Kalau tidak ada item prioritas, kembali cek Queue atau Lead Management. Bisa jadi tidak ada task yang jatuh tempo hari ini."
+                      : "Halaman ini bukan untuk membaca semua detail dari awal. Fungsinya adalah memilih tindakan harian tercepat: buka conversation, snooze, dismiss, atau tandai done."}
                   </p>
                 </div>
                 <Link
@@ -157,7 +138,7 @@ export default function FollowUpPage() {
                   }
                   className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
                 >
-                  {worklist.items[0] ? "Buka Prioritas Teratas" : "Buka Chat Masuk"}
+                  {worklist.items[0] ? "Buka Prioritas Teratas" : "Buka Queue"}
                 </Link>
               </div>
             </section>
@@ -172,12 +153,12 @@ export default function FollowUpPage() {
                   description="Urutannya sudah diprioritaskan. Anda tidak perlu memilah dari nol kecuali ada konteks khusus."
                 />
                 <UsageHint
-                  title="2. Putuskan aksi singkat"
-                  description="Buka conversation kalau perlu konteks, snooze kalau belum waktunya, dan mark done kalau task benar-benar selesai."
+                  title="2. Putuskan lifecycle action"
+                  description="Buka conversation kalau perlu konteks, snooze kalau belum waktunya, dismiss kalau tidak relevan sementara, dan done kalau task benar-benar selesai."
                 />
                 <UsageHint
-                  title="3. Naikkan ke CRM bila perlu"
-                  description="Kalau follow-up mengubah status bisnis lead, rapikan stage, notes, atau deal di halaman Lead Pipeline."
+                  title="3. Rapikan lead bila perlu"
+                  description="Kalau follow-up mengubah status bisnis lead, rapikan stage, notes, atau deal di halaman Lead Management."
                 />
               </div>
             </section>
@@ -243,7 +224,9 @@ export default function FollowUpPage() {
                         key={`${item.lead_id}-${item.task_type}-${item.task_id ?? "derived"}`}
                         item={item}
                         index={index}
-                        isUpdating={updatingTaskId === item.task_id}
+                        isUpdating={
+                          updatingTaskId === (item.task_id ?? item.lead_id)
+                        }
                         onTaskAction={handleTaskAction}
                       />
                     ))
@@ -294,9 +277,24 @@ function WorklistRow({
   isUpdating: boolean;
   onTaskAction: (
     item: SalesWorklistItem,
-    action: "done" | "snooze" | "reopen"
+    payload: LeadQueueActionRequest
   ) => Promise<void>;
 }) {
+  const [reasonTag, setReasonTag] = useState("follow_up_executed");
+  const [reasonNote, setReasonNote] = useState("");
+
+  function buildPayload(
+    action: LeadQueueActionRequest["action"],
+    duration?: LeadQueueActionRequest["duration"]
+  ): LeadQueueActionRequest {
+    return {
+      action,
+      duration: duration ?? null,
+      reason_tag: reasonTag,
+      reason_note: reasonNote.trim() || null,
+    };
+  }
+
   return (
     <article className="clara-card rounded-[24px] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -343,6 +341,39 @@ function WorklistRow({
               <p className="mt-2">Priority score: {item.priority_score}</p>
             </div>
           </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Reason Tag
+              </label>
+              <select
+                value={reasonTag}
+                onChange={(event) => setReasonTag(event.target.value)}
+                className="clara-select mt-2"
+                disabled={isUpdating}
+              >
+                <option value="follow_up_executed">follow_up_executed</option>
+                <option value="waiting_customer">waiting_customer</option>
+                <option value="needs_more_context">needs_more_context</option>
+                <option value="not_priority_now">not_priority_now</option>
+                <option value="duplicate_or_noise">duplicate_or_noise</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Reason Note
+              </label>
+              <input
+                value={reasonNote}
+                onChange={(event) => setReasonNote(event.target.value)}
+                className="clara-input mt-2"
+                placeholder="Catatan singkat kenapa action ini dipilih"
+                disabled={isUpdating}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="flex w-full flex-col gap-2 lg:w-60">
@@ -358,45 +389,73 @@ function WorklistRow({
             href="/dashboard/crm"
             className="clara-button clara-button-ghost"
           >
-            Buka Lead Pipeline
+            Buka Lead Management
           </Link>
-          {item.task_id ? (
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={() => {
+              void onTaskAction(item, buildPayload("done"));
+            }}
+            className="clara-button bg-emerald-600 text-white"
+          >
+            {isUpdating ? "Memproses..." : "Done"}
+          </button>
+          {item.task_status === "snoozed" ? (
+            <button
+              type="button"
+              disabled={isUpdating}
+              onClick={() => {
+                void onTaskAction(item, buildPayload("reopen"));
+              }}
+              className="clara-button clara-button-ghost"
+            >
+              Reopen
+            </button>
+          ) : (
             <>
               <button
                 type="button"
                 disabled={isUpdating}
                 onClick={() => {
-                  void onTaskAction(item, "done");
+                  void onTaskAction(item, buildPayload("snooze", "30m"));
                 }}
-                className="clara-button bg-emerald-600 text-white"
+                className="clara-button border border-amber-300 bg-amber-50 text-amber-800"
               >
-                {isUpdating ? "Memproses..." : "Mark Done"}
+                Snooze 30m
               </button>
-              {item.task_status === "snoozed" ? (
-                <button
-                  type="button"
-                  disabled={isUpdating}
-                  onClick={() => {
-                    void onTaskAction(item, "reopen");
-                  }}
-                  className="clara-button clara-button-ghost"
-                >
-                  Reopen Task
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isUpdating}
-                  onClick={() => {
-                    void onTaskAction(item, "snooze");
-                  }}
-                  className="clara-button border border-amber-300 bg-amber-50 text-amber-800"
-                >
-                  Snooze 1 Hari
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => {
+                  void onTaskAction(item, buildPayload("snooze", "2h"));
+                }}
+                className="clara-button border border-amber-300 bg-amber-50 text-amber-800"
+              >
+                Snooze 2h
+              </button>
+              <button
+                type="button"
+                disabled={isUpdating}
+                onClick={() => {
+                  void onTaskAction(item, buildPayload("snooze", "tomorrow"));
+                }}
+                className="clara-button border border-amber-300 bg-amber-50 text-amber-800"
+              >
+                Snooze Besok
+              </button>
             </>
-          ) : null}
+          )}
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={() => {
+              void onTaskAction(item, buildPayload("dismiss"));
+            }}
+            className="clara-button border border-rose-300 bg-rose-50 text-rose-800"
+          >
+            Dismiss
+          </button>
         </div>
       </div>
     </article>

@@ -32,6 +32,7 @@ from app.services.auth_service import (
     update_user,
 )
 from app.services.rate_limiter import login_rate_limiter
+from app.services.role_service import is_owner_like, normalize_role
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -41,7 +42,7 @@ def build_user_response(user: User) -> CurrentUserResponse:
         id=user.id,
         name=user.name,
         email=user.email,
-        role=user.role,
+        role=normalize_role(user.role),
         is_active=user.is_active,
         created_at=user.created_at,
         organization_id=user.organization_id,
@@ -212,9 +213,10 @@ def create_user_endpoint(
     current_user: User = Depends(require_roles("admin")),
 ):
     payload_to_create = payload
+    requested_role = normalize_role(payload.role)
 
     if current_user.role == "admin":
-        if payload.role == "owner":
+        if requested_role in {"owner", "super_admin"}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin cannot create owner users.",
@@ -276,7 +278,7 @@ def list_users_endpoint(
 ):
     users = list_users(db=db)
 
-    if current_user.role == "owner":
+    if is_owner_like(current_user.role):
         return [build_user_response(user) for user in users]
 
     if current_user.organization_id is None:
@@ -297,6 +299,8 @@ def update_user_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin")),
 ):
+    requested_role = normalize_role(payload.role) if payload.role is not None else None
+
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))
     except ValueError as exc:
@@ -322,7 +326,7 @@ def update_user_endpoint(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
-        if payload.role == "owner":
+        if requested_role in {"owner", "super_admin"}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin cannot promote users to owner.",
@@ -401,7 +405,7 @@ def deactivate_user_endpoint(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
-        if target_user.role == "owner":
+        if is_owner_like(target_user.role):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin cannot deactivate owner users.",
@@ -452,7 +456,7 @@ def activate_user_endpoint(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
-        if target_user.role == "owner":
+        if is_owner_like(target_user.role):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin cannot activate owner users.",

@@ -3,11 +3,13 @@ from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.services.auth_service import AuthError, decode_access_token, get_user_by_id
+from app.services.role_service import is_owner_like, normalize_role
 
 SAFE_HTTP_METHODS = {"GET", "HEAD", "OPTIONS"}
 
@@ -74,15 +76,21 @@ def get_current_user(
             detail="User not found or inactive.",
         )
 
+    normalized_role = normalize_role(user.role)
+    if normalized_role != user.role:
+        set_committed_value(user, "role", normalized_role)
+
     return user
 
 
 def require_roles(*allowed_roles: str) -> Callable:
     def dependency(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role == "owner":
+        if is_owner_like(current_user.role):
             return current_user
 
-        if current_user.role not in allowed_roles:
+        normalized_allowed_roles = {normalize_role(role) for role in allowed_roles}
+
+        if normalize_role(current_user.role) not in normalized_allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to access this resource.",

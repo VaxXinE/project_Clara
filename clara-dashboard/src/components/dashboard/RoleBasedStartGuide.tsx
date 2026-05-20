@@ -2,110 +2,111 @@
 
 import Link from "next/link";
 
+import { isAdminLike, isOwnerLike } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
-const MARKETING_WORKFLOW_STEPS = [
+const SALES_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Masukkan Chat",
+    title: "Tangkap Lead Cepat",
     description:
-      "Mulai dari halaman Import Chat. Upload file TXT atau paste chat langsung, lalu pilih channel yang benar.",
+      "Mulai dari Lead Capture. Upload file TXT atau paste chat langsung supaya lead dan conversation cepat masuk ke sistem.",
     href: "/dashboard/upload",
-    cta: "Buka Import Chat",
+    cta: "Buka Lead Capture",
   },
   {
     step: "2",
-    title: "Buka Chat Masuk",
+    title: "Kerjakan Queue",
     description:
-      "Setelah chat masuk, buka Chat Masuk untuk review percakapan, jalankan AI analysis, lalu generate draft balasan.",
+      "Setelah data masuk, buka Queue untuk review percakapan, jalankan AI analysis, lalu siapkan balasan atau next action.",
     href: "/dashboard/sales",
-    cta: "Buka Chat Masuk",
+    cta: "Buka Queue",
   },
   {
     step: "3",
-    title: "Ubah Jadi Lead Kerja",
+    title: "Rapikan Lead",
     description:
-      "Masuk ke Lead Pipeline untuk melihat lead yang terbentuk, ubah stage, atur follow-up, dan cek customer identity.",
+      "Masuk ke Lead Management untuk atur stage, owner, follow-up date, dan timeline lead yang sedang dikerjakan.",
     href: "/dashboard/crm",
-    cta: "Buka Lead Pipeline",
+    cta: "Buka Lead Management",
   },
   {
     step: "4",
-    title: "Kelola Tindakan Harian",
+    title: "Pantau Tindakan Harian",
     description:
-      "Gunakan AI Worklist, Approvals, dan Notifications untuk tahu siapa yang harus dihubungi, direview, atau dieskalasi.",
+      "Gunakan Action Center dan Review Queue untuk tahu item mana yang overdue, panas, atau butuh review manusia.",
     href: "/dashboard/follow-up",
-    cta: "Buka AI Worklist",
+    cta: "Buka Action Center",
   },
 ] as const;
 
-const ADMIN_WORKFLOW_STEPS = [
+const HEAD_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Cek Notification Center",
+    title: "Cek Action Center",
     description:
-      "Mulai dari notifikasi operasional untuk melihat apakah ada overdue follow-up, approval kritis, atau alert yang perlu perhatian cepat.",
+      "Mulai dari action center untuk melihat overdue follow-up, hot lead belum disentuh, dan alert operasional yang perlu perhatian cepat.",
     href: "/dashboard/notifications",
-    cta: "Buka Notifications",
+    cta: "Buka Action Center",
   },
   {
     step: "2",
-    title: "Review Approval & Worklist",
+    title: "Review Queue dan Eskalasi",
     description:
-      "Pastikan bottleneck tim terlihat dari Approval Queue dan AI Worklist sebelum Anda masuk ke area insight yang lebih luas.",
+      "Pastikan bottleneck tim terlihat dari review queue dan worklist sebelum Anda masuk ke insight yang lebih luas.",
     href: "/dashboard/approvals",
-    cta: "Buka Approvals",
+    cta: "Buka Review Queue",
   },
   {
     step: "3",
-    title: "Rapikan Pipeline Tim",
+    title: "Rapikan Lead Tim",
     description:
-      "Masuk ke Lead Pipeline untuk memastikan lead aktif, hot lead, dan stage penting tidak tertinggal atau salah arah.",
+      "Masuk ke lead management untuk memastikan lead aktif, hot lead, dan stage penting tidak tertinggal atau salah arah.",
     href: "/dashboard/crm",
-    cta: "Buka Lead Pipeline",
+    cta: "Buka Lead Management",
   },
   {
     step: "4",
-    title: "Ambil Keputusan dari KPI",
+    title: "Ambil Keputusan dari Dashboard",
     description:
-      "Kalau operasional sudah cukup jelas, gunakan KPI dan Marketing Insights untuk membaca performa org dan arah intervensi berikutnya.",
+      "Kalau operasional sudah cukup jelas, gunakan ops dashboard dan chat insight untuk membaca performa tim dan arah intervensi berikutnya.",
     href: "/dashboard/kpi",
-    cta: "Buka KPI",
+    cta: "Buka Ops Dashboard",
   },
 ] as const;
 
-const OWNER_WORKFLOW_STEPS = [
+const SUPERADMIN_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Baca KPI dan Alert",
+    title: "Baca Dashboard dan Alert",
     description:
-      "Mulai dari KPI Command Center dan notifikasi aktif untuk melihat kesehatan bisnis, tim, dan sinyal anomali secara global.",
+      "Mulai dari ops dashboard dan alert aktif untuk melihat kesehatan eksekusi, tim, dan sinyal anomali secara global.",
     href: "/dashboard/kpi",
-    cta: "Buka KPI",
+    cta: "Buka Ops Dashboard",
   },
   {
     step: "2",
-    title: "Lihat Arah Market",
+    title: "Lihat Pola Lapangan",
     description:
-      "Masuk ke Marketing Insights untuk membaca objection, content brief, execution board, dan hasil campaign yang teratribusi.",
+      "Masuk ke chat insight untuk membaca objection, pola percakapan, dan sinyal yang perlu diterjemahkan jadi intervensi operasional.",
     href: "/dashboard/marketing",
-    cta: "Buka Marketing",
+    cta: "Buka Chat Insight",
   },
   {
     step: "3",
     title: "Verifikasi Lapangan",
     description:
-      "Kalau ada sinyal yang perlu dicek lebih dalam, turun ke Lead Pipeline, Chat Masuk, atau AI Worklist untuk melihat konteks operasionalnya.",
+      "Kalau ada sinyal yang perlu dicek lebih dalam, turun ke lead management, queue, atau action center untuk melihat konteks operasionalnya.",
     href: "/dashboard/follow-up",
-    cta: "Buka AI Worklist",
+    cta: "Buka Action Center",
   },
   {
     step: "4",
     title: "Intervensi Akses atau Pengetahuan",
     description:
-      "Gunakan Users, Admin Ops, atau Knowledge saat perlu membenahi kontrol organisasi, akses, atau landasan jawaban AI.",
+      "Gunakan access control, system ops, atau knowledge base saat perlu membenahi governance, akses, atau landasan jawaban tim.",
     href: "/dashboard/admin/access",
-    cta: "Buka Users",
+    cta: "Buka Access Control",
   },
 ] as const;
 
@@ -113,32 +114,32 @@ function buildRoleTasks(role?: string) {
   const common = [
     {
       title: "Saya mau input chat baru",
-      description: "Masuk ke Import Chat untuk upload file atau paste chat manual.",
+      description: "Masuk ke Lead Capture untuk upload file atau paste chat manual.",
       href: "/dashboard/upload",
     },
     {
       title: "Saya mau balas customer",
-      description: "Masuk ke Chat Masuk, buka detail conversation, lalu jalankan AI analysis dan draft reply.",
+      description: "Masuk ke Queue, buka detail conversation, lalu jalankan AI analysis dan draft reply.",
       href: "/dashboard/sales",
     },
     {
       title: "Saya mau lihat lead yang harus dikejar",
-      description: "Masuk ke Lead Pipeline atau AI Worklist tergantung Anda ingin lihat board atau prioritas harian.",
+      description: "Masuk ke Lead Management atau Action Center tergantung Anda ingin lihat board atau prioritas harian.",
       href: "/dashboard/follow-up",
     },
   ];
 
-  if (role === "owner" || role === "admin") {
+  if (isAdminLike(role)) {
     return [
       ...common,
       {
         title: "Saya mau lihat kesehatan tim",
-        description: "Buka KPI untuk memantau leaderboard sales, alert, dan business signal.",
+        description: "Buka ops dashboard untuk memantau KPI operasional, alert, dan tekanan harian tim.",
         href: "/dashboard/kpi",
       },
       {
-        title: "Saya mau lihat insight marketing",
-        description: "Buka Marketing untuk membaca objection trend, brief konten, execution board, dan outcome campaign.",
+        title: "Saya mau lihat pola objection",
+        description: "Buka chat insight untuk membaca objection trend dan sinyal percakapan yang perlu ditindak.",
         href: "/dashboard/marketing",
       },
     ];
@@ -148,51 +149,51 @@ function buildRoleTasks(role?: string) {
 }
 
 function buildWorkflowSteps(role?: string) {
-  if (role === "owner") {
-    return OWNER_WORKFLOW_STEPS;
+  if (isOwnerLike(role)) {
+    return SUPERADMIN_WORKFLOW_STEPS;
   }
-  if (role === "admin") {
-    return ADMIN_WORKFLOW_STEPS;
+  if (isAdminLike(role)) {
+    return HEAD_WORKFLOW_STEPS;
   }
-  return MARKETING_WORKFLOW_STEPS;
+  return SALES_WORKFLOW_STEPS;
 }
 
 function buildRoleStartCopy(role?: string) {
-  if (role === "owner") {
+  if (isOwnerLike(role)) {
     return {
-      eyebrow: "Owner flow",
-      title: "Mulai dari KPI, alert, lalu turun ke operasional bila perlu",
+      eyebrow: "Superadmin flow",
+      title: "Mulai dari dashboard operasional, lalu turun ke queue bila perlu",
       description:
-        "Sebagai owner, Clara paling berguna kalau dipakai dari atas ke bawah: baca health bisnis dulu, lihat market signal, lalu turun ke halaman operasional hanya saat Anda butuh verifikasi atau intervensi.",
+        "Sebagai superadmin, workspace ini paling berguna kalau dipakai dari atas ke bawah: baca health operasional dulu, lihat pola lapangan, lalu turun ke halaman eksekusi saat Anda butuh verifikasi atau intervensi.",
       primaryHref: "/dashboard/kpi",
-      primaryLabel: "Buka KPI",
+      primaryLabel: "Buka Ops Dashboard",
       secondaryHref: "/dashboard/marketing",
-      secondaryLabel: "Buka Marketing",
+      secondaryLabel: "Buka Chat Insight",
     };
   }
 
-  if (role === "admin") {
+  if (isAdminLike(role)) {
     return {
-      eyebrow: "Admin flow",
-      title: "Mulai dari bottleneck tim, lalu rapikan pipeline dan kontrol org",
+      eyebrow: "Head flow",
+      title: "Mulai dari bottleneck tim, lalu rapikan lead dan kontrol akses",
       description:
-        "Sebagai admin, Clara paling efektif saat Anda memakai notifikasi, approvals, dan KPI untuk melihat titik macet tim sebelum masuk ke pipeline dan akses organisasi.",
+        "Sebagai head, workspace ini paling efektif saat Anda memakai action center, review queue, dan dashboard KPI untuk melihat titik macet tim sebelum masuk ke lead dan kontrol akses.",
       primaryHref: "/dashboard/notifications",
-      primaryLabel: "Buka Notifications",
+      primaryLabel: "Buka Action Center",
       secondaryHref: "/dashboard/approvals",
-      secondaryLabel: "Buka Approvals",
+      secondaryLabel: "Buka Review Queue",
     };
   }
 
   return {
-    eyebrow: "Marketing flow",
-    title: "Mulai dari chat, lalu ubah jadi lead dan tindakan harian",
+    eyebrow: "Sales flow",
+    title: "Mulai dari queue, lalu ubah jadi lead dan tindakan harian",
     description:
-      "Sebagai marketing atau operator, alur Clara yang paling masuk akal tetap dimulai dari chat customer: import, review, analisis, lalu lanjutkan ke lead dan follow-up.",
+      "Sebagai sales, alur kerja paling masuk akal tetap dimulai dari lead capture atau queue: review percakapan, analisis, lalu lanjutkan ke lead dan follow-up.",
     primaryHref: "/dashboard/upload",
-    primaryLabel: "Mulai Input Chat",
+    primaryLabel: "Mulai Lead Capture",
     secondaryHref: "/dashboard/sales",
-    secondaryLabel: "Lihat Chat Masuk",
+    secondaryLabel: "Lihat Queue",
   };
 }
 
@@ -297,28 +298,28 @@ export function RoleBasedStartGuide({
             </p>
             <div className="mt-5 space-y-3 text-sm leading-7 text-slate-600">
               <p>
-                <span className="font-semibold text-slate-950">Chat Masuk</span>:
-                tempat baca percakapan dan generate tindakan AI.
+                <span className="font-semibold text-slate-950">Queue</span>:
+                tempat eksekusi prioritas harian, bukan arsip semua percakapan.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Lead Pipeline</span>:
+                <span className="font-semibold text-slate-950">Lead Management</span>:
                 tempat melihat hasil chat yang sudah berubah jadi lead kerja.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">AI Worklist</span>:
-                daftar prioritas harian, bukan arsip semua lead.
+                <span className="font-semibold text-slate-950">Action Center</span>:
+                daftar tekanan operasional harian, bukan arsip semua lead.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Approvals</span>:
-                antrian draft yang perlu review manusia.
+                <span className="font-semibold text-slate-950">Review Queue</span>:
+                antrian draft atau eskalasi yang perlu review manusia.
               </p>
               <p>
                 <span className="font-semibold text-slate-950">Notifications</span>:
                 sinyal operasional yang perlu acknowledge, resolve, atau escalate.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Marketing / KPI</span>:
-                area owner/admin untuk membaca insight, eksekusi marketing, dan kesehatan bisnis.
+                <span className="font-semibold text-slate-950">Chat Insight / Ops Dashboard</span>:
+                area head dan superadmin untuk membaca pola lapangan dan kesehatan eksekusi.
               </p>
             </div>
           </article>

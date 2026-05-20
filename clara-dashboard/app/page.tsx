@@ -2,9 +2,9 @@ import Link from "next/link";
 
 const featureCards = [
   {
-    title: "Inbox Operasional",
+    title: "Execution Queue",
     description:
-      "Upload chat WhatsApp, review percakapan aktif, lalu teruskan follow-up dari satu workspace yang rapi.",
+      "Tangkap lead cepat, review percakapan aktif, lalu teruskan follow-up dari satu workspace yang rapi.",
     eyebrow: "Operations",
   },
   {
@@ -20,9 +20,9 @@ const featureCards = [
     eyebrow: "Response",
   },
   {
-    title: "Marketing Insight",
+    title: "Ops Oversight",
     description:
-      "Owner dan admin bisa menangkap pola kebutuhan pasar dari data chat yang terus masuk setiap hari.",
+      "Head dan superadmin bisa menangkap bottleneck operasional dari data chat yang terus masuk setiap hari.",
     eyebrow: "Insight",
   },
 ] as const;
@@ -30,13 +30,13 @@ const featureCards = [
 const workflowSteps = [
   {
     step: "1",
-    title: "Masukkan chat harian",
+    title: "Tangkap lead harian",
     description:
-      "Upload file TXT export WhatsApp dari tim operasional agar percakapan mulai dipetakan Clara.",
+      "Upload file TXT export WhatsApp dari tim operasional agar lead dan percakapan cepat masuk ke command center.",
   },
   {
     step: "2",
-    title: "Biarkan Clara membaca pola",
+    title: "Biarkan sistem membaca pola",
     description:
       "Chat di-parse menjadi conversation terstruktur lalu dianalisis untuk intent, objection, dan risiko.",
   },
@@ -48,9 +48,9 @@ const workflowSteps = [
   },
   {
     step: "4",
-    title: "Naikkan jadi insight bisnis",
+    title: "Naikkan jadi oversight operasional",
     description:
-      "Owner dan admin membaca sinyal pasar, tren objection, dan prioritas eksekusi dari workflow yang sama.",
+      "Head dan superadmin membaca tren objection, pressure operasional, dan prioritas eksekusi dari workflow yang sama.",
   },
 ] as const;
 
@@ -70,9 +70,9 @@ const platformSignals = [
 ] as const;
 
 const operatingNotes = [
-  "Cocok untuk tim owner, admin, dan marketing yang butuh workflow cepat tanpa kehilangan konteks percakapan.",
+  "Cocok untuk tim sales, head, dan superadmin yang butuh workflow cepat tanpa kehilangan konteks percakapan.",
   "Dashboard, extension, dan backend memakai alur kerja yang saling terhubung agar review dan eksekusi tetap sinkron.",
-  "Desain Clara sengaja dibuat hangat, fokus, dan minim distraksi supaya area operasional terasa lebih tenang dipakai harian.",
+  "Desain workspace ini sengaja dibuat hangat, fokus, dan minim distraksi supaya area operasional terasa lebih tenang dipakai harian.",
 ] as const;
 
 export default function HomePage() {
@@ -86,9 +86,9 @@ export default function HomePage() {
         <header className="clara-surface rounded-[30px] px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="clara-kicker">Clara Workspace</p>
+              <p className="clara-kicker">SGB Sales Command Center</p>
               <h1 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950 sm:text-3xl">
-                AI workspace untuk membaca pasar dari chat customer
+                Sales Command Center untuk membaca prioritas dari chat customer
               </h1>
             </div>
 
@@ -111,16 +111,16 @@ export default function HomePage() {
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_380px]">
           <div className="space-y-6">
             <article className="clara-card rounded-[36px] p-6 sm:p-8 h-fit">
-              <span className="clara-chip">Internal AI CRM Intelligence</span>
+              <span className="clara-chip">Operational Truth Layer</span>
               <h2 className="mt-5 max-w-4xl text-4xl font-bold tracking-[-0.06em] text-slate-950 sm:text-[3.5rem] sm:leading-[1.02]">
                 Dari chat harian tim operasional menjadi insight yang siap
                 dipakai ambil keputusan.
               </h2>
               <p className="mt-5 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">
-                Clara membantu tim membaca objection customer, menyusun draft
-                balasan yang lebih aman, dan mengubah percakapan menjadi arah
-                konten, KPI, serta sinyal kebutuhan pasar tanpa perlu bongkar
-                chat satu per satu.
+                Workspace ini membantu tim membaca objection customer,
+                menyusun draft balasan yang lebih aman, dan mengubah
+                percakapan menjadi queue, timeline, KPI, serta sinyal
+                operasional tanpa perlu bongkar chat satu per satu.
               </p>
 
               <div className="mt-7 flex flex-wrap gap-3">
@@ -160,7 +160,7 @@ export default function HomePage() {
                 <div>
                   <p className="clara-kicker text-xs">Platform Modules</p>
                   <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
-                    Satu bahasa desain untuk seluruh workflow Clara
+                    Satu bahasa desain untuk seluruh workflow SCC
                   </h2>
                 </div>
                 <Link href="/login" className="clara-button clara-button-ghost">
@@ -234,27 +234,27 @@ export default function HomePage() {
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
           <article className="clara-card rounded-[34px] p-6 sm:p-7">
-            <p className="clara-kicker text-xs">Why Clara</p>
+            <p className="clara-kicker text-xs">Why SCC</p>
             <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
               Dibuat untuk tim yang perlu cepat, tapi tetap rapi
             </h2>
             <p className="mt-4 text-sm leading-7 text-slate-600">
-              Clara tidak berhenti di parsing chat. Platform ini menyambungkan
-              data mentah, analisis AI, grounded reply, dan insight agregat
-              dalam satu ritme kerja yang konsisten.
+              Platform ini tidak berhenti di parsing chat. Ia menyambungkan
+              data mentah, analisis AI, grounded reply, dan oversight
+              operasional dalam satu ritme kerja yang konsisten.
             </p>
 
             <div className="mt-6 space-y-4">
               <InfoBlock
                 title="Operasional lebih fokus"
-                description="Tim marketing dan admin bisa bergerak dari inbox ke follow-up tanpa kehilangan konteks percakapan."
+                description="Tim sales dan head bisa bergerak dari queue ke follow-up tanpa kehilangan konteks percakapan."
               />
               <InfoBlock
                 title="Insight lebih bisa dipertanggungjawabkan"
                 description="Balasan dan pembacaan AI ditopang knowledge base, audit trail, dan boundary role yang jelas."
               />
               <InfoBlock
-                title="Owner lebih cepat membaca pasar"
+                title="Superadmin lebih cepat membaca situasi"
                 description="Objection, kebutuhan, dan risiko customer naik menjadi sinyal keputusan yang lebih nyata."
               />
             </div>

@@ -10,6 +10,7 @@ from app.schemas.product_knowledge_schema import (
     ProductKnowledgeUpdateRequest,
 )
 from app.services.access_control_service import AccessDeniedError, ensure_user_has_organization
+from app.services.role_service import is_owner_like
 
 
 class ProductKnowledgeError(RuntimeError):
@@ -23,14 +24,14 @@ def list_product_knowledge(
     category: str | None = None,
     is_active: bool | None = None,
 ) -> list[ProductKnowledge]:
-    if current_user.role != "owner":
+    if not is_owner_like(current_user.role):
         ensure_user_has_organization(current_user)
 
     statement = select(ProductKnowledge).options(
         selectinload(ProductKnowledge.created_by_user)
     )
 
-    if current_user.role == "owner":
+    if is_owner_like(current_user.role):
         pass
     else:
         statement = statement.where(
@@ -70,7 +71,7 @@ def create_product_knowledge(
     payload: ProductKnowledgeCreateRequest,
     current_user: User,
 ) -> ProductKnowledge:
-    if current_user.role != "owner":
+    if not is_owner_like(current_user.role):
         raise AccessDeniedError("Only owner can create product knowledge.")
 
     entry = ProductKnowledge(
@@ -103,7 +104,7 @@ def get_product_knowledge_or_raise(
     knowledge_id: UUID,
     current_user: User,
 ) -> ProductKnowledge:
-    if current_user.role != "owner":
+    if not is_owner_like(current_user.role):
         ensure_user_has_organization(current_user)
 
     entry = (
@@ -117,7 +118,7 @@ def get_product_knowledge_or_raise(
     if entry is None:
         raise ProductKnowledgeError("Product knowledge entry not found.")
 
-    if current_user.role == "owner":
+    if is_owner_like(current_user.role):
         return entry
 
     if (
@@ -136,7 +137,7 @@ def ensure_can_modify_product_knowledge(
     entry: ProductKnowledge,
     current_user: User,
 ) -> None:
-    if current_user.role != "owner":
+    if not is_owner_like(current_user.role):
         raise AccessDeniedError("Only owner can modify product knowledge.")
 
 

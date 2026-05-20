@@ -187,7 +187,9 @@ def call_openai_for_reply_suggestion(
             },
         )
     except Exception as exc:
-        raise ReplySuggestionError(f"Failed to call OpenAI: {exc}") from exc
+        raise ReplySuggestionError(
+            "Failed to call OpenAI. Check OPENAI_API_KEY and OPENAI_MODEL configuration."
+        ) from exc
 
     raw_output = response.output_text
 

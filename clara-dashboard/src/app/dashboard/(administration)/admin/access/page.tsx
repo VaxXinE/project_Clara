@@ -10,6 +10,11 @@ import {
   formatStatusLabel,
   getPasswordStrength,
 } from "@/lib/format";
+import {
+  getRoleDisplayLabel,
+  isAdminLike,
+  isOwnerLike,
+} from "@/lib/roles";
 import type {
   CreateOrganizationRequest,
   CreateUserRequest,
@@ -76,8 +81,11 @@ export default function AdminAccessPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const canManageOrganizations = currentUser?.role === "owner";
-  const isAdminScoped = currentUser?.role === "admin";
+  const canManageOrganizations = isOwnerLike(currentUser?.role);
+  const isAdminScoped =
+    currentUser !== null &&
+    isAdminLike(currentUser.role) &&
+    !isOwnerLike(currentUser.role);
 
   async function loadPageData(me?: CurrentUser) {
     const activeUser = me ?? currentUser;
@@ -89,13 +97,14 @@ export default function AdminAccessPage() {
     setOrganizations(organizationData);
     setUsers(userData);
 
-    if (activeUser?.role === "admin") {
+    if (activeUser && isAdminLike(activeUser.role) && !isOwnerLike(activeUser.role)) {
       setUserForm((current) => ({
         ...current,
         organization_id: activeUser.organization_id,
       }));
     } else if (
-      activeUser?.role === "owner" &&
+      activeUser &&
+      isOwnerLike(activeUser.role) &&
       organizationData.length > 0 &&
       !userForm.organization_id
     ) {
@@ -112,9 +121,9 @@ export default function AdminAccessPage() {
         const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
 
-        if (!["owner", "admin"].includes(me.role)) {
+        if (!isAdminLike(me.role)) {
           setErrorMessage(
-            "Halaman ini hanya bisa diakses oleh owner atau admin.",
+            "Halaman ini hanya bisa diakses oleh head atau superadmin.",
           );
           return;
         }
@@ -294,7 +303,7 @@ export default function AdminAccessPage() {
       currentUser={currentUser}
       eyebrow="Access management"
       title="User & Organization Setup"
-      description="Kelola struktur organisasi, akses user, dan boundary role untuk menjaga operasional tetap aman dan rapi."
+      description="Kelola struktur organisasi, akses user, dan boundary role supaya workspace SCC tetap aman dan rapi."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
@@ -302,7 +311,7 @@ export default function AdminAccessPage() {
           href="/dashboard/admin/ops"
           className="clara-button clara-button-ghost"
         >
-          Buka Admin Ops
+          Buka System Ops
         </Link>
       }
     >
@@ -322,8 +331,8 @@ export default function AdminAccessPage() {
             value={isAdminScoped ? "Scoped" : "Global"}
             description={
               isAdminScoped
-                ? "Admin dibatasi pada organization miliknya sendiri."
-                : "Owner bisa melihat dan mengelola semua organization."
+                ? "Head dibatasi pada organization miliknya sendiri."
+                : "Superadmin bisa melihat dan mengelola semua organization."
             }
           />
           <InfoCard
@@ -358,7 +367,7 @@ export default function AdminAccessPage() {
 
         {!isLoading &&
           currentUser &&
-          ["owner", "admin"].includes(currentUser.role) && (
+          isAdminLike(currentUser.role) && (
             <>
               <section className="grid gap-6 lg:grid-cols-2">
                 <form
@@ -370,7 +379,7 @@ export default function AdminAccessPage() {
                       Organization Management
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Create organization hanya dibuka untuk owner.
+                      Create organization hanya dibuka untuk superadmin.
                     </p>
                   </div>
 
@@ -390,7 +399,7 @@ export default function AdminAccessPage() {
                         !canManageOrganizations || isSubmittingOrganization
                       }
                       className="clara-input mt-2"
-                      placeholder="Contoh: Clara Demo"
+                      placeholder="Contoh: SGB Jakarta"
                     />
                   </div>
 
@@ -410,13 +419,13 @@ export default function AdminAccessPage() {
                         !canManageOrganizations || isSubmittingOrganization
                       }
                       className="clara-input mt-2"
-                      placeholder="clara-demo"
+                      placeholder="sgb-jakarta"
                     />
                   </div>
 
                   {!canManageOrganizations && (
                     <p className="clara-card-soft rounded-xl p-3 text-sm text-amber-700">
-                      Admin tidak bisa membuat organization baru dari UI ini.
+                      Head tidak bisa membuat organization baru dari UI ini.
                     </p>
                   )}
 
@@ -442,7 +451,7 @@ export default function AdminAccessPage() {
                       Create User
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Admin otomatis terikat ke organization miliknya sendiri.
+                      Head otomatis terikat ke organization miliknya sendiri.
                     </p>
                   </div>
 
@@ -461,7 +470,7 @@ export default function AdminAccessPage() {
                     onChange={(value) =>
                       setUserForm((current) => ({ ...current, email: value }))
                     }
-                    placeholder="marketing@clara.local"
+                    placeholder="sales@sgb.local"
                     type="email"
                   />
 
@@ -486,10 +495,21 @@ export default function AdminAccessPage() {
                         setUserForm((current) => ({ ...current, role: value }))
                       }
                       options={[
-                        { value: "marketing", label: "marketing" },
-                        { value: "admin", label: "admin" },
-                        ...(currentUser.role === "owner"
-                          ? [{ value: "owner", label: "owner" }]
+                        {
+                          value: "marketing",
+                          label: getRoleDisplayLabel("marketing"),
+                        },
+                        {
+                          value: "admin",
+                          label: getRoleDisplayLabel("admin"),
+                        },
+                        ...(isOwnerLike(currentUser.role)
+                          ? [
+                              {
+                                value: "owner",
+                                label: getRoleDisplayLabel("owner"),
+                              },
+                            ]
                           : []),
                       ]}
                     />
@@ -527,7 +547,7 @@ export default function AdminAccessPage() {
               <section className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
                 <Panel
                   title="Available Organizations"
-                  description="Owner melihat semua organization. Admin hanya organization miliknya."
+                  description="Superadmin melihat semua organization. Head hanya organization miliknya."
                 >
                   {organizations.length === 0 ? (
                     <EmptyText text="Belum ada organization." />
@@ -567,7 +587,7 @@ export default function AdminAccessPage() {
                           resettingPasswordUserId === user.id;
                         const isSelf = currentUser.id === user.id;
                         const canResetPassword =
-                          currentUser.role === "owner" ||
+                          isOwnerLike(currentUser.role) ||
                           user.created_by_user_id === currentUser.id;
                         const passwordStrength = getPasswordStrength(
                           passwordForm.password,
@@ -619,11 +639,19 @@ export default function AdminAccessPage() {
                                     options={[
                                       {
                                         value: "marketing",
-                                        label: "marketing",
+                                        label: getRoleDisplayLabel("marketing"),
                                       },
-                                      { value: "admin", label: "admin" },
-                                      ...(currentUser.role === "owner"
-                                        ? [{ value: "owner", label: "owner" }]
+                                      {
+                                        value: "admin",
+                                        label: getRoleDisplayLabel("admin"),
+                                      },
+                                      ...(isOwnerLike(currentUser.role)
+                                        ? [
+                                            {
+                                              value: "owner",
+                                              label: getRoleDisplayLabel("owner"),
+                                            },
+                                          ]
                                         : []),
                                     ]}
                                     disabled={isSelf}
@@ -678,8 +706,8 @@ export default function AdminAccessPage() {
                                     Reset password untuk {user.email}
                                   </p>
                                   <p className="mt-1 text-sm text-slate-600">
-                                    Owner bisa mengganti semua password user.
-                                    Admin hanya bisa mengganti password user
+                                    Superadmin bisa mengganti semua password user.
+                                    Head hanya bisa mengganti password user
                                     yang dia buat sendiri.
                                   </p>
                                 </div>
@@ -814,7 +842,7 @@ export default function AdminAccessPage() {
 
                                 {!canResetPassword && (
                                   <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
-                                    Admin hanya bisa mengganti password user
+                                    Head hanya bisa mengganti password user
                                     yang dibuat dari akunnya sendiri.
                                   </p>
                                 )}

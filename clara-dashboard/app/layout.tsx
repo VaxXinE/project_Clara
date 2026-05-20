@@ -18,9 +18,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Clara Dashboard",
+  title: "SGB Sales Command Center",
   description:
-    "Dashboard internal Clara untuk analisis chat customer, product knowledge, dan marketing insights.",
+    "Workspace operasional SGB untuk execution queue, lead management, audit trail, dan oversight tim.",
 };
 
 export default function RootLayout({

@@ -219,7 +219,9 @@ def call_openai_for_extraction(conversation_text: str) -> AIExtractionCreate:
             },
         )
     except Exception as exc:
-        raise AIExtractionError(f"Failed to call OpenAI: {exc}") from exc
+        raise AIExtractionError(
+            "Failed to call OpenAI. Check OPENAI_API_KEY and OPENAI_MODEL configuration."
+        ) from exc
 
     raw_output = response.output_text
 

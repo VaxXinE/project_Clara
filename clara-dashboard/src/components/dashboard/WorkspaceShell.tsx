@@ -26,7 +26,7 @@ import { useEffect, useState } from "react";
 
 import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
 import { apiFetch } from "@/lib/api";
-import { formatStatusLabel } from "@/lib/format";
+import { getRoleDisplayLabel, isAdminLike, isOwnerLike } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 type WorkspaceShellProps = {
@@ -53,34 +53,34 @@ type NavGroup = {
 };
 
 function getRolePrinciples(role?: string) {
-  if (role === "owner") {
+  if (isOwnerLike(role)) {
     return {
-      title: "Mode Owner",
+      title: "Mode Superadmin",
       items: [
-        "Mulai dari KPI, alert, dan notification untuk membaca kesehatan bisnis lebih dulu.",
-        "Turun ke marketing, pipeline, atau identity hanya saat ada sinyal yang perlu intervensi.",
-        "Gunakan halaman operasional untuk verifikasi, bukan sebagai titik pantau utama harian.",
+        "Mulai dari ops dashboard, alert, dan action center untuk membaca kesehatan eksekusi lebih dulu.",
+        "Turun ke queue, lead management, atau review queue hanya saat ada sinyal yang perlu intervensi.",
+        "Gunakan halaman operasional untuk verifikasi lapangan, bukan sebagai titik pantau utama harian.",
       ],
     };
   }
 
-  if (role === "admin") {
+  if (isAdminLike(role)) {
     return {
-      title: "Mode Admin",
+      title: "Mode Head",
       items: [
-        "Mulai dari notification, approvals, dan KPI agar bottleneck tim cepat terlihat.",
-        "Pastikan workflow sales dan lead pipeline tetap rapi sebelum masuk ke area insight.",
-        "Users dan Admin Ops dipakai saat ada masalah akses atau kontrol organisasi.",
+        "Mulai dari action center, review queue, dan ops dashboard agar bottleneck tim cepat terlihat.",
+        "Pastikan queue dan lead management tetap rapi sebelum masuk ke area insight yang lebih luas.",
+        "Access control dan system ops dipakai saat ada masalah governance atau boundary user.",
       ],
     };
   }
 
   return {
-    title: "Mode Marketing",
+    title: "Mode Sales",
     items: [
-      "Mulai dari import chat atau Chat Masuk, lalu bergerak ke lead dan follow-up.",
+      "Mulai dari lead capture atau queue, lalu bergerak ke lead management dan follow-up.",
       "Gunakan AI analysis dan draft sebagai alat bantu, bukan pengganti pengecekan konteks chat.",
-      "Naikkan ke approvals, notifications, atau CRM saat conversation sudah butuh tindakan lanjutan.",
+      "Naikkan ke review queue, action center, atau lead detail saat conversation sudah butuh tindakan lanjutan.",
     ],
   };
 }
@@ -95,76 +95,76 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     },
     {
       href: "/dashboard/sales",
-      label: "Inbox",
+      label: "Queue",
       icon: faComments,
-      description: "Percakapan pelanggan",
+      description: "Eksekusi prioritas harian",
     },
     {
       href: "/dashboard/upload",
-      label: "Upload",
+      label: "Lead Capture",
       icon: faCloudArrowUp,
-      description: "Masukkan chat baru",
+      description: "Masukkan chat atau lead baru",
     },
     {
       href: "/dashboard/crm",
-      label: "CRM",
+      label: "Lead Management",
       icon: faBriefcase,
-      description: "Monitor pipeline lead",
+      description: "Status, owner, dan timeline lead",
     },
     {
       href: "/dashboard/follow-up",
-      label: "Follow Up",
+      label: "Action Center",
       icon: faCalendarCheck,
-      description: "Tugas prioritas harian",
+      description: "Overdue, hot lead, dan follow-up",
     },
     {
       href: "/dashboard/approvals",
-      label: "Approval",
+      label: "Review Queue",
       icon: faWandSparkles,
-      description: "Review draft Clara",
+      description: "Draft dan eskalasi yang perlu review",
     },
   ];
 
   const insightItems: NavItem[] = [];
   const adminItems: NavItem[] = [];
 
-  if (currentUser?.role === "owner") {
+  if (isOwnerLike(currentUser?.role)) {
     insightItems.push({
       href: "/dashboard/knowledge",
-      label: "Knowledge",
+      label: "Knowledge Base",
       icon: faBookOpen,
-      description: "Fakta dan policy resmi",
+      description: "Landasan jawaban resmi",
     });
   }
 
-  if (currentUser && ["owner", "admin"].includes(currentUser.role)) {
+  if (currentUser && isAdminLike(currentUser.role)) {
     insightItems.push(
       {
         href: "/dashboard/marketing",
-        label: "Insights",
+        label: "Chat Insight",
         icon: faChartLine,
-        description: "Sinyal pasar dan tren",
+        description: "Pola objection dan sinyal percakapan",
       },
       {
         href: "/dashboard/kpi",
-        label: "KPI Center",
+        label: "Ops Dashboard",
         icon: faChartColumn,
-        description: "Performa tim dan org",
+        description: "Performa tim dan organisasi",
       },
     );
 
     adminItems.push(
       {
         href: "/dashboard/admin/ops",
-        label: "Admin Ops",
+        label: "System Ops",
         icon: faBuildingShield,
-        description: "Kontrol operasional",
+        description: "Kontrol sistem operasional",
       },
       {
         href: "/dashboard/admin/access",
-        label: "User Access",
+        label: "Access Control",
         icon: faUsersGear,
-        description: "Kelola struktur akses",
+        description: "Kelola role dan boundary akses",
       },
     );
   }
@@ -192,7 +192,7 @@ function isNavItemActive(pathname: string, href: string): boolean {
 
 function getWorkspaceTitle(currentUser?: CurrentUser | null) {
   if (!currentUser) {
-    return "Clara Workspace";
+    return "SCC Workspace";
   }
 
   return currentUser.name;
@@ -307,7 +307,7 @@ export function WorkspaceShell({
                     {getWorkspaceTitle(resolvedCurrentUser)}
                   </p>
                   <p className="truncate text-sm text-slate-300">
-                    {resolvedCurrentUser?.organization_name ?? "Clara Workspace"}
+                    {resolvedCurrentUser?.organization_name ?? "SCC Workspace"}
                   </p>
                 </div>
               </div>
@@ -315,10 +315,10 @@ export function WorkspaceShell({
               {resolvedCurrentUser ? (
                 <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-200">
                   <span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1">
-                    {formatStatusLabel(resolvedCurrentUser.role)}
+                    {getRoleDisplayLabel(resolvedCurrentUser.role)}
                   </span>
                   <span className="rounded-full border border-white/10 bg-white/8 px-2.5 py-1">
-                    Internal workspace
+                    Operational workspace
                   </span>
                 </div>
               ) : null}
@@ -329,7 +329,7 @@ export function WorkspaceShell({
             {navGroups.map((group) => (
               <div key={group.title}>
                 <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#d4b07b]">
-                  {group.title}
+                  {group.title === "Insights" ? "Oversight" : group.title}
                 </p>
                 <nav className="mt-3 space-y-2.5">
                   {group.items.map((item) => {
@@ -405,7 +405,7 @@ export function WorkspaceShell({
             <div className="clara-surface flex items-center justify-between rounded-[24px] border px-4 py-3 shadow-xl backdrop-blur-xl">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8e6b3f]">
-                  Clara Workspace
+                  SCC Workspace
                 </p>
                 <p className="truncate text-sm font-semibold text-slate-900">
                   {getWorkspaceTitle(resolvedCurrentUser)}
@@ -425,36 +425,7 @@ export function WorkspaceShell({
             </div>
           </div>
 
-          <div className="mb-6 grid gap-4 rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(15,23,42,0.035),rgba(255,255,255,0.85)_45%,rgba(184,138,90,0.08))] p-5 sm:grid-cols-[1.2fr_0.8fr] sm:p-6">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">
-                {eyebrow}
-              </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-                {title}
-              </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">
-                {description}
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-white/80 bg-white/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  {rolePrinciples.title}
-                </p>
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                  {todayLabel}
-                </span>
-              </div>
-              <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-                {rolePrinciples.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="pt-6">{children}</div>
+          <div>{children}</div>
         </section>
       </div>
     </main>

@@ -14,6 +14,7 @@ from app.services.organization_service import (
     create_organization,
     list_organizations,
 )
+from app.services.role_service import is_owner_like
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -42,7 +43,7 @@ def list_organizations_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin")),
 ):
-    if current_user.role == "owner":
+    if is_owner_like(current_user.role):
         return list_organizations(db=db)
 
     if current_user.organization_id is None:

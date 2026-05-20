@@ -12,6 +12,7 @@ from app.schemas.lead_schema import (
     LeadActivityEventItem,
     LeadDetail,
     LeadListItem,
+    LeadQueueActionRequest,
     LeadTaskCreateRequest,
     LeadTaskEventItem,
     LeadTaskItem,
@@ -28,6 +29,7 @@ from app.services.lead_service import (
 )
 from app.services.lead_task_service import (
     create_lead_task_for_user,
+    execute_queue_action_for_user,
     get_lead_task_events_for_user,
     get_lead_tasks_for_user,
     update_lead_task_for_user,
@@ -170,5 +172,20 @@ def list_lead_task_events(
         db=db,
         lead_id=lead_id,
         task_id=task_id,
+        current_user=current_user,
+    )
+
+
+@router.post("/{lead_id}/queue-action", response_model=LeadTaskItem)
+def execute_queue_action(
+    lead_id: UUID,
+    payload: LeadQueueActionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("marketing", "admin")),
+) -> LeadTaskItem:
+    return execute_queue_action_for_user(
+        db=db,
+        lead_id=lead_id,
+        payload=payload,
         current_user=current_user,
     )

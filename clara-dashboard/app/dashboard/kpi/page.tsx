@@ -1,1 +1,1 @@
-export { default } from "@/app/dashboard/kpi/page";
+export { default } from "../../../src/app/dashboard/(insights)/kpi/page";

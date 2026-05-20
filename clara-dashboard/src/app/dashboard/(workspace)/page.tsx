@@ -27,6 +27,7 @@ import {
   formatStatusLabel,
   getPasswordStrength,
 } from "@/lib/format";
+import { isAdminLike } from "@/lib/roles";
 import type {
   ChangePasswordRequest,
   CurrentUser,
@@ -68,17 +69,17 @@ const roleCopy: Record<
   { title: string; summary: string; focus: string[] }
 > = {
   owner: {
-    title: "Global Command Center",
+    title: "Superadmin Command Center",
     summary:
-      "Lihat kesehatan operasional, quality insight, dan arah market signal lintas organization dari satu control room yang ringkas.",
+      "Lihat kesehatan operasional, quality insight, dan arah intervensi lintas organization dari satu control room yang ringkas.",
     focus: [
       "Pantau conversation berisiko tinggi sebelum mengganggu closing.",
-      "Validasi insight mingguan agar tim sales dan marketing bergerak sinkron.",
-      "Jaga knowledge base tetap rapi supaya balasan Clara tetap grounded.",
+      "Validasi insight mingguan agar tim sales dan head bergerak sinkron.",
+      "Jaga knowledge base tetap rapi supaya balasan sistem tetap grounded.",
     ],
   },
   admin: {
-    title: "Organization Control Room",
+    title: "Head Control Room",
     summary:
       "Atur ritme kerja tim, follow-up, dan akses operasional tanpa harus lompat dari satu modul ke modul lain.",
     focus: [
@@ -88,9 +89,9 @@ const roleCopy: Record<
     ],
   },
   marketing: {
-    title: "Operational Workspace",
+    title: "Sales Workspace",
     summary:
-      "Masuk ke inbox, upload percakapan baru, lalu teruskan analisis customer dengan alur yang lebih fokus dan minim distraksi.",
+      "Masuk ke queue, upload percakapan baru, lalu teruskan analisis customer dengan alur yang lebih fokus dan minim distraksi.",
     focus: [
       "Upload chat baru dan cek parsing agar tidak ada data yang tertinggal.",
       "Lanjutkan follow-up conversation yang sudah aktif kembali hari ini.",
@@ -205,10 +206,8 @@ export default function DashboardHomePage() {
   }
 
   const roleLabel = currentUser ? roleCopy[currentUser.role] : null;
-  const canAccessInsights =
-    currentUser !== null && ["owner", "admin"].includes(currentUser.role);
-  const canAccessAdmin =
-    currentUser !== null && ["owner", "admin"].includes(currentUser.role);
+  const canAccessInsights = currentUser !== null && isAdminLike(currentUser.role);
+  const canAccessAdmin = currentUser !== null && isAdminLike(currentUser.role);
   const passwordStrength = getPasswordStrength(changePasswordForm.new_password);
   const quickLinks = buildQuickLinks(canAccessInsights, canAccessAdmin);
   const nextStep = getDashboardNextStep({
@@ -223,7 +222,7 @@ export default function DashboardHomePage() {
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Workspace overview"
-      title={currentUser ? `Halo, ${currentUser.name}.` : "Clara Workspace"}
+      title={currentUser ? `Halo, ${currentUser.name}.` : "SCC Workspace"}
       description={
         roleLabel?.summary ??
         "Pusat kerja harian untuk mengubah percakapan customer menjadi tindakan operasional dan insight yang bisa dipakai tim."
@@ -240,7 +239,7 @@ export default function DashboardHomePage() {
             href="/dashboard/sales"
             className="clara-button clara-button-secondary"
           >
-            Buka Chat Masuk
+            Buka Queue
           </Link>
           <Link
             href="/dashboard/channels"

@@ -63,9 +63,11 @@ export default function UploadWhatsAppPage() {
           </p>
 
           <pre className="mt-4 overflow-x-auto rounded-[24px] bg-[#10172d] p-4 text-sm leading-7 text-slate-100 shadow-[0_18px_34px_rgba(16,23,45,0.2)]">
-            {`12/04/26, 09.12 - Customer: Kak, ini programnya legal nggak?
+            {`{Whatsapp}
+12/04/26, 09.12 - Customer: Kak, ini programnya legal nggak?
 12/04/26, 09.13 - Sales Ani: Legal kak, nanti saya kirim dokumen resminya.
 
+{Telegram}
 [18.05.2026 09:12] Customer Leoni: Halo kak, saya tertarik.
 [18.05.2026 09:13] Sales Aria: Siap kak, saya bantu jelaskan.`}
           </pre>

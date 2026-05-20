@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -12,6 +12,7 @@ from app.models.lead_task import LeadTask
 from app.models.lead_task_event import LeadTaskEvent
 from app.models.user import User
 from app.schemas.lead_schema import (
+    LeadQueueActionRequest,
     LeadTaskCreateRequest,
     LeadTaskEventItem,
     LeadTaskItem,
@@ -22,6 +23,43 @@ from app.services.lead_activity_service import create_lead_activity_event
 
 VALID_TASK_TYPES = {"manual_follow_up", "scheduled_follow_up", "approval_follow_up"}
 VALID_TASK_STATUSES = {"open", "done", "snoozed", "cancelled"}
+VALID_QUEUE_ACTIONS = {"done", "snooze", "dismiss", "reopen"}
+VALID_SNOOZE_DURATIONS = {"30m", "2h", "tomorrow"}
+
+
+def build_queue_reason_text(
+    *,
+    action: str,
+    reason_tag: str,
+    reason_note: str | None,
+    duration: str | None = None,
+) -> str:
+    parts = [f"queue_action={action}", f"reason_tag={reason_tag.strip()}"]
+
+    if duration:
+        parts.append(f"duration={duration}")
+
+    if reason_note and reason_note.strip():
+        parts.append(f"reason_note={reason_note.strip()}")
+
+    return " | ".join(parts)
+
+
+def resolve_snooze_due_at(duration: str) -> datetime:
+    now = datetime.now(timezone.utc)
+
+    if duration == "30m":
+        return now + timedelta(minutes=30)
+    if duration == "2h":
+        return now + timedelta(hours=2)
+    if duration == "tomorrow":
+        tomorrow = now + timedelta(days=1)
+        return tomorrow.replace(hour=8, minute=0, second=0, microsecond=0)
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid snooze duration.",
+    )
 
 
 def build_task_item(task: LeadTask) -> LeadTaskItem:
@@ -514,3 +552,153 @@ def upsert_follow_up_task_for_lead(
         to_value="open",
     )
     return task
+
+
+def ensure_queue_task_for_lead(
+    db: Session,
+    *,
+    lead: Lead,
+) -> LeadTask:
+    statement = (
+        select(LeadTask)
+        .where(
+            LeadTask.lead_id == lead.id,
+            LeadTask.status.in_({"open", "snoozed"}),
+        )
+        .order_by(LeadTask.created_at.desc())
+    )
+    existing_task = db.scalars(statement).first()
+
+    if existing_task is not None:
+        return existing_task
+
+    due_at = lead.next_follow_up_at or datetime.now(timezone.utc)
+    task = LeadTask(
+        lead_id=lead.id,
+        organization_id=lead.organization_id,
+        assigned_user_id=lead.assigned_user_id,
+        completed_by_user_id=None,
+        task_type="scheduled_follow_up",
+        status="open",
+        title="Queue follow up",
+        description=(
+            f"Task queue otomatis untuk lead {lead.display_name} agar lifecycle action tetap tercatat."
+        ),
+        due_at=due_at,
+    )
+    db.add(task)
+    db.flush()
+    create_task_event(
+        db=db,
+        task=task,
+        event_type="queue_created",
+        to_status="open",
+        next_due_at=task.due_at,
+        notes="Task queue otomatis dibuat saat lead pertama kali dieksekusi dari action center.",
+    )
+    create_lead_activity_event(
+        db=db,
+        lead=lead,
+        event_type="queue_event",
+        title="Queue task otomatis dibuat",
+        description="Lead mulai dikelola lewat action center sehingga task queue dipersist ke sistem.",
+        to_value="open",
+    )
+    return task
+
+
+def execute_queue_action_for_user(
+    db: Session,
+    *,
+    lead_id: UUID,
+    payload: LeadQueueActionRequest,
+    current_user: User,
+) -> LeadTaskItem:
+    lead = get_accessible_lead(db=db, lead_id=lead_id, current_user=current_user)
+    action = payload.action.strip().lower()
+
+    if action not in VALID_QUEUE_ACTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid queue action.",
+        )
+
+    reason_tag = payload.reason_tag.strip()
+    if not reason_tag:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reason_tag is required.",
+        )
+
+    task = ensure_queue_task_for_lead(db=db, lead=lead)
+    previous_status = task.status
+    previous_due_at = task.due_at
+    note_text = build_queue_reason_text(
+        action=action,
+        reason_tag=reason_tag,
+        reason_note=payload.reason_note,
+        duration=payload.duration,
+    )
+
+    if action == "done":
+        task.status = "done"
+        task.completed_at = datetime.now(timezone.utc)
+        task.completed_by_user_id = current_user.id
+        task.last_status_changed_at = datetime.now(timezone.utc)
+        event_type = "queue_action_done"
+        activity_title = "Queue action: done"
+    elif action == "dismiss":
+        task.status = "cancelled"
+        task.completed_at = None
+        task.completed_by_user_id = None
+        task.last_status_changed_at = datetime.now(timezone.utc)
+        event_type = "queue_action_dismiss"
+        activity_title = "Queue action: dismiss"
+    elif action == "reopen":
+        task.status = "open"
+        task.completed_at = None
+        task.completed_by_user_id = None
+        task.last_status_changed_at = datetime.now(timezone.utc)
+        event_type = "queue_action_reopen"
+        activity_title = "Queue action: reopen"
+    else:
+        duration = (payload.duration or "").strip().lower()
+        if duration not in VALID_SNOOZE_DURATIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="duration is required for snooze.",
+            )
+        task.status = "snoozed"
+        task.due_at = resolve_snooze_due_at(duration)
+        task.completed_at = None
+        task.completed_by_user_id = None
+        task.last_status_changed_at = datetime.now(timezone.utc)
+        event_type = "queue_action_snooze"
+        activity_title = "Queue action: snooze"
+
+    db.add(task)
+    db.flush()
+    create_task_event(
+        db=db,
+        task=task,
+        event_type=event_type,
+        actor_user_id=current_user.id,
+        from_status=previous_status,
+        to_status=task.status,
+        previous_due_at=previous_due_at,
+        next_due_at=task.due_at,
+        notes=note_text,
+    )
+    create_lead_activity_event(
+        db=db,
+        lead=lead,
+        event_type="queue_event",
+        title=activity_title,
+        description=note_text,
+        actor_user_id=current_user.id,
+        from_value=previous_status,
+        to_value=task.status,
+    )
+    db.commit()
+    db.refresh(task)
+    return build_task_item(task)
