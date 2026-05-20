@@ -91,3 +91,29 @@ def require_roles(*allowed_roles: str) -> Callable:
         return current_user
 
     return dependency
+
+
+def require_sgcc_integration(request: Request) -> str:
+    configured_key = settings.sgcc_integration_api_key
+
+    if not configured_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="SGCC integration is not configured.",
+        )
+
+    presented_key = request.headers.get("X-Clara-Integration-Key")
+
+    if not presented_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing SGCC integration key.",
+        )
+
+    if presented_key != configured_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid SGCC integration key.",
+        )
+
+    return "sgcc"

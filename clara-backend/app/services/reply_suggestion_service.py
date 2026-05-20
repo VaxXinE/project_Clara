@@ -16,6 +16,7 @@ from app.schemas.reply_suggestion_schema import (
     RejectReplyRequest,
     ReplySuggestionCreate,
 )
+from app.schemas.ai_extraction_schema import AIExtractionCreate
 from app.services.ai_extraction_service import format_conversation_for_ai
 from app.services.clara_playbook_service import load_clara_response_playbook
 from app.services.policy_engine import decide_reply_action
@@ -63,7 +64,7 @@ def get_reply_suggestion_json_schema() -> dict:
 
 def build_reply_prompt(
     conversation_text: str,
-    extraction: AIExtraction,
+    extraction: AIExtraction | AIExtractionCreate,
     action_mode: str,
     grounded_knowledge: str,
     response_playbook: str,
@@ -142,7 +143,7 @@ def build_grounded_knowledge_context(conversation: Conversation, db: Session) ->
 
 def call_openai_for_reply_suggestion(
     conversation_text: str,
-    extraction: AIExtraction,
+    extraction: AIExtraction | AIExtractionCreate,
     action_mode: str,
     grounded_knowledge: str,
 ) -> ReplySuggestionCreate:

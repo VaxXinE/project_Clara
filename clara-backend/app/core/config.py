@@ -5,6 +5,8 @@ class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str
     redis_url: str = "redis://localhost:6379/0"
+    sgcc_integration_api_key: str | None = None
+    sgcc_integration_rate_limit_per_minute: int = 30
 
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"

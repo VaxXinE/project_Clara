@@ -8,6 +8,7 @@ from app.api.routes_conversations import router as conversations_router
 from app.api.routes_customers import router as customers_router
 from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_extension import router as extension_router
+from app.api.routes_integrations import router as integrations_router
 from app.api.routes_leads import router as leads_router
 from app.api.routes_reply import router as reply_router
 from app.api.routes_sent_messages import router as sent_messages_router
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(organizations_router)
     app.include_router(product_knowledge_router)
+    app.include_router(integrations_router)
     app.include_router(extension_router)
     app.include_router(upload_router)
     app.include_router(leads_router)
