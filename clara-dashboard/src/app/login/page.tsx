@@ -1,25 +1,32 @@
 "use client";
 
+import { faEye, faEyeSlash } from "@fortawesome/free-regular-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { getRoleDisplayLabel } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 type LoginResponse = {
-  access_token: string;
   token_type: string;
+  user: CurrentUser;
 };
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 function getDashboardPathForRole(role: string): string {
   switch (role) {
     case "marketing":
-      return "/dashboard/sales";
+      return "/dashboard";
     case "owner":
-      return "/dashboard/marketing";
+      return "/dashboard";
     case "admin":
     default:
-      return "/dashboard/sales";
+      return "/dashboard";
   }
 }
 
@@ -28,27 +35,43 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("owner@clara.local");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const normalizedEmail = email.trim().toLowerCase();
     setErrorMessage("");
+
+    if (!normalizedEmail) {
+      setErrorMessage("Email wajib diisi.");
+      return;
+    }
+
+    if (!isValidEmail(normalizedEmail)) {
+      setErrorMessage("Format email belum valid.");
+      return;
+    }
+
+    if (!password.trim()) {
+      setErrorMessage("Password wajib diisi.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       const response = await apiFetch<LoginResponse>("/auth/login", {
         method: "POST",
         body: {
-          email,
+          email: normalizedEmail,
           password,
         },
       });
 
-      window.localStorage.setItem("clara_access_token", response.access_token);
-      const currentUser = await apiFetch<CurrentUser>("/auth/me");
-      router.push(getDashboardPathForRole(currentUser.role));
+      router.push(getDashboardPathForRole(response.user.role));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Login gagal.");
     } finally {
@@ -57,57 +80,126 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-      >
-        <div>
-          <p className="text-sm font-medium text-slate-500">Clara</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-950">
-            Login Dashboard
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 sm:px-6">
+      <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,_rgba(212,176,123,0.28),_transparent_65%)]" />
+      <div className="absolute bottom-0 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(16,23,45,0.12),_transparent_70%)] blur-3xl" />
+
+      <div className="relative grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="clara-card-dark rounded-[34px] p-7 sm:p-8">
+          <span className="clara-chip clara-chip-dark">SGB SCC</span>
+          <h1 className="mt-5 max-w-xl text-4xl font-bold tracking-[-0.05em] text-white sm:text-3xl">
+            Satu pintu untuk queue operasional, lead management, dan kontrol tim.
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Masuk untuk mengakses inbox operasional dan AI copilot.
+          <p className="mt-4 max-w-lg text-sm leading-7 text-slate-200 sm:text-[15px]">
+            Masuk ke Sales Command Center untuk memantau percakapan pelanggan,
+            meninjau rekomendasi AI, dan menjaga workflow tim tetap rapi.
           </p>
-        </div>
 
-        <div>
-          <label className="text-sm font-semibold text-slate-900">Email</label>
-          <input
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            type="email"
-            className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm outline-none focus:border-slate-600"
-          />
-        </div>
+          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[24px] border border-white/10 bg-white/7 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4b07b]">
+                Queue
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-100">
+                Percakapan dan prioritas harian ada di satu alur kerja.
+              </p>
+            </div>
+            <div className="rounded-[24px] border border-white/10 bg-white/7 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4b07b]">
+                AI Review
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-100">
+                Draft balasan, analisis, dan approval lebih cepat dipindai.
+              </p>
+            </div>
+            <div className="rounded-[24px] border border-white/10 bg-white/7 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4b07b]">
+                Governance
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-100">
+                Role, knowledge, dan akses tetap terkendali.
+              </p>
+            </div>
+          </div>
+        </section>
 
-        <div>
-          <label className="text-sm font-semibold text-slate-900">
-            Password
-          </label>
-          <input
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            type="password"
-            className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-sm outline-none focus:border-slate-600"
-          />
-        </div>
-
-        {errorMessage && (
-          <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
-            {errorMessage}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="w-full rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        <form
+          onSubmit={handleSubmit}
+          className="clara-card rounded-[34px] p-6 sm:p-8"
         >
-          {isSubmitting ? "Logging in..." : "Login"}
-        </button>
-      </form>
+          <div>
+            <p className="clara-kicker">Login Dashboard</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-[-0.04em] text-slate-950">
+              Masuk ke workspace SCC
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Gunakan akun internal untuk membuka queue, review balasan AI, dan
+              workspace operasional lainnya.
+            </p>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            <div>
+              <label className="clara-label">Email</label>
+              <input
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                className="clara-input mt-2"
+                placeholder="owner@clara.local"
+                autoComplete="email"
+              />
+            </div>
+
+            <div>
+              <label className="clara-label">Password</label>
+              <div className="relative mt-2">
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type={showPassword ? "text" : "password"}
+                  className="clara-input pr-28"
+                  placeholder="Masukkan password akun"
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                  aria-label={
+                    showPassword ? "Sembunyikan password" : "Tampilkan password"
+                  }
+                >
+                  {showPassword ? (
+                    <FontAwesomeIcon icon={faEyeSlash} className="h-4 w-4" />
+                  ) : (
+                    <FontAwesomeIcon icon={faEye} className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {errorMessage && (
+            <p className="clara-alert clara-alert-danger mt-5">
+              {errorMessage}
+            </p>
+          )}
+
+          <p className="clara-helper mt-4">
+            Kalau email belum terdaftar, minta {getRoleDisplayLabel("admin")} atau{" "}
+            {getRoleDisplayLabel("owner")} untuk membuatkan akun Anda terlebih dulu.
+          </p>
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="clara-button clara-button-primary mt-6 w-full"
+          >
+            {isSubmitting ? "Logging in..." : "Masuk ke Dashboard"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

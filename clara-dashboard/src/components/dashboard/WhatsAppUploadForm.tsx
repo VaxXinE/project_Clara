@@ -1,20 +1,60 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
-import type { UploadWhatsAppResponse } from "@/types/dashboard";
+import type {
+  ChannelDefinitionItem,
+  ChannelDetectResponse,
+  UploadConversationResponse,
+} from "@/types/dashboard";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+
+const INPUT_MODE_OPTIONS = [
+  { value: "file", label: "Upload File" },
+  { value: "paste", label: "Paste Chat" },
+] as const;
 
 export function WhatsAppUploadForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [channelOptions, setChannelOptions] = useState<ChannelDefinitionItem[]>(
+    [],
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState("whatsapp");
+  const [inputMode, setInputMode] =
+    useState<(typeof INPUT_MODE_OPTIONS)[number]["value"]>("file");
+  const [pastedText, setPastedText] = useState("");
+  const [conversationTitle, setConversationTitle] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [isDetectingChannel, setIsDetectingChannel] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [detectionMessage, setDetectionMessage] = useState("");
+
+  useEffect(() => {
+    async function loadChannels() {
+      try {
+        const channels =
+          await apiFetch<ChannelDefinitionItem[]>("/upload/channels");
+        setChannelOptions(channels);
+        if (channels.length > 0) {
+          setSelectedChannel((current) =>
+            channels.some((channel) => channel.key === current)
+              ? current
+              : channels[0].key,
+          );
+        }
+      } catch {
+        setErrorMessage("Gagal memuat daftar channel upload.");
+      }
+    }
+
+    void loadChannels();
+  }, []);
 
   function validateFile(file: File): string | null {
     if (!file.name.toLowerCase().endsWith(".txt")) {
@@ -58,74 +98,258 @@ export function WhatsAppUploadForm() {
     event.preventDefault();
 
     setErrorMessage("");
+    setDetectionMessage("");
 
-    if (!selectedFile) {
-      setErrorMessage("Pilih file .txt terlebih dahulu.");
-      return;
-    }
-
-    const validationError = validateFile(selectedFile);
-
-    if (validationError) {
-      setErrorMessage(validationError);
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", selectedFile);
+    const channelConfig = channelOptions.find(
+      (item) => item.key === selectedChannel,
+    );
 
     setIsUploading(true);
 
     try {
-      const result = await apiFetch<UploadWhatsAppResponse>(
-        "/upload/whatsapp-txt",
-        {
-          method: "POST",
-          body: formData,
+      let result: UploadConversationResponse;
+
+      if (inputMode === "file") {
+        if (!selectedFile) {
+          setErrorMessage("Pilih file .txt terlebih dahulu.");
+          setIsUploading(false);
+          return;
         }
-      );
+
+        const validationError = validateFile(selectedFile);
+        if (validationError) {
+          setErrorMessage(validationError);
+          setIsUploading(false);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        result = await apiFetch<UploadConversationResponse>(
+          channelConfig?.file_endpoint ?? "/upload/whatsapp-txt",
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
+      } else {
+        if (pastedText.trim().length === 0) {
+          setErrorMessage("Paste chat terlebih dahulu.");
+          setIsUploading(false);
+          return;
+        }
+
+        result = await apiFetch<UploadConversationResponse>(
+          channelConfig?.text_endpoint ?? "/upload/whatsapp-text",
+          {
+            method: "POST",
+            body: {
+              raw_text: pastedText,
+              title: conversationTitle.trim() || null,
+            },
+          },
+        );
+      }
 
       router.push(`/dashboard/sales/conversations/${result.conversation_id}`);
       router.refresh();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Upload gagal."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Upload gagal.");
     } finally {
       setIsUploading(false);
     }
   }
 
+  async function handleDetectChannel() {
+    if (pastedText.trim().length === 0) {
+      setErrorMessage(
+        "Paste chat terlebih dahulu sebelum auto-detect channel.",
+      );
+      return;
+    }
+
+    setErrorMessage("");
+    setDetectionMessage("");
+    setIsDetectingChannel(true);
+
+    try {
+      const result = await apiFetch<ChannelDetectResponse>(
+        "/upload/detect-channel",
+        {
+          method: "POST",
+          body: { raw_text: pastedText },
+        },
+      );
+
+      if (!result.detected_channel) {
+        setDetectionMessage(
+          "Clara belum bisa menebak channel dari isi chat ini. Pilih channel manual.",
+        );
+        return;
+      }
+
+      setSelectedChannel(result.detected_channel);
+      const topCandidate = result.candidates[0];
+      setDetectionMessage(
+        `Clara mendeteksi ${topCandidate.label} (${topCandidate.matched_message_count} pesan, confidence ${Math.round(topCandidate.confidence * 100)}%).`,
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Auto-detect channel gagal.",
+      );
+    } finally {
+      setIsDetectingChannel(false);
+    }
+  }
+
+  const activeChannel = channelOptions.find(
+    (channel) => channel.key === selectedChannel,
+  );
+
   return (
     <form
       onSubmit={handleUpload}
-      className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+      className="clara-card space-y-5 rounded-[30px] p-5 sm:p-6"
     >
       <div>
         <label
-          htmlFor="whatsappFile"
+          htmlFor="channelType"
           className="text-sm font-semibold text-slate-900"
         >
-          File WhatsApp .txt
+          Channel
         </label>
-
-        <input
-          ref={fileInputRef}
-          id="whatsappFile"
-          type="file"
-          accept=".txt,text/plain"
-          onChange={handleFileChange}
-          className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-        />
-
-        <p className="mt-2 text-xs text-slate-500">
-          Maksimal 5MB. Jangan upload file berisi data yang tidak boleh
-          dianalisis.
-        </p>
+        <select
+          id="channelType"
+          value={selectedChannel}
+          onChange={(event) => {
+            setSelectedChannel(event.target.value);
+            setDetectionMessage("");
+          }}
+          className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+        >
+          {channelOptions.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {activeChannel ? (
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            {activeChannel.description}
+          </p>
+        ) : null}
       </div>
 
+      <div>
+        <label htmlFor="whatsappFile" className="clara-label">
+          Input Mode
+        </label>
+        <select
+          id="inputMode"
+          value={inputMode}
+          onChange={(event) => {
+            setInputMode(
+              event.target
+                .value as (typeof INPUT_MODE_OPTIONS)[number]["value"],
+            );
+            setErrorMessage("");
+          }}
+          className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+        >
+          {INPUT_MODE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {inputMode === "file" ? (
+        <div>
+          <label
+            htmlFor="whatsappFile"
+            className="text-sm font-semibold text-slate-900"
+          >
+            File Chat .txt
+          </label>
+
+          <input
+            ref={fileInputRef}
+            id="whatsappFile"
+            type="file"
+            accept=".txt,text/plain"
+            onChange={handleFileChange}
+            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+          />
+
+          <p className="mt-2 text-xs text-slate-500">
+            Maksimal 5MB. Pilih channel yang sesuai sebelum upload supaya parser
+            Clara memakai format yang benar.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="conversationTitle"
+              className="text-sm font-semibold text-slate-900"
+            >
+              Judul Conversation (opsional)
+            </label>
+            <input
+              id="conversationTitle"
+              type="text"
+              value={conversationTitle}
+              onChange={(event) => {
+                setConversationTitle(event.target.value);
+              }}
+              placeholder="Contoh: Chat Leoni Telegram"
+              className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="pastedText"
+              className="text-sm font-semibold text-slate-900"
+            >
+              Paste Chat
+            </label>
+            <textarea
+              id="pastedText"
+              value={pastedText}
+              onChange={(event) => {
+                setPastedText(event.target.value);
+                setDetectionMessage("");
+              }}
+              placeholder="Paste export chat di sini..."
+              className="mt-2 min-h-[220px] w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  void handleDetectChannel();
+                }}
+                disabled={isDetectingChannel}
+                className="rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isDetectingChannel ? "Mendeteksi..." : "Auto-Detect Channel"}
+              </button>
+              <p className="text-xs text-slate-500">
+                Cocok untuk user yang tidak ingin menyimpan file .txt dulu.
+              </p>
+            </div>
+            {detectionMessage ? (
+              <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
+                {detectionMessage}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       {selectedFile && (
-        <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+        <div className="clara-card-soft rounded-[24px] p-4 text-sm text-slate-700">
           <p>
             <span className="font-semibold">Selected:</span> {selectedFile.name}
           </p>
@@ -137,17 +361,25 @@ export function WhatsAppUploadForm() {
       )}
 
       {errorMessage && (
-        <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
-          {errorMessage}
-        </p>
+        <p className="clara-alert clara-alert-danger">{errorMessage}</p>
       )}
 
       <button
         type="submit"
-        disabled={isUploading || !selectedFile}
+        disabled={
+          isUploading ||
+          channelOptions.length === 0 ||
+          (inputMode === "file"
+            ? !selectedFile
+            : pastedText.trim().length === 0)
+        }
         className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isUploading ? "Uploading..." : "Upload Chat"}
+        {isUploading
+          ? "Uploading..."
+          : inputMode === "file"
+            ? "Upload Chat"
+            : "Proses Paste Chat"}
       </button>
     </form>
   );

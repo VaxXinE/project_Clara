@@ -1,10 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import models as _models  # noqa: F401
 from app.api.routes_ai import router as ai_router
 from app.api.routes_auth import router as auth_router
 from app.api.routes_conversations import router as conversations_router
+from app.api.routes_customers import router as customers_router
 from app.api.routes_dashboard import router as dashboard_router
+from app.api.routes_extension import router as extension_router
+from app.api.routes_integrations import router as integrations_router
+from app.api.routes_leads import router as leads_router
 from app.api.routes_reply import router as reply_router
 from app.api.routes_sent_messages import router as sent_messages_router
 from app.api.routes_upload import router as upload_router
@@ -37,7 +42,11 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(organizations_router)
     app.include_router(product_knowledge_router)
+    app.include_router(integrations_router)
+    app.include_router(extension_router)
     app.include_router(upload_router)
+    app.include_router(leads_router)
+    app.include_router(customers_router)
     app.include_router(conversations_router)
     app.include_router(ai_router)
     app.include_router(reply_router)

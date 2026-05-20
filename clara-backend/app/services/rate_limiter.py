@@ -21,3 +21,4 @@ class InMemoryRateLimiter:
 
 
 login_rate_limiter = InMemoryRateLimiter()
+sgcc_integration_rate_limiter = InMemoryRateLimiter()

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
@@ -19,6 +19,11 @@ class Conversation(Base):
     )
     sales_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    lead_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -59,11 +64,17 @@ class Conversation(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
     organization = relationship("Organization", back_populates="conversations")
-    sales_user = relationship("User", foreign_keys=[sales_user_id])
+    sales_user = relationship(
+        "User",
+        back_populates="conversations_owned",
+        foreign_keys=[sales_user_id],
+        overlaps="conversations_owned",
+    )
+    lead = relationship("Lead", back_populates="conversations")
 
     messages = relationship(
         "Message",

@@ -8,3 +8,12 @@ wheels/
 
 # Virtual environments
 .venv
+
+# local environment files
+.env
+.env.*
+!.env.example
+
+# local tooling caches
+.pytest_cache/
+.ruff_cache/

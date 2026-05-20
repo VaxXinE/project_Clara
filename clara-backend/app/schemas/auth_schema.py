@@ -22,9 +22,15 @@ class CurrentUserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     organization_id: UUID | None
+    organization_name: str | None = None
     created_by_user_id: UUID | None
     created_by_user_name: str | None = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class SessionResponse(BaseModel):
+    token_type: str = "bearer"
+    user: CurrentUserResponse
 
 
 class CreateUserRequest(BaseModel):
@@ -40,3 +46,12 @@ class UpdateUserRequest(BaseModel):
     email: str | None = Field(default=None, min_length=3, max_length=255)
     role: str | None = Field(default=None, max_length=50)
     organization_id: UUID | None = None
+
+
+class ResetUserPasswordRequest(BaseModel):
+    password: str = Field(min_length=8, max_length=255)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=255)
+    new_password: str = Field(min_length=8, max_length=255)

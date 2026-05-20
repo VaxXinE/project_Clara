@@ -1,6 +1,7 @@
+import secrets
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user, require_roles
@@ -8,9 +9,12 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth_schema import (
+    ChangePasswordRequest,
     CreateUserRequest,
     CurrentUserResponse,
     LoginRequest,
+    ResetUserPasswordRequest,
+    SessionResponse,
     TokenResponse,
     UpdateUserRequest,
 )
@@ -18,14 +22,17 @@ from app.services.audit_service import create_audit_log
 from app.services.auth_service import (
     AuthError,
     authenticate_user,
+    change_user_password,
     create_access_token,
     create_user,
     get_user_by_id,
     list_users,
     set_user_active_status,
+    set_user_password,
     update_user,
 )
 from app.services.rate_limiter import login_rate_limiter
+from app.services.role_service import is_owner_like, normalize_role
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -35,19 +42,60 @@ def build_user_response(user: User) -> CurrentUserResponse:
         id=user.id,
         name=user.name,
         email=user.email,
-        role=user.role,
+        role=normalize_role(user.role),
         is_active=user.is_active,
         created_at=user.created_at,
         organization_id=user.organization_id,
+        organization_name=user.organization.name if user.organization else None,
         created_by_user_id=user.created_by_user_id,
         created_by_user_name=user.created_by_user.name if user.created_by_user else None,
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+def set_auth_cookies(response: Response, access_token: str) -> None:
+    max_age = settings.access_token_expire_minutes * 60
+    csrf_token = secrets.token_urlsafe(32)
+
+    response.set_cookie(
+        key=settings.auth_cookie_name,
+        value=access_token,
+        httponly=True,
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite_value,
+        domain=settings.auth_cookie_domain,
+        max_age=max_age,
+        path="/",
+    )
+    response.set_cookie(
+        key=settings.csrf_cookie_name,
+        value=csrf_token,
+        httponly=False,
+        secure=settings.auth_cookie_secure,
+        samesite=settings.auth_cookie_samesite_value,
+        domain=settings.auth_cookie_domain,
+        max_age=max_age,
+        path="/",
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.auth_cookie_name,
+        domain=settings.auth_cookie_domain,
+        path="/",
+    )
+    response.delete_cookie(
+        key=settings.csrf_cookie_name,
+        domain=settings.auth_cookie_domain,
+        path="/",
+    )
+
+
+@router.post("/login", response_model=SessionResponse)
 def login(
     payload: LoginRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
 ):
     ip_address = request.client.host if request.client else "unknown"
@@ -84,7 +132,10 @@ def login(
         metadata={"email": user.email},
     )
 
-    return TokenResponse(access_token=create_access_token(user))
+    access_token = create_access_token(user)
+    set_auth_cookies(response=response, access_token=access_token)
+
+    return SessionResponse(user=build_user_response(user))
 
 
 @router.get("/me", response_model=CurrentUserResponse)
@@ -92,6 +143,62 @@ def get_me(
     current_user: User = Depends(get_current_user),
 ):
     return build_user_response(current_user)
+
+
+@router.post("/access-token", response_model=TokenResponse)
+def issue_access_token(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    create_audit_log(
+        db=db,
+        action="auth.access_token.issue",
+        resource_type="user",
+        resource_id=str(current_user.id),
+        current_user=current_user,
+        request=request,
+        metadata={"purpose": "extension_integration"},
+    )
+    return TokenResponse(access_token=create_access_token(current_user))
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response) -> Response:
+    clear_auth_cookies(response)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
+
+
+@router.post("/change-password", response_model=CurrentUserResponse)
+def change_password_endpoint(
+    payload: ChangePasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        updated_user = change_user_password(
+            db=db,
+            user=current_user,
+            current_password=payload.current_password,
+            new_password=payload.new_password,
+        )
+        create_audit_log(
+            db=db,
+            action="auth.user.change_password_self",
+            resource_type="user",
+            resource_id=str(updated_user.id),
+            current_user=current_user,
+            request=request,
+            metadata={"email": updated_user.email},
+        )
+        return build_user_response(updated_user)
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post(
@@ -106,9 +213,10 @@ def create_user_endpoint(
     current_user: User = Depends(require_roles("admin")),
 ):
     payload_to_create = payload
+    requested_role = normalize_role(payload.role)
 
     if current_user.role == "admin":
-        if payload.role == "owner":
+        if requested_role in {"owner", "super_admin"}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin cannot create owner users.",
@@ -170,7 +278,7 @@ def list_users_endpoint(
 ):
     users = list_users(db=db)
 
-    if current_user.role == "owner":
+    if is_owner_like(current_user.role):
         return [build_user_response(user) for user in users]
 
     if current_user.organization_id is None:
@@ -191,6 +299,8 @@ def update_user_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("admin")),
 ):
+    requested_role = normalize_role(payload.role) if payload.role is not None else None
+
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))
     except ValueError as exc:
@@ -216,7 +326,7 @@ def update_user_endpoint(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
-        if payload.role == "owner":
+        if requested_role in {"owner", "super_admin"}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin cannot promote users to owner.",
@@ -295,7 +405,7 @@ def deactivate_user_endpoint(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
-        if target_user.role == "owner":
+        if is_owner_like(target_user.role):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin cannot deactivate owner users.",
@@ -346,7 +456,7 @@ def activate_user_endpoint(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
-        if target_user.role == "owner":
+        if is_owner_like(target_user.role):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin cannot activate owner users.",
@@ -356,6 +466,62 @@ def activate_user_endpoint(
     create_audit_log(
         db=db,
         action="auth.user.activate",
+        resource_type="user",
+        resource_id=str(updated_user.id),
+        current_user=current_user,
+        request=request,
+        metadata={"email": updated_user.email},
+    )
+    return build_user_response(updated_user)
+
+
+@router.post("/users/{user_id}/reset-password", response_model=CurrentUserResponse)
+def reset_user_password_endpoint(
+    user_id: str,
+    payload: ResetUserPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("admin")),
+):
+    try:
+        target_user = get_user_by_id(db=db, user_id=UUID(user_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user id.",
+        ) from exc
+
+    if target_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    if current_user.role == "admin":
+        if current_user.organization_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin has no organization assigned.",
+            )
+        if target_user.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+        if target_user.created_by_user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin can only reset passwords for users they created.",
+            )
+
+    updated_user = set_user_password(
+        db=db,
+        user=target_user,
+        password=payload.password,
+    )
+    create_audit_log(
+        db=db,
+        action="auth.user.reset_password",
         resource_type="user",
         resource_id=str(updated_user.id),
         current_user=current_user,

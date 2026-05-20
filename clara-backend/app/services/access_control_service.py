@@ -2,9 +2,15 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models.reply_suggestion import ReplySuggestion
 from app.models.conversation import Conversation
+from app.models.reply_suggestion import ReplySuggestion
 from app.models.user import User
+from app.services.role_service import (
+    is_admin_like,
+    is_marketing_like,
+    is_owner_like,
+    is_platform_super_admin as is_platform_super_admin_role,
+)
 
 
 class AccessDeniedError(RuntimeError):
@@ -12,15 +18,15 @@ class AccessDeniedError(RuntimeError):
 
 
 def is_platform_super_admin(user: User) -> bool:
-    return user.role == "super_admin"
+    return is_platform_super_admin_role(user.role)
 
 
 def can_access_all_conversations(user: User) -> bool:
-    return user.role in {"owner", "admin"}
+    return is_admin_like(user.role)
 
 
 def can_access_marketing_insights(user: User) -> bool:
-    return user.role in {"owner", "admin", "marketing"}
+    return is_admin_like(user.role) or is_marketing_like(user.role)
 
 
 def ensure_user_has_organization(user: User) -> None:
@@ -48,7 +54,7 @@ def can_access_conversation(user: User, conversation: Conversation) -> bool:
     if can_access_all_conversations(user):
         return True
 
-    if user.role != "marketing":
+    if not is_marketing_like(user.role):
         return False
 
     return conversation.sales_user_id == user.id

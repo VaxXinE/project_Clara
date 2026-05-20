@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
 from app.schemas.ai_extraction_schema import AIExtractionCreate
+from app.services.lead_service import sync_lead_from_conversation
 
 
 class AIExtractionError(RuntimeError):
@@ -218,7 +219,9 @@ def call_openai_for_extraction(conversation_text: str) -> AIExtractionCreate:
             },
         )
     except Exception as exc:
-        raise AIExtractionError(f"Failed to call OpenAI: {exc}") from exc
+        raise AIExtractionError(
+            "Failed to call OpenAI. Check OPENAI_API_KEY and OPENAI_MODEL configuration."
+        ) from exc
 
     raw_output = response.output_text
 
@@ -273,7 +276,16 @@ def analyze_conversation(
         confidence_score=extraction_data.confidence_score,
     )
 
+    conversation.current_stage = extraction_data.pipeline_stage
+    conversation.lead_temperature = extraction_data.lead_temperature
+
     db.add(extraction)
+    db.add(conversation)
+    sync_lead_from_conversation(
+        db=db,
+        conversation=conversation,
+        customer_summary=extraction_data.customer_summary,
+    )
     db.commit()
     db.refresh(extraction)
 

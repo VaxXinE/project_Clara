@@ -35,4 +35,19 @@ def test_parse_whatsapp_txt_supports_existing_date_first_format() -> None:
     assert len(messages) == 2
     assert messages[0].sender_type == "customer"
     assert messages[1].sender_type == "sales"
+
+
+def test_parse_whatsapp_txt_infers_customer_and_sales_for_two_plain_names() -> None:
+    raw_text = """12/04/26, 09.12 - Nia: Halo kak, saya lihat iklannya tadi.
+12/04/26, 09.13 - Aria: Halo kak Nia, siap saya bantu.
+12/04/26, 09.15 - Nia: Masih lihat-lihat dulu sih kak."""
+
+    messages = parse_whatsapp_txt(raw_text)
+
+    assert messages[0].sender_name == "Nia"
+    assert messages[0].sender_type == "customer"
+    assert messages[1].sender_name == "Aria"
+    assert messages[1].sender_type == "sales"
+    assert messages[2].sender_name == "Nia"
+    assert messages[2].sender_type == "customer"
     assert messages[1].message_timestamp.isoformat() == "2026-04-12T09:13:00+07:00"

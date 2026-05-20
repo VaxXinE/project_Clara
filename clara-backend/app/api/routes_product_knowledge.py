@@ -56,7 +56,7 @@ def create_product_knowledge_endpoint(
     payload: ProductKnowledgeCreateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("owner")),
 ):
     try:
         entry = create_product_knowledge(
@@ -91,7 +91,7 @@ def update_product_knowledge_endpoint(
     payload: ProductKnowledgeUpdateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("owner")),
 ):
     try:
         entry = update_product_knowledge(
@@ -131,7 +131,7 @@ def delete_product_knowledge_endpoint(
     knowledge_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("owner")),
 ) -> Response:
     try:
         delete_product_knowledge(

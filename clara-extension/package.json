@@ -1,0 +1,42 @@
+{
+  "name": "clara-extension",
+  "displayName": "Clara Extension",
+  "version": "0.0.27",
+  "description": "Browser extension untuk WhatsApp Web yang terintegrasi dengan Clara.",
+  "author": "newsmaker.id",
+  "scripts": {
+    "dev": "concurrently \"node scripts/plasmo-cli.mjs dev\" \"node server/openai-proxy.mjs\"",
+    "build": "node scripts/plasmo-cli.mjs build",
+    "package": "node scripts/plasmo-cli.mjs package",
+    "proxy": "node server/openai-proxy.mjs"
+  },
+  "dependencies": {
+    "plasmo": "0.90.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@ianvs/prettier-plugin-sort-imports": "4.1.1",
+    "@types/chrome": "0.0.258",
+    "@types/node": "20.11.5",
+    "@types/react": "18.2.48",
+    "@types/react-dom": "18.2.18",
+    "concurrently": "^9.2.1",
+    "prettier": "3.2.4",
+    "typescript": "5.3.3"
+  },
+  "manifest": {
+    "permissions": [
+      "cookies",
+      "sidePanel",
+      "storage",
+      "tabs",
+      "scripting"
+    ],
+    "host_permissions": [
+      "http://localhost/*",
+      "http://127.0.0.1/*",
+      "https://*/*"
+    ]
+  }
+}

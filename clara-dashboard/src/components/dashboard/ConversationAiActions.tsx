@@ -60,9 +60,12 @@ export function ConversationAiActions({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-950">AI Actions</h2>
-      <p className="mt-1 text-sm text-slate-600">
+    <div className="clara-card rounded-[30px] p-5">
+      <p className="clara-kicker">AI Actions</p>
+      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+        Jalankan analisis dan draft
+      </h2>
+      <p className="mt-2 text-sm text-slate-600">
         Jalankan analysis dan generate draft balasan langsung dari dashboard.
       </p>
 
@@ -71,7 +74,7 @@ export function ConversationAiActions({
           type="button"
           onClick={handleAnalyze}
           disabled={isAnalyzing}
-          className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="clara-button clara-button-primary"
         >
           {isAnalyzing
             ? "Analyzing..."
@@ -84,7 +87,7 @@ export function ConversationAiActions({
           type="button"
           onClick={handleGenerateReply}
           disabled={isGeneratingReply || !hasAiExtraction}
-          className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="clara-button clara-button-ghost"
         >
           {isGeneratingReply
             ? "Generating..."
@@ -94,16 +97,14 @@ export function ConversationAiActions({
         </button>
 
         {!hasAiExtraction && (
-          <p className="text-xs text-slate-500">
+          <p className="clara-helper">
             Jalankan AI analysis dulu sebelum generate reply suggestion.
           </p>
         )}
       </div>
 
       {errorMessage && (
-        <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
-          {errorMessage}
-        </p>
+        <p className="clara-alert clara-alert-danger mt-4">{errorMessage}</p>
       )}
     </div>
   );

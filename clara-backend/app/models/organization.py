@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from sqlalchemy import DateTime, String
@@ -17,9 +17,26 @@ class Organization(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
     users = relationship("User", back_populates="organization")
+    customer_profiles = relationship("CustomerProfile", back_populates="organization")
+    leads = relationship("Lead", back_populates="organization")
+    lead_deals = relationship("LeadDeal", back_populates="organization")
+    lead_activity_events = relationship(
+        "LeadActivityEvent",
+        back_populates="organization",
+    )
+    marketing_execution_items = relationship(
+        "MarketingExecutionItem",
+        back_populates="organization",
+    )
     conversations = relationship("Conversation", back_populates="organization")
+    lead_tasks = relationship("LeadTask", back_populates="organization")
+    ops_notifications = relationship(
+        "OpsNotification",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )

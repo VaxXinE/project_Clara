@@ -1,1 +1,1 @@
-export { default } from "@/app/dashboard/sales/conversations/[conversationId]/page";
+export { default } from "../../../../../src/app/dashboard/(workspace)/sales/conversations/[conversationId]/page";

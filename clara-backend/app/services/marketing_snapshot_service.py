@@ -10,10 +10,11 @@ from app.schemas.dashboard_schema import (
     MarketingInsightSnapshotResponse,
 )
 from app.services.dashboard_service import get_marketing_insights_preview
+from app.services.role_service import is_owner_like
 
 
 def get_snapshot_scope(current_user: User) -> tuple[str, str | None]:
-    if current_user.role == "owner":
+    if is_owner_like(current_user.role):
         return "global", None
 
     return "organization", (

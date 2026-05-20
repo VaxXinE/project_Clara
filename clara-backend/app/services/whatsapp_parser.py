@@ -163,6 +163,17 @@ def infer_sender_types(messages: list[ParsedMessage]) -> list[ParsedMessage]:
         unknown_sender = next(iter(unknown_senders))
         inferred_types[unknown_sender] = "sales"
 
+    # Heuristic for simple 2-party pasted chats:
+    # if no explicit sender role is present and only two participants exist,
+    # assume the first sender is the customer and the other participant is sales.
+    if not explicit_sales and not explicit_customers and len(sender_names) == 2:
+        first_sender = messages[0].sender_name
+        other_sender = next(
+            sender_name for sender_name in sender_names if sender_name != first_sender
+        )
+        inferred_types[first_sender] = "customer"
+        inferred_types[other_sender] = "sales"
+
     normalized_messages: list[ParsedMessage] = []
 
     for message in messages:
