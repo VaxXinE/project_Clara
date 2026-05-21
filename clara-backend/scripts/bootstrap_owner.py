@@ -85,18 +85,18 @@ def ensure_owner_bootstrap(db, config: BootstrapConfig) -> tuple[str, Organizati
     existing_org = get_organization_by_slug(db=db, slug=config.organization_slug)
 
     if existing_user is not None:
-        if existing_user.role != "owner":
+        if existing_user.role != "superadmin":
             raise BootstrapError(
-                f"User {existing_user.email} sudah ada tapi rolenya {existing_user.role}, bukan owner."
+                f"User {existing_user.email} sudah ada tapi rolenya {existing_user.role}, bukan superadmin."
             )
 
         if existing_org is not None and existing_user.organization_id != existing_org.id:
             raise BootstrapError(
-                "Owner dengan email yang sama sudah ada, tapi organization-nya tidak cocok "
+                "Superadmin dengan email yang sama sudah ada, tapi organization-nya tidak cocok "
                 "dengan BOOTSTRAP_ORGANIZATION_SLUG."
             )
 
-        return ("owner_exists", existing_org, existing_user)
+        return ("superadmin_exists", existing_org, existing_user)
 
     organization = existing_org
     if organization is None:
@@ -114,7 +114,7 @@ def ensure_owner_bootstrap(db, config: BootstrapConfig) -> tuple[str, Organizati
             name=config.owner_name,
             email=config.owner_email,
             password=config.owner_password,
-            role="owner",
+            role="superadmin",
             organization_id=organization.id,
         ),
     )
@@ -131,7 +131,7 @@ def main() -> int:
 
     if config is None:
         print(
-            "Bootstrap owner di-skip. Isi env BOOTSTRAP_* kalau ingin membuat organization + owner awal."
+            "Bootstrap superadmin di-skip. Isi env BOOTSTRAP_* kalau ingin membuat organization + superadmin awal."
         )
         return 0
 
@@ -140,16 +140,16 @@ def main() -> int:
 
     try:
         status, organization, owner = ensure_owner_bootstrap(db=db, config=config)
-        if status == "owner_exists" and owner is not None:
+        if status == "superadmin_exists" and owner is not None:
             result_message = (
-                "Bootstrap owner di-skip. "
-                f"User owner {owner.email} sudah ada."
+                "Bootstrap superadmin di-skip. "
+                f"User superadmin {owner.email} sudah ada."
             )
         elif organization is not None and owner is not None:
             result_message = (
-                "Bootstrap owner berhasil. "
+                "Bootstrap superadmin berhasil. "
                 f"Organization={organization.name} ({organization.slug}), "
-                f"Owner={owner.email}"
+                f"Superadmin={owner.email}"
             )
     except (BootstrapError, AuthError, OrganizationError) as exc:
         print(f"Bootstrap gagal: {exc}")

@@ -58,6 +58,18 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     login_rate_limit_per_minute: int = 5
 
+    bootstrap_owner_name: str | None = None
+    bootstrap_owner_email: str | None = None
+    bootstrap_owner_password: str | None = None
+    bootstrap_organization_name: str | None = None
+    bootstrap_organization_slug: str | None = None
+    clara_knowledge_owner_email: str | None = None
+    clara_knowledge_dir: str | None = None
+    whatsapp_meta_verify_token: str | None = None
+    whatsapp_meta_app_secret: str | None = None
+    whatsapp_meta_default_organization_slug: str | None = None
+    whatsapp_meta_default_sales_user_email: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

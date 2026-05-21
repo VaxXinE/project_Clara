@@ -22,12 +22,22 @@ class User(Base):
         nullable=True,
         index=True,
     )
+    team_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(
+            "sales_teams.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_users_team_id_sales_teams",
+        ),
+        nullable=True,
+        index=True,
+    )
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    role: Mapped[str] = mapped_column(String(50), nullable=False, default="marketing")
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="sales")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -37,6 +47,11 @@ class User(Base):
     )
 
     organization = relationship("Organization", back_populates="users")
+    sales_team = relationship(
+        "SalesTeam",
+        back_populates="members",
+        foreign_keys=[team_id],
+    )
     created_by_user = relationship(
         "User",
         back_populates="created_users",
@@ -85,6 +100,11 @@ class User(Base):
         foreign_keys="LeadActivityEvent.actor_user_id",
         back_populates="actor_user",
     )
+    lead_discipline_logs = relationship(
+        "LeadDisciplineLog",
+        foreign_keys="LeadDisciplineLog.actor_user_id",
+        back_populates="actor_user",
+    )
     owned_lead_deals = relationship(
         "LeadDeal",
         foreign_keys="LeadDeal.owner_user_id",
@@ -109,4 +129,34 @@ class User(Base):
         "OpsNotification",
         foreign_keys="OpsNotification.acknowledged_by_user_id",
         back_populates="acknowledged_by_user",
+    )
+    managed_sales_teams = relationship(
+        "SalesTeam",
+        back_populates="manager_user",
+        foreign_keys="SalesTeam.manager_user_id",
+    )
+    submitted_chat_review_cases = relationship(
+        "ChatReviewCase",
+        foreign_keys="ChatReviewCase.submitted_by_user_id",
+        back_populates="submitted_by_user",
+    )
+    assigned_chat_review_cases = relationship(
+        "ChatReviewCase",
+        foreign_keys="ChatReviewCase.reviewer_user_id",
+        back_populates="reviewer_user",
+    )
+    chat_review_notes = relationship(
+        "ChatReviewNote",
+        foreign_keys="ChatReviewNote.author_user_id",
+        back_populates="author_user",
+    )
+    submitted_knowledge_update_proposals = relationship(
+        "KnowledgeUpdateProposal",
+        foreign_keys="KnowledgeUpdateProposal.proposed_by_user_id",
+        back_populates="proposed_by_user",
+    )
+    reviewed_knowledge_update_proposals = relationship(
+        "KnowledgeUpdateProposal",
+        foreign_keys="KnowledgeUpdateProposal.reviewed_by_user_id",
+        back_populates="reviewed_by_user",
     )

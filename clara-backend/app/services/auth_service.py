@@ -10,8 +10,8 @@ from app.core.config import settings
 from app.models.user import User
 from app.schemas.auth_schema import CreateUserRequest, UpdateUserRequest
 from app.models.organization import Organization
+from app.models.sales_team import SalesTeam
 from app.services.role_service import normalize_role
-
 
 
 password_hash = PasswordHash.recommended()
@@ -21,7 +21,7 @@ class AuthError(RuntimeError):
     pass
 
 
-ALLOWED_ROLES = {"owner", "admin", "marketing", "super_admin"}
+ALLOWED_ROLES = {"superadmin", "head", "manager", "sales"}
 
 
 def hash_password(password: str) -> str:
@@ -39,7 +39,16 @@ def get_user_by_email(db: Session, email: str) -> User | None:
 
 
 def get_user_by_id(db: Session, user_id: UUID) -> User | None:
-    return db.get(User, user_id)
+    statement = (
+        select(User)
+        .options(
+            selectinload(User.organization),
+            selectinload(User.created_by_user),
+            selectinload(User.sales_team).selectinload(SalesTeam.unit),
+        )
+        .where(User.id == user_id)
+    )
+    return db.scalars(statement).first()
 
 
 def create_access_token(user: User) -> str:
@@ -113,9 +122,16 @@ def create_user(
 
         if organization is None:
             raise AuthError("Organization not found.")
+    if payload.team_id is not None:
+        team = db.get(SalesTeam, payload.team_id)
+        if team is None:
+            raise AuthError("Sales team not found.")
+        if payload.organization_id is not None and team.organization_id != payload.organization_id:
+            raise AuthError("Sales team does not belong to the selected organization.")
 
     user = User(
         organization_id=payload.organization_id,
+        team_id=payload.team_id,
         created_by_user_id=created_by_user.id if created_by_user is not None else None,
         name=payload.name.strip(),
         email=normalized_email,
@@ -135,7 +151,11 @@ def list_users(db: Session) -> list[User]:
     return list(
         db.scalars(
             select(User)
-            .options(selectinload(User.created_by_user))
+            .options(
+                selectinload(User.organization),
+                selectinload(User.created_by_user),
+                selectinload(User.sales_team).selectinload(SalesTeam.unit),
+            )
             .order_by(User.created_at.desc())
         ).all()
     )
@@ -169,6 +189,17 @@ def update_user(
         if organization is None:
             raise AuthError("Organization not found.")
         user.organization_id = payload.organization_id
+
+    if payload.team_id is not None:
+        team = db.get(SalesTeam, payload.team_id)
+        if team is None:
+            raise AuthError("Sales team not found.")
+        organization_id = payload.organization_id if payload.organization_id is not None else user.organization_id
+        if organization_id is None or team.organization_id != organization_id:
+            raise AuthError("Sales team does not belong to the selected organization.")
+        user.team_id = payload.team_id
+    elif payload.team_id is None and "team_id" in payload.model_fields_set:
+        user.team_id = None
 
     db.add(user)
     db.commit()

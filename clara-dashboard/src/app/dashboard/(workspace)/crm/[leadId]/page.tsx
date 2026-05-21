@@ -11,6 +11,8 @@ import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
 import type {
   CurrentUser,
   LeadDealItem,
+  LeadDisciplineLogCreateRequest,
+  LeadDisciplineSuggestionResponse,
   LeadDealUpsertRequest,
   LeadDetail,
   LeadTaskCreateRequest,
@@ -33,6 +35,29 @@ const STAGE_OPTIONS = [
 
 const TEMPERATURE_OPTIONS = ["cold", "warm", "hot", "unknown"];
 const DEAL_STATUS_OPTIONS = ["open", "won", "lost"];
+const DISCIPLINE_ACTIVITY_OPTIONS = [
+  "follow_up_call",
+  "follow_up_chat",
+  "site_visit",
+  "proposal_sent",
+  "closing_push",
+  "internal_coordination",
+];
+const DISCIPLINE_RESULT_OPTIONS = [
+  "waiting_customer",
+  "follow_up_scheduled",
+  "needs_escalation",
+  "won_progress",
+  "lost_signal",
+  "no_response",
+];
+const DISCIPLINE_MOOD_OPTIONS = [
+  "positive",
+  "neutral",
+  "cautious",
+  "resistant",
+  "unresponsive",
+];
 
 function toDateTimeLocalValue(value: string | null): string {
   if (!value) {
@@ -68,6 +93,23 @@ function formatTimelineValue(value: string | null): string {
   return value;
 }
 
+function getTodayDateInputValue(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDisciplineStatus(value: string): string {
+  switch (value) {
+    case "logged_today":
+      return "Logged today";
+    case "missing_today_log":
+      return "Missing today log";
+    case "stale_log":
+      return "Stale log";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
 export default function LeadDetailPage() {
   const params = useParams<{ leadId: string }>();
   const leadId = params.leadId;
@@ -78,11 +120,16 @@ export default function LeadDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [isCreatingDisciplineLog, setIsCreatingDisciplineLog] = useState(false);
+  const [isPrefillingDisciplineLog, setIsPrefillingDisciplineLog] = useState(false);
   const [isSavingDeal, setIsSavingDeal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [dealSuccessMessage, setDealSuccessMessage] = useState("");
   const [taskErrorMessage, setTaskErrorMessage] = useState("");
+  const [disciplineErrorMessage, setDisciplineErrorMessage] = useState("");
+  const [disciplineSuccessMessage, setDisciplineSuccessMessage] = useState("");
+  const [disciplineSuggestionHint, setDisciplineSuggestionHint] = useState("");
   const [dealErrorMessage, setDealErrorMessage] = useState("");
 
   const [summaryInput, setSummaryInput] = useState("");
@@ -95,6 +142,21 @@ export default function LeadDetailPage() {
   const [taskTitleInput, setTaskTitleInput] = useState("");
   const [taskDescriptionInput, setTaskDescriptionInput] = useState("");
   const [taskDueAtInput, setTaskDueAtInput] = useState("");
+  const [disciplineLogDateInput, setDisciplineLogDateInput] = useState(
+    getTodayDateInputValue()
+  );
+  const [disciplineActivityTypeInput, setDisciplineActivityTypeInput] = useState(
+    DISCIPLINE_ACTIVITY_OPTIONS[0]
+  );
+  const [disciplineResultStatusInput, setDisciplineResultStatusInput] = useState(
+    DISCIPLINE_RESULT_OPTIONS[0]
+  );
+  const [disciplineObjectionInput, setDisciplineObjectionInput] = useState("");
+  const [disciplineMoodInput, setDisciplineMoodInput] = useState(
+    DISCIPLINE_MOOD_OPTIONS[0]
+  );
+  const [disciplineNotesInput, setDisciplineNotesInput] = useState("");
+  const [disciplineFollowUpInput, setDisciplineFollowUpInput] = useState("");
   const [dealStatusInput, setDealStatusInput] = useState("open");
   const [dealCurrencyInput, setDealCurrencyInput] = useState("IDR");
   const [expectedValueInput, setExpectedValueInput] = useState("0");
@@ -103,7 +165,8 @@ export default function LeadDetailPage() {
   const [dealClosedAtInput, setDealClosedAtInput] = useState("");
   const [dealNotesInput, setDealNotesInput] = useState("");
 
-  const canReassignLead = currentUser?.role === "admin" || currentUser?.role === "owner";
+  const canReassignLead =
+    currentUser?.role === "head" || currentUser?.role === "superadmin";
 
   const fetchLeadDetail = useCallback(async (): Promise<LeadDetail> => {
     return apiFetch<LeadDetail>(`/leads/${leadId}`);
@@ -120,11 +183,15 @@ export default function LeadDetailPage() {
     setErrorMessage("");
 
     try {
-      const [me, leadDetail, scopedUsers] = await Promise.all([
+      const [me, leadDetail] = await Promise.all([
         apiFetch<CurrentUser>("/auth/me"),
         fetchLeadDetail(),
-        apiFetch<CurrentUser[]>("/auth/users"),
       ]);
+      const canLoadScopedUsers =
+        me.role === "head" || me.role === "superadmin";
+      const scopedUsers = canLoadScopedUsers
+        ? await apiFetch<CurrentUser[]>("/auth/users")
+        : [];
 
       setCurrentUser(me);
       setUsers(scopedUsers.filter((user) => user.is_active));
@@ -143,6 +210,7 @@ export default function LeadDetailPage() {
       setDealClosedAtInput(toDateTimeLocalValue(leadDetail.deal?.closed_at ?? null));
       setDealNotesInput(leadDetail.deal?.notes ?? "");
       setSuccessMessage("");
+      setDisciplineSuccessMessage("");
       setDealSuccessMessage("");
     } catch (error) {
       setLead(null);
@@ -296,6 +364,96 @@ export default function LeadDetailPage() {
       );
     } finally {
       setIsCreatingTask(false);
+    }
+  }
+
+  async function handleCreateDisciplineLog(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!lead) {
+      return;
+    }
+
+    setIsCreatingDisciplineLog(true);
+    setDisciplineErrorMessage("");
+    setDisciplineSuccessMessage("");
+
+    try {
+      const payload: LeadDisciplineLogCreateRequest = {
+        log_date: disciplineLogDateInput || null,
+        activity_type: disciplineActivityTypeInput,
+        result_status: disciplineResultStatusInput,
+        main_objection: disciplineObjectionInput.trim() || null,
+        customer_mood: disciplineMoodInput || null,
+        notes: disciplineNotesInput.trim() || null,
+        next_follow_up_at: fromDateTimeLocalValue(disciplineFollowUpInput),
+      };
+
+      await apiFetch(`/leads/${lead.id}/discipline-logs`, {
+        method: "POST",
+        body: payload,
+      });
+
+      const refreshedLead = await fetchLeadDetail();
+      setLead(refreshedLead);
+      setFollowUpInput(toDateTimeLocalValue(refreshedLead.next_follow_up_at));
+      setDisciplineLogDateInput(getTodayDateInputValue());
+      setDisciplineActivityTypeInput(DISCIPLINE_ACTIVITY_OPTIONS[0]);
+      setDisciplineResultStatusInput(DISCIPLINE_RESULT_OPTIONS[0]);
+      setDisciplineObjectionInput("");
+      setDisciplineMoodInput(DISCIPLINE_MOOD_OPTIONS[0]);
+      setDisciplineNotesInput("");
+      setDisciplineFollowUpInput("");
+      setDisciplineSuccessMessage("Discipline log berhasil disimpan.");
+      setDisciplineSuggestionHint("");
+    } catch (error) {
+      setDisciplineErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal menyimpan discipline log."
+      );
+    } finally {
+      setIsCreatingDisciplineLog(false);
+    }
+  }
+
+  async function handlePrefillDisciplineLog() {
+    if (!lead) {
+      return;
+    }
+
+    setIsPrefillingDisciplineLog(true);
+    setDisciplineErrorMessage("");
+    setDisciplineSuccessMessage("");
+
+    try {
+      const suggestion = await apiFetch<LeadDisciplineSuggestionResponse>(
+        `/leads/${lead.id}/discipline-log-suggestion`
+      );
+      setDisciplineActivityTypeInput(suggestion.activity_type);
+      setDisciplineResultStatusInput(suggestion.result_status);
+      setDisciplineObjectionInput(suggestion.main_objection ?? "");
+      setDisciplineMoodInput(
+        suggestion.customer_mood && DISCIPLINE_MOOD_OPTIONS.includes(suggestion.customer_mood)
+          ? suggestion.customer_mood
+          : DISCIPLINE_MOOD_OPTIONS[0]
+      );
+      setDisciplineNotesInput(suggestion.notes);
+      setDisciplineFollowUpInput(
+        toDateTimeLocalValue(suggestion.next_follow_up_at)
+      );
+      setDisciplineSuggestionHint(
+        `${suggestion.source_summary} Confidence ${Math.round(
+          suggestion.confidence_score * 100
+        )}%.`
+      );
+    } catch (error) {
+      setDisciplineErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal mengambil prefill discipline log dari Clara."
+      );
+    } finally {
+      setIsPrefillingDisciplineLog(false);
     }
   }
 
@@ -505,6 +663,222 @@ export default function LeadDetailPage() {
                   </button>
                 </div>
               </form>
+
+              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-950">
+                      Daily Discipline Log
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Catat hasil aktivitas harian sales langsung dari halaman lead supaya manager bisa membaca ritme kerja, objection, dan follow-up tanpa menebak.
+                    </p>
+                  </div>
+                  {disciplineSuccessMessage ? (
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      {disciplineSuccessMessage}
+                    </span>
+                  ) : null}
+                </div>
+
+                {disciplineSuggestionHint ? (
+                  <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-700">
+                    {disciplineSuggestionHint}
+                  </div>
+                ) : null}
+
+                <div className="mt-5 grid gap-4 md:grid-cols-4">
+                  <Metric
+                    label="Compliance"
+                    value={formatDisciplineStatus(lead.discipline_summary.compliance_status)}
+                  />
+                  <Metric
+                    label="Latest log"
+                    value={lead.discipline_summary.latest_log_date ?? "-"}
+                  />
+                  <Metric
+                    label="Logs today"
+                    value={String(lead.discipline_summary.logs_today_count)}
+                  />
+                  <Metric
+                    label="Total logs"
+                    value={String(lead.discipline_summary.log_count)}
+                  />
+                </div>
+
+                {disciplineErrorMessage ? (
+                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {disciplineErrorMessage}
+                  </div>
+                ) : null}
+
+                <form
+                  onSubmit={(event) => void handleCreateDisciplineLog(event)}
+                  className="mt-6 space-y-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5"
+                >
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <Field label="Log date">
+                      <input
+                        type="date"
+                        value={disciplineLogDateInput}
+                        onChange={(event) => setDisciplineLogDateInput(event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+
+                    <Field label="Activity type">
+                      <select
+                        value={disciplineActivityTypeInput}
+                        onChange={(event) =>
+                          setDisciplineActivityTypeInput(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      >
+                        {DISCIPLINE_ACTIVITY_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Result status">
+                      <select
+                        value={disciplineResultStatusInput}
+                        onChange={(event) =>
+                          setDisciplineResultStatusInput(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      >
+                        {DISCIPLINE_RESULT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Customer mood">
+                      <select
+                        value={disciplineMoodInput}
+                        onChange={(event) => setDisciplineMoodInput(event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      >
+                        {DISCIPLINE_MOOD_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Main objection">
+                      <input
+                        value={disciplineObjectionInput}
+                        onChange={(event) =>
+                          setDisciplineObjectionInput(event.target.value)
+                        }
+                        placeholder="Contoh: legalitas, harga, trust"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+
+                    <Field label="Next follow-up">
+                      <input
+                        type="datetime-local"
+                        value={disciplineFollowUpInput}
+                        onChange={(event) =>
+                          setDisciplineFollowUpInput(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Notes">
+                    <textarea
+                      value={disciplineNotesInput}
+                      onChange={(event) => setDisciplineNotesInput(event.target.value)}
+                      rows={4}
+                      placeholder="Tulis hasil follow-up hari ini, sinyal customer, dan langkah berikutnya."
+                      className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
+                    />
+                  </Field>
+
+                  <div className="flex justify-end">
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void handlePrefillDisciplineLog()}
+                        disabled={isPrefillingDisciplineLog}
+                        className="inline-flex rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {isPrefillingDisciplineLog
+                          ? "Clara sedang mengisi..."
+                          : "Prefill dengan Clara"}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isCreatingDisciplineLog}
+                        className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {isCreatingDisciplineLog
+                          ? "Menyimpan log..."
+                          : "Simpan Discipline Log"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+
+                <div className="mt-6 space-y-3">
+                  {lead.discipline_logs.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
+                      Belum ada discipline log untuk lead ini.
+                    </div>
+                  ) : (
+                    lead.discipline_logs.slice(0, 5).map((log) => (
+                      <article
+                        key={log.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-semibold text-slate-950">
+                              {log.activity_type.replaceAll("_", " ")} ·{" "}
+                              {log.result_status.replaceAll("_", " ")}
+                            </h3>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {log.actor_user_name ?? "System"} · {log.log_date}
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                            {log.customer_mood?.replaceAll("_", " ") ?? "no mood"}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <Metric
+                            label="Main objection"
+                            value={log.main_objection ?? "-"}
+                          />
+                          <Metric
+                            label="Next follow-up"
+                            value={formatDateTime(log.next_follow_up_at)}
+                          />
+                        </div>
+
+                        {log.notes ? (
+                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                            {log.notes}
+                          </p>
+                        ) : null}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
             </section>
 
             <aside className="space-y-6">

@@ -45,6 +45,62 @@ class DashboardSentMessageSummary(BaseModel):
     sent_at: datetime
 
 
+class ChatReviewNoteItem(BaseModel):
+    id: UUID
+    author_user_id: UUID | None
+    author_user_name: str | None
+    note_type: str
+    body: str
+    created_at: datetime
+
+
+class ChatReviewCaseItem(BaseModel):
+    id: UUID
+    conversation_id: UUID
+    organization_id: UUID | None
+    lead_id: UUID | None
+    submitted_by_user_id: UUID | None
+    submitted_by_user_name: str | None
+    reviewer_user_id: UUID | None
+    reviewer_user_name: str | None
+    status: str
+    review_label: str
+    review_summary: str | None
+    coaching_focus: str | None
+    recommended_action: str | None
+    reviewed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    notes: list[ChatReviewNoteItem]
+
+
+class KnowledgeUpdateProposalItem(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    conversation_id: UUID
+    conversation_title: str | None
+    chat_review_case_id: UUID | None
+    lead_id: UUID | None
+    proposed_by_user_id: UUID | None
+    proposed_by_user_name: str | None
+    reviewed_by_user_id: UUID | None
+    reviewed_by_user_name: str | None
+    published_product_knowledge_id: UUID | None
+    published_product_knowledge_title: str | None
+    title: str
+    category: str
+    proposed_content: str
+    source_type: str
+    rationale: str | None
+    status: str
+    review_decision_note: str | None
+    submitted_at: datetime | None
+    reviewed_at: datetime | None
+    published_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class SalesInboxItem(BaseModel):
     conversation_id: UUID
     organization_id: UUID | None
@@ -57,6 +113,7 @@ class SalesInboxItem(BaseModel):
     last_message_at: datetime | None
     created_at: datetime
     sales_user_id: UUID | None
+    sales_owner_name: str | None
     latest_message: DashboardLatestMessage | None
     latest_ai_extraction: DashboardAIExtractionSummary | None
     latest_reply_suggestion: DashboardReplySuggestionSummary | None
@@ -81,6 +138,8 @@ class SalesConversationDetail(BaseModel):
     latest_ai_extraction: DashboardAIExtractionSummary | None
     latest_reply_suggestion: DashboardReplySuggestionSummary | None
     sent_messages: list[DashboardSentMessageSummary]
+    chat_review_case: ChatReviewCaseItem | None
+    knowledge_update_proposal: KnowledgeUpdateProposalItem | None
 
 
 class SalesWorklistItem(BaseModel):
@@ -99,6 +158,7 @@ class SalesWorklistItem(BaseModel):
     recommended_action: str
     last_contact_at: datetime | None
     next_follow_up_at: datetime | None
+    latest_discipline_log_date: date | None = None
 
 
 class SalesWorklistResponse(BaseModel):
@@ -113,6 +173,8 @@ class SalesWorklistResponse(BaseModel):
     overdue_24h_count: int
     overdue_72h_count: int
     open_task_count: int
+    missing_discipline_log_count: int
+    stale_discipline_log_count: int
     completion_rate_today: float
     items: list[SalesWorklistItem]
 
@@ -165,6 +227,10 @@ class ChatReviewQueueItem(BaseModel):
     latest_ai_extraction: DashboardAIExtractionSummary | None
     latest_reply_suggestion: DashboardReplySuggestionSummary | None
     latest_sent_message: DashboardSentMessageSummary | None
+    active_review_case_id: UUID | None = None
+    active_review_status: str | None = None
+    active_review_label: str | None = None
+    active_review_reviewer_name: str | None = None
 
 
 class ChatReviewCenterResponse(BaseModel):
@@ -177,6 +243,102 @@ class ChatReviewCenterResponse(BaseModel):
     ready_to_send_count: int
     stale_count: int
     items: list[ChatReviewQueueItem]
+
+
+class ManagerTeamDisciplineRow(BaseModel):
+    team_id: UUID | None
+    team_name: str
+    unit_id: UUID | None
+    unit_name: str | None
+    manager_user_name: str | None
+    member_count: int
+    lead_count: int
+    missing_or_stale_logs: int
+    overdue_follow_ups: int
+    open_coaching_cases: int
+    pending_knowledge_proposals: int
+    discipline_compliance_rate: float
+    follow_up_compliance_rate: float
+
+
+class ManagerCoachingPriorityItem(BaseModel):
+    review_case_id: UUID
+    conversation_id: UUID
+    lead_id: UUID | None
+    lead_name: str
+    conversation_title: str
+    sales_owner_name: str | None
+    reviewer_user_name: str | None
+    review_status: str
+    review_label: str
+    risk_level: str | None
+    latest_message_at: datetime | None
+    priority_score: int
+    recommended_action: str | None
+
+
+class ManagerObjectionTrendItem(BaseModel):
+    objection: str
+    count: int
+
+
+class ManagerBoundaryAlertItem(BaseModel):
+    team_id: UUID | None
+    team_name: str
+    unit_id: UUID | None
+    unit_name: str | None
+    severity: str
+    title: str
+    description: str
+    target_href: str | None
+
+
+class ManagerInsightsResponse(BaseModel):
+    generated_at: datetime
+    scope_label: str
+    scope_team_count: int
+    scope_member_count: int
+    total_leads: int
+    stale_lead_ratio: float
+    follow_up_compliance_rate: float
+    missing_or_stale_log_count: int
+    overdue_follow_up_count: int
+    open_coaching_case_count: int
+    pending_knowledge_proposal_count: int
+    team_discipline: list[ManagerTeamDisciplineRow]
+    coaching_priority: list[ManagerCoachingPriorityItem]
+    objection_trends: list[ManagerObjectionTrendItem]
+    boundary_alerts: list[ManagerBoundaryAlertItem]
+
+
+class ChatReviewCaseUpsertRequest(BaseModel):
+    reviewer_user_id: UUID | None = None
+    status: str
+    review_label: str
+    review_summary: str | None = None
+    coaching_focus: str | None = None
+    recommended_action: str | None = None
+
+
+class ChatReviewCaseSuggestionResponse(BaseModel):
+    status: str
+    review_label: str
+    review_summary: str
+    coaching_focus: str
+    recommended_action: str
+    confidence_score: float
+    source_summary: str
+
+
+class ChatReviewNoteCreateRequest(BaseModel):
+    note_type: str = "manager_note"
+    body: str
+
+
+class ChatReviewerCandidateItem(BaseModel):
+    id: UUID
+    name: str
+    role: str
 
 
 class OpsNotificationItem(BaseModel):

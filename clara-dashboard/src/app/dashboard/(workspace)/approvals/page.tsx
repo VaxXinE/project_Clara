@@ -471,6 +471,21 @@ function ReviewCard({
             </p>
           </div>
 
+          {item.active_review_case_id ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <p className="clara-kicker text-xs text-amber-700">
+                Active Coaching Case
+              </p>
+              <p className="mt-3 text-sm font-semibold text-amber-900">
+                {formatStatusLabel(item.active_review_status ?? "draft")} ·{" "}
+                {(item.active_review_label ?? "unik").replaceAll("_", " ")}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-amber-800">
+                Reviewer: {item.active_review_reviewer_name ?? "Belum ditunjuk"}
+              </p>
+            </div>
+          ) : null}
+
           <div className="grid gap-3 sm:grid-cols-3">
             <MetaCard
               label="AI Status"

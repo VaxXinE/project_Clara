@@ -26,20 +26,30 @@ os.environ.setdefault(
     "http://localhost:3000,http://127.0.0.1:3000",
 )
 
-from app.api import routes_auth, routes_dashboard, routes_extension, routes_product_knowledge
+from app.api import (
+    routes_auth,
+    routes_dashboard,
+    routes_extension,
+    routes_product_knowledge,
+    routes_sales_structure,
+)
 from app.core.config import settings
 from app.db.session import Base, get_db
 from app.main import create_app
 from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
 from app.models.audit_log import AuditLog
+from app.models.chat_review_case import ChatReviewCase
+from app.models.chat_review_note import ChatReviewNote
 from app.models.conversation import Conversation
 from app.models.customer_profile import CustomerProfile
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
+from app.models.knowledge_update_proposal import KnowledgeUpdateProposal
 from app.models.lead import Lead
 from app.models.lead_activity_event import LeadActivityEvent
 from app.models.lead_deal import LeadDeal
+from app.models.lead_discipline_log import LeadDisciplineLog
 from app.models.lead_task import LeadTask
 from app.models.lead_task_event import LeadTaskEvent
 from app.models.marketing_execution_item import MarketingExecutionItem
@@ -48,6 +58,8 @@ from app.models.organization import Organization
 from app.models.ops_notification import OpsNotification
 from app.models.product_knowledge import ProductKnowledge
 from app.models.reply_suggestion import ReplySuggestion
+from app.models.sales_team import SalesTeam
+from app.models.sales_unit import SalesUnit
 from app.models.sent_message import SentMessage
 from app.models.user import User
 from app.services.auth_service import hash_password
@@ -76,12 +88,15 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
         bind=engine,
         tables=[
             Organization.__table__,
+            SalesUnit.__table__,
+            SalesTeam.__table__,
             User.__table__,
             CustomerProfile.__table__,
             KpiCommandSnapshot.__table__,
             KpiAlertRecord.__table__,
             Lead.__table__,
             LeadActivityEvent.__table__,
+            LeadDisciplineLog.__table__,
             LeadTask.__table__,
             LeadTaskEvent.__table__,
             LeadDeal.__table__,
@@ -93,8 +108,11 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             ReplySuggestion.__table__,
             ApprovalLog.__table__,
             AuditLog.__table__,
+            ChatReviewCase.__table__,
+            ChatReviewNote.__table__,
             SentMessage.__table__,
             ProductKnowledge.__table__,
+            KnowledgeUpdateProposal.__table__,
         ],
     )
 
@@ -103,6 +121,11 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
     monkeypatch.setattr(routes_dashboard, "create_audit_log", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         routes_product_knowledge,
+        "create_audit_log",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        routes_sales_structure,
         "create_audit_log",
         lambda *args, **kwargs: None,
     )
@@ -117,15 +140,19 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
     Base.metadata.drop_all(
         bind=engine,
         tables=[
+            KnowledgeUpdateProposal.__table__,
             ProductKnowledge.__table__,
             SentMessage.__table__,
             AuditLog.__table__,
+            ChatReviewNote.__table__,
+            ChatReviewCase.__table__,
             ApprovalLog.__table__,
             ReplySuggestion.__table__,
             AIExtraction.__table__,
             Message.__table__,
             Conversation.__table__,
             LeadActivityEvent.__table__,
+            LeadDisciplineLog.__table__,
             LeadTaskEvent.__table__,
             LeadTask.__table__,
             LeadDeal.__table__,
@@ -135,6 +162,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             CustomerProfile.__table__,
             KpiAlertRecord.__table__,
             KpiCommandSnapshot.__table__,
+            SalesTeam.__table__,
+            SalesUnit.__table__,
             User.__table__,
             Organization.__table__,
         ],
@@ -180,7 +209,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         name="Owner Clara",
         email="owner@clara.local",
         hashed_password=hash_password("OwnerPass123!"),
-        role="owner",
+        role="superadmin",
         is_active=True,
     )
     admin_a = User(
@@ -188,7 +217,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         name="Admin Alpha",
         email="admin.alpha@clara.local",
         hashed_password=hash_password("AdminPass123!"),
-        role="admin",
+        role="head",
         is_active=True,
     )
     admin_b = User(
@@ -196,7 +225,23 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         name="Admin Beta",
         email="admin.beta@clara.local",
         hashed_password=hash_password("AdminPass123!"),
-        role="admin",
+        role="head",
+        is_active=True,
+    )
+    manager_a = User(
+        organization_id=org_a.id,
+        name="Manager Alpha",
+        email="manager.alpha@clara.local",
+        hashed_password=hash_password("ManagerPass123!"),
+        role="manager",
+        is_active=True,
+    )
+    manager_b = User(
+        organization_id=org_a.id,
+        name="Manager Beta",
+        email="manager.beta@clara.local",
+        hashed_password=hash_password("ManagerPass123!"),
+        role="manager",
         is_active=True,
     )
     marketing_a = User(
@@ -205,7 +250,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         name="Marketing Alpha",
         email="marketing.alpha@clara.local",
         hashed_password=hash_password("MarketingPass123!"),
-        role="marketing",
+        role="sales",
         is_active=True,
     )
     marketing_b = User(
@@ -214,7 +259,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         name="Marketing Beta",
         email="marketing.beta@clara.local",
         hashed_password=hash_password("MarketingPass123!"),
-        role="marketing",
+        role="sales",
         is_active=True,
     )
     marketing_other_org = User(
@@ -223,7 +268,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         name="Marketing Gamma",
         email="marketing.gamma@clara.local",
         hashed_password=hash_password("MarketingPass123!"),
-        role="marketing",
+        role="sales",
         is_active=True,
     )
     inactive_user = User(
@@ -231,7 +276,7 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         name="Inactive User",
         email="inactive@clara.local",
         hashed_password=hash_password("InactivePass123!"),
-        role="marketing",
+        role="sales",
         is_active=False,
     )
 
@@ -240,6 +285,8 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
             owner,
             admin_a,
             admin_b,
+            manager_a,
+            manager_b,
             marketing_a,
             marketing_b,
             marketing_other_org,
@@ -248,6 +295,8 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
     )
     db.flush()
 
+    manager_a.created_by_user_id = admin_a.id
+    manager_b.created_by_user_id = admin_b.id
     marketing_a.created_by_user_id = admin_a.id
     marketing_b.created_by_user_id = admin_b.id
     marketing_other_org.created_by_user_id = admin_b.id
@@ -303,6 +352,8 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
     db.refresh(owner)
     db.refresh(admin_a)
     db.refresh(admin_b)
+    db.refresh(manager_a)
+    db.refresh(manager_b)
     db.refresh(marketing_a)
     db.refresh(marketing_b)
     db.refresh(marketing_other_org)
@@ -318,6 +369,8 @@ def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object]
         "owner": owner,
         "admin_a": admin_a,
         "admin_b": admin_b,
+        "manager_a": manager_a,
+        "manager_b": manager_b,
         "marketing_a": marketing_a,
         "marketing_b": marketing_b,
         "marketing_other_org": marketing_other_org,

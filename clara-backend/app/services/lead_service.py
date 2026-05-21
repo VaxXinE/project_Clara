@@ -12,6 +12,7 @@ from app.models.customer_profile import CustomerProfile
 from app.models.lead import Lead
 from app.models.lead_activity_event import LeadActivityEvent
 from app.models.lead_deal import LeadDeal
+from app.models.lead_discipline_log import LeadDisciplineLog
 from app.models.lead_task import LeadTask
 from app.models.user import User
 from app.schemas.lead_schema import (
@@ -20,6 +21,7 @@ from app.schemas.lead_schema import (
     LeadDealItem,
     LeadDealUpsertRequest,
     LeadDetail,
+    LeadDisciplineSummaryItem,
     LeadListItem,
     LeadUpdateRequest,
 )
@@ -31,11 +33,23 @@ from app.services.customer_profile_service import (
     build_customer_profile_summary,
     ensure_customer_profile_for_lead,
 )
-from app.services.access_control_service import can_access_all_conversations
+from app.services.lead_discipline_service import (
+    build_lead_discipline_summary,
+    list_lead_discipline_logs,
+)
+from app.services.access_control_service import (
+    apply_sales_user_scope_filter,
+    can_access_all_conversations,
+    get_accessible_sales_user_ids,
+)
 from app.services.lead_task_service import (
     list_tasks_for_lead,
     upsert_follow_up_task_for_lead,
     validate_assignee_for_lead,
+)
+from app.services.business_segmentation_service import (
+    matches_account_category,
+    normalize_account_category,
 )
 from app.services.source_intelligence_service import (
     build_source_label,
@@ -82,6 +96,7 @@ def ensure_conversation_lead(
     *,
     conversation: Conversation,
     preferred_name: str | None = None,
+    account_category: str | None = None,
 ) -> Lead:
     if conversation.lead_id is not None:
         lead = db.get(Lead, conversation.lead_id)
@@ -96,6 +111,7 @@ def ensure_conversation_lead(
             preferred_name=preferred_name,
         ),
         source=conversation.source,
+        account_category=normalize_account_category(account_category),
         current_stage=conversation.current_stage,
         lead_temperature=conversation.lead_temperature,
         last_contact_at=conversation.last_message_at,
@@ -126,12 +142,27 @@ def sync_lead_from_conversation(
     conversation: Conversation,
     customer_summary: str | None = None,
     next_follow_up_at: datetime | None = None,
+    account_category: str | None = None,
 ) -> Lead:
     lead = ensure_conversation_lead(db=db, conversation=conversation)
     lead.organization_id = conversation.organization_id
     lead.assigned_user_id = conversation.sales_user_id
     lead.display_name = derive_lead_display_name(conversation=conversation)
     lead.source = conversation.source
+    if account_category is not None:
+        next_account_category = normalize_account_category(account_category)
+        if next_account_category != lead.account_category:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="account_category_changed",
+                title="Segmentasi bisnis lead diperbarui",
+                description="Kategori mini atau reguler diperbarui dari sumber integrasi terbaru.",
+                actor_user_id=conversation.sales_user_id,
+                from_value=lead.account_category,
+                to_value=next_account_category,
+            )
+            lead.account_category = next_account_category
     if conversation.current_stage != lead.current_stage:
         create_lead_activity_event(
             db=db,
@@ -214,6 +245,7 @@ def build_lead_list_item(lead: Lead) -> LeadListItem:
         source=lead.source,
         source_channel=normalize_source_channel(lead.source),
         source_label=build_source_label(lead.source),
+        account_category=lead.account_category,
         current_stage=lead.current_stage,
         lead_temperature=lead.lead_temperature,
         summary=lead.summary,
@@ -258,12 +290,17 @@ def build_lead_detail_for_user(
 ) -> LeadDetail:
     list_item = build_lead_list_item(lead)
     visible_customer_leads = None
-    if lead.customer_profile and current_user is not None and not can_access_all_conversations(current_user):
-        visible_customer_leads = [
-            related_lead
-            for related_lead in lead.customer_profile.leads
-            if related_lead.assigned_user_id == current_user.id
-        ]
+    if lead.customer_profile and current_user is not None:
+        accessible_user_ids = get_accessible_sales_user_ids(
+            db=db,
+            current_user=current_user,
+        )
+        if accessible_user_ids is not None:
+            visible_customer_leads = [
+                related_lead
+                for related_lead in lead.customer_profile.leads
+                if related_lead.assigned_user_id in accessible_user_ids
+            ]
     return LeadDetail(
         **list_item.model_dump(),
         conversation_ids=[
@@ -286,6 +323,10 @@ def build_lead_detail_for_user(
         deal=build_lead_deal_item(lead.deal) if lead.deal else None,
         tasks=list_tasks_for_lead(lead),
         timeline=list_lead_activity_events(db=db, lead_id=lead.id),
+        discipline_summary=LeadDisciplineSummaryItem(
+            **build_lead_discipline_summary(lead).model_dump()
+        ),
+        discipline_logs=list_lead_discipline_logs(lead=lead),
     )
 
 
@@ -309,6 +350,7 @@ def get_lead_model_for_user(
             selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
             selectinload(Lead.deal).selectinload(LeadDeal.owner_user),
             selectinload(Lead.activity_events).selectinload(LeadActivityEvent.actor_user),
+            selectinload(Lead.discipline_logs).selectinload(LeadDisciplineLog.actor_user),
         )
     )
     lead = db.scalars(statement).first()
@@ -325,7 +367,11 @@ def get_lead_model_for_user(
             detail="Lead not found.",
         )
 
-    if not can_access_all_conversations(current_user) and lead.assigned_user_id != current_user.id:
+    accessible_user_ids = get_accessible_sales_user_ids(
+        db=db,
+        current_user=current_user,
+    )
+    if accessible_user_ids is not None and lead.assigned_user_id not in accessible_user_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lead not found.",
@@ -339,6 +385,7 @@ def get_leads_for_user(
     *,
     current_user: User,
     source_channel: str | None = None,
+    account_category: str | None = None,
 ) -> list[LeadListItem]:
     if current_user.organization_id is None:
         return []
@@ -354,13 +401,18 @@ def get_leads_for_user(
         .order_by(desc(Lead.last_contact_at), desc(Lead.created_at))
     )
 
-    if not can_access_all_conversations(current_user):
-        statement = statement.where(Lead.assigned_user_id == current_user.id)
+    statement = apply_sales_user_scope_filter(
+        statement,
+        db=db,
+        current_user=current_user,
+        sales_user_id_column=Lead.assigned_user_id,
+    )
 
     leads = [
         lead
         for lead in db.scalars(statement).all()
         if matches_source_channel(lead.source, source_channel)
+        and matches_account_category(lead.account_category, account_category)
     ]
     backfilled = False
     for lead in leads:
@@ -436,6 +488,21 @@ def update_lead_for_user(
             )
             lead.current_stage = payload.current_stage
 
+    if payload.account_category is not None:
+        next_account_category = normalize_account_category(payload.account_category)
+        if next_account_category != lead.account_category:
+            create_lead_activity_event(
+                db=db,
+                lead=lead,
+                event_type="account_category_changed",
+                title="Segmentasi bisnis diperbarui",
+                description="Kategori mini atau reguler diubah dari CRM.",
+                actor_user_id=current_user.id,
+                from_value=lead.account_category,
+                to_value=next_account_category,
+            )
+            lead.account_category = next_account_category
+
     if payload.lead_temperature is not None:
         if payload.lead_temperature not in VALID_TEMPERATURES:
             raise HTTPException(
@@ -503,7 +570,7 @@ def update_lead_for_user(
         if not can_access_all_conversations(current_user):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admin can reassign leads.",
+                detail="Only head can reassign leads.",
             )
 
         assignee = validate_assignee_for_lead(

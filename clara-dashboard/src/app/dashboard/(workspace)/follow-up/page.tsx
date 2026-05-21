@@ -127,7 +127,7 @@ export default function FollowUpPage() {
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                     {worklist.items.length === 0
                       ? "Kalau tidak ada item prioritas, kembali cek Queue atau Lead Management. Bisa jadi tidak ada task yang jatuh tempo hari ini."
-                      : "Halaman ini bukan untuk membaca semua detail dari awal. Fungsinya adalah memilih tindakan harian tercepat: buka conversation, snooze, dismiss, atau tandai done."}
+                      : "Halaman ini bukan untuk membaca semua detail dari awal. Fungsinya adalah memilih tindakan harian tercepat: buka conversation, dismiss, atau tandai done."}
                   </p>
                 </div>
                 <Link
@@ -154,7 +154,7 @@ export default function FollowUpPage() {
                 />
                 <UsageHint
                   title="2. Putuskan lifecycle action"
-                  description="Buka conversation kalau perlu konteks, snooze kalau belum waktunya, dismiss kalau tidak relevan sementara, dan done kalau task benar-benar selesai."
+                  description="Buka conversation kalau perlu konteks, dismiss kalau tidak relevan sementara, dan done kalau task benar-benar selesai."
                 />
                 <UsageHint
                   title="3. Rapikan lead bila perlu"
@@ -171,7 +171,7 @@ export default function FollowUpPage() {
                 label="Needs Analysis"
                 value={String(worklist.pending_analysis_count)}
               />
-              <MetricCard label="Snoozed Tasks" value={String(worklist.snoozed_count)} />
+              {/* <MetricCard label="Snoozed Tasks" value={String(worklist.snoozed_count)} /> */}
               <MetricCard
                 label="Done Today"
                 value={String(worklist.completed_today_count)}
@@ -401,6 +401,7 @@ function WorklistRow({
           >
             {isUpdating ? "Memproses..." : "Done"}
           </button>
+          {/* Snooze UI disembunyikan sementara, backend state tetap dipertahankan untuk kompatibilitas data lama.
           {item.task_status === "snoozed" ? (
             <button
               type="button"
@@ -445,7 +446,7 @@ function WorklistRow({
                 Snooze Besok
               </button>
             </>
-          )}
+          )} */}
           <button
             type="button"
             disabled={isUpdating}

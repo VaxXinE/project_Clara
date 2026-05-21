@@ -76,6 +76,35 @@ class LeadActivityEventItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LeadDisciplineLogItem(BaseModel):
+    id: UUID
+    lead_id: UUID
+    organization_id: UUID | None
+    actor_user_id: UUID | None
+    actor_user_name: str | None
+    log_date: date
+    activity_type: str
+    result_status: str
+    main_objection: str | None
+    customer_mood: str | None
+    notes: str | None
+    next_follow_up_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LeadDisciplineSummaryItem(BaseModel):
+    latest_log_date: date | None
+    latest_activity_type: str | None
+    latest_result_status: str | None
+    log_count: int
+    logs_today_count: int
+    days_since_latest_log: int | None
+    compliance_status: str
+
+
 class CustomerRelatedLeadItem(BaseModel):
     id: UUID
     display_name: str
@@ -140,6 +169,7 @@ class LeadListItem(BaseModel):
     source: str
     source_channel: str
     source_label: str
+    account_category: str
     current_stage: str
     lead_temperature: str
     summary: str | None
@@ -160,9 +190,12 @@ class LeadDetail(LeadListItem):
     deal: LeadDealItem | None
     tasks: list[LeadTaskItem]
     timeline: list[LeadActivityEventItem]
+    discipline_summary: LeadDisciplineSummaryItem
+    discipline_logs: list[LeadDisciplineLogItem]
 
 
 class LeadUpdateRequest(BaseModel):
+    account_category: str | None = None
     current_stage: str | None = None
     lead_temperature: str | None = None
     summary: str | None = None
@@ -203,3 +236,34 @@ class LeadDealUpsertRequest(BaseModel):
     expected_close_date: date | None = None
     closed_at: datetime | None = None
     notes: str | None = None
+
+
+class LeadDisciplineLogCreateRequest(BaseModel):
+    log_date: date | None = None
+    activity_type: str
+    result_status: str
+    main_objection: str | None = None
+    customer_mood: str | None = None
+    notes: str | None = None
+    next_follow_up_at: datetime | None = None
+
+
+class LeadDisciplineLogUpdateRequest(BaseModel):
+    log_date: date | None = None
+    activity_type: str | None = None
+    result_status: str | None = None
+    main_objection: str | None = None
+    customer_mood: str | None = None
+    notes: str | None = None
+    next_follow_up_at: datetime | None = None
+
+
+class LeadDisciplineSuggestionResponse(BaseModel):
+    activity_type: str
+    result_status: str
+    main_objection: str | None
+    customer_mood: str | None
+    notes: str
+    next_follow_up_at: datetime | None
+    confidence_score: float
+    source_summary: str

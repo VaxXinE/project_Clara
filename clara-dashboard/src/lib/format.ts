@@ -13,10 +13,10 @@ export function formatStatusLabel(value: string): string {
   const normalizedRole = normalizeWorkspaceRole(value);
 
   if (
-    normalizedRole === "marketing" ||
-    normalizedRole === "admin" ||
-    normalizedRole === "owner" ||
-    normalizedRole === "super_admin"
+    normalizedRole === "sales" ||
+    normalizedRole === "manager" ||
+    normalizedRole === "head" ||
+    normalizedRole === "superadmin"
   ) {
     return getRoleDisplayLabel(value);
   }

@@ -174,7 +174,7 @@ export default function KpiCommandCenterPage() {
       currentUser={currentUser}
       eyebrow="KPI foundation"
       title="KPI Command Center"
-      description="Owner dan admin bisa membaca kesehatan pipeline, produktivitas sales, dan performa organization dari data conversation yang benar-benar sudah ada."
+      description="Superadmin dan head bisa membaca kesehatan pipeline, produktivitas sales, dan performa organization dari data conversation yang benar-benar sudah ada."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
@@ -658,7 +658,7 @@ export default function KpiCommandCenterPage() {
                   Executive Actions
                 </p>
                 <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                  Rekomendasi tindakan untuk owner dan admin
+                  Rekomendasi tindakan untuk superadmin dan head
                 </h2>
 
                 <div className="mt-5 space-y-4">

@@ -22,11 +22,33 @@ class Organization(Base):
     )
 
     users = relationship("User", back_populates="organization")
+    sales_units = relationship(
+        "SalesUnit",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )
+    sales_teams = relationship(
+        "SalesTeam",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )
     customer_profiles = relationship("CustomerProfile", back_populates="organization")
     leads = relationship("Lead", back_populates="organization")
     lead_deals = relationship("LeadDeal", back_populates="organization")
     lead_activity_events = relationship(
         "LeadActivityEvent",
+        back_populates="organization",
+    )
+    lead_discipline_logs = relationship(
+        "LeadDisciplineLog",
+        back_populates="organization",
+    )
+    chat_review_cases = relationship(
+        "ChatReviewCase",
+        back_populates="organization",
+    )
+    knowledge_update_proposals = relationship(
+        "KnowledgeUpdateProposal",
         back_populates="organization",
     )
     marketing_execution_items = relationship(

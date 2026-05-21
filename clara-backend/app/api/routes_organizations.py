@@ -14,7 +14,7 @@ from app.services.organization_service import (
     create_organization,
     list_organizations,
 )
-from app.services.role_service import is_owner_like
+from app.services.role_service import is_superadmin_like
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/organizations", tags=["organizations"])
 def create_organization_endpoint(
     payload: CreateOrganizationRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("owner")),
+    _: User = Depends(require_roles("superadmin")),
 ):
     try:
         return create_organization(db=db, payload=payload)
@@ -41,9 +41,9 @@ def create_organization_endpoint(
 @router.get("", response_model=list[OrganizationResponse])
 def list_organizations_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head")),
 ):
-    if is_owner_like(current_user.role):
+    if is_superadmin_like(current_user.role):
         return list_organizations(db=db)
 
     if current_user.organization_id is None:

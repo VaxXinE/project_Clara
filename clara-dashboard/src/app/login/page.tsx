@@ -20,11 +20,10 @@ function isValidEmail(value: string): boolean {
 
 function getDashboardPathForRole(role: string): string {
   switch (role) {
-    case "marketing":
-      return "/dashboard";
-    case "owner":
-      return "/dashboard";
-    case "admin":
+    case "sales":
+    case "manager":
+    case "head":
+    case "superadmin":
     default:
       return "/dashboard";
   }
@@ -187,8 +186,8 @@ export default function LoginPage() {
           )}
 
           <p className="clara-helper mt-4">
-            Kalau email belum terdaftar, minta {getRoleDisplayLabel("admin")} atau{" "}
-            {getRoleDisplayLabel("owner")} untuk membuatkan akun Anda terlebih dulu.
+            Kalau email belum terdaftar, minta {getRoleDisplayLabel("head")} atau{" "}
+            {getRoleDisplayLabel("superadmin")} untuk membuatkan akun Anda terlebih dulu.
           </p>
 
           <button

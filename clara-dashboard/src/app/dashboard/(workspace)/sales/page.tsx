@@ -11,6 +11,7 @@ import {
   getLeadBadgeClass,
   getRiskBadgeClass,
 } from "@/lib/format";
+import { getRoleDisplayLabel, isManagerLike } from "@/lib/roles";
 import type { CurrentUser, SalesInboxItem } from "@/types/dashboard";
 
 const SOURCE_CHANNEL_OPTIONS = [
@@ -55,11 +56,11 @@ export default function SalesInboxPage() {
   }, []);
 
   const canAccessMarketing =
-    currentUser !== null && ["owner", "admin"].includes(currentUser.role);
+    currentUser !== null && ["superadmin", "head"].includes(currentUser.role);
   const canAccessKnowledge =
-    currentUser !== null && currentUser.role === "owner";
+    currentUser !== null && currentUser.role === "superadmin";
   const canAccessAdminOps =
-    currentUser !== null && ["owner", "admin"].includes(currentUser.role);
+    currentUser !== null && ["superadmin", "head"].includes(currentUser.role);
 
   const analyzedCount = inboxItems.filter(
     (item) => item.latest_ai_extraction !== null,
@@ -70,6 +71,7 @@ export default function SalesInboxPage() {
   const highRiskCount = inboxItems.filter(
     (item) => item.latest_ai_extraction?.risk_level === "high",
   ).length;
+  const shouldShowOwnership = isManagerLike(currentUser?.role);
 
   async function handleLogout() {
     try {
@@ -354,6 +356,17 @@ export default function SalesInboxPage() {
                           </p>
 
                           <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
+                            {shouldShowOwnership && item.sales_owner_name ? (
+                              <>
+                                <span>
+                                  Owner:{" "}
+                                  <span className="font-semibold text-slate-700">
+                                    {item.sales_owner_name}
+                                  </span>
+                                </span>
+                                <span>&bull;</span>
+                              </>
+                            ) : null}
                             <span>
                               Pesan terakhir:{" "}
                               {formatDateTime(item.last_message_at)}
@@ -380,6 +393,20 @@ export default function SalesInboxPage() {
                           <p className="mt-2 text-sm font-medium text-slate-800">
                             {formatStatusLabel(item.ui_status)}
                           </p>
+
+                          {shouldShowOwnership ? (
+                            <>
+                              <p className="clara-kicker mt-5 text-[11px]">
+                                Kepemilikan
+                              </p>
+                              <p className="mt-2 text-sm font-medium text-slate-800">
+                                {item.sales_owner_name ?? "Belum ada owner"}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Visible untuk {getRoleDisplayLabel(currentUser?.role)}
+                              </p>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                     </Link>

@@ -134,7 +134,7 @@ def create_conversation_from_messages(
 
 @router.get("/channels", response_model=list[ChannelDefinitionItem])
 def list_upload_channels(
-    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> list[ChannelDefinitionItem]:
     validate_upload_access(current_user)
     return [ChannelDefinitionItem(**item) for item in list_channel_definitions()]
@@ -143,7 +143,7 @@ def list_upload_channels(
 @router.post("/detect-channel", response_model=ChannelDetectResponse)
 def detect_upload_channel(
     payload: ChannelDetectRequest,
-    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> ChannelDetectResponse:
     validate_upload_access(current_user)
     raw_text = payload.raw_text.strip()
@@ -166,7 +166,7 @@ async def upload_whatsapp_txt(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -236,7 +236,7 @@ async def upload_telegram_txt(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -306,7 +306,7 @@ async def upload_whatsapp_raw_text(
     payload: UploadRawChatRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -359,7 +359,7 @@ async def upload_telegram_raw_text(
     payload: UploadRawChatRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 

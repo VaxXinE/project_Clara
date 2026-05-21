@@ -26,7 +26,12 @@ import { useEffect, useState } from "react";
 
 import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
 import { apiFetch } from "@/lib/api";
-import { getRoleDisplayLabel, isAdminLike, isOwnerLike } from "@/lib/roles";
+import {
+  getRoleDisplayLabel,
+  isAdminLike,
+  isManagerLike,
+  isOwnerLike,
+} from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 type WorkspaceShellProps = {
@@ -134,6 +139,15 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       label: "Knowledge Base",
       icon: faBookOpen,
       description: "Landasan jawaban resmi",
+    });
+  }
+
+  if (currentUser && isManagerLike(currentUser.role)) {
+    insightItems.push({
+      href: "/dashboard/manager-insights",
+      label: "Manager Insights",
+      icon: faChartLine,
+      description: "Discipline, coaching, dan alert tim",
     });
   }
 

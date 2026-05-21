@@ -12,7 +12,7 @@ from app.models.conversation import Conversation
 from app.models.customer_profile import CustomerProfile
 from app.models.lead import Lead
 from app.models.user import User
-from app.services.access_control_service import can_access_all_conversations
+from app.services.access_control_service import get_accessible_sales_user_ids
 from app.services.source_intelligence_service import build_source_label, normalize_source_channel
 
 
@@ -286,8 +286,14 @@ def get_customer_profile_model_for_user(
             detail="Customer profile not found.",
         )
 
-    if not can_access_all_conversations(current_user):
-        accessible_leads = [lead for lead in profile.leads if lead.assigned_user_id == current_user.id]
+    accessible_user_ids = get_accessible_sales_user_ids(
+        db=db,
+        current_user=current_user,
+    )
+    if accessible_user_ids is not None:
+        accessible_leads = [
+            lead for lead in profile.leads if lead.assigned_user_id in accessible_user_ids
+        ]
         if not accessible_leads:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -313,10 +319,18 @@ def get_customer_profile_for_user(
             status_code=status.HTTP_409_CONFLICT,
             detail="Customer profile sudah digabung ke profil lain.",
         )
+    accessible_user_ids = get_accessible_sales_user_ids(
+        db=db,
+        current_user=current_user,
+    )
     visible_leads = (
         list(profile.leads)
-        if can_access_all_conversations(current_user)
-        else [lead for lead in profile.leads if lead.assigned_user_id == current_user.id]
+        if accessible_user_ids is None
+        else [
+            lead
+            for lead in profile.leads
+            if lead.assigned_user_id in accessible_user_ids
+        ]
     )
     visible_profiles = db.scalars(
         select(CustomerProfile)
@@ -325,11 +339,11 @@ def get_customer_profile_for_user(
         )
         .options(selectinload(CustomerProfile.leads).selectinload(Lead.conversations))
     ).all()
-    if not can_access_all_conversations(current_user):
+    if accessible_user_ids is not None:
         visible_profiles = [
             candidate
             for candidate in visible_profiles
-            if any(lead.assigned_user_id == current_user.id for lead in candidate.leads)
+            if any(lead.assigned_user_id in accessible_user_ids for lead in candidate.leads)
         ]
     merge_candidates = build_merge_candidates(profile, visible_profiles=visible_profiles)
     return build_customer_profile_summary(
@@ -406,13 +420,17 @@ def merge_customer_profiles(
         current_user=current_user,
     )
 
+    accessible_user_ids = get_accessible_sales_user_ids(
+        db=db,
+        current_user=current_user,
+    )
     visible_leads = (
         list(refreshed_target_profile.leads)
-        if can_access_all_conversations(current_user)
+        if accessible_user_ids is None
         else [
             lead
             for lead in refreshed_target_profile.leads
-            if lead.assigned_user_id == current_user.id
+            if lead.assigned_user_id in accessible_user_ids
         ]
     )
     visible_profiles = db.scalars(
@@ -420,11 +438,11 @@ def merge_customer_profiles(
         .where(CustomerProfile.organization_id == refreshed_target_profile.organization_id)
         .options(selectinload(CustomerProfile.leads).selectinload(Lead.conversations))
     ).all()
-    if not can_access_all_conversations(current_user):
+    if accessible_user_ids is not None:
         visible_profiles = [
             candidate
             for candidate in visible_profiles
-            if any(lead.assigned_user_id == current_user.id for lead in candidate.leads)
+            if any(lead.assigned_user_id in accessible_user_ids for lead in candidate.leads)
         ]
     return build_customer_profile_summary(
         refreshed_target_profile,

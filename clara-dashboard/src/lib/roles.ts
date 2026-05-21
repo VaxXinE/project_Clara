@@ -2,12 +2,13 @@ export function normalizeWorkspaceRole(role?: string | null): string {
   const normalized = (role ?? "").trim().toLowerCase().replaceAll("-", "_");
 
   switch (normalized) {
-    case "sales":
-      return "marketing";
-    case "head":
-      return "admin";
-    case "superadmin":
-      return "owner";
+    case "marketing":
+      return "sales";
+    case "admin":
+      return "head";
+    case "owner":
+    case "super_admin":
+      return "superadmin";
     default:
       return normalized;
   }
@@ -15,28 +16,37 @@ export function normalizeWorkspaceRole(role?: string | null): string {
 
 export function isOwnerLike(role?: string | null): boolean {
   const normalized = normalizeWorkspaceRole(role);
-  return normalized === "owner" || normalized === "super_admin";
+  return normalized === "superadmin";
 }
 
 export function isAdminLike(role?: string | null): boolean {
   const normalized = normalizeWorkspaceRole(role);
-  return normalized === "admin" || isOwnerLike(normalized);
+  return normalized === "head" || isOwnerLike(normalized);
+}
+
+export function isManagerLike(role?: string | null): boolean {
+  const normalized = normalizeWorkspaceRole(role);
+  return normalized === "manager" || isAdminLike(normalized);
+}
+
+export function canLeadSalesTeam(role?: string | null): boolean {
+  return normalizeWorkspaceRole(role) === "manager";
 }
 
 export function isSalesLike(role?: string | null): boolean {
-  return normalizeWorkspaceRole(role) === "marketing";
+  return normalizeWorkspaceRole(role) === "sales";
 }
 
 export function getRoleDisplayLabel(role?: string | null): string {
   switch (normalizeWorkspaceRole(role)) {
-    case "marketing":
+    case "sales":
       return "sales";
-    case "admin":
+    case "manager":
+      return "manager";
+    case "head":
       return "head";
-    case "owner":
+    case "superadmin":
       return "superadmin";
-    case "super_admin":
-      return "platform superadmin";
     default:
       return (role ?? "").replaceAll("_", " ");
   }

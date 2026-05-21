@@ -9,7 +9,7 @@ from app.models.conversation import Conversation
 from app.schemas.conversation_schema import ConversationDetail, ConversationListItem
 from app.core.security import require_roles
 from app.models.user import User
-from app.services.access_control_service import can_access_all_conversations
+from app.services.access_control_service import apply_sales_user_scope_filter
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/conversations", tags=["conversations"])
 @router.get("", response_model=list[ConversationListItem])
 def list_conversations(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head")),
 ) -> list[Conversation]:
     if current_user.organization_id is None:
         return []
@@ -27,8 +27,12 @@ def list_conversations(
         Conversation.organization_id == current_user.organization_id
     )
 
-    if not can_access_all_conversations(current_user):
-        statement = statement.where(Conversation.sales_user_id == current_user.id)
+    statement = apply_sales_user_scope_filter(
+        statement,
+        db=db,
+        current_user=current_user,
+        sales_user_id_column=Conversation.sales_user_id,
+    )
 
     statement = statement.order_by(desc(Conversation.created_at))
 
@@ -39,7 +43,7 @@ def list_conversations(
 def get_conversation(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head")),
 ) -> Conversation:
     if current_user.organization_id is None:
         raise HTTPException(
@@ -54,8 +58,12 @@ def get_conversation(
         .options(selectinload(Conversation.messages))
     )
 
-    if not can_access_all_conversations(current_user):
-        statement = statement.where(Conversation.sales_user_id == current_user.id)
+    statement = apply_sales_user_scope_filter(
+        statement,
+        db=db,
+        current_user=current_user,
+        sales_user_id_column=Conversation.sales_user_id,
+    )
 
     conversation = db.scalars(statement).first()
 

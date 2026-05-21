@@ -23,6 +23,10 @@ class CurrentUserResponse(BaseModel):
     created_at: datetime
     organization_id: UUID | None
     organization_name: str | None = None
+    team_id: UUID | None = None
+    team_name: str | None = None
+    unit_id: UUID | None = None
+    unit_name: str | None = None
     created_by_user_id: UUID | None
     created_by_user_name: str | None = None
     model_config = ConfigDict(from_attributes=True)
@@ -37,8 +41,9 @@ class CreateUserRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     email: str = Field(min_length=3, max_length=255)
     password: str = Field(min_length=8, max_length=255)
-    role: str = Field(default="marketing", max_length=50)
+    role: str = Field(default="sales", max_length=50)
     organization_id: UUID | None = None
+    team_id: UUID | None = None
 
 
 class UpdateUserRequest(BaseModel):
@@ -46,6 +51,7 @@ class UpdateUserRequest(BaseModel):
     email: str | None = Field(default=None, min_length=3, max_length=255)
     role: str | None = Field(default=None, max_length=50)
     organization_id: UUID | None = None
+    team_id: UUID | None = None
 
 
 class ResetUserPasswordRequest(BaseModel):

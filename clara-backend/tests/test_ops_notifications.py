@@ -25,7 +25,7 @@ def csrf_headers(client: TestClient) -> dict[str, str]:
     return {"X-CSRF-Token": csrf_token}
 
 
-def test_admin_can_list_and_acknowledge_ops_notifications(
+def test_head_can_list_and_acknowledge_ops_notifications(
     client: TestClient,
     db_session_factory: sessionmaker,
     seeded_data: dict[str, object],
@@ -119,7 +119,7 @@ def test_admin_can_list_and_acknowledge_ops_notifications(
     )
     assert escalate_response.status_code == 200, escalate_response.text
     escalate_payload = escalate_response.json()
-    assert escalate_payload["escalation_level"] in {"team_lead", "owner"}
+    assert escalate_payload["escalation_level"] in {"team_lead", "superadmin"}
 
 
 def test_approval_queue_filters_by_risk_level(

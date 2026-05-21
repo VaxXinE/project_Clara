@@ -68,7 +68,7 @@ const roleCopy: Record<
   string,
   { title: string; summary: string; focus: string[] }
 > = {
-  owner: {
+  superadmin: {
     title: "Superadmin Command Center",
     summary:
       "Lihat kesehatan operasional, quality insight, dan arah intervensi lintas organization dari satu control room yang ringkas.",
@@ -78,7 +78,7 @@ const roleCopy: Record<
       "Jaga knowledge base tetap rapi supaya balasan sistem tetap grounded.",
     ],
   },
-  admin: {
+  head: {
     title: "Head Control Room",
     summary:
       "Atur ritme kerja tim, follow-up, dan akses operasional tanpa harus lompat dari satu modul ke modul lain.",
@@ -88,7 +88,17 @@ const roleCopy: Record<
       "Gunakan preview KPI untuk memutuskan prioritas tim hari ini.",
     ],
   },
-  marketing: {
+  manager: {
+    title: "Manager Action Room",
+    summary:
+      "Pantau queue tim yang Anda pegang, triase percakapan yang macet, dan jaga follow-up tetap disiplin di boundary team atau unit Anda.",
+    focus: [
+      "Pantau worklist tim untuk lead panas, overdue, dan chat yang butuh intervensi.",
+      "Gunakan queue review untuk membaca pola hambatan sebelum eskalasi ke head.",
+      "Jaga ritme follow-up tim tetap rapi tanpa kehilangan konteks percakapan.",
+    ],
+  },
+  sales: {
     title: "Sales Workspace",
     summary:
       "Masuk ke queue, upload percakapan baru, lalu teruskan analisis customer dengan alur yang lebih fokus dan minim distraksi.",
@@ -122,7 +132,7 @@ export default function DashboardHomePage() {
 
         const nextMetrics: OverviewMetrics = { ...EMPTY_METRICS };
 
-        if (["marketing", "admin", "owner"].includes(me.role)) {
+        if (["sales", "manager", "head", "superadmin"].includes(me.role)) {
           try {
             const [inbox, worklistResponse] = await Promise.all([
               apiFetch<SalesInboxItem[]>("/dashboard/sales/inbox"),
@@ -139,7 +149,7 @@ export default function DashboardHomePage() {
           }
         }
 
-        if (["owner", "admin"].includes(me.role)) {
+        if (["superadmin", "head"].includes(me.role)) {
           try {
             const [insights, kpiResponse] = await Promise.all([
               apiFetch<MarketingInsightsPreview>(
@@ -773,11 +783,11 @@ function getDashboardNextStep({
       title: "Operasional sudah cukup stabil, lanjut baca insight",
       description:
         "Kalau inbox dan follow-up relatif aman, langkah berikutnya yang paling bernilai adalah membaca Marketing Insights atau KPI untuk mengambil keputusan level tim.",
-      href: currentUser.role === "owner" || currentUser.role === "admin"
+      href: currentUser.role === "superadmin" || currentUser.role === "head"
         ? "/dashboard/marketing"
         : "/dashboard/sales",
       actionLabel:
-        currentUser.role === "owner" || currentUser.role === "admin"
+        currentUser.role === "superadmin" || currentUser.role === "head"
           ? "Buka Marketing Insights"
           : "Buka Workspace",
     };

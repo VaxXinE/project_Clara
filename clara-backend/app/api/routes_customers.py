@@ -20,7 +20,7 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 def get_customer_profile(
     customer_profile_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> CustomerProfileSummaryItem:
     return CustomerProfileSummaryItem(
         **get_customer_profile_for_user(
@@ -36,7 +36,7 @@ def merge_customer_profile_endpoint(
     payload: CustomerProfileMergeRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "owner")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ) -> CustomerProfileSummaryItem:
     try:
         profile = merge_customer_profiles(

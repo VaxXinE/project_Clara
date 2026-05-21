@@ -230,7 +230,7 @@ export default function MarketingInsightsPage() {
       currentUser={currentUser}
       eyebrow="Strategic intelligence"
       title="Marketing Insights"
-      description="Ringkasan yang membantu owner dan admin membaca kebutuhan pasar, area resistensi, dan prioritas konten berikutnya tanpa harus membongkar seluruh chat customer."
+      description="Ringkasan yang membantu superadmin dan head membaca kebutuhan pasar, area resistensi, dan prioritas konten berikutnya tanpa harus membongkar seluruh chat customer."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={

@@ -72,7 +72,7 @@ def create_product_knowledge(
     current_user: User,
 ) -> ProductKnowledge:
     if not is_owner_like(current_user.role):
-        raise AccessDeniedError("Only owner can create product knowledge.")
+        raise AccessDeniedError("Only superadmin can create product knowledge.")
 
     entry = ProductKnowledge(
         organization_id=None,
@@ -138,7 +138,7 @@ def ensure_can_modify_product_knowledge(
     current_user: User,
 ) -> None:
     if not is_owner_like(current_user.role):
-        raise AccessDeniedError("Only owner can modify product knowledge.")
+        raise AccessDeniedError("Only superadmin can modify product knowledge.")
 
 
 def update_product_knowledge(

@@ -1,16 +1,17 @@
-LEGACY_ROLE_MARKETING = "marketing"
-LEGACY_ROLE_ADMIN = "admin"
-LEGACY_ROLE_OWNER = "owner"
-PLATFORM_ROLE_SUPER_ADMIN = "super_admin"
+ROLE_SALES = "sales"
+ROLE_MANAGER = "manager"
+ROLE_HEAD = "head"
+ROLE_SUPERADMIN = "superadmin"
 
 ROLE_ALIASES = {
-    "sales": LEGACY_ROLE_MARKETING,
-    "marketing": LEGACY_ROLE_MARKETING,
-    "head": LEGACY_ROLE_ADMIN,
-    "admin": LEGACY_ROLE_ADMIN,
-    "superadmin": LEGACY_ROLE_OWNER,
-    "owner": LEGACY_ROLE_OWNER,
-    PLATFORM_ROLE_SUPER_ADMIN: PLATFORM_ROLE_SUPER_ADMIN,
+    "marketing": ROLE_SALES,
+    ROLE_SALES: ROLE_SALES,
+    "admin": ROLE_HEAD,
+    ROLE_HEAD: ROLE_HEAD,
+    ROLE_MANAGER: ROLE_MANAGER,
+    "owner": ROLE_SUPERADMIN,
+    "super_admin": ROLE_SUPERADMIN,
+    ROLE_SUPERADMIN: ROLE_SUPERADMIN,
 }
 
 
@@ -20,22 +21,35 @@ def normalize_role(role: str | None) -> str:
 
 
 def is_platform_super_admin(role: str | None) -> bool:
-    return normalize_role(role) == PLATFORM_ROLE_SUPER_ADMIN
+    return normalize_role(role) == ROLE_SUPERADMIN
 
 
-def is_owner_like(role: str | None) -> bool:
+def is_superadmin_like(role: str | None) -> bool:
+    return normalize_role(role) == ROLE_SUPERADMIN
+
+
+def is_head_like(role: str | None) -> bool:
     normalized = normalize_role(role)
-    return normalized in {LEGACY_ROLE_OWNER, PLATFORM_ROLE_SUPER_ADMIN}
+    return normalized in {ROLE_HEAD, ROLE_SUPERADMIN}
+
+
+def is_manager_like(role: str | None) -> bool:
+    normalized = normalize_role(role)
+    return normalized in {ROLE_MANAGER, ROLE_HEAD, ROLE_SUPERADMIN}
+
+
+def is_sales_like(role: str | None) -> bool:
+    return normalize_role(role) == ROLE_SALES
+
+
+# Compatibility helpers for older call sites while the codebase is migrated.
+def is_owner_like(role: str | None) -> bool:
+    return is_superadmin_like(role)
 
 
 def is_admin_like(role: str | None) -> bool:
-    normalized = normalize_role(role)
-    return normalized in {
-        LEGACY_ROLE_ADMIN,
-        LEGACY_ROLE_OWNER,
-        PLATFORM_ROLE_SUPER_ADMIN,
-    }
+    return is_manager_like(role)
 
 
 def is_marketing_like(role: str | None) -> bool:
-    return normalize_role(role) == LEGACY_ROLE_MARKETING
+    return is_sales_like(role)

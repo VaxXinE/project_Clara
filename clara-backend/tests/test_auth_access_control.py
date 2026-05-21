@@ -48,7 +48,7 @@ def test_login_sets_cookie_session_and_allows_fetching_current_user(
     assert response.status_code == 200
     payload = response.json()
     assert payload["email"] == owner.email
-    assert payload["role"] == "owner"
+    assert payload["role"] == "superadmin"
     assert payload["organization_name"] == "Org Alpha"
 
 
@@ -84,10 +84,10 @@ def test_inactive_user_cannot_login(
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "User is inactive."
+    assert response.json()["detail"] == "Akun user ini sedang nonaktif."
 
 
-def test_admin_can_only_reset_password_for_user_they_created(
+def test_head_can_only_reset_password_for_user_they_created(
     client: TestClient,
     db_session_factory: sessionmaker,
     seeded_data: dict[str, object],
@@ -113,7 +113,7 @@ def test_admin_can_only_reset_password_for_user_they_created(
     assert forbidden_response.status_code == 403
     assert (
         forbidden_response.json()["detail"]
-        == "Admin can only reset passwords for users they created."
+        == "Head can only reset passwords for users they created."
     )
 
     db = db_session_factory()
@@ -122,7 +122,7 @@ def test_admin_can_only_reset_password_for_user_they_created(
     assert verify_password("ResetPass123!", refreshed_user.hashed_password)
 
 
-def test_owner_can_reset_any_user_password(
+def test_superadmin_can_reset_any_user_password(
     client: TestClient,
     db_session_factory: sessionmaker,
     seeded_data: dict[str, object],
@@ -134,7 +134,7 @@ def test_owner_can_reset_any_user_password(
 
     response = client.post(
         f"/auth/users/{marketing_b.id}/reset-password",
-        json={"password": "OwnerReset123!"},
+        json={"password": "SuperadminReset123!"},
         headers=csrf_headers(client),
     )
 
@@ -143,10 +143,10 @@ def test_owner_can_reset_any_user_password(
     db = db_session_factory()
     refreshed_user = db.get(User, marketing_b.id)
     assert refreshed_user is not None
-    assert verify_password("OwnerReset123!", refreshed_user.hashed_password)
+    assert verify_password("SuperadminReset123!", refreshed_user.hashed_password)
 
 
-def test_only_owner_can_create_product_knowledge(
+def test_only_superadmin_can_create_product_knowledge(
     client: TestClient,
     seeded_data: dict[str, object],
 ) -> None:
@@ -173,9 +173,9 @@ def test_only_owner_can_create_product_knowledge(
     success_response = client.post(
         "/product-knowledge",
         json={
-            "title": "Knowledge Owner",
+            "title": "Knowledge Superadmin",
             "category": "general",
-            "content": "Knowledge ini dibuat owner.",
+            "content": "Knowledge ini dibuat superadmin.",
             "source_type": "manual_note",
             "is_active": True,
         },
@@ -184,12 +184,12 @@ def test_only_owner_can_create_product_knowledge(
 
     assert success_response.status_code == 201, success_response.text
     payload = success_response.json()
-    assert payload["title"] == "Knowledge Owner"
+    assert payload["title"] == "Knowledge Superadmin"
     assert payload["organization_id"] is None
     assert payload["scope_type"] == "global"
 
 
-def test_marketing_can_view_global_product_knowledge_but_cannot_access_marketing_insights(
+def test_sales_can_view_global_product_knowledge_but_cannot_access_marketing_insights(
     client: TestClient,
     seeded_data: dict[str, object],
 ) -> None:

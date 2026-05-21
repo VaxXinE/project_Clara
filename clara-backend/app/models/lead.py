@@ -30,6 +30,11 @@ class Lead(Base):
 
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     source: Mapped[str] = mapped_column(String(50), nullable=False, default="unknown")
+    account_category: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="unknown",
+    )
     current_stage: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -78,9 +83,23 @@ class Lead(Base):
         cascade="all, delete-orphan",
         order_by="desc(LeadActivityEvent.created_at)",
     )
+    discipline_logs = relationship(
+        "LeadDisciplineLog",
+        back_populates="lead",
+        cascade="all, delete-orphan",
+        order_by="desc(LeadDisciplineLog.log_date), desc(LeadDisciplineLog.created_at)",
+    )
     deal = relationship(
         "LeadDeal",
         back_populates="lead",
         cascade="all, delete-orphan",
         uselist=False,
+    )
+    chat_review_cases = relationship(
+        "ChatReviewCase",
+        back_populates="lead",
+    )
+    knowledge_update_proposals = relationship(
+        "KnowledgeUpdateProposal",
+        back_populates="lead",
     )

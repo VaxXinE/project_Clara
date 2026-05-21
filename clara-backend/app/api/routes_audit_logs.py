@@ -15,7 +15,7 @@ router = APIRouter(prefix="/audit-logs", tags=["audit-logs"])
 def list_audit_logs(
     limit: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head")),
 ):
     if current_user.organization_id is None:
         return []

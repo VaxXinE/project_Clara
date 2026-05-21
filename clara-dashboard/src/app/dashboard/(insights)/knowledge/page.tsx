@@ -8,6 +8,8 @@ import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type {
   CurrentUser,
+  KnowledgeUpdateProposalItem,
+  KnowledgeUpdateProposalReviewRequest,
   ProductKnowledgeCreateRequest,
   ProductKnowledgeItem,
   ProductKnowledgeListFilters,
@@ -23,6 +25,7 @@ const EMPTY_FORM: ProductKnowledgeCreateRequest = {
 
 export default function ProductKnowledgePage() {
   const [items, setItems] = useState<ProductKnowledgeItem[]>([]);
+  const [proposals, setProposals] = useState<KnowledgeUpdateProposalItem[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [form, setForm] = useState<ProductKnowledgeCreateRequest>(EMPTY_FORM);
   const [filters, setFilters] = useState<ProductKnowledgeListFilters>({});
@@ -30,11 +33,23 @@ export default function ProductKnowledgePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reviewingProposalId, setReviewingProposalId] = useState<string | null>(
+    null,
+  );
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const canManageKnowledge = currentUser?.role === "owner";
+  const canManageKnowledge = currentUser?.role === "superadmin";
+  const canReviewProposals = ["head", "superadmin"].includes(
+    currentUser?.role ?? "",
+  );
+  const canSeeProposalQueue = ["manager", "head", "superadmin"].includes(
+    currentUser?.role ?? "",
+  );
 
-  async function loadKnowledge(activeFilters?: ProductKnowledgeListFilters) {
+  async function loadKnowledge(
+    activeFilters?: ProductKnowledgeListFilters,
+    options?: { includeProposalQueue?: boolean },
+  ) {
     setErrorMessage("");
 
     try {
@@ -57,8 +72,17 @@ export default function ProductKnowledgePage() {
         ? `/product-knowledge?${params.toString()}`
         : "/product-knowledge";
 
-      const data = await apiFetch<ProductKnowledgeItem[]>(path);
+      const includeProposalQueue =
+        options?.includeProposalQueue ?? canSeeProposalQueue;
+
+      const [data, proposalData] = await Promise.all([
+        apiFetch<ProductKnowledgeItem[]>(path),
+        includeProposalQueue
+          ? apiFetch<KnowledgeUpdateProposalItem[]>("/product-knowledge/proposals")
+          : Promise.resolve([]),
+      ]);
       setItems(data);
+      setProposals(proposalData);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -75,11 +99,13 @@ export default function ProductKnowledgePage() {
       try {
         const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
+        const includeProposalQueue = ["manager", "head", "superadmin"].includes(
+          me.role,
+        );
+        await loadKnowledge(undefined, { includeProposalQueue });
       } catch {
-        // apiFetch will already handle auth redirect when needed
+        await loadKnowledge(undefined, { includeProposalQueue: false });
       }
-
-      await loadKnowledge();
     }
 
     void bootstrap();
@@ -93,7 +119,7 @@ export default function ProductKnowledgePage() {
 
   function startEdit(item: ProductKnowledgeItem) {
     if (!canManageKnowledge) {
-      setErrorMessage("Hanya owner yang boleh mengubah product knowledge.");
+      setErrorMessage("Hanya superadmin yang boleh mengubah product knowledge.");
       return;
     }
 
@@ -113,7 +139,7 @@ export default function ProductKnowledgePage() {
     event.preventDefault();
 
     if (!canManageKnowledge) {
-      setErrorMessage("Hanya owner yang boleh menambahkan product knowledge.");
+      setErrorMessage("Hanya superadmin yang boleh menambahkan product knowledge.");
       return;
     }
 
@@ -154,7 +180,7 @@ export default function ProductKnowledgePage() {
 
   async function handleDelete(knowledgeId: string) {
     if (!canManageKnowledge) {
-      setErrorMessage("Hanya owner yang boleh menghapus product knowledge.");
+      setErrorMessage("Hanya superadmin yang boleh menghapus product knowledge.");
       return;
     }
 
@@ -190,6 +216,48 @@ export default function ProductKnowledgePage() {
     setFilters(nextFilters);
     setIsLoading(true);
     await loadKnowledge(nextFilters);
+  }
+
+  async function handleReviewProposal(
+    proposalId: string,
+    status: "approved" | "rejected",
+  ) {
+    if (!canReviewProposals) {
+      setErrorMessage("Hanya head atau superadmin yang boleh review proposal.");
+      return;
+    }
+
+    setReviewingProposalId(proposalId);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const body: KnowledgeUpdateProposalReviewRequest = {
+        status,
+        review_decision_note: null,
+      };
+      await apiFetch<KnowledgeUpdateProposalItem>(
+        `/product-knowledge/proposals/${proposalId}/review`,
+        {
+          method: "PATCH",
+          body,
+        },
+      );
+      setSuccessMessage(
+        status === "approved"
+          ? "Proposal knowledge berhasil di-approve dan dipublish."
+          : "Proposal knowledge berhasil di-reject.",
+      );
+      await loadKnowledge();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal memproses review proposal knowledge.",
+      );
+    } finally {
+      setReviewingProposalId(null);
+    }
   }
 
   const activeItemsCount = items.filter((item) => item.is_active).length;
@@ -229,6 +297,95 @@ export default function ProductKnowledgePage() {
             description="Owner bisa menambah dan mengubah isi, role lain tetap bisa membaca."
           />
         </section>
+
+        {canSeeProposalQueue && (
+          <section className="clara-card rounded-[30px] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">
+                  Knowledge Update Queue
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Usulan knowledge yang datang dari coaching review lapangan.
+                </p>
+              </div>
+              <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                {proposals.length} proposal
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {proposals.length === 0 ? (
+                <div className="clara-empty-state text-sm text-slate-600">
+                  Belum ada proposal knowledge dari coaching case.
+                </div>
+              ) : (
+                proposals.map((proposal) => (
+                  <article
+                    key={proposal.id}
+                    className="rounded-[24px] border border-slate-200 bg-white/90 p-4"
+                  >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-semibold text-slate-950">
+                            {proposal.title}
+                          </h3>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            {proposal.category}
+                          </span>
+                          <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                            {proposal.status}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-600">
+                          Conversation: {proposal.conversation_title ?? "-"}
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                          {proposal.proposed_content}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                          <span>Pengusul: {proposal.proposed_by_user_name ?? "-"}</span>
+                          <span>&bull;</span>
+                          <span>Source: {proposal.source_type}</span>
+                          <span>&bull;</span>
+                          <span>Updated: {formatDateTime(proposal.updated_at)}</span>
+                        </div>
+                      </div>
+
+                      {canReviewProposals && proposal.status === "pending_approval" ? (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleReviewProposal(proposal.id, "rejected")
+                            }
+                            disabled={reviewingProposalId === proposal.id}
+                            className="clara-button border border-red-200 bg-white/70 text-red-700"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleReviewProposal(proposal.id, "approved")
+                            }
+                            disabled={reviewingProposalId === proposal.id}
+                            className="clara-button clara-button-primary"
+                          >
+                            {reviewingProposalId === proposal.id
+                              ? "Memproses..."
+                              : "Approve & Publish"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           {canManageKnowledge && (

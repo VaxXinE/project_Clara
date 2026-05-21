@@ -331,7 +331,7 @@ export default function NotificationsPage() {
                             >
                               Resolve
                             </button>
-                            {["admin", "owner"].includes(currentUser?.role ?? "") ? (
+                            {["head", "superadmin"].includes(currentUser?.role ?? "") ? (
                               <button
                                 type="button"
                                 disabled={updatingId === item.id}

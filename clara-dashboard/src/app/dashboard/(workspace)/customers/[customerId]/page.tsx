@@ -140,7 +140,7 @@ export default function CustomerProfilePage() {
                     Merge Candidates
                   </h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Clara menampilkan kandidat profil customer lain yang kemungkinan adalah orang yang sama. Admin atau owner bisa merge manual kalau identity otomatis masih pecah.
+                    Clara menampilkan kandidat profil customer lain yang kemungkinan adalah orang yang sama. Head atau superadmin bisa merge manual kalau identity otomatis masih pecah.
                   </p>
                 </div>
                 <textarea
@@ -199,7 +199,7 @@ export default function CustomerProfilePage() {
                           </span>
                         ))}
                       </div>
-                      {["admin", "owner"].includes(currentUser?.role ?? "") ? (
+                      {["head", "superadmin"].includes(currentUser?.role ?? "") ? (
                         <div className="mt-4">
                           <button
                             type="button"

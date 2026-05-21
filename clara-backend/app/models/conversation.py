@@ -28,6 +28,12 @@ class Conversation(Base):
         index=True,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
+    provider_key: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    external_thread_key: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+    )
     source: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -96,4 +102,16 @@ class Conversation(Base):
         "SentMessage",
         back_populates="conversation",
         cascade="all, delete-orphan",
+    )
+    chat_review_case = relationship(
+        "ChatReviewCase",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    knowledge_update_proposal = relationship(
+        "KnowledgeUpdateProposal",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        uselist=False,
     )

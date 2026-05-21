@@ -146,12 +146,12 @@ def main() -> int:
 
             if owner is None:
                 raise KnowledgeImportError(
-                    f"Owner untuk import knowledge tidak ditemukan: {owner_email}"
+                    f"Superadmin untuk import knowledge tidak ditemukan: {owner_email}"
                 )
 
-            if owner.role != "owner":
+            if owner.role != "superadmin":
                 raise KnowledgeImportError(
-                    f"User {owner.email} ditemukan, tapi rolenya {owner.role}, bukan owner."
+                    f"User {owner.email} ditemukan, tapi rolenya {owner.role}, bukan superadmin."
                 )
 
             created_by_user_id = owner.id

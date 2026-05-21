@@ -18,7 +18,10 @@ from app.schemas.lead_schema import (
     LeadTaskItem,
     LeadTaskUpdateRequest,
 )
-from app.services.access_control_service import can_access_all_conversations
+from app.services.access_control_service import (
+    can_access_all_conversations,
+    get_accessible_sales_user_ids,
+)
 from app.services.lead_activity_service import create_lead_activity_event
 
 VALID_TASK_TYPES = {"manual_follow_up", "scheduled_follow_up", "approval_follow_up"}
@@ -158,7 +161,11 @@ def get_accessible_lead(
             detail="Lead not found.",
         )
 
-    if not can_access_all_conversations(current_user) and lead.assigned_user_id != current_user.id:
+    accessible_user_ids = get_accessible_sales_user_ids(
+        db=db,
+        current_user=current_user,
+    )
+    if accessible_user_ids is not None and lead.assigned_user_id not in accessible_user_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lead not found.",
@@ -330,7 +337,7 @@ def update_lead_task_for_user(
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admin can reassign tasks.",
+                detail="Only head can reassign tasks.",
             )
 
         assignee = validate_assignee_for_lead(

@@ -85,7 +85,7 @@ export default function ChannelsOverviewPage() {
               <MetricCard
                 label="Scope"
                 value={overview.scope_type}
-                hint="Owner membaca scope global, sedangkan admin/marketing membaca scope organization."
+                hint="Superadmin membaca scope global, sedangkan head/manager/sales membaca scope organization."
               />
               <MetricCard
                 label="Active Channels"

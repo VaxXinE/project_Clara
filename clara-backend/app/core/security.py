@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.services.auth_service import AuthError, decode_access_token, get_user_by_id
-from app.services.role_service import is_owner_like, normalize_role
+from app.services.role_service import is_superadmin_like, normalize_role
 
 SAFE_HTTP_METHODS = {"GET", "HEAD", "OPTIONS"}
 
@@ -85,7 +85,7 @@ def get_current_user(
 
 def require_roles(*allowed_roles: str) -> Callable:
     def dependency(current_user: User = Depends(get_current_user)) -> User:
-        if is_owner_like(current_user.role):
+        if is_superadmin_like(current_user.role):
             return current_user
 
         normalized_allowed_roles = {normalize_role(role) for role in allowed_roles}
