@@ -177,6 +177,7 @@ class SalesWorklistResponse(BaseModel):
     stale_discipline_log_count: int
     completion_rate_today: float
     items: list[SalesWorklistItem]
+    upcoming_items: list[SalesWorklistItem]
 
 
 class SalesApprovalQueueItem(BaseModel):

@@ -110,6 +110,32 @@ function formatDisciplineStatus(value: string): string {
   }
 }
 
+function resolveDealStatusInput(
+  currentStage: string,
+  explicitDealStatus: string | null | undefined
+): string {
+  if (explicitDealStatus && explicitDealStatus !== "open") {
+    return explicitDealStatus;
+  }
+
+  if (currentStage === "won" || currentStage === "lost") {
+    return currentStage;
+  }
+
+  return explicitDealStatus ?? "open";
+}
+
+function leadNeedsDealMetricsSync(
+  currentStage: string,
+  explicitDealStatus: string | null | undefined
+): boolean {
+  if (currentStage !== "won" && currentStage !== "lost") {
+    return false;
+  }
+
+  return explicitDealStatus !== currentStage;
+}
+
 export default function LeadDetailPage() {
   const params = useParams<{ leadId: string }>();
   const leadId = params.leadId;
@@ -167,6 +193,9 @@ export default function LeadDetailPage() {
 
   const canReassignLead =
     currentUser?.role === "head" || currentUser?.role === "superadmin";
+  const dealMetricsNeedsSync = lead
+    ? leadNeedsDealMetricsSync(lead.current_stage, lead.deal?.status ?? null)
+    : false;
 
   const fetchLeadDetail = useCallback(async (): Promise<LeadDetail> => {
     return apiFetch<LeadDetail>(`/leads/${leadId}`);
@@ -202,7 +231,12 @@ export default function LeadDetailPage() {
       setTemperatureInput(leadDetail.lead_temperature);
       setFollowUpInput(toDateTimeLocalValue(leadDetail.next_follow_up_at));
       setAssignedUserInput(leadDetail.assigned_user_id ?? "");
-      setDealStatusInput(leadDetail.deal?.status ?? "open");
+      setDealStatusInput(
+        resolveDealStatusInput(
+          leadDetail.current_stage,
+          leadDetail.deal?.status ?? null
+        )
+      );
       setDealCurrencyInput(leadDetail.deal?.currency ?? "IDR");
       setExpectedValueInput(String(leadDetail.deal?.expected_value ?? 0));
       setDepositAmountInput(String(leadDetail.deal?.deposit_amount ?? 0));
@@ -321,6 +355,9 @@ export default function LeadDetailPage() {
       setTemperatureInput(updatedLead.lead_temperature);
       setFollowUpInput(toDateTimeLocalValue(updatedLead.next_follow_up_at));
       setAssignedUserInput(updatedLead.assigned_user_id ?? "");
+      setDealStatusInput(
+        resolveDealStatusInput(updatedLead.current_stage, updatedLead.deal?.status ?? null)
+      );
       setSuccessMessage("Lead berhasil diperbarui.");
     } catch (error) {
       setErrorMessage(
@@ -1017,6 +1054,21 @@ export default function LeadDetailPage() {
                 {dealErrorMessage && (
                   <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                     {dealErrorMessage}
+                  </div>
+                )}
+
+                {dealMetricsNeedsSync && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    Stage lead ini sudah{" "}
+                    <span className="font-semibold uppercase">
+                      {lead.current_stage}
+                    </span>{" "}
+                    tetapi deal status di KPI masih{" "}
+                    <span className="font-semibold uppercase">
+                      {(lead.deal?.status ?? "belum diisi")}
+                    </span>
+                    . Klik <span className="font-semibold">Simpan Deal Metrics</span>{" "}
+                    supaya KPI dan nilai deal ikut sinkron.
                   </div>
                 )}
 

@@ -610,6 +610,19 @@ def confirm_extension_reply_sent(
     )
 
     db.add(sent_message)
+    db.flush()
+    conversation.last_message_at = sent_message.sent_at
+    db.add(
+        Message(
+            conversation_id=conversation.id,
+            sender_name=sent_by_name,
+            sender_type="sales",
+            external_message_id=None,
+            message_text=suggestion.final_reply_text,
+            message_timestamp=sent_message.sent_at,
+        )
+    )
+    db.add(conversation)
     db.commit()
     db.refresh(sent_message)
     db.refresh(suggestion)

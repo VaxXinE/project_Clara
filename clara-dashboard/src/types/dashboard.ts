@@ -449,6 +449,7 @@ export type SalesWorklistResponse = {
   open_task_count: number;
   completion_rate_today: number;
   items: SalesWorklistItem[];
+  upcoming_items: SalesWorklistItem[];
 };
 
 export type ManagerTeamDisciplineRow = {

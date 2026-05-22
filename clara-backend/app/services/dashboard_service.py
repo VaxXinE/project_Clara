@@ -166,6 +166,14 @@ def get_latest_discipline_log_for_lead(lead: Lead) -> LeadDisciplineLog | None:
     )
 
 
+def lead_requires_deal_metrics_sync(lead: Lead) -> bool:
+    if lead.current_stage not in {"won", "lost"}:
+        return False
+
+    current_deal_status = lead.deal.status if lead.deal is not None else None
+    return current_deal_status != lead.current_stage
+
+
 def build_ops_notification_item(notification: OpsNotification) -> OpsNotificationItem:
     now = datetime.now(timezone.utc)
     return OpsNotificationItem(
@@ -1002,6 +1010,7 @@ def get_sales_worklist(
             stale_discipline_log_count=0,
             completion_rate_today=0,
             items=[],
+            upcoming_items=[],
         )
 
     statement = (
@@ -1028,6 +1037,7 @@ def get_sales_worklist(
     leads = list(db.scalars(statement).all())
     now = datetime.now(timezone.utc)
     items: list[SalesWorklistItem] = []
+    upcoming_items: list[SalesWorklistItem] = []
 
     overdue_count = 0
     hot_lead_count = 0
@@ -1059,6 +1069,20 @@ def get_sales_worklist(
             ],
             key=lambda task: (ensure_aware_utc(task.due_at) or now, task.created_at),
         )
+        actionable_open_or_snoozed_tasks = [
+            task
+            for task in open_or_snoozed_tasks
+            if task.status == "snoozed"
+            or (task_due_at := ensure_aware_utc(task.due_at)) is None
+            or task_due_at.date() <= now.date()
+        ]
+        future_open_tasks = [
+            task
+            for task in open_or_snoozed_tasks
+            if task.status == "open"
+            and (task_due_at := ensure_aware_utc(task.due_at)) is not None
+            and task_due_at.date() > now.date()
+        ]
         done_today_tasks = [
             task
             for task in lead.tasks
@@ -1069,8 +1093,8 @@ def get_sales_worklist(
         completed_today_count += len(done_today_tasks)
         open_task_count += len(open_or_snoozed_tasks)
 
-        if open_or_snoozed_tasks:
-            task_due_at = ensure_aware_utc(open_or_snoozed_tasks[0].due_at)
+        if actionable_open_or_snoozed_tasks:
+            task_due_at = ensure_aware_utc(actionable_open_or_snoozed_tasks[0].due_at)
             if task_due_at is not None:
                 age_seconds = (now - task_due_at).total_seconds()
                 if task_due_at.date() == now.date():
@@ -1082,7 +1106,7 @@ def get_sales_worklist(
             task_item = build_sales_worklist_item_from_task(
                 lead=lead,
                 conversation=conversation,
-                task=open_or_snoozed_tasks[0],
+                task=actionable_open_or_snoozed_tasks[0],
                 latest_extraction=latest_extraction,
                 latest_discipline_log=latest_discipline_log,
                 now=now,
@@ -1093,6 +1117,18 @@ def get_sales_worklist(
             elif task_item.task_type == "snoozed_follow_up":
                 snoozed_count += 1
             continue
+
+        if future_open_tasks:
+            upcoming_items.append(
+                build_sales_worklist_item_from_task(
+                    lead=lead,
+                    conversation=conversation,
+                    task=future_open_tasks[0],
+                    latest_extraction=latest_extraction,
+                    latest_discipline_log=latest_discipline_log,
+                    now=now,
+                )
+            )
 
         derived_item = None
         if conversation is not None:
@@ -1138,6 +1174,12 @@ def get_sales_worklist(
         key=lambda item: (item.priority_score, item.last_contact_at or now),
         reverse=True,
     )
+    upcoming_items.sort(
+        key=lambda item: (
+            ensure_aware_utc(item.next_follow_up_at) or now,
+            -item.priority_score,
+        ),
+    )
 
     return SalesWorklistResponse(
         generated_at=now,
@@ -1162,6 +1204,7 @@ def get_sales_worklist(
             else 0
         ),
         items=items,
+        upcoming_items=upcoming_items,
     )
 
 
@@ -1839,6 +1882,42 @@ def sync_ops_notifications(
                 "target_href": f"/dashboard/sales/conversations/{item.conversation_id}",
             }
         )
+
+    if current_user.organization_id is not None:
+        lead_statement = (
+            select(Lead)
+            .where(Lead.organization_id == current_user.organization_id)
+            .options(selectinload(Lead.deal))
+            .order_by(desc(Lead.updated_at), desc(Lead.created_at))
+        )
+        lead_statement = apply_sales_user_scope_filter(
+            lead_statement,
+            db=db,
+            current_user=current_user,
+            sales_user_id_column=Lead.assigned_user_id,
+        )
+        leads_needing_sync = [
+            lead
+            for lead in db.scalars(lead_statement).all()
+            if lead_requires_deal_metrics_sync(lead)
+        ]
+        for lead in leads_needing_sync[:20]:
+            current_deal_status = lead.deal.status if lead.deal is not None else None
+            desired_notifications.append(
+                {
+                    "source_type": "deal_metrics_sync",
+                    "source_key": f"deal-sync:{lead.id}:{lead.current_stage}",
+                    "severity": "high",
+                    "title": f"Deal metrics perlu diupdate: {lead.display_name}",
+                    "body": (
+                        f"Pipeline stage lead ini sudah {lead.current_stage.upper()} "
+                        f"tetapi deal status masih "
+                        f"{(current_deal_status or 'belum diisi').upper()}. "
+                        "Buka detail lead dan simpan Deal Metrics agar KPI tetap akurat."
+                    ),
+                    "target_href": f"/dashboard/crm/{lead.id}",
+                }
+            )
 
     for alert in kpi_alerts[:20]:
         if alert.status == "resolved":

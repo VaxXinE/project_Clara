@@ -33,6 +33,30 @@ export default function NotificationsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState("");
 
+  function updateNotificationLocally(
+    notificationId: string,
+    updater: (item: OpsNotificationItem) => OpsNotificationItem
+  ) {
+    setNotifications((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextItems = current.items.map((item) =>
+        item.id === notificationId ? updater(item) : item
+      );
+
+      return {
+        ...current,
+        active_count: nextItems.filter((item) => item.status === "active").length,
+        acknowledged_count: nextItems.filter((item) => item.status === "acknowledged").length,
+        resolved_count: nextItems.filter((item) => item.status === "resolved").length,
+        escalated_count: nextItems.filter((item) => item.escalation_level !== "none").length,
+        items: nextItems,
+      };
+    });
+  }
+
   async function loadNotifications() {
     setIsLoading(true);
     setErrorMessage("");
@@ -101,10 +125,13 @@ export default function NotificationsPage() {
     setUpdatingId(item.id);
     setErrorMessage("");
     try {
-      await apiFetch(`/dashboard/notifications/${item.id}/reopen`, {
+      const reopenedItem = await apiFetch<OpsNotificationItem>(
+        `/dashboard/notifications/${item.id}/reopen`,
+        {
         method: "PATCH",
-      });
-      await loadNotifications();
+        }
+      );
+      updateNotificationLocally(item.id, () => reopenedItem);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Gagal reopen notification."

@@ -13,12 +13,18 @@ import type {
   SalesWorklistResponse,
 } from "@/types/dashboard";
 
+function getWorklistItemKey(item: SalesWorklistItem): string {
+  return `${item.lead_id}:${item.task_type}:${item.task_id ?? "derived"}`;
+}
+
 export default function FollowUpPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [worklist, setWorklist] = useState<SalesWorklistResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [hiddenItemKeys, setHiddenItemKeys] = useState<string[]>([]);
 
   async function loadWorklist() {
     try {
@@ -51,12 +57,29 @@ export default function FollowUpPage() {
   ) {
     setUpdatingTaskId(item.task_id ?? item.lead_id);
     setErrorMessage("");
+    setSuccessMessage("");
 
     try {
       await apiFetch(`/leads/${item.lead_id}/queue-action`, {
         method: "POST",
         body: payload,
       });
+      if (payload.action === "done" || payload.action === "dismiss") {
+        setHiddenItemKeys((currentKeys) => {
+          const nextKey = getWorklistItemKey(item);
+          if (currentKeys.includes(nextKey)) {
+            return currentKeys;
+          }
+          return [...currentKeys, nextKey];
+        });
+      }
+      setSuccessMessage(
+        payload.action === "done"
+          ? `Item ${item.lead_name} ditandai selesai.`
+          : payload.action === "dismiss"
+            ? `Item ${item.lead_name} disembunyikan dari action center saat ini.`
+            : "Task berhasil diperbarui."
+      );
       await loadWorklist();
     } catch (error) {
       setErrorMessage(
@@ -66,6 +89,13 @@ export default function FollowUpPage() {
       setUpdatingTaskId(null);
     }
   }
+
+  const visibleItems = (worklist?.items ?? []).filter(
+    (item) => !hiddenItemKeys.includes(getWorklistItemKey(item))
+  );
+  const visibleUpcomingItems = (worklist?.upcoming_items ?? []).filter(
+    (item) => !hiddenItemKeys.includes(getWorklistItemKey(item))
+  );
 
   return (
     <WorkspaceShell
@@ -111,6 +141,12 @@ export default function FollowUpPage() {
           </div>
         )}
 
+        {successMessage && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+            {successMessage}
+          </div>
+        )}
+
         {!isLoading && worklist && (
           <>
             <section className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#fef2f2_0%,#ffffff_45%,#eef2ff_100%)] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
@@ -120,25 +156,25 @@ export default function FollowUpPage() {
                     Langkah Berikutnya
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    {worklist.items.length === 0
+                    {visibleItems.length === 0
                       ? "Queue sedang relatif aman"
                       : "Kerjakan item urutan teratas lebih dulu"}
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    {worklist.items.length === 0
-                      ? "Kalau tidak ada item prioritas, kembali cek Queue atau Lead Management. Bisa jadi tidak ada task yang jatuh tempo hari ini."
+                    {visibleItems.length === 0
+                      ? "Kalau tidak ada item prioritas, kembali cek Queue atau Lead Management. Bisa jadi task aktif Anda memang dijadwalkan untuk besok atau hari berikutnya."
                       : "Halaman ini bukan untuk membaca semua detail dari awal. Fungsinya adalah memilih tindakan harian tercepat: buka conversation, dismiss, atau tandai done."}
                   </p>
                 </div>
                 <Link
                   href={
-                    worklist.items[0]?.conversation_id
-                      ? `/dashboard/sales/conversations/${worklist.items[0].conversation_id}`
+                    visibleItems[0]?.conversation_id
+                      ? `/dashboard/sales/conversations/${visibleItems[0].conversation_id}`
                       : "/dashboard/sales"
                   }
                   className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
                 >
-                  {worklist.items[0] ? "Buka Prioritas Teratas" : "Buka Queue"}
+                  {visibleItems[0] ? "Buka Prioritas Teratas" : "Buka Queue"}
                 </Link>
               </div>
             </section>
@@ -205,7 +241,7 @@ export default function FollowUpPage() {
                     Prioritas Hari Ini
                   </p>
                   <h2 className="mt-1 text-2xl font-bold text-slate-950">
-                    {worklist.items.length} item kerja siap ditindak
+                    {visibleItems.length} item kerja siap ditindak
                   </h2>
                 </div>
                 <p className="text-sm text-slate-500">
@@ -214,12 +250,12 @@ export default function FollowUpPage() {
               </div>
 
               <div className="mt-5 space-y-4">
-                {worklist.items.length === 0 ? (
+                {visibleItems.length === 0 ? (
                   <div className="clara-empty-state text-sm text-slate-500">
                     Belum ada task prioritas. Inbox Anda sedang relatif aman.
                   </div>
                 ) : (
-                    worklist.items.map((item, index) => (
+                    visibleItems.map((item, index) => (
                       <WorklistRow
                         key={`${item.lead_id}-${item.task_type}-${item.task_id ?? "derived"}`}
                         item={item}
@@ -232,6 +268,42 @@ export default function FollowUpPage() {
                     ))
                   )}
                 </div>
+            </section>
+
+            <section className="clara-card rounded-[28px] p-5">
+              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Prioritas Berikutnya
+                  </p>
+                  <h2 className="mt-1 text-2xl font-bold text-slate-950">
+                    {visibleUpcomingItems.length} item follow-up untuk besok dan seterusnya
+                  </h2>
+                </div>
+                <p className="text-sm text-slate-500">
+                  Task ini belum jatuh tempo hari ini, jadi disimpan terpisah supaya queue harian tetap bersih.
+                </p>
+              </div>
+
+              <div className="mt-5 space-y-4">
+                {visibleUpcomingItems.length === 0 ? (
+                  <div className="clara-empty-state text-sm text-slate-500">
+                    Belum ada task future. Semua follow-up aktif Anda sudah masuk prioritas hari ini atau belum dibuat jadwal berikutnya.
+                  </div>
+                ) : (
+                  visibleUpcomingItems.map((item, index) => (
+                    <WorklistRow
+                      key={`${item.lead_id}-${item.task_type}-${item.task_id ?? "derived"}-upcoming`}
+                      item={item}
+                      index={index}
+                      isUpdating={
+                        updatingTaskId === (item.task_id ?? item.lead_id)
+                      }
+                      onTaskAction={handleTaskAction}
+                    />
+                  ))
+                )}
+              </div>
             </section>
           </>
         )}
@@ -386,7 +458,7 @@ function WorklistRow({
             </Link>
           )}
           <Link
-            href="/dashboard/crm"
+            href={`/dashboard/crm/${item.lead_id}`}
             className="clara-button clara-button-ghost"
           >
             Buka Lead Management

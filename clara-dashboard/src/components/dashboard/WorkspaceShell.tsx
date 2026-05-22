@@ -32,7 +32,11 @@ import {
   isManagerLike,
   isOwnerLike,
 } from "@/lib/roles";
-import type { CurrentUser } from "@/types/dashboard";
+import type {
+  CurrentUser,
+  OpsNotificationItem,
+  OpsNotificationResponse,
+} from "@/types/dashboard";
 
 type WorkspaceShellProps = {
   currentUser?: CurrentUser | null;
@@ -212,6 +216,33 @@ function getTodayLabel() {
   }).format(new Date());
 }
 
+function getGlobalAlertNotifications(
+  notifications: OpsNotificationItem[]
+): OpsNotificationItem[] {
+  const activeItems = notifications.filter((item) => item.status === "active");
+  const prioritizedItems = activeItems.sort((left, right) => {
+    const leftIsDealSync = left.source_type === "deal_metrics_sync" ? 1 : 0;
+    const rightIsDealSync = right.source_type === "deal_metrics_sync" ? 1 : 0;
+    if (leftIsDealSync !== rightIsDealSync) {
+      return rightIsDealSync - leftIsDealSync;
+    }
+
+    const leftIsHigh = left.severity === "high" ? 1 : 0;
+    const rightIsHigh = right.severity === "high" ? 1 : 0;
+    if (leftIsHigh !== rightIsHigh) {
+      return rightIsHigh - leftIsHigh;
+    }
+
+    return right.updated_at.localeCompare(left.updated_at);
+  });
+
+  return prioritizedItems.filter(
+    (item) =>
+      item.source_type === "deal_metrics_sync" ||
+      (item.severity === "high" && Boolean(item.target_href))
+  );
+}
+
 export function WorkspaceShell({
   currentUser,
   eyebrow,
@@ -230,6 +261,9 @@ export function WorkspaceShell({
   const todayLabel = getTodayLabel();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [globalNotifications, setGlobalNotifications] = useState<
+    OpsNotificationItem[]
+  >([]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -252,6 +286,39 @@ export function WorkspaceShell({
       document.body.style.removeProperty("overflow");
     };
   }, [mobileNavOpen]);
+
+  useEffect(() => {
+    if (!resolvedCurrentUser) {
+      setGlobalNotifications([]);
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function loadGlobalNotifications() {
+      try {
+        const response = await apiFetch<OpsNotificationResponse>(
+          "/dashboard/notifications"
+        );
+        if (isCancelled) {
+          return;
+        }
+        setGlobalNotifications(
+          getGlobalAlertNotifications(response.items).slice(0, 2)
+        );
+      } catch {
+        if (!isCancelled) {
+          setGlobalNotifications([]);
+        }
+      }
+    }
+
+    void loadGlobalNotifications();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [resolvedCurrentUser, pathname]);
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -419,7 +486,56 @@ export function WorkspaceShell({
             </div>
           </div>
 
-          <div>{children}</div>
+          <div className="space-y-4">
+            {globalNotifications.length > 0 ? (
+              <div className="space-y-3">
+                {globalNotifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="rounded-[24px] border border-amber-300 bg-[linear-gradient(135deg,#fff7d6_0%,#ffe7a3_100%)] p-4 shadow-[0_18px_36px_rgba(180,83,9,0.12)]"
+                  >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-amber-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-50">
+                            Perlu tindakan
+                          </span>
+                          <span className="rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-900">
+                            {notification.source_type.replaceAll("_", " ")}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-base font-semibold text-amber-950">
+                          {notification.title}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-amber-900">
+                          {notification.body}
+                        </p>
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap gap-3">
+                        {notification.target_href ? (
+                          <Link
+                            href={notification.target_href}
+                            className="inline-flex items-center rounded-full bg-amber-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(120,53,15,0.18)] hover:bg-amber-900"
+                          >
+                            Buka data yang belum sinkron
+                          </Link>
+                        ) : null}
+                        <Link
+                          href="/dashboard/notifications"
+                          className="inline-flex items-center rounded-full border border-amber-400 bg-white/70 px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-white"
+                        >
+                          Buka notification center
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <div>{children}</div>
+          </div>
         </section>
       </div>
     </main>

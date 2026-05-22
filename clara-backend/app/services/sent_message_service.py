@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
+from app.models.message import Message
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
 from app.schemas.sent_message_schema import MarkReplySentRequest
@@ -12,6 +13,27 @@ from app.schemas.sent_message_schema import MarkReplySentRequest
 
 class SentMessageError(RuntimeError):
     pass
+
+
+def append_sent_message_to_conversation_timeline(
+    db: Session,
+    *,
+    conversation: Conversation,
+    sent_by_name: str,
+    message_text: str,
+    message_timestamp,
+) -> Message:
+    timeline_message = Message(
+        conversation_id=conversation.id,
+        sender_name=sent_by_name,
+        sender_type="sales",
+        external_message_id=None,
+        message_text=message_text,
+        message_timestamp=message_timestamp,
+    )
+    db.add(timeline_message)
+    db.flush()
+    return timeline_message
 
 
 def get_latest_extraction(
@@ -78,6 +100,19 @@ def mark_reply_suggestion_as_sent(
         conversation.lead_temperature = latest_extraction.lead_temperature
 
     db.add(sent_message)
+    db.flush()
+    sent_at = sent_message.sent_at
+    conversation.last_message_at = sent_at
+
+    append_sent_message_to_conversation_timeline(
+        db=db,
+        conversation=conversation,
+        sent_by_name=payload.sent_by_name,
+        message_text=suggestion.final_reply_text,
+        message_timestamp=sent_at,
+    )
+
+    db.add(conversation)
     db.commit()
     db.refresh(sent_message)
 

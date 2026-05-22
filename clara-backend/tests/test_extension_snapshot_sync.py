@@ -643,6 +643,18 @@ def test_extension_send_endpoint_auto_approves_and_marks_sent(
     assert sent_message.reply_suggestion_id == suggestion.id
     assert sent_message.send_mode == "whatsapp_extension"
 
+    timeline_messages = list(
+        db.scalars(
+            select(Message)
+            .where(Message.conversation_id == suggestion.conversation_id)
+            .order_by(Message.message_timestamp.asc(), Message.created_at.asc())
+        ).all()
+    )
+    assert timeline_messages
+    assert timeline_messages[-1].sender_type == "sales"
+    assert timeline_messages[-1].sender_name == "Marketing Alpha"
+    assert timeline_messages[-1].message_text == final_reply_text
+
     approval_log = db.scalars(
         select(ApprovalLog).where(ApprovalLog.reply_suggestion_id == suggestion.id)
     ).first()
