@@ -144,6 +144,259 @@ def test_extension_snapshot_sync_detects_duplicate_payload(
     assert duplicate_payload["duplicate"] is True
 
 
+def test_extension_snapshot_sync_updates_messages_when_chat_grows(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    initial_payload = {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:00:00.000Z",
+            "chatTitle": "Leoni Customer",
+            "chatSubtitle": "online",
+            "messages": [
+                {
+                    "id": "09.00-0",
+                    "author": "Leoni",
+                    "direction": "incoming",
+                    "text": "Halo kak, ini legal tidak?",
+                    "timestampLabel": "09.00",
+                },
+                {
+                    "id": "09.01-1",
+                    "author": "Arya",
+                    "direction": "outgoing",
+                    "text": "Legal, nanti saya kirim penjelasannya.",
+                    "timestampLabel": "09.01",
+                },
+            ],
+        }
+    }
+
+    first_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=initial_payload,
+        headers=csrf_headers(client),
+    )
+    assert first_response.status_code == 201, first_response.text
+    conversation_id = UUID(first_response.json()["conversation_id"])
+
+    updated_payload = {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:05:00.000Z",
+            "chatTitle": "Leoni Customer",
+            "chatSubtitle": "online",
+            "messages": [
+                *initial_payload["chatData"]["messages"],
+                {
+                    "id": "09.05-2",
+                    "author": "Leoni",
+                    "direction": "incoming",
+                    "text": "Kalau saya kirim datanya hari ini bisa diproses ya?",
+                    "timestampLabel": "09.05",
+                },
+            ],
+        }
+    }
+
+    update_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=updated_payload,
+        headers=csrf_headers(client),
+    )
+    assert update_response.status_code == 201, update_response.text
+    assert update_response.json()["status"] == "updated"
+
+    db = db_session_factory()
+    messages = list(
+        db.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.message_timestamp.asc())
+        ).all()
+    )
+    assert len(messages) == 3
+    assert messages[-1].message_text == "Kalau saya kirim datanya hari ini bisa diproses ya?"
+
+
+def test_extension_reply_suggestions_regenerate_when_snapshot_changed_before_request(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    extraction_calls = {"count": 0}
+    reply_calls = {"count": 0}
+
+    def fake_extraction(conversation_text: str) -> AIExtractionCreate:
+        extraction_calls["count"] += 1
+        has_latest_question = "Kalau saya kirim datanya hari ini bisa diproses ya?" in conversation_text
+        return AIExtractionCreate(
+            lead_temperature="hot" if has_latest_question else "warm",
+            pipeline_stage="closing" if has_latest_question else "objection",
+            buying_intent="high" if has_latest_question else "medium",
+            sentiment="positive" if has_latest_question else "cautious",
+            risk_level="medium",
+            main_objections=["legalitas"],
+            budget_signal={
+                "detected": False,
+                "amount_text": None,
+                "notes": "Belum ada sinyal budget spesifik.",
+            },
+            recommended_reply_strategy={
+                "tone": "professional",
+                "key_points": ["jawab legalitas", "jelaskan proses"],
+                "avoid_topics": ["janji hasil"],
+            },
+            customer_summary=(
+                "Customer siap kirim data hari ini."
+                if has_latest_question
+                else "Customer ragu soal legalitas."
+            ),
+            next_best_action=(
+                "Arahkan langkah kirim data dan validasi proses."
+                if has_latest_question
+                else "Kirim penjelasan legalitas resmi."
+            ),
+            content_insight="Legalitas adalah isu utama.",
+            internal_notes="Perlu dokumen resmi.",
+            confidence_score=0.88,
+        )
+
+    def fake_reply(**kwargs) -> ReplySuggestionCreate:
+        reply_calls["count"] += 1
+        extraction = kwargs["extraction"]
+        has_latest_question = extraction.pipeline_stage == "closing"
+        return ReplySuggestionCreate(
+            suggested_replies=[
+                {
+                    "tone": "friendly",
+                    "text": (
+                        "Siap kak, kalau datanya dikirim hari ini saya bantu arahkan prosesnya."
+                        if has_latest_question
+                        else "Siap kak, saya bantu jelaskan legalitasnya ya."
+                    ),
+                    "reasoning": "Ramah.",
+                },
+                {
+                    "tone": "professional",
+                    "text": (
+                        "Baik kak, saya bantu cek data dan jelaskan alur prosesnya."
+                        if has_latest_question
+                        else "Baik kak, saya kirim penjelasan legalitas resmi yang tersedia."
+                    ),
+                    "reasoning": "Profesional.",
+                },
+                {
+                    "tone": "empathetic",
+                    "text": (
+                        "Tenang kak, nanti saya dampingi supaya proses kirim data lebih jelas."
+                        if has_latest_question
+                        else "Wajar kak kalau masih ragu, nanti saya bantu kirim dasar legalitasnya."
+                    ),
+                    "reasoning": "Empatik.",
+                },
+            ]
+        )
+
+    monkeypatch.setattr(
+        "app.services.ai_extraction_service.call_openai_for_extraction",
+        fake_extraction,
+    )
+    monkeypatch.setattr(
+        "app.services.reply_suggestion_service.call_openai_for_reply_suggestion",
+        fake_reply,
+    )
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    initial_payload = {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:00:00.000Z",
+            "chatTitle": "Leoni Customer",
+            "chatSubtitle": "online",
+            "messages": [
+                {
+                    "id": "09.00-0",
+                    "author": "Leoni",
+                    "direction": "incoming",
+                    "text": "Ini legal tidak ya kak?",
+                    "timestampLabel": "09.00",
+                },
+                {
+                    "id": "09.01-1",
+                    "author": "Arya",
+                    "direction": "outgoing",
+                    "text": "Saya bantu jelaskan ya kak.",
+                    "timestampLabel": "09.01",
+                },
+            ],
+        }
+    }
+
+    first_response = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json=initial_payload,
+        headers=csrf_headers(client),
+    )
+    assert first_response.status_code == 201, first_response.text
+    assert first_response.json()["cached"] is False
+
+    updated_snapshot_payload = {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:05:00.000Z",
+            "chatTitle": "Leoni Customer",
+            "chatSubtitle": "online",
+            "messages": [
+                *initial_payload["chatData"]["messages"],
+                {
+                    "id": "09.05-2",
+                    "author": "Leoni",
+                    "direction": "incoming",
+                    "text": "Kalau saya kirim datanya hari ini bisa diproses ya?",
+                    "timestampLabel": "09.05",
+                },
+            ],
+        }
+    }
+
+    sync_only_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=updated_snapshot_payload,
+        headers=csrf_headers(client),
+    )
+    assert sync_only_response.status_code == 201, sync_only_response.text
+    assert sync_only_response.json()["status"] == "updated"
+
+    second_response = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json=updated_snapshot_payload,
+        headers=csrf_headers(client),
+    )
+    assert second_response.status_code == 201, second_response.text
+    second_payload = second_response.json()
+    assert second_payload["status"] == "duplicate"
+    assert second_payload["duplicate"] is True
+    assert second_payload["cached"] is False
+    assert "kirim data hari ini" in second_payload["customer_summary"].lower()
+    assert extraction_calls["count"] == 2
+    assert reply_calls["count"] == 2
+
+    db = db_session_factory()
+    conversation_id = UUID(second_payload["conversation_id"])
+    messages = list(
+        db.scalars(
+            select(Message).where(Message.conversation_id == conversation_id)
+        ).all()
+    )
+    assert len(messages) == 3
+
+
 def test_extension_reply_suggestions_endpoint_generates_clara_suggestions(
     client: TestClient,
     db_session_factory: sessionmaker,

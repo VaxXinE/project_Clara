@@ -29,6 +29,7 @@ export default function SalesInboxPage() {
 
   useEffect(() => {
     async function loadInbox() {
+      setIsLoading(true);
       try {
         const inboxPath =
           sourceChannelFilter === "all"
@@ -53,7 +54,7 @@ export default function SalesInboxPage() {
     }
 
     void loadInbox();
-  }, []);
+  }, [sourceChannelFilter]);
 
   const canAccessMarketing =
     currentUser !== null && ["superadmin", "head"].includes(currentUser.role);

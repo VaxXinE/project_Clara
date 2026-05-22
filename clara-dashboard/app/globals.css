@@ -1,6 +1,20 @@
 @import "tailwindcss";
 
 :root {
+  --font-manrope:
+    "Manrope",
+    "Avenir Next",
+    "Segoe UI",
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  --font-plex-mono:
+    "IBM Plex Mono",
+    "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    Menlo,
+    monospace;
   --background: #f4efe6;
   --foreground: #111827;
   --surface: rgba(255, 251, 245, 0.76);

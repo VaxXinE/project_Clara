@@ -50,6 +50,7 @@ export default function CrmPage() {
   const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
 
   async function loadCrmBoard() {
+    setIsLoading(true);
     try {
       const leadsPath =
         sourceChannelFilter === "all"
@@ -77,7 +78,7 @@ export default function CrmPage() {
     }, 0);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [sourceChannelFilter]);
 
   const stageBuckets = useMemo(() => {
     return STAGE_ORDER.map((stage) => ({

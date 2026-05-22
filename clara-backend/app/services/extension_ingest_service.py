@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import hashlib
 import re
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, desc, select
-from sqlalchemy.orm import Session
+from sqlalchemy import desc, select
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
@@ -47,6 +48,7 @@ class ExtensionSnapshotError(RuntimeError):
 
 @dataclass(frozen=True)
 class NormalizedSnapshotMessage:
+    external_message_id: str
     author: str
     sender_type: str
     text: str
@@ -156,6 +158,7 @@ def normalize_snapshot_messages(
 
         normalized_messages.append(
             NormalizedSnapshotMessage(
+                external_message_id=message.id.strip(),
                 author=message.author.strip(),
                 sender_type="sales" if message.direction == "outgoing" else "customer",
                 text=message.text.strip(),
@@ -184,6 +187,20 @@ def get_existing_extension_conversation(
     return db.scalars(statement).first()
 
 
+def build_extension_message_key(
+    *,
+    current_user: User,
+    chat_title: str,
+    snapshot_message_id: str,
+) -> str:
+    key_source = (
+        f"waext:{current_user.organization_id}:{current_user.id}:"
+        f"{chat_title.strip().lower()}:{snapshot_message_id.strip()}"
+    )
+    digest = hashlib.sha256(key_source.encode("utf-8")).hexdigest()
+    return f"waext:{digest}"
+
+
 def get_latest_ai_extraction_for_conversation(
     db: Session,
     *,
@@ -208,6 +225,103 @@ def get_latest_reply_suggestion_for_conversation(
         .order_by(desc(ReplySuggestion.created_at))
     )
     return db.scalars(statement).first()
+
+
+def get_extension_conversation_or_raise(
+    db: Session,
+    *,
+    conversation_id: UUID,
+) -> Conversation:
+    statement = (
+        select(Conversation)
+        .where(Conversation.id == conversation_id)
+        .where(Conversation.source == EXTENSION_SOURCE)
+        .options(selectinload(Conversation.messages))
+    )
+    conversation = db.scalars(statement).first()
+
+    if conversation is None:
+        raise ExtensionSnapshotError("Conversation extension tidak ditemukan.")
+
+    return conversation
+
+
+def sync_extension_messages(
+    db: Session,
+    *,
+    conversation: Conversation,
+    current_user: User,
+    chat_title: str,
+    normalized_messages: list[NormalizedSnapshotMessage],
+) -> None:
+    existing_messages = list(
+        db.scalars(
+            select(Message).where(Message.conversation_id == conversation.id)
+        ).all()
+    )
+    existing_by_external_id = {
+        message.external_message_id: message
+        for message in existing_messages
+        if message.external_message_id
+    }
+    retained_message_ids: set[UUID] = set()
+
+    for message in normalized_messages:
+        external_message_id = build_extension_message_key(
+            current_user=current_user,
+            chat_title=chat_title,
+            snapshot_message_id=message.external_message_id,
+        )
+        existing_message = existing_by_external_id.get(external_message_id)
+
+        if existing_message is None:
+            existing_message = Message(
+                conversation_id=conversation.id,
+                external_message_id=external_message_id,
+                sender_name=message.author,
+                sender_type=message.sender_type,
+                message_text=message.text,
+                message_timestamp=message.timestamp,
+            )
+            db.add(existing_message)
+            db.flush()
+        else:
+            existing_message.sender_name = message.author
+            existing_message.sender_type = message.sender_type
+            existing_message.message_text = message.text
+            existing_message.message_timestamp = message.timestamp
+            db.add(existing_message)
+
+        retained_message_ids.add(existing_message.id)
+
+    for message in existing_messages:
+        if message.id not in retained_message_ids:
+            db.delete(message)
+
+
+def is_extension_cache_fresh(
+    *,
+    conversation: Conversation,
+    extraction: AIExtraction | None,
+    suggestion: ReplySuggestion | None,
+) -> bool:
+    if extraction is None or suggestion is None:
+        return False
+
+    if suggestion.ai_extraction_id != extraction.id:
+        return False
+
+    latest_message_created_at = max(
+        (message.created_at for message in conversation.messages),
+        default=None,
+    )
+    if latest_message_created_at is None:
+        return True
+
+    return (
+        extraction.created_at >= latest_message_created_at
+        and suggestion.created_at >= latest_message_created_at
+    )
 
 
 def sync_whatsapp_extension_snapshot(
@@ -275,19 +389,15 @@ def sync_whatsapp_extension_snapshot(
         conversation.last_message_at = last_message_at
         db.add(conversation)
         db.flush()
-        db.execute(delete(Message).where(Message.conversation_id == conversation.id))
         status_value = "updated"
 
-    for message in normalized_messages:
-        db.add(
-            Message(
-                conversation_id=conversation.id,
-                sender_name=message.author,
-                sender_type=message.sender_type,
-                message_text=message.text,
-                message_timestamp=message.timestamp,
-            )
-        )
+    sync_extension_messages(
+        db=db,
+        conversation=conversation,
+        current_user=current_user,
+        chat_title=snapshot.chat_title,
+        normalized_messages=normalized_messages,
+    )
 
     customer_messages = [
         message for message in normalized_messages if message.sender_type == "customer"
@@ -371,12 +481,18 @@ def generate_extension_reply_suggestions(
         db=db,
         conversation_id=snapshot_result.conversation_id,
     )
+    conversation = get_extension_conversation_or_raise(
+        db=db,
+        conversation_id=snapshot_result.conversation_id,
+    )
 
     if (
         snapshot_result.duplicate
-        and latest_extraction is not None
-        and latest_suggestion is not None
-        and latest_suggestion.ai_extraction_id == latest_extraction.id
+        and is_extension_cache_fresh(
+            conversation=conversation,
+            extraction=latest_extraction,
+            suggestion=latest_suggestion,
+        )
     ):
         return build_extension_reply_suggestions_response(
             snapshot_result=snapshot_result,

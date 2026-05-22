@@ -62,9 +62,9 @@ function getRolePrinciples(role?: string) {
     return {
       title: "Mode Superadmin",
       items: [
-        "Mulai dari ops dashboard, alert, dan action center untuk membaca kesehatan eksekusi lebih dulu.",
-        "Turun ke queue, lead management, atau chat review center hanya saat ada sinyal yang perlu intervensi.",
-        "Gunakan halaman operasional untuk verifikasi lapangan, bukan sebagai titik pantau utama harian.",
+        "Mulai dari manager insights, ops dashboard, dan knowledge untuk membaca kesehatan organisasi lebih dulu.",
+        "Turun ke queue, lead management, atau chat review center saat ada sinyal yang perlu intervensi langsung.",
+        "Access control dipakai saat ada perubahan boundary user, struktur tim, atau governance akses.",
       ],
     };
   }
@@ -73,9 +73,20 @@ function getRolePrinciples(role?: string) {
     return {
       title: "Mode Head",
       items: [
-        "Mulai dari action center, chat review center, dan ops dashboard agar bottleneck tim cepat terlihat.",
-        "Pastikan queue dan lead management tetap rapi sebelum masuk ke area insight yang lebih luas.",
-        "Access control dan system ops dipakai saat ada masalah governance atau boundary user.",
+        "Mulai dari manager insights dan chat review center agar bottleneck tim cepat terlihat.",
+        "Gunakan queue dan lead management saat perlu turun langsung ke percakapan atau lead yang bermasalah.",
+        "Knowledge, ops dashboard, dan access control dipakai untuk approval, governance, dan pembacaan organisasi.",
+      ],
+    };
+  }
+
+  if (isManagerLike(role)) {
+    return {
+      title: "Mode Manager",
+      items: [
+        "Mulai dari manager insights untuk membaca discipline, coaching priority, dan alert tim.",
+        "Turun ke queue atau lead management saat perlu menindak percakapan dan lead tertentu.",
+        "Gunakan chat review center untuk coaching case yang memang butuh pembinaan atau eskalasi.",
       ],
     };
   }
@@ -83,9 +94,9 @@ function getRolePrinciples(role?: string) {
   return {
     title: "Mode Sales",
     items: [
-      "Mulai dari lead capture atau queue, lalu bergerak ke lead management dan follow-up.",
+      "Mulai dari queue, lalu bergerak ke lead management saat percakapan sudah jelas arahnya.",
       "Gunakan AI analysis dan draft sebagai alat bantu, bukan pengganti pengecekan konteks chat.",
-      "Naikkan ke chat review center, action center, atau lead detail saat conversation sudah butuh tindakan lanjutan.",
+      "Gunakan lead capture saat perlu memasukkan chat atau lead baru secara manual.",
     ],
   };
 }
@@ -105,44 +116,32 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       description: "Eksekusi prioritas harian",
     },
     {
-      href: "/dashboard/upload",
-      label: "Lead Capture",
-      icon: faCloudArrowUp,
-      description: "Masukkan chat atau lead baru",
-    },
-    {
       href: "/dashboard/crm",
       label: "Lead Management",
       icon: faBriefcase,
       description: "Status, owner, dan timeline lead",
-    },
-    {
-      href: "/dashboard/follow-up",
-      label: "Action Center",
-      icon: faCalendarCheck,
-      description: "Overdue, hot lead, dan follow-up",
-    },
-    {
-      href: "/dashboard/approvals",
-      label: "Chat Review Center",
-      icon: faWandSparkles,
-      description: "Triase chat, draft, dan escalation",
     },
   ];
 
   const insightItems: NavItem[] = [];
   const adminItems: NavItem[] = [];
 
-  if (isOwnerLike(currentUser?.role)) {
-    insightItems.push({
-      href: "/dashboard/knowledge",
-      label: "Knowledge Base",
-      icon: faBookOpen,
-      description: "Landasan jawaban resmi",
+  if (currentUser && !isManagerLike(currentUser.role) && !isAdminLike(currentUser.role)) {
+    workspaceItems.push({
+      href: "/dashboard/upload",
+      label: "Lead Capture",
+      icon: faCloudArrowUp,
+      description: "Masukkan chat atau lead baru",
     });
   }
 
   if (currentUser && isManagerLike(currentUser.role)) {
+    workspaceItems.push({
+      href: "/dashboard/approvals",
+      label: "Chat Review Center",
+      icon: faWandSparkles,
+      description: "Triase chat, draft, dan escalation",
+    });
     insightItems.push({
       href: "/dashboard/manager-insights",
       label: "Manager Insights",
@@ -154,10 +153,10 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   if (currentUser && isAdminLike(currentUser.role)) {
     insightItems.push(
       {
-        href: "/dashboard/marketing",
-        label: "Chat Insight",
-        icon: faChartLine,
-        description: "Pola objection dan sinyal percakapan",
+        href: "/dashboard/knowledge",
+        label: "Knowledge Base",
+        icon: faBookOpen,
+        description: "Landasan jawaban resmi",
       },
       {
         href: "/dashboard/kpi",
@@ -167,20 +166,12 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       },
     );
 
-    adminItems.push(
-      {
-        href: "/dashboard/admin/ops",
-        label: "System Ops",
-        icon: faBuildingShield,
-        description: "Kontrol sistem operasional",
-      },
-      {
-        href: "/dashboard/admin/access",
-        label: "Access Control",
-        icon: faUsersGear,
-        description: "Kelola role dan boundary akses",
-      },
-    );
+    adminItems.push({
+      href: "/dashboard/admin/access",
+      label: "Access Control",
+      icon: faUsersGear,
+      description: "Kelola role dan boundary akses",
+    });
   }
 
   const groups: NavGroup[] = [{ title: "Workspace", items: workspaceItems }];
