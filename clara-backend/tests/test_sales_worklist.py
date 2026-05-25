@@ -200,3 +200,40 @@ def test_worklist_moves_future_open_follow_up_to_upcoming_bucket(
         and item["task_id"] is not None
         for item in payload["upcoming_items"]
     )
+
+
+def test_worklist_hides_follow_up_for_won_lead(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    owned_lead = seeded_data["owned_lead"]
+
+    db = db_session_factory()
+    lead = db.get(type(owned_lead), owned_lead.id)
+    assert lead is not None
+    lead.current_stage = "won"
+    lead.next_follow_up_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    db.add(
+        LeadTask(
+            lead_id=lead.id,
+            organization_id=lead.organization_id,
+            assigned_user_id=lead.assigned_user_id,
+            task_type="scheduled_follow_up",
+            status="open",
+            title="Follow up lama",
+            description="Seharusnya tidak tampil karena lead sudah won.",
+            due_at=datetime.now(timezone.utc) - timedelta(hours=2),
+        )
+    )
+    db.commit()
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    response = client.get("/dashboard/sales/worklist")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert all(item["lead_id"] != str(lead.id) for item in payload["items"])
+    assert all(item["lead_id"] != str(lead.id) for item in payload["upcoming_items"])

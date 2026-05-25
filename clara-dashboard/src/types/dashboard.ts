@@ -98,6 +98,7 @@ export type SalesInboxItem = {
   latest_sent_message: DashboardSentMessageSummary | null;
   sales_user_id: string | null;
   sales_owner_name: string | null;
+  is_archived: boolean;
 };
 
 export type SalesConversationMessage = {

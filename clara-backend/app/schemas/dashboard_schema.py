@@ -121,6 +121,7 @@ class SalesInboxItem(BaseModel):
 
     ui_status: str
     priority_score: int
+    is_archived: bool
 
 
 class SalesConversationDetail(BaseModel):

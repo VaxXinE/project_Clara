@@ -20,10 +20,17 @@ const SOURCE_CHANNEL_OPTIONS = [
   { value: "telegram", label: "Telegram" },
 ] as const;
 
+const ARCHIVE_SCOPE_OPTIONS = [
+  { value: "active", label: "Aktif" },
+  { value: "archived", label: "Archived" },
+  { value: "all", label: "Semua" },
+] as const;
+
 export default function SalesInboxPage() {
   const [inboxItems, setInboxItems] = useState<SalesInboxItem[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
+  const [archiveScope, setArchiveScope] = useState("active");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -31,12 +38,16 @@ export default function SalesInboxPage() {
     async function loadInbox() {
       setIsLoading(true);
       try {
-        const inboxPath =
-          sourceChannelFilter === "all"
-            ? "/dashboard/sales/inbox"
-            : `/dashboard/sales/inbox?source_channel=${encodeURIComponent(
-                sourceChannelFilter,
-              )}`;
+        const params = new URLSearchParams();
+        if (sourceChannelFilter !== "all") {
+          params.set("source_channel", sourceChannelFilter);
+        }
+        if (archiveScope !== "active") {
+          params.set("archive_scope", archiveScope);
+        }
+        const inboxPath = params.size
+          ? `/dashboard/sales/inbox?${params.toString()}`
+          : "/dashboard/sales/inbox";
         const [data, me] = await Promise.all([
           apiFetch<SalesInboxItem[]>(inboxPath),
           apiFetch<CurrentUser>("/auth/me"),
@@ -54,7 +65,7 @@ export default function SalesInboxPage() {
     }
 
     void loadInbox();
-  }, [sourceChannelFilter]);
+  }, [archiveScope, sourceChannelFilter]);
 
   const canAccessMarketing =
     currentUser !== null && ["superadmin", "head"].includes(currentUser.role);
@@ -73,6 +84,7 @@ export default function SalesInboxPage() {
     (item) => item.latest_ai_extraction?.risk_level === "high",
   ).length;
   const shouldShowOwnership = isManagerLike(currentUser?.role);
+  const archivedCount = inboxItems.filter((item) => item.is_archived).length;
 
   async function handleLogout() {
     try {
@@ -189,12 +201,16 @@ export default function SalesInboxPage() {
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                     {inboxItems.length === 0
-                      ? "Inbox masih kosong"
+                      ? archiveScope === "archived"
+                        ? "Belum ada conversation yang terarsip"
+                        : "Inbox masih kosong"
                       : "Buka conversation paling atas lebih dulu"}
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                     {inboxItems.length === 0
-                      ? "Kalau belum ada percakapan, langkah paling masuk akal adalah import chat dulu supaya Clara punya bahan kerja."
+                      ? archiveScope === "archived"
+                        ? "Belum ada chat yang masuk arsip otomatis. Conversation yang tidak aktif akan muncul di sini setelah melewati batas inactivity."
+                        : "Kalau belum ada percakapan, langkah paling masuk akal adalah import chat dulu supaya Clara punya bahan kerja."
                       : "Urutan di inbox ini sudah cukup dekat dengan prioritas operasional. Setelah membuka conversation, pastikan AI analysis tersedia sebelum Anda memutuskan reply, approval, atau pindah ke lead detail."}
                   </p>
                 </div>
@@ -252,6 +268,46 @@ export default function SalesInboxPage() {
                 value={String(highRiskCount)}
                 tone="amber"
               />
+              <OverviewTile
+                label="Archived"
+                value={String(archivedCount)}
+                tone="slate"
+              />
+            </section>
+
+            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Scope Conversation
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Pisahkan chat aktif dan arsip agar queue harian tetap bersih.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {ARCHIVE_SCOPE_OPTIONS.map((option) => {
+                    const isActive = archiveScope === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setArchiveScope(option.value);
+                        }}
+                        className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                          isActive
+                            ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
+                            : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </section>
 
             <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
@@ -293,18 +349,23 @@ export default function SalesInboxPage() {
               {inboxItems.length === 0 ? (
                 <div className="clara-empty-state">
                   <h2 className="text-xl font-semibold text-slate-900">
-                    Belum ada conversation
+                    {archiveScope === "archived"
+                      ? "Belum ada conversation archived"
+                      : "Belum ada conversation"}
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Workspace ini akan mulai terasa hidup setelah chat WhatsApp
-                    pertama di-upload dan diparse menjadi conversation.
+                    {archiveScope === "archived"
+                      ? "Chat lama yang tidak aktif akan muncul di tab ini setelah melewati batas inactivity yang ditentukan sistem."
+                      : "Workspace ini akan mulai terasa hidup setelah chat WhatsApp pertama di-upload dan diparse menjadi conversation."}
                   </p>
-                  <Link
-                    href="/dashboard/upload"
-                    className="clara-button clara-button-primary mt-5"
-                  >
-                    Upload Chat Pertama
-                  </Link>
+                  {archiveScope !== "archived" && (
+                    <Link
+                      href="/dashboard/upload"
+                      className="clara-button clara-button-primary mt-5"
+                    >
+                      Upload Chat Pertama
+                    </Link>
+                  )}
                 </div>
               ) : (
                 inboxItems.map((item) => {
@@ -348,6 +409,12 @@ export default function SalesInboxPage() {
                                 SENT
                               </span>
                             )}
+
+                            {item.is_archived && (
+                              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                ARCHIVED
+                              </span>
+                            )}
                           </div>
 
                           <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
@@ -376,6 +443,12 @@ export default function SalesInboxPage() {
                             <span>Priority: {item.priority_score}</span>
                             <span>&bull;</span>
                             <span>{formatStatusLabel(item.ui_status)}</span>
+                            {archiveScope === "all" && (
+                              <>
+                                <span>&bull;</span>
+                                <span>{item.is_archived ? "Arsip" : "Aktif"}</span>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -408,6 +481,13 @@ export default function SalesInboxPage() {
                               </p>
                             </>
                           ) : null}
+
+                          <p className="clara-kicker mt-5 text-[11px]">
+                            Status arsip
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-slate-800">
+                            {item.is_archived ? "Archived otomatis" : "Aktif"}
+                          </p>
                         </div>
                       </div>
                     </Link>

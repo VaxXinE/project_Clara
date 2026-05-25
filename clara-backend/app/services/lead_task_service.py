@@ -22,6 +22,7 @@ from app.services.access_control_service import (
     can_access_all_conversations,
     get_accessible_sales_user_ids,
 )
+from app.services.role_service import is_superadmin_like
 from app.services.lead_activity_service import create_lead_activity_event
 
 VALID_TASK_TYPES = {"manual_follow_up", "scheduled_follow_up", "approval_follow_up"}
@@ -155,7 +156,13 @@ def get_accessible_lead(
             detail="Lead not found.",
         )
 
-    if current_user.organization_id is None or lead.organization_id != current_user.organization_id:
+    if (
+        not is_superadmin_like(current_user.role)
+        and (
+            current_user.organization_id is None
+            or lead.organization_id != current_user.organization_id
+        )
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lead not found.",

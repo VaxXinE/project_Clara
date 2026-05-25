@@ -166,7 +166,7 @@ async def upload_whatsapp_txt(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -236,7 +236,7 @@ async def upload_telegram_txt(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -306,7 +306,7 @@ async def upload_whatsapp_raw_text(
     payload: UploadRawChatRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -359,7 +359,7 @@ async def upload_telegram_raw_text(
     payload: UploadRawChatRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 

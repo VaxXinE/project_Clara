@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     whatsapp_meta_app_secret: str | None = None
     whatsapp_meta_default_organization_slug: str | None = None
     whatsapp_meta_default_sales_user_email: str | None = None
+    conversation_auto_archive_days: int = 7
 
     model_config = SettingsConfigDict(
         env_file=".env",

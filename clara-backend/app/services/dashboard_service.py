@@ -93,6 +93,7 @@ from app.services.access_control_service import (
 )
 from app.services.chat_review_service import build_chat_review_case_item
 from app.services.business_segmentation_service import matches_account_category
+from app.services.conversation_lifecycle_service import is_conversation_auto_archived
 from app.services.knowledge_update_queue_service import (
     build_knowledge_update_proposal_item,
 )
@@ -172,6 +173,16 @@ def lead_requires_deal_metrics_sync(lead: Lead) -> bool:
 
     current_deal_status = lead.deal.status if lead.deal is not None else None
     return current_deal_status != lead.current_stage
+
+
+def lead_has_closed_outcome(lead: Lead) -> bool:
+    if lead.current_stage in {"won", "lost"}:
+        return True
+
+    if lead.deal is not None and lead.deal.status in {"won", "lost"}:
+        return True
+
+    return False
 
 
 def build_ops_notification_item(notification: OpsNotification) -> OpsNotificationItem:
@@ -580,8 +591,9 @@ def get_sales_inbox(
     current_user: User,
     *,
     source_channel: str | None = None,
+    archive_scope: str = "active",
 ) -> list[SalesInboxItem]:
-    if current_user.organization_id is None:
+    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
         return []
 
     statement = select(Conversation).options(
@@ -591,9 +603,10 @@ def get_sales_inbox(
         selectinload(Conversation.sent_messages),
         selectinload(Conversation.sales_user),
     )
-    statement = statement.where(
-        Conversation.organization_id == current_user.organization_id
-    )
+    if not is_superadmin_like(current_user.role):
+        statement = statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
 
     statement = apply_sales_user_scope_filter(
         statement,
@@ -604,11 +617,20 @@ def get_sales_inbox(
 
     statement = statement.order_by(desc(Conversation.last_message_at))
 
-    conversations = [
-        conversation
-        for conversation in db.scalars(statement).all()
-        if matches_source_channel(conversation.source, source_channel)
-    ]
+    normalized_archive_scope = archive_scope if archive_scope in {"active", "archived", "all"} else "active"
+    conversations = []
+    for conversation in db.scalars(statement).all():
+        if not matches_source_channel(conversation.source, source_channel):
+            continue
+
+        is_archived = is_conversation_auto_archived(conversation)
+        if normalized_archive_scope == "active" and is_archived:
+            continue
+        if normalized_archive_scope == "archived" and not is_archived:
+            continue
+
+        conversations.append(conversation)
+
     inbox_items: list[SalesInboxItem] = []
 
     for conversation in conversations:
@@ -657,6 +679,7 @@ def get_sales_inbox(
                 ),
                 sales_user_id=conversation.sales_user_id,
                 sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
+                is_archived=is_conversation_auto_archived(conversation),
             )
         )
 
@@ -802,6 +825,9 @@ def build_sales_worklist_item(
     latest_discipline_log: LeadDisciplineLog | None,
     now: datetime,
 ) -> SalesWorklistItem | None:
+    if lead_has_closed_outcome(lead):
+        return None
+
     current_sent_state = resolve_current_sent_message(latest_message, latest_sent_message)
     ui_status = determine_ui_status(
         latest_message,
@@ -950,6 +976,9 @@ def build_discipline_worklist_item(
     latest_discipline_log: LeadDisciplineLog | None,
     now: datetime,
 ) -> SalesWorklistItem | None:
+    if lead_has_closed_outcome(lead):
+        return None
+
     today = now.date()
     latest_log_date = latest_discipline_log.log_date if latest_discipline_log else None
 
@@ -993,7 +1022,7 @@ def get_sales_worklist(
     db: Session,
     current_user: User,
 ) -> SalesWorklistResponse:
-    if current_user.organization_id is None:
+    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
         return SalesWorklistResponse(
             generated_at=datetime.now(timezone.utc),
             overdue_count=0,
@@ -1013,19 +1042,17 @@ def get_sales_worklist(
             upcoming_items=[],
         )
 
-    statement = (
-        select(Lead)
-        .where(Lead.organization_id == current_user.organization_id)
-        .options(
-            selectinload(Lead.assigned_user),
-            selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
-            selectinload(Lead.discipline_logs).selectinload(LeadDisciplineLog.actor_user),
-            selectinload(Lead.conversations).selectinload(Conversation.messages),
-            selectinload(Lead.conversations).selectinload(Conversation.ai_extractions),
-            selectinload(Lead.conversations).selectinload(Conversation.reply_suggestions),
-            selectinload(Lead.conversations).selectinload(Conversation.sent_messages),
-        )
+    statement = select(Lead).options(
+        selectinload(Lead.assigned_user),
+        selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
+        selectinload(Lead.discipline_logs).selectinload(LeadDisciplineLog.actor_user),
+        selectinload(Lead.conversations).selectinload(Conversation.messages),
+        selectinload(Lead.conversations).selectinload(Conversation.ai_extractions),
+        selectinload(Lead.conversations).selectinload(Conversation.reply_suggestions),
+        selectinload(Lead.conversations).selectinload(Conversation.sent_messages),
     )
+    if not is_superadmin_like(current_user.role):
+        statement = statement.where(Lead.organization_id == current_user.organization_id)
 
     statement = apply_sales_user_scope_filter(
         statement,
@@ -1055,6 +1082,7 @@ def get_sales_worklist(
     for lead in leads:
         conversation = get_latest_conversation_for_lead(lead)
         latest_discipline_log = get_latest_discipline_log_for_lead(lead)
+        lead_is_closed = lead_has_closed_outcome(lead)
 
         latest_message = get_latest_message(conversation) if conversation else None
         latest_extraction = get_latest_extraction(conversation) if conversation else None
@@ -1066,6 +1094,10 @@ def get_sales_worklist(
                 task
                 for task in lead.tasks
                 if task.status in {"open", "snoozed"}
+                and not (
+                    lead_is_closed
+                    and task.task_type in {"manual_follow_up", "scheduled_follow_up", "approval_follow_up"}
+                )
             ],
             key=lambda task: (ensure_aware_utc(task.due_at) or now, task.created_at),
         )
@@ -1262,7 +1294,7 @@ def get_manager_insights(
 ) -> ManagerInsightsResponse:
     now = datetime.now(timezone.utc)
 
-    if current_user.organization_id is None:
+    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
         return ManagerInsightsResponse(
             generated_at=now,
             scope_label="No organization scope",
@@ -1286,14 +1318,12 @@ def get_manager_insights(
         current_user=current_user,
     )
 
-    lead_statement = (
-        select(Lead)
-        .where(Lead.organization_id == current_user.organization_id)
-        .options(
-            selectinload(Lead.assigned_user).selectinload(User.sales_team),
-            selectinload(Lead.discipline_logs),
-        )
+    lead_statement = select(Lead).options(
+        selectinload(Lead.assigned_user).selectinload(User.sales_team),
+        selectinload(Lead.discipline_logs),
     )
+    if not is_superadmin_like(current_user.role):
+        lead_statement = lead_statement.where(Lead.organization_id == current_user.organization_id)
     lead_statement = apply_sales_user_scope_filter(
         lead_statement,
         db=db,
@@ -1307,20 +1337,20 @@ def get_manager_insights(
     ]
     allowed_lead_ids = {lead.id for lead in leads}
 
-    conversation_statement = (
-        select(Conversation)
-        .where(Conversation.organization_id == current_user.organization_id)
-        .options(
-            selectinload(Conversation.lead),
-            selectinload(Conversation.sales_user).selectinload(User.sales_team),
-            selectinload(Conversation.messages),
-            selectinload(Conversation.ai_extractions),
-            selectinload(Conversation.chat_review_case).selectinload(
-                ChatReviewCase.reviewer_user
-            ),
-            selectinload(Conversation.knowledge_update_proposal),
-        )
+    conversation_statement = select(Conversation).options(
+        selectinload(Conversation.lead),
+        selectinload(Conversation.sales_user).selectinload(User.sales_team),
+        selectinload(Conversation.messages),
+        selectinload(Conversation.ai_extractions),
+        selectinload(Conversation.chat_review_case).selectinload(
+            ChatReviewCase.reviewer_user
+        ),
+        selectinload(Conversation.knowledge_update_proposal),
     )
+    if not is_superadmin_like(current_user.role):
+        conversation_statement = conversation_statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
     conversation_statement = apply_sales_user_scope_filter(
         conversation_statement,
         db=db,
@@ -1334,15 +1364,13 @@ def get_manager_insights(
     ]
     conversation_by_id = {conversation.id: conversation for conversation in conversations}
 
-    team_statement = (
-        select(SalesTeam)
-        .where(SalesTeam.organization_id == current_user.organization_id)
-        .options(
-            selectinload(SalesTeam.unit),
-            selectinload(SalesTeam.manager_user),
-            selectinload(SalesTeam.members),
-        )
+    team_statement = select(SalesTeam).options(
+        selectinload(SalesTeam.unit),
+        selectinload(SalesTeam.manager_user),
+        selectinload(SalesTeam.members),
     )
+    if not is_superadmin_like(current_user.role):
+        team_statement = team_statement.where(SalesTeam.organization_id == current_user.organization_id)
     teams = list(db.scalars(team_statement).all())
 
     if accessible_user_ids is not None:
@@ -1596,7 +1624,7 @@ def get_sales_approval_queue(
 ) -> SalesApprovalQueueResponse:
     now = datetime.now(timezone.utc)
 
-    if current_user.organization_id is None:
+    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
         return SalesApprovalQueueResponse(
             generated_at=now,
             pending_count=0,
@@ -1606,16 +1634,14 @@ def get_sales_approval_queue(
             items=[],
         )
 
-    statement = (
-        select(Conversation)
-        .where(Conversation.organization_id == current_user.organization_id)
-        .options(
-            selectinload(Conversation.lead),
-            selectinload(Conversation.ai_extractions),
-            selectinload(Conversation.reply_suggestions),
-        )
-        .order_by(desc(Conversation.last_message_at), desc(Conversation.created_at))
+    statement = select(Conversation).options(
+        selectinload(Conversation.lead),
+        selectinload(Conversation.ai_extractions),
+        selectinload(Conversation.reply_suggestions),
     )
+    if not is_superadmin_like(current_user.role):
+        statement = statement.where(Conversation.organization_id == current_user.organization_id)
+    statement = statement.order_by(desc(Conversation.last_message_at), desc(Conversation.created_at))
 
     statement = apply_sales_user_scope_filter(
         statement,
@@ -1711,7 +1737,7 @@ def get_sales_chat_review_center(
 ) -> ChatReviewCenterResponse:
     now = datetime.now(timezone.utc)
 
-    if current_user.organization_id is None:
+    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
         return ChatReviewCenterResponse(
             generated_at=now,
             total_items=0,
@@ -1724,22 +1750,20 @@ def get_sales_chat_review_center(
             items=[],
         )
 
-    statement = (
-        select(Conversation)
-        .where(Conversation.organization_id == current_user.organization_id)
-        .options(
-            selectinload(Conversation.lead),
-            selectinload(Conversation.sales_user),
-            selectinload(Conversation.messages),
-            selectinload(Conversation.ai_extractions),
-            selectinload(Conversation.reply_suggestions),
-            selectinload(Conversation.sent_messages),
-            selectinload(Conversation.chat_review_case).selectinload(
-                ChatReviewCase.reviewer_user
-            ),
-        )
-        .order_by(desc(Conversation.last_message_at), desc(Conversation.created_at))
+    statement = select(Conversation).options(
+        selectinload(Conversation.lead),
+        selectinload(Conversation.sales_user),
+        selectinload(Conversation.messages),
+        selectinload(Conversation.ai_extractions),
+        selectinload(Conversation.reply_suggestions),
+        selectinload(Conversation.sent_messages),
+        selectinload(Conversation.chat_review_case).selectinload(
+            ChatReviewCase.reviewer_user
+        ),
     )
+    if not is_superadmin_like(current_user.role):
+        statement = statement.where(Conversation.organization_id == current_user.organization_id)
+    statement = statement.order_by(desc(Conversation.last_message_at), desc(Conversation.created_at))
 
     statement = apply_sales_user_scope_filter(
         statement,

@@ -31,7 +31,7 @@ def mark_reply_sent_endpoint(
     payload: MarkReplySentRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         get_accessible_reply_suggestion_or_raise(
@@ -74,7 +74,7 @@ def mark_reply_sent_endpoint(
 def list_sent_messages_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         get_accessible_conversation_or_raise(

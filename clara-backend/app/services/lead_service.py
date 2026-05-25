@@ -56,6 +56,7 @@ from app.services.source_intelligence_service import (
     matches_source_channel,
     normalize_source_channel,
 )
+from app.services.role_service import is_superadmin_like
 
 VALID_LEAD_STAGES = {
     "new_lead",
@@ -70,6 +71,37 @@ VALID_LEAD_STAGES = {
 }
 VALID_TEMPERATURES = {"cold", "warm", "hot", "unknown"}
 VALID_DEAL_STATUSES = {"open", "won", "lost"}
+
+
+def clear_follow_up_for_closed_lead(
+    db: Session,
+    *,
+    lead: Lead,
+    actor_user_id: UUID | None,
+    reason_title: str,
+    reason_description: str,
+) -> bool:
+    if lead.current_stage not in {"won", "lost"} and (
+        lead.deal is None or lead.deal.status not in {"won", "lost"}
+    ):
+        return False
+
+    if lead.next_follow_up_at is None:
+        return False
+
+    previous_follow_up_at = lead.next_follow_up_at
+    lead.next_follow_up_at = None
+    create_lead_activity_event(
+        db=db,
+        lead=lead,
+        event_type="follow_up_updated",
+        title=reason_title,
+        description=reason_description,
+        actor_user_id=actor_user_id,
+        from_value=previous_follow_up_at.isoformat(),
+        to_value=None,
+    )
+    return True
 
 
 def derive_lead_display_name(
@@ -361,7 +393,13 @@ def get_lead_model_for_user(
             detail="Lead not found.",
         )
 
-    if current_user.organization_id is None or lead.organization_id != current_user.organization_id:
+    if (
+        not is_superadmin_like(current_user.role)
+        and (
+            current_user.organization_id is None
+            or lead.organization_id != current_user.organization_id
+        )
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lead not found.",
@@ -387,19 +425,17 @@ def get_leads_for_user(
     source_channel: str | None = None,
     account_category: str | None = None,
 ) -> list[LeadListItem]:
-    if current_user.organization_id is None:
+    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
         return []
 
-    statement = (
-        select(Lead)
-        .where(Lead.organization_id == current_user.organization_id)
-        .options(
-            selectinload(Lead.conversations),
-            selectinload(Lead.assigned_user),
-            selectinload(Lead.customer_profile),
-        )
-        .order_by(desc(Lead.last_contact_at), desc(Lead.created_at))
+    statement = select(Lead).options(
+        selectinload(Lead.conversations),
+        selectinload(Lead.assigned_user),
+        selectinload(Lead.customer_profile),
     )
+    if not is_superadmin_like(current_user.role):
+        statement = statement.where(Lead.organization_id == current_user.organization_id)
+    statement = statement.order_by(desc(Lead.last_contact_at), desc(Lead.created_at))
 
     statement = apply_sales_user_scope_filter(
         statement,
@@ -606,9 +642,17 @@ def update_lead_for_user(
         db.add(lead.deal)
 
     db.add(lead)
+    cleared_follow_up_for_closed_lead = clear_follow_up_for_closed_lead(
+        db=db,
+        lead=lead,
+        actor_user_id=current_user.id,
+        reason_title="Jadwal follow-up dibersihkan",
+        reason_description="Lead sudah ditandai won atau lost sehingga jadwal follow-up lama dibersihkan otomatis.",
+    )
     if (
         "next_follow_up_at" in payload.model_fields_set
         or "assigned_user_id" in payload.model_fields_set
+        or cleared_follow_up_for_closed_lead
     ):
         upsert_follow_up_task_for_lead(db=db, lead=lead)
     db.commit()
@@ -737,7 +781,18 @@ def upsert_lead_deal_for_user(
     if deal.status == "open":
         deal.closed_at = None
 
+    cleared_follow_up_for_closed_lead = clear_follow_up_for_closed_lead(
+        db=db,
+        lead=lead,
+        actor_user_id=current_user.id,
+        reason_title="Jadwal follow-up dibersihkan",
+        reason_description="Deal sudah ditandai won atau lost sehingga jadwal follow-up lama dibersihkan otomatis.",
+    )
+
     db.add(deal)
+    db.add(lead)
+    if cleared_follow_up_for_closed_lead:
+        upsert_follow_up_task_for_lead(db=db, lead=lead)
     db.commit()
     db.refresh(deal)
     return build_lead_deal_item(deal)

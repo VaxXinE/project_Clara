@@ -37,7 +37,7 @@ def sync_whatsapp_snapshot_endpoint(
     payload: WhatsAppExtensionSnapshotSyncRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         result = sync_whatsapp_extension_snapshot(
@@ -78,7 +78,7 @@ def send_whatsapp_reply_suggestion_endpoint(
     payload: WhatsAppExtensionSendReplyRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         get_accessible_reply_suggestion_or_raise(
@@ -133,7 +133,7 @@ def generate_whatsapp_reply_suggestions_endpoint(
     payload: WhatsAppExtensionSnapshotSyncRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         result = generate_extension_reply_suggestions(

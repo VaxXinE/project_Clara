@@ -13,6 +13,7 @@ from app.models.customer_profile import CustomerProfile
 from app.models.lead import Lead
 from app.models.user import User
 from app.services.access_control_service import get_accessible_sales_user_ids
+from app.services.role_service import is_superadmin_like
 from app.services.source_intelligence_service import build_source_label, normalize_source_channel
 
 
@@ -280,7 +281,13 @@ def get_customer_profile_model_for_user(
             detail="Customer profile not found.",
         )
 
-    if current_user.organization_id is None or profile.organization_id != current_user.organization_id:
+    if (
+        not is_superadmin_like(current_user.role)
+        and (
+            current_user.organization_id is None
+            or profile.organization_id != current_user.organization_id
+        )
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Customer profile not found.",
