@@ -103,11 +103,11 @@ export function ReplySuggestionActions({
 
   if (hasBeenSent) {
     return (
-      <div className="clara-alert rounded-[24px] border border-green-200 bg-green-50/92 p-4">
-        <p className="text-sm font-semibold text-green-800">
+      <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(24,17,12,0.98)_100%)] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
+        <p className="text-sm font-semibold text-[#fff0c9]">
           Reply sudah ditandai terkirim.
         </p>
-        <p className="mt-1 text-sm text-green-700">
+        <p className="mt-1 text-sm leading-6 text-[#d6bb84]">
           Untuk MVP ini, status terkirim masih simulasi manual. Nanti bisa
           diganti ke WhatsApp Cloud API.
         </p>

@@ -546,7 +546,6 @@ export default function SalesConversationDetailPage() {
         {detail && !isLoading && !errorMessage && (
           <>
             <ConversationDetailHeader detail={detail} />
-            <ConversationUsageGuide detail={detail} />
             <ConversationDetailContent
               currentUser={currentUser}
               detail={detail}
@@ -622,63 +621,73 @@ function ConversationDetailHeader({
   const suggestion = detail.latest_reply_suggestion;
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-      <div className="clara-card rounded-[30px] p-6">
-        <p className="clara-kicker">Conversation Signal</p>
-        <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-slate-950">
-          Ringkasan kondisi percakapan saat ini
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Last message: {formatDateTime(detail.last_message_at)}
-        </p>
+    <section className="clara-card rounded-[30px] p-5 sm:p-6">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+        <div>
+          <p className="clara-kicker">Conversation Signal</p>
+          <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+            Ringkasan kondisi percakapan saat ini
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Last message: {formatDateTime(detail.last_message_at)}
+          </p>
 
-        <div className="mt-5 flex flex-wrap gap-2">
-          {extraction && (
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                extraction.lead_temperature,
-              )}`}
-            >
-              {extraction.lead_temperature.toUpperCase()}
-            </span>
-          )}
+          <div className="mt-5 flex flex-wrap gap-2">
+            {extraction ? (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
+                  extraction.lead_temperature,
+                )}`}
+              >
+                {extraction.lead_temperature.toUpperCase()}
+              </span>
+            ) : (
+              <span className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                Menunggu AI analysis
+              </span>
+            )}
 
-          {extraction && (
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${getRiskBadgeClass(
-                extraction.risk_level,
-              )}`}
-            >
-              Risk {extraction.risk_level}
-            </span>
-          )}
+            {extraction ? (
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${getRiskBadgeClass(
+                  extraction.risk_level,
+                )}`}
+              >
+                Risk {extraction.risk_level}
+              </span>
+            ) : null}
 
-          {suggestion && (
-            <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-              {formatStatusLabel(suggestion.approval_status)}
-            </span>
-          )}
+            {suggestion ? (
+              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                {formatStatusLabel(suggestion.approval_status)}
+              </span>
+            ) : (
+              <span className="rounded-full border border-[#d3a74b]/22 bg-[#f3e0b3] px-3 py-1 text-xs font-semibold text-[#5c3a12]">
+                Belum ada draft
+              </span>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="clara-card-dark rounded-[30px] p-6">
-        <p className="clara-kicker text-[#d4b07b]">Snapshot</p>
-        <div className="mt-4 space-y-3">
-          <MetaPill
-            label="Messages"
-            value={String(detail.messages.length)}
-            dark
-          />
-          <MetaPill
-            label="Sent logs"
-            value={String(detail.sent_messages.length)}
-            dark
-          />
-          <MetaPill
-            label="AI status"
-            value={extraction ? "Analyzed" : "Pending"}
-            dark
-          />
+        <div className="clara-card-dark rounded-[26px] p-5">
+          <p className="clara-kicker text-[#d4b07b]">Snapshot</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <MetaPill
+              label="Messages"
+              value={String(detail.messages.length)}
+              dark
+            />
+            <MetaPill
+              label="Sent logs"
+              value={String(detail.sent_messages.length)}
+              dark
+            />
+            <MetaPill
+              label="AI status"
+              value={extraction ? "Analyzed" : "Pending"}
+              dark
+            />
+          </div>
         </div>
       </div>
     </section>
@@ -721,7 +730,7 @@ function ConversationUsageGuide({
 
   return (
     <section className="clara-card rounded-[30px] p-5 sm:p-6">
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)] xl:items-start">
         <div>
           <p className="clara-kicker">Langkah Berikutnya</p>
           <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
@@ -731,17 +740,34 @@ function ConversationUsageGuide({
             {nextStep.description}
           </p>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {actionPlan.map((item) => (
-              <UsageCard
+          <div className="mt-5 space-y-3">
+            {actionPlan.map((item, index) => (
+              <div
                 key={item.condition}
-                title={item.condition}
-                description={`${item.action} ${item.detail}`}
-              />
+                className="clara-card-soft rounded-[22px] p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f0cb73]/14 text-xs font-semibold text-[#7c541d]">
+                    0{index + 1}
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-950">
+                      {item.condition}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {item.action}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                      {item.detail}
+                    </p>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+
+        <div className="space-y-3">
           <UsageCard
             title="Kalau customer masih nanya"
             description="Fokus ke AI analysis lalu reply suggestion supaya balasan cepat dan tetap terarah."
@@ -865,6 +891,31 @@ function ConversationDetailContent({
   const canReviewProposal = canReviewKnowledgeProposal(currentUser?.role);
   const reviewCase = detail.chat_review_case;
   const knowledgeProposal = detail.knowledge_update_proposal;
+  const sentCount = detail.sent_messages.length;
+  const actionPlan = buildConversationActionPlan(detail);
+  const nextStep = !extraction
+    ? {
+        title: "Jalankan AI analysis dulu",
+        description:
+          "Tanpa AI analysis, Anda belum punya ringkasan stage, risiko, objection, dan next best action. Ini langkah pertama yang paling masuk akal.",
+      }
+    : !suggestion
+      ? {
+          title: "Buat draft balasan",
+          description:
+            "Analisis sudah ada. Langkah berikutnya adalah menghasilkan reply suggestion supaya conversation ini bisa ditindaklanjuti dengan cepat.",
+        }
+      : sentCount === 0
+        ? {
+            title: "Review lalu kirim atau approve draft",
+            description:
+              "Draft sudah tersedia. Sekarang fokus Anda adalah mengecek kesesuaian bahasa, approval status, dan apakah balasan sudah siap dikirim.",
+          }
+        : {
+            title: "Naikkan konteksnya ke lead dan follow-up",
+            description:
+              "Percakapan ini sudah punya jejak balasan. Pastikan lead stage, task, dan follow-up berikutnya di CRM sudah ikut rapi.",
+          };
   const [activePanel, setActivePanel] = useState<
     "ai_reply" | "coaching" | "knowledge" | "sent_logs"
   >("ai_reply");
@@ -872,85 +923,146 @@ function ConversationDetailContent({
   const visibleMessages = showAllMessages
     ? detail.messages
     : detail.messages.slice(Math.max(detail.messages.length - 12, 0));
-
-  return (
-    <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-      <div className="clara-card rounded-[30px] p-5 sm:p-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="clara-kicker">Chat Timeline</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
-              Timeline percakapan
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Fokus ke pesan terbaru dulu. Expand penuh hanya saat butuh membaca konteks lama.
-            </p>
-          </div>
-
-          <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">
-            Menampilkan {visibleMessages.length} dari {detail.messages.length} pesan
-          </div>
+  const chatTimeline = (
+    <div className="clara-card rounded-[30px] p-5 sm:p-6">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="clara-kicker">Chat Timeline</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[#fff0c9]">
+            Timeline percakapan
+          </h2>
+          <p className="mt-2 text-sm text-[#d6bb84]">
+            Fokus ke pesan terbaru dulu. Expand penuh hanya saat butuh membaca konteks lama.
+          </p>
         </div>
 
-        <div className="mt-5 space-y-3">
-          {!showAllMessages && detail.messages.length > visibleMessages.length ? (
-            <div className="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-              {detail.messages.length - visibleMessages.length} pesan lama disembunyikan dulu supaya halaman tetap ringkas.
-            </div>
-          ) : null}
-
-          {visibleMessages.map((message) => {
-            const isSales = message.sender_type === "sales";
-
-            return (
-              <div
-                key={message.id}
-                className={`flex ${isSales ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[88%] rounded-[24px] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] ${
-                    isSales
-                      ? "bg-[#10172d] text-white"
-                      : "bg-[rgba(255,248,239,0.92)] text-slate-900"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-xs font-semibold">
-                      {message.sender_name}
-                    </p>
-                    <p
-                      className={`text-xs ${
-                        isSales ? "text-slate-300" : "text-slate-500"
-                      }`}
-                    >
-                      {formatDateTime(message.message_timestamp)}
-                    </p>
-                  </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
-                    {message.message_text}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
+        <div className="rounded-full border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(24,17,12,0.96)_100%)] px-4 py-2 text-sm text-[#d6bb84]">
+          Menampilkan {visibleMessages.length} dari {detail.messages.length} pesan
         </div>
-
-        {detail.messages.length > 12 ? (
-          <div className="mt-5 flex justify-center">
-            <button
-              type="button"
-              onClick={() => setShowAllMessages((current) => !current)}
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
-            >
-              {showAllMessages ? "Tampilkan ringkas" : "Tampilkan semua pesan"}
-            </button>
-          </div>
-        ) : null}
       </div>
 
-      <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+      <div className="mt-5 space-y-3">
+        {!showAllMessages && detail.messages.length > visibleMessages.length ? (
+          <div className="rounded-[22px] border border-dashed border-[#f0cb73]/24 bg-[rgba(32,23,14,0.92)] p-4 text-sm text-[#d6bb84]">
+            {detail.messages.length - visibleMessages.length} pesan lama disembunyikan dulu supaya halaman tetap ringkas.
+          </div>
+        ) : null}
+
+        {visibleMessages.map((message) => {
+          const isSales = message.sender_type === "sales";
+
+          return (
+            <div
+              key={message.id}
+              className={`flex ${isSales ? "justify-end" : "justify-start"}`}
+            >
+              <div
+                className={`max-w-[90%] sm:max-w-[82%] rounded-[24px] border p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)] ${
+                  isSales
+                    ? "border-[#d3a74b]/18 bg-[linear-gradient(135deg,rgba(63,42,18,0.96)_0%,rgba(25,18,11,0.98)_100%)] text-[#fff0c9]"
+                    : "border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(248,223,162,0.98)_0%,rgba(217,176,92,0.98)_55%,rgba(168,116,34,0.98)_100%)] text-[#1b130b]"
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold">
+                    {message.sender_name}
+                  </p>
+                  <p
+                    className={`text-xs ${
+                      isSales ? "text-[#d6bb84]" : "text-[#5c3a12]"
+                    }`}
+                  >
+                    {formatDateTime(message.message_timestamp)}
+                  </p>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
+                  {message.message_text}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {detail.messages.length > 12 ? (
+        <div className="mt-5 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShowAllMessages((current) => !current)}
+            className="inline-flex rounded-full border border-[#f0cb73]/18 bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#f0cb73] hover:border-[#f0cb73]/32"
+          >
+            {showAllMessages ? "Tampilkan ringkas" : "Tampilkan semua pesan"}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <section className="space-y-6">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] xl:items-start">
+        <div className="clara-card rounded-[30px] p-5 sm:p-6">
+          <div>
+            <p className="clara-kicker">Langkah Berikutnya</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+              {nextStep.title}
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              {nextStep.description}
+            </p>
+
+            <div className="mt-5 space-y-3">
+              {actionPlan.map((item, index) => (
+                <div
+                  key={item.condition}
+                  className="clara-card-soft rounded-[22px] p-4"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f0cb73]/14 text-xs font-semibold text-[#7c541d]">
+                      0{index + 1}
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-950">
+                        {item.condition}
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        {item.action}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-500">
+                        {item.detail}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <UsageCard
+                title="Kalau customer masih nanya"
+                description="Fokus ke AI analysis lalu reply suggestion supaya balasan cepat dan tetap terarah."
+              />
+              <UsageCard
+                title="Kalau sudah dibalas"
+                description="Jangan berhenti di conversation. Pindahkan konteksnya ke lead detail agar follow-up berikutnya tercatat."
+              />
+              <UsageCard
+                title="Kalau ada risiko tinggi"
+                description="Naikkan ke approval atau coaching review. Hindari kirim jawaban sensitif tanpa pengecekan."
+              />
+            </div>
+          </div>
+        </div>
+
         <section className="clara-card rounded-[30px] p-5">
-          <div className="flex flex-wrap gap-2">
+          <div>
+            <p className="clara-kicker">Workspace Panel</p>
+            <h3 className="mt-2 text-lg font-semibold text-slate-950">
+              Pilih area kerja
+            </h3>
+          </div>
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <PanelTab
               label="AI & Reply"
               isActive={activePanel === "ai_reply"}
@@ -1541,7 +1653,9 @@ function ConversationDetailContent({
             ) : null}
           </div>
         </section>
-      </aside>
+      </section>
+
+      {chatTimeline}
     </section>
   );
 }
@@ -1559,7 +1673,7 @@ function PanelTab({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+      className={`w-full rounded-2xl px-3.5 py-2.5 text-center text-sm font-semibold transition ${
         isActive
           ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
           : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400"
