@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 
-import { isAdminLike, isOwnerLike } from "@/lib/roles";
+import {
+  canAccessQueueAndActionCenter,
+  isAdminLike,
+  isManagerLike,
+  isOwnerLike,
+} from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 const SALES_WORKFLOW_STEPS = [
@@ -75,6 +80,41 @@ const HEAD_WORKFLOW_STEPS = [
   },
 ] as const;
 
+const MANAGER_WORKFLOW_STEPS = [
+  {
+    step: "1",
+    title: "Buka Chat Review Center",
+    description:
+      "Mulai dari review center untuk melihat chat yang macet, butuh coaching, atau menunggu approval manusia.",
+    href: "/dashboard/approvals",
+    cta: "Buka Chat Review Center",
+  },
+  {
+    step: "2",
+    title: "Baca Manager Insights",
+    description:
+      "Pantau discipline by team, coaching priority, dan boundary alert supaya manager tahu tim mana yang mulai bocor.",
+    href: "/dashboard/manager-insights",
+    cta: "Buka Manager Insights",
+  },
+  {
+    step: "3",
+    title: "Rapikan Lead Penting",
+    description:
+      "Turun ke Lead Management untuk memastikan lead aktif, hot lead, dan stage penting tidak tertinggal atau salah arah.",
+    href: "/dashboard/crm",
+    cta: "Buka Lead Management",
+  },
+  {
+    step: "4",
+    title: "Tindak Alert Bila Perlu",
+    description:
+      "Kalau sudah cukup jelas, cek Alert Center untuk sinyal operasional yang perlu keputusan atau koordinasi lebih lanjut.",
+    href: "/dashboard/notifications",
+    cta: "Buka Alert Center",
+  },
+] as const;
+
 const SUPERADMIN_WORKFLOW_STEPS = [
   {
     step: "1",
@@ -118,16 +158,43 @@ function buildRoleTasks(role?: string) {
       href: "/dashboard/upload",
     },
     {
+      title: "Saya mau lihat lead yang harus dikejar",
+      description: "Masuk ke Lead Management untuk membaca lead yang butuh tindakan, overdue, atau perlu sinkronisasi.",
+      href: "/dashboard/crm",
+    },
+  ];
+
+  if (isManagerLike(role) && !isAdminLike(role)) {
+    return [
+      ...common,
+      {
+        title: "Saya mau review percakapan tim",
+        description: "Masuk ke Chat Review Center untuk coaching case, approval, dan bottleneck percakapan tim.",
+        href: "/dashboard/approvals",
+      },
+      {
+        title: "Saya mau lihat disiplin tim",
+        description: "Buka Manager Insights untuk membaca stale lead, coaching priority, dan boundary alert.",
+        href: "/dashboard/manager-insights",
+      },
+    ];
+  }
+
+  if (canAccessQueueAndActionCenter(role)) {
+    common.splice(1, 0, {
       title: "Saya mau balas customer",
       description: "Masuk ke Queue, buka detail conversation, lalu jalankan AI analysis dan draft reply.",
       href: "/dashboard/sales",
-    },
-    {
-      title: "Saya mau lihat lead yang harus dikejar",
-    description: "Masuk ke Lead Management atau Action Center tergantung Anda ingin lihat board atau prioritas harian.",
+    });
+  }
+
+  if (canAccessQueueAndActionCenter(role)) {
+    common.push({
+      title: "Saya mau lihat prioritas harian",
+      description: "Masuk ke Action Center untuk melihat overdue follow-up, hot lead, dan task harian yang harus dibersihkan dulu.",
       href: "/dashboard/follow-up",
-    },
-  ];
+    });
+  }
 
   if (isAdminLike(role)) {
     return [
@@ -155,6 +222,9 @@ function buildWorkflowSteps(role?: string) {
   if (isAdminLike(role)) {
     return HEAD_WORKFLOW_STEPS;
   }
+  if (isManagerLike(role)) {
+    return MANAGER_WORKFLOW_STEPS;
+  }
   return SALES_WORKFLOW_STEPS;
 }
 
@@ -175,13 +245,26 @@ function buildRoleStartCopy(role?: string) {
   if (isAdminLike(role)) {
     return {
       eyebrow: "Head flow",
-      title: "Mulai dari bottleneck tim, lalu rapikan lead dan kontrol akses",
+      title: "Mulai dari alert, review bottleneck, lalu rapikan lead dan kontrol akses",
       description:
-        "Sebagai head, workspace ini paling efektif saat Anda memakai Action Center, Alert Center, dan Chat Review Center untuk melihat titik macet tim sebelum masuk ke lead dan kontrol akses.",
-      primaryHref: "/dashboard/follow-up",
-      primaryLabel: "Buka Action Center",
-      secondaryHref: "/dashboard/notifications",
-      secondaryLabel: "Buka Alert Center",
+        "Sebagai head, workspace ini paling efektif saat Anda memakai Alert Center, Chat Review Center, KPI Dashboard, dan Lead Management untuk melihat titik macet tim tanpa masuk ke Queue atau Action Center harian.",
+      primaryHref: "/dashboard/notifications",
+      primaryLabel: "Buka Alert Center",
+      secondaryHref: "/dashboard/approvals",
+      secondaryLabel: "Buka Chat Review Center",
+    };
+  }
+
+  if (isManagerLike(role)) {
+    return {
+      eyebrow: "Manager flow",
+      title: "Mulai dari review center, lalu turun ke insight tim dan lead",
+      description:
+        "Sebagai manager, fokus utama sekarang ada di Chat Review Center, Manager Insights, dan Lead Management. Queue dan Action Center tidak dipakai lagi di role ini.",
+      primaryHref: "/dashboard/approvals",
+      primaryLabel: "Buka Chat Review Center",
+      secondaryHref: "/dashboard/manager-insights",
+      secondaryLabel: "Buka Manager Insights",
     };
   }
 

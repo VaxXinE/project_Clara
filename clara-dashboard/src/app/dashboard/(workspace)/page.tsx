@@ -27,7 +27,7 @@ import {
   formatStatusLabel,
   getPasswordStrength,
 } from "@/lib/format";
-import { isAdminLike } from "@/lib/roles";
+import { canAccessQueueAndActionCenter, isAdminLike, isManagerLike } from "@/lib/roles";
 import type {
   ChangePasswordRequest,
   CurrentUser,
@@ -91,11 +91,11 @@ const roleCopy: Record<
   manager: {
     title: "Manager Action Room",
     summary:
-      "Pantau queue tim yang Anda pegang, triase percakapan yang macet, dan jaga follow-up tetap disiplin di boundary team atau unit Anda.",
+      "Pantau review percakapan tim, baca boundary alert, dan jaga disiplin lead tetap rapi di scope team atau unit Anda.",
     focus: [
-      "Pantau worklist tim untuk lead panas, overdue, dan chat yang butuh intervensi.",
-      "Gunakan queue review untuk membaca pola hambatan sebelum eskalasi ke head.",
-      "Jaga ritme follow-up tim tetap rapi tanpa kehilangan konteks percakapan.",
+      "Gunakan Chat Review Center untuk coaching case dan chat yang butuh intervensi.",
+      "Baca Manager Insights untuk melihat stale lead, discipline issue, dan prioritas tim.",
+      "Rapikan lead penting tanpa harus masuk ke queue operasional sales.",
     ],
   },
   sales: {
@@ -132,7 +132,7 @@ export default function DashboardHomePage() {
 
         const nextMetrics: OverviewMetrics = { ...EMPTY_METRICS };
 
-        if (["sales", "manager", "head", "superadmin"].includes(me.role)) {
+        if (canAccessQueueAndActionCenter(me.role)) {
           try {
             const [inbox, worklistResponse] = await Promise.all([
               apiFetch<SalesInboxItem[]>("/dashboard/sales/inbox"),
@@ -219,7 +219,7 @@ export default function DashboardHomePage() {
   const canAccessInsights = currentUser !== null && isAdminLike(currentUser.role);
   const canAccessAdmin = currentUser !== null && isAdminLike(currentUser.role);
   const passwordStrength = getPasswordStrength(changePasswordForm.new_password);
-  const quickLinks = buildQuickLinks(canAccessInsights, canAccessAdmin);
+  const quickLinks = buildQuickLinks(currentUser, canAccessInsights, canAccessAdmin);
   const nextStep = getDashboardNextStep({
     currentUser,
     latestConversation,
@@ -239,18 +239,29 @@ export default function DashboardHomePage() {
       }
       actions={
         <>
-          <Link
-            href="/dashboard/follow-up"
-            className="clara-button clara-button-primary"
-          >
-            Action Center
-          </Link>
-          <Link
-            href="/dashboard/sales"
-            className="clara-button clara-button-secondary"
-          >
-            Queue
-          </Link>
+          {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
+            <>
+              <Link
+                href="/dashboard/follow-up"
+                className="clara-button clara-button-primary"
+              >
+                Action Center
+              </Link>
+              <Link
+                href="/dashboard/sales"
+                className="clara-button clara-button-secondary"
+              >
+                Queue
+              </Link>
+            </>
+          ) : (
+            <Link
+              href="/dashboard/approvals"
+              className="clara-button clara-button-primary"
+            >
+              Chat Review Center
+            </Link>
+          )}
           <Link
             href="/dashboard/crm"
             className="clara-button clara-button-secondary"
@@ -459,8 +470,16 @@ export default function DashboardHomePage() {
           <PanelFrame
             eyebrow="Quick Routes"
             title="Akses modul yang paling sering dipakai"
-            actionLabel="Lihat inbox"
-            actionHref="/dashboard/sales"
+            actionLabel={
+              currentUser && canAccessQueueAndActionCenter(currentUser.role)
+                ? "Lihat inbox"
+                : "Buka review center"
+            }
+            actionHref={
+              currentUser && canAccessQueueAndActionCenter(currentUser.role)
+                ? "/dashboard/sales"
+                : "/dashboard/approvals"
+            }
           >
             <div className="grid gap-4 sm:grid-cols-2">
               {quickLinks.map((item) => (
@@ -470,39 +489,63 @@ export default function DashboardHomePage() {
           </PanelFrame>
 
           <div className="space-y-6">
-            <PanelFrame
-              eyebrow="Action Center"
-              title="Prioritas follow-up hari ini"
-              actionLabel="Lihat semua"
-              actionHref="/dashboard/follow-up"
-            >
-              <div className="space-y-3">
-                {worklist && worklist.items.length > 0 ? (
-                  worklist.items.slice(0, 3).map((item) => (
-                    <div
-                      key={`${item.lead_id}-${item.task_type}`}
-                      className="rounded-[24px] border border-slate-200/80 bg-[#fffdf8] p-4"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-semibold text-slate-950">
-                          {item.lead_name}
+            {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
+              <PanelFrame
+                eyebrow="Action Center"
+                title="Prioritas follow-up hari ini"
+                actionLabel="Lihat semua"
+                actionHref="/dashboard/follow-up"
+              >
+                <div className="space-y-3">
+                  {worklist && worklist.items.length > 0 ? (
+                    worklist.items.slice(0, 3).map((item) => (
+                      <div
+                        key={`${item.lead_id}-${item.task_type}`}
+                        className="rounded-[24px] border border-slate-200/80 bg-[#fffdf8] p-4"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-semibold text-slate-950">
+                            {item.lead_name}
+                          </p>
+                          <span className="rounded-full bg-[#fff0da] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6737]">
+                            {item.task_label}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {item.recommended_action}
                         </p>
-                        <span className="rounded-full bg-[#fff0da] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6737]">
-                          {item.task_label}
-                        </span>
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
-                        {item.recommended_action}
-                      </p>
+                    ))
+                  ) : (
+                    <div className="rounded-[24px] border border-dashed border-slate-300 bg-[#fffdf8] p-5 text-sm text-slate-600">
+                      Belum ada follow-up yang mendesak.
                     </div>
-                  ))
-                ) : (
-                  <div className="rounded-[24px] border border-dashed border-slate-300 bg-[#fffdf8] p-5 text-sm text-slate-600">
-                    Belum ada follow-up yang mendesak.
+                  )}
+                </div>
+              </PanelFrame>
+            ) : (
+              <PanelFrame
+                eyebrow="Manager Queue"
+                title="Triase review dan disiplin tim"
+                actionLabel="Buka review center"
+                actionHref="/dashboard/approvals"
+              >
+                <div className="space-y-3">
+                  <div className="rounded-[24px] border border-slate-200/80 bg-[#fffdf8] p-4">
+                    <p className="font-semibold text-slate-950">Chat Review Center</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Manager fokus ke bottleneck percakapan, coaching case, dan approval, bukan kerja dari Queue harian.
+                    </p>
                   </div>
-                )}
-              </div>
-            </PanelFrame>
+                  <div className="rounded-[24px] border border-slate-200/80 bg-[#fffdf8] p-4">
+                    <p className="font-semibold text-slate-950">Manager Insights</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Gunakan manager insights untuk lihat disiplin tim, coaching priority, dan boundary alert sebelum turun ke lead tertentu.
+                    </p>
+                  </div>
+                </div>
+              </PanelFrame>
+            )}
 
             {canAccessAdmin && (
               <PanelFrame
@@ -644,17 +687,11 @@ export default function DashboardHomePage() {
 }
 
 function buildQuickLinks(
+  currentUser: CurrentUser | null,
   canAccessInsights: boolean,
   canAccessAdmin: boolean
 ): QuickLink[] {
   const links: QuickLink[] = [
-    {
-      href: "/dashboard/sales",
-      title: "Queue",
-      description: "Masuk ke antrian percakapan dan lanjutkan follow-up customer.",
-      eyebrow: "Sales",
-      icon: faComments,
-    },
     {
       href: "/dashboard/upload",
       title: "Lead Capture",
@@ -669,14 +706,41 @@ function buildQuickLinks(
       eyebrow: "CRM",
       icon: faBriefcase,
     },
-    {
+  ];
+
+  if (currentUser && canAccessQueueAndActionCenter(currentUser.role)) {
+    links.unshift({
+      href: "/dashboard/sales",
+      title: "Queue",
+      description: "Masuk ke antrian percakapan dan lanjutkan follow-up customer.",
+      eyebrow: "Sales",
+      icon: faComments,
+    });
+
+    links.push({
       href: "/dashboard/follow-up",
       title: "Action Center",
       description: "Pantau hot lead, overdue follow-up, dan draft siap kirim.",
       eyebrow: "Follow-up",
       icon: faCalendarCheck,
-    },
-  ];
+    });
+  } else {
+    links.unshift({
+      href: "/dashboard/approvals",
+      title: "Chat Review Center",
+      description: "Triase chat yang macet, butuh coaching, atau perlu approval manusia.",
+      eyebrow: "Review",
+      icon: faWandSparkles,
+    });
+
+    links.push({
+      href: "/dashboard/manager-insights",
+      title: "Manager Insights",
+      description: "Pantau disiplin tim, coaching priority, dan alert per boundary team.",
+      eyebrow: "Insights",
+      icon: faChartLine,
+    });
+  }
 
   if (canAccessInsights) {
     links.push({
@@ -771,6 +835,16 @@ function getDashboardNextStep({
         ? `/dashboard/sales/conversations/${latestConversation.conversation_id}`
         : "/dashboard/sales",
       actionLabel: latestConversation ? "Buka Chat Terbaru" : "Buka Chat Masuk",
+    };
+  }
+
+  if (isManagerLike(currentUser.role)) {
+    return {
+      title: "Mulai dari review center dan manager insights",
+      description:
+        "Role manager tidak lagi memakai Queue atau Action Center. Fokuskan kerja ke Chat Review Center, Manager Insights, dan Lead Management untuk intervensi tim.",
+      href: "/dashboard/approvals",
+      actionLabel: "Buka Chat Review Center",
     };
   }
 

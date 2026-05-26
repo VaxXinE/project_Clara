@@ -14,6 +14,11 @@ import {
   getLeadBadgeClass,
   getRiskBadgeClass,
 } from "@/lib/format";
+import {
+  canAccessQueueAndActionCenter,
+  isManagerLike,
+  normalizeWorkspaceRole,
+} from "@/lib/roles";
 import type {
   ChatReviewCaseItem,
   ChatReviewCaseSuggestionResponse,
@@ -483,14 +488,32 @@ export default function SalesConversationDetailPage() {
       eyebrow="Conversation detail"
       title={detail?.title ?? "Detail percakapan"}
       description="Baca timeline chat, cek hasil analisis AI, dan review draft balasan dari satu layar kerja yang konsisten."
-      backHref="/dashboard/sales"
-      backLabel="Kembali ke inbox"
+      backHref={
+        currentUser && !canAccessQueueAndActionCenter(currentUser.role)
+          ? "/dashboard/approvals"
+          : "/dashboard/sales"
+      }
+      backLabel={
+        currentUser && !canAccessQueueAndActionCenter(currentUser.role)
+          ? "Kembali ke review center"
+          : "Kembali ke inbox"
+      }
       actions={
         <Link
-          href="/dashboard/follow-up"
+          href={
+            currentUser && !canAccessQueueAndActionCenter(currentUser.role)
+              ? normalizeWorkspaceRole(currentUser.role) === "head"
+                ? "/dashboard/notifications"
+                : "/dashboard/manager-insights"
+              : "/dashboard/follow-up"
+          }
           className="clara-button clara-button-ghost"
         >
-          Buka Worklist
+          {currentUser && !canAccessQueueAndActionCenter(currentUser.role)
+            ? normalizeWorkspaceRole(currentUser.role) === "head"
+              ? "Buka Alert Center"
+              : "Buka Manager Insights"
+            : "Buka Worklist"}
         </Link>
       }
     >
@@ -504,8 +527,17 @@ export default function SalesConversationDetailPage() {
         {errorMessage && !isLoading && (
           <div className="clara-alert clara-alert-danger">
             {errorMessage}. Coba kembali ke{" "}
-            <Link href="/dashboard/sales" className="font-semibold underline">
-              sales inbox
+            <Link
+              href={
+                currentUser && !canAccessQueueAndActionCenter(currentUser.role)
+                  ? "/dashboard/approvals"
+                  : "/dashboard/sales"
+              }
+              className="font-semibold underline"
+            >
+              {currentUser && !canAccessQueueAndActionCenter(currentUser.role)
+                ? "chat review center"
+                : "sales inbox"}
             </Link>
             .
           </div>

@@ -11,6 +11,10 @@ import {
   getLeadBadgeClass,
   getRiskBadgeClass,
 } from "@/lib/format";
+import {
+  canAccessQueueAndActionCenter,
+  normalizeWorkspaceRole,
+} from "@/lib/roles";
 import type {
   ChatReviewCenterResponse,
   ChatReviewQueueItem,
@@ -137,20 +141,59 @@ export default function ChatReviewCenterPage() {
     }
   }
 
+  const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
+  const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
+  const fallbackHref = canAccessQueue
+    ? "/dashboard/sales"
+    : normalizedRole === "head"
+      ? "/dashboard/notifications"
+      : "/dashboard/manager-insights";
+  const fallbackLabel = canAccessQueue
+    ? "Kembali ke Queue"
+    : normalizedRole === "head"
+      ? "Buka Alert Center"
+      : "Buka Manager Insights";
+  const emptyStateTitle = canAccessQueue
+    ? "Tidak ada chat yang macet saat ini"
+    : normalizedRole === "head"
+      ? "Tidak ada chat lintas tim yang perlu review saat ini"
+      : "Tidak ada chat tim yang perlu review saat ini";
+  const emptyStateDescription = canAccessQueue
+    ? "Chat Review Center hanya menampilkan chat yang butuh analisis ulang, draft baru, approval, escalation, atau sudah stale. Kalau kosong, lanjutkan eksekusi lewat Queue atau Action Center."
+    : normalizedRole === "head"
+      ? "Chat Review Center hanya menampilkan chat yang butuh analisis ulang, draft baru, approval, escalation, atau sudah stale. Kalau kosong, berarti tidak ada bottleneck review lintas tim saat ini. Lanjutkan pantau Alert Center, KPI, atau Lead Management."
+      : "Chat Review Center hanya menampilkan chat yang butuh analisis ulang, draft baru, approval, escalation, atau sudah stale. Kalau kosong, berarti tidak ada bottleneck di tim saat ini. Lanjutkan pantau Manager Insights atau buka Lead Management.";
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Review workflow"
       title="Chat Review Center"
       description="Satu layar untuk membaca chat yang perlu analisis ulang, butuh draft baru, menunggu approval, atau harus dinaikkan ke reviewer manusia."
-      backHref="/dashboard/sales"
-      backLabel="Kembali ke Queue"
+      backHref={fallbackHref}
+      backLabel={
+        canAccessQueue
+          ? "Kembali ke Queue"
+          : normalizedRole === "head"
+            ? "Kembali ke Alert Center"
+            : "Kembali ke Manager Insights"
+      }
       actions={
         <Link
-          href="/dashboard/follow-up"
+          href={
+            canAccessQueue
+              ? "/dashboard/follow-up"
+              : normalizedRole === "head"
+                ? "/dashboard/notifications"
+                : "/dashboard/manager-insights"
+          }
           className="clara-button clara-button-primary"
         >
-          Buka Action Center
+          {canAccessQueue
+            ? "Buka Action Center"
+            : normalizedRole === "head"
+              ? "Buka Alert Center"
+              : "Buka Manager Insights"}
         </Link>
       }
     >
@@ -175,12 +218,12 @@ export default function ChatReviewCenterPage() {
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                     {queue.items.length === 0
-                      ? "Tidak ada chat yang macet saat ini"
+                      ? emptyStateTitle
                       : "Ambil item paling berisiko atau paling lama menunggu dulu"}
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                     {queue.items.length === 0
-                      ? "Kalau review center kosong, lanjutkan eksekusi lewat queue dan action center."
+                      ? emptyStateDescription
                       : "Halaman ini dipakai untuk triase cepat. Utamakan escalation, chat high risk, atau item stale sebelum Anda turun ke item yang lebih ringan."}
                   </p>
                 </div>
@@ -188,11 +231,11 @@ export default function ChatReviewCenterPage() {
                   href={
                     queue.items[0]
                       ? `/dashboard/sales/conversations/${queue.items[0].conversation_id}`
-                      : "/dashboard/sales"
+                      : fallbackHref
                   }
                   className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
                 >
-                  {queue.items[0] ? "Buka Item Teratas" : "Kembali ke Queue"}
+                  {queue.items[0] ? "Buka Item Teratas" : fallbackLabel}
                 </Link>
               </div>
             </section>
@@ -346,7 +389,7 @@ export default function ChatReviewCenterPage() {
             <section className="space-y-4">
               {queue.items.length === 0 ? (
                 <div className="clara-empty-state text-sm text-slate-500">
-                  Tidak ada item chat review yang cocok dengan filter saat ini.
+                  Tidak ada item review yang cocok dengan filter saat ini. Halaman ini hanya memuat chat yang benar-benar perlu analisis, draft, approval, escalation, atau sudah stale.
                 </div>
               ) : (
                 queue.items.map((item) => (

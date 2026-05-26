@@ -6,6 +6,11 @@ import { useEffect, useState } from "react";
 import { RoleBasedStartGuide } from "@/components/dashboard/RoleBasedStartGuide";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
+import {
+  canAccessQueueAndActionCenter,
+  isManagerLike,
+  normalizeWorkspaceRole,
+} from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 export default function StartHerePage() {
@@ -37,12 +42,33 @@ export default function StartHerePage() {
       backLabel="Kembali ke overview"
       actions={
         <>
+          {(() => {
+            const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
+            const cannotUseQueue = currentUser && !canAccessQueueAndActionCenter(currentUser.role);
+            const href =
+              normalizedRole === "head"
+                ? "/dashboard/notifications"
+                : cannotUseQueue
+                  ? "/dashboard/approvals"
+                  : "/dashboard/follow-up";
+            const label =
+              normalizedRole === "head"
+                ? "Buka Alert Center"
+                : currentUser &&
+                    isManagerLike(currentUser.role) &&
+                    !canAccessQueueAndActionCenter(currentUser.role)
+                  ? "Buka Chat Review Center"
+                  : "Buka Action Center";
+
+            return (
           <Link
-            href="/dashboard/follow-up"
+            href={href}
             className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
           >
-            Buka Action Center
+            {label}
           </Link>
+            );
+          })()}
           <Link
             href="/dashboard/upload"
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"

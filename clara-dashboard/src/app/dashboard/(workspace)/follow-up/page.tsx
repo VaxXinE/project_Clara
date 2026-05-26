@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass, formatStatusLabel } from "@/lib/format";
+import {
+  canAccessQueueAndActionCenter,
+  normalizeWorkspaceRole,
+} from "@/lib/roles";
 import type {
   CurrentUser,
   LeadQueueActionRequest,
@@ -139,6 +144,7 @@ function getActionBucketConfig(bucket: ActionBucketKey) {
 }
 
 export default function FollowUpPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [worklist, setWorklist] = useState<SalesWorklistResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -151,11 +157,19 @@ export default function FollowUpPage() {
 
   async function loadWorklist() {
     try {
-      const [me, data] = await Promise.all([
-        apiFetch<CurrentUser>("/auth/me"),
-        apiFetch<SalesWorklistResponse>("/dashboard/sales/worklist"),
-      ]);
+      const me = await apiFetch<CurrentUser>("/auth/me");
       setCurrentUser(me);
+
+      if (!canAccessQueueAndActionCenter(me.role)) {
+        router.replace(
+          normalizeWorkspaceRole(me.role) === "head"
+            ? "/dashboard/notifications"
+            : "/dashboard/manager-insights",
+        );
+        return;
+      }
+
+      const data = await apiFetch<SalesWorklistResponse>("/dashboard/sales/worklist");
       setWorklist(data);
     } catch (error) {
       setErrorMessage(
@@ -172,7 +186,7 @@ export default function FollowUpPage() {
     }, 0);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [router]);
 
   async function handleTaskAction(
     item: SalesWorklistItem,

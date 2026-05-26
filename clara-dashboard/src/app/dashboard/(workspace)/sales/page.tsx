@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
@@ -11,7 +12,12 @@ import {
   getLeadBadgeClass,
   getRiskBadgeClass,
 } from "@/lib/format";
-import { getRoleDisplayLabel, isManagerLike } from "@/lib/roles";
+import {
+  canAccessQueueAndActionCenter,
+  getRoleDisplayLabel,
+  isManagerLike,
+  normalizeWorkspaceRole,
+} from "@/lib/roles";
 import type { CurrentUser, SalesInboxItem } from "@/types/dashboard";
 
 const SOURCE_CHANNEL_OPTIONS = [
@@ -126,6 +132,7 @@ function getQueueBucketConfig(bucket: QueueBucketKey) {
 }
 
 export default function SalesInboxPage() {
+  const router = useRouter();
   const [inboxItems, setInboxItems] = useState<SalesInboxItem[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
@@ -140,14 +147,22 @@ export default function SalesInboxPage() {
     setIsLoading(true);
 
     try {
-      const [data, me] = await Promise.all([
-        apiFetch<SalesInboxItem[]>(
-          buildInboxPath(sourceChannelFilter, archiveScope),
-        ),
-        apiFetch<CurrentUser>("/auth/me"),
-      ]);
-      setInboxItems(data);
+      const me = await apiFetch<CurrentUser>("/auth/me");
       setCurrentUser(me);
+
+      if (!canAccessQueueAndActionCenter(me.role)) {
+        router.replace(
+          normalizeWorkspaceRole(me.role) === "head"
+            ? "/dashboard/approvals"
+            : "/dashboard/manager-insights",
+        );
+        return;
+      }
+
+      const data = await apiFetch<SalesInboxItem[]>(
+        buildInboxPath(sourceChannelFilter, archiveScope),
+      );
+      setInboxItems(data);
       setErrorMessage("");
     } catch (error) {
       setErrorMessage(
@@ -160,7 +175,7 @@ export default function SalesInboxPage() {
 
   useEffect(() => {
     void loadInbox();
-  }, [archiveScope, sourceChannelFilter]);
+  }, [archiveScope, router, sourceChannelFilter]);
 
   const canAccessMarketing =
     currentUser !== null && ["superadmin", "head"].includes(currentUser.role);

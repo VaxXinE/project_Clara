@@ -28,6 +28,7 @@ import { useEffect, useState } from "react";
 import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
 import { apiFetch } from "@/lib/api";
 import {
+  canAccessQueueAndActionCenter,
   getRoleDisplayLabel,
   isAdminLike,
   isManagerLike,
@@ -78,8 +79,8 @@ function getRolePrinciples(role?: string) {
     return {
       title: "Mode Head",
       items: [
-        "Mulai dari Action Center, Alert Center, dan Chat Review Center agar bottleneck tim cepat terlihat.",
-        "Gunakan Queue dan Lead Management saat perlu turun langsung ke percakapan atau lead yang bermasalah.",
+        "Mulai dari Alert Center dan Chat Review Center agar bottleneck tim cepat terlihat tanpa turun ke antrian harian.",
+        "Gunakan Lead Management saat perlu turun langsung ke lead yang bermasalah atau butuh sinkronisasi.",
         "Knowledge Base, Ops Dashboard, dan Access Control dipakai untuk approval, governance, dan pembacaan organisasi.",
       ],
     };
@@ -90,7 +91,7 @@ function getRolePrinciples(role?: string) {
       title: "Mode Manager",
       items: [
         "Mulai dari manager insights untuk membaca discipline, coaching priority, dan alert tim.",
-        "Turun ke Queue, Action Center, atau Lead Management saat perlu menindak percakapan dan lead tertentu.",
+        "Turun ke Lead Management saat perlu menindak lead tertentu yang butuh sinkronisasi, owner, atau stage update.",
         "Gunakan Chat Review Center untuk coaching case yang memang butuh pembinaan atau eskalasi.",
       ],
     };
@@ -115,18 +116,6 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       description: "Pusat ringkasan tim",
     },
     {
-      href: "/dashboard/sales",
-      label: "Queue",
-      icon: faComments,
-      description: "Kerja percakapan customer",
-    },
-    {
-      href: "/dashboard/follow-up",
-      label: "Action Center",
-      icon: faCalendarCheck,
-      description: "Prioritas follow-up harian",
-    },
-    {
       href: "/dashboard/crm",
       label: "Lead Management",
       icon: faBriefcase,
@@ -139,6 +128,25 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       description: "Alert operasional yang perlu ditindak",
     },
   ];
+
+  if (currentUser && canAccessQueueAndActionCenter(currentUser.role)) {
+    workspaceItems.splice(
+      1,
+      0,
+      {
+        href: "/dashboard/sales",
+        label: "Queue",
+        icon: faComments,
+        description: "Kerja percakapan customer",
+      },
+      {
+        href: "/dashboard/follow-up",
+        label: "Action Center",
+        icon: faCalendarCheck,
+        description: "Prioritas follow-up harian",
+      },
+    );
+  }
 
   const insightItems: NavItem[] = [];
   const adminItems: NavItem[] = [];

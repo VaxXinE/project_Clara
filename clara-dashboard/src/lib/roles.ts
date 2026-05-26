@@ -37,6 +37,11 @@ export function isSalesLike(role?: string | null): boolean {
   return normalizeWorkspaceRole(role) === "sales";
 }
 
+export function canAccessQueueAndActionCenter(role?: string | null): boolean {
+  const normalized = normalizeWorkspaceRole(role);
+  return normalized === "sales" || normalized === "superadmin";
+}
+
 export function canAccessManagerInsights(role?: string | null): boolean {
   return isManagerLike(role);
 }

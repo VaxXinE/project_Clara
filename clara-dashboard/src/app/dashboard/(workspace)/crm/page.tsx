@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
+import { canAccessQueueAndActionCenter } from "@/lib/roles";
 import type {
   CurrentUser,
   LeadListItem,
@@ -430,9 +431,15 @@ export default function CrmPage() {
       backLabel="Kembali ke overview"
       actions={
         <>
-          <Link href="/dashboard/sales" className="clara-button clara-button-ghost">
-            Queue
-          </Link>
+          {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
+            <Link href="/dashboard/sales" className="clara-button clara-button-ghost">
+              Queue
+            </Link>
+          ) : (
+            <Link href="/dashboard/approvals" className="clara-button clara-button-ghost">
+              Chat Review Center
+            </Link>
+          )}
           <Link href="/dashboard/upload" className="clara-button clara-button-primary">
             Lead Capture
           </Link>

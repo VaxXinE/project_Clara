@@ -6,6 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import {
+  canAccessQueueAndActionCenter,
+  isManagerLike,
+  normalizeWorkspaceRole,
+} from "@/lib/roles";
 import type {
   CurrentUser,
   OpsNotificationItem,
@@ -21,6 +26,37 @@ function getSeverityClass(severity: string) {
     return "bg-amber-100 text-amber-700";
   }
   return "bg-slate-100 text-slate-700";
+}
+
+function resolveNotificationTargetHref(
+  href: string | null | undefined,
+  role?: string | null,
+): string | null {
+  if (!href) {
+    return null;
+  }
+
+  if (normalizeWorkspaceRole(role) === "head" && !canAccessQueueAndActionCenter(role)) {
+    if (href.startsWith("/dashboard/follow-up")) {
+      return "/dashboard/notifications";
+    }
+
+    if (href.startsWith("/dashboard/sales")) {
+      return "/dashboard/approvals";
+    }
+  }
+
+  if (isManagerLike(role) && !canAccessQueueAndActionCenter(role)) {
+    if (href.startsWith("/dashboard/follow-up")) {
+      return "/dashboard/manager-insights";
+    }
+
+    if (href.startsWith("/dashboard/sales")) {
+      return "/dashboard/approvals";
+    }
+  }
+
+  return href;
 }
 
 export default function NotificationsPage() {
@@ -185,6 +221,18 @@ export default function NotificationsPage() {
     return filteredNotifications.slice(startIndex, startIndex + pageSize);
   }, [filteredNotifications, notificationPage]);
 
+  const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
+  const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
+  const isManagerMonitorView =
+    isManagerLike(currentUser?.role) && !canAccessQueue;
+  const isHeadMonitorView = normalizedRole === "head";
+  const isOversightAlertView = isManagerMonitorView || isHeadMonitorView;
+  const hasAnyNotifications = (notifications?.items.length ?? 0) > 0;
+  const hasActiveNotifications = (notifications?.active_count ?? 0) > 0;
+  const isActiveStatusView = statusFilter === "active";
+  const showActiveEmptyState =
+    hasAnyNotifications && isActiveStatusView && filteredNotifications.length === 0;
+
   useEffect(() => {
     setNotificationPage(1);
   }, [statusFilter, severityFilter]);
@@ -205,12 +253,21 @@ export default function NotificationsPage() {
       backLabel="Kembali ke overview"
       actions={
         <>
-          <Link
-            href="/dashboard/follow-up"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
-          >
-            Action Center
-          </Link>
+          {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
+            <Link
+              href="/dashboard/follow-up"
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            >
+              Action Center
+            </Link>
+          ) : (
+            <Link
+              href="/dashboard/manager-insights"
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            >
+              Manager Insights
+            </Link>
+          )}
           <Link
             href="/dashboard/approvals"
             className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
@@ -248,123 +305,223 @@ export default function NotificationsPage() {
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                     {notifications.items.length === 0
-                      ? "Kalau Alert Center kosong, itu berarti operasional relatif stabil. Tetap cek Action Center untuk memastikan tidak ada task yang harus ditindak."
+                      ? currentUser && canAccessQueueAndActionCenter(currentUser.role)
+                        ? "Kalau Alert Center kosong, itu berarti operasional relatif stabil. Tetap cek Action Center untuk memastikan tidak ada task yang harus ditindak."
+                        : "Kalau Alert Center kosong, itu berarti operasional relatif stabil. Lanjutkan cek Manager Insights atau Chat Review Center untuk memantau bottleneck tim."
                       : "Alert Center dipakai untuk aksi cepat pada sinyal operasional. Baca severity, age, dan target tindakan sebelum memilih acknowledge, resolve, atau escalate."}
                   </p>
                 </div>
                 <Link
-                  href={notifications.items[0]?.target_href ?? "/dashboard/follow-up"}
+                  href={
+                    resolveNotificationTargetHref(
+                      notifications.items[0]?.target_href,
+                      currentUser?.role,
+                    ) ??
+                    (canAccessQueue
+                      ? "/dashboard/follow-up"
+                      : "/dashboard/manager-insights")
+                  }
                   className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
                 >
-                  {notifications.items[0] ? "Buka Alert Teratas" : "Buka Action Center"}
+                  {notifications.items[0]
+                    ? "Buka Alert Teratas"
+                    : canAccessQueue
+                      ? "Buka Action Center"
+                      : "Buka Manager Insights"}
                 </Link>
               </div>
             </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Cara Pakai Halaman Ini
-              </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <UsageHint
-                  title="1. Baca title dan severity"
-                  description="Itu memberi konteks tercepat soal seberapa kritis notifikasi ini."
-                />
-                <UsageHint
-                  title="2. Pakai Acknowledge untuk tandai sedang ditangani"
-                  description="Resolve dipakai kalau isu memang selesai, bukan sekadar sudah dibaca."
-                />
-                <UsageHint
-                  title="3. Escalate kalau perlu level keputusan lebih tinggi"
-                  description="Gunakan escalation untuk isu yang tidak bisa diselesaikan di level operator saat ini."
-                />
-              </div>
-            </section>
+            {hasAnyNotifications ? (
+              <>
+                {!showActiveEmptyState ? (
+                  <>
+                    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                        Cara Pakai Halaman Ini
+                      </p>
+                      <div className="mt-3 grid gap-3 md:grid-cols-3">
+                        {isOversightAlertView ? (
+                          <>
+                            <UsageHint
+                              title="1. Baca severity dan target tindakan"
+                              description="Role oversight memakai alert untuk membaca bottleneck paling cepat, bukan untuk kerja seperti operator."
+                            />
+                            <UsageHint
+                              title="2. Buka chat review atau lead terkait"
+                              description="Masuk ke Chat Review Center atau Lead Management saat alert butuh keputusan, coaching, atau follow-up lanjutan."
+                            />
+                            <UsageHint
+                              title="3. Pantau pola, bukan cuma satu alert"
+                              description={
+                                isHeadMonitorView
+                                  ? "Kalau alert serupa muncul berulang, lanjutkan ke KPI atau Manager Insights untuk baca pola lintas team."
+                                  : "Kalau alert serupa muncul berulang, lanjutkan ke Manager Insights untuk baca akar masalah per team."
+                              }
+                            />
+                          </>
+                        ) : (
+                          <>
+                            <UsageHint
+                              title="1. Baca title dan severity"
+                              description="Itu memberi konteks tercepat soal seberapa kritis notifikasi ini."
+                            />
+                            <UsageHint
+                              title="2. Pakai Acknowledge untuk tandai sedang ditangani"
+                              description="Resolve dipakai kalau isu memang selesai, bukan sekadar sudah dibaca."
+                            />
+                            <UsageHint
+                              title="3. Escalate kalau perlu level keputusan lebih tinggi"
+                              description="Gunakan escalation untuk isu yang tidak bisa diselesaikan di level operator saat ini."
+                            />
+                          </>
+                        )}
+                      </div>
+                    </section>
 
-            <section className="grid gap-4 md:grid-cols-3">
-              <MetricCard label="Active" value={String(notifications.active_count)} />
-              <MetricCard
-                label="Acknowledged"
-                value={String(notifications.acknowledged_count)}
-              />
-              <MetricCard label="Resolved" value={String(notifications.resolved_count)} />
-            </section>
+                    <section className="grid gap-4 md:grid-cols-3">
+                      <MetricCard label="Active" value={String(notifications.active_count)} />
+                      <MetricCard
+                        label="Acknowledged"
+                        value={String(notifications.acknowledged_count)}
+                      />
+                      <MetricCard label="Resolved" value={String(notifications.resolved_count)} />
+                    </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <MetricCard label="Escalated" value={String(notifications.escalated_count)} />
-                <MetricCard
-                  label="Generated"
-                  value={formatDateTime(notifications.generated_at)}
-                />
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 md:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Resolution Note
-                  </p>
-                  <textarea
-                    value={resolutionNote}
-                    onChange={(event) => {
-                      setResolutionNote(event.target.value);
-                    }}
-                    placeholder="Catatan saat resolve notification..."
-                    className="mt-3 min-h-[88px] w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
-                  />
-                </div>
-              </div>
-            </section>
+                    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                      <div
+                        className={`grid gap-4 ${isOversightAlertView ? "md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-4"}`}
+                      >
+                        <MetricCard
+                          label="Escalated"
+                          value={String(notifications.escalated_count)}
+                        />
+                        <MetricCard
+                          label="Generated"
+                          value={formatDateTime(notifications.generated_at)}
+                        />
+                        {!isOversightAlertView ? (
+                          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 md:col-span-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Resolution Note
+                            </p>
+                            <textarea
+                              value={resolutionNote}
+                              onChange={(event) => {
+                                setResolutionNote(event.target.value);
+                              }}
+                              placeholder="Catatan saat resolve notification..."
+                              className="mt-3 min-h-[88px] w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                    </section>
+                  </>
+                ) : (
+                  <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                          Tidak Ada Alert Aktif
+                        </p>
+                        <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                          Tidak ada sinyal operasional yang perlu ditangani sekarang
+                        </h3>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                          Fokus halaman ini adalah alert aktif. Karena sekarang kosong, lanjutkan kerja dari{" "}
+                          {canAccessQueue ? "Action Center, Queue, atau Lead Management" : "Manager Insights, KPI, atau Chat Review Center"}.
+                          {notifications.resolved_count > 0
+                            ? ` Ada ${notifications.resolved_count} alert resolved yang bisa dibuka kalau kamu butuh melihat histori.`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setStatusFilter("resolved")}
+                          className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                        >
+                          Lihat Histori Alert
+                        </button>
+                        <Link
+                          href={canAccessQueue ? "/dashboard/follow-up" : isHeadMonitorView ? "/dashboard/kpi" : "/dashboard/manager-insights"}
+                          className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
+                        >
+                          {canAccessQueue
+                            ? "Buka Action Center"
+                            : isHeadMonitorView
+                              ? "Buka KPI Dashboard"
+                              : "Buka Manager Insights"}
+                        </Link>
+                      </div>
+                    </div>
+                    <div className="mt-5 grid gap-4 md:grid-cols-3">
+                      <MetricCard label="Active" value={String(notifications.active_count)} />
+                      <MetricCard
+                        label="Resolved"
+                        value={String(notifications.resolved_count)}
+                      />
+                      <MetricCard
+                        label="Generated"
+                        value={formatDateTime(notifications.generated_at)}
+                      />
+                    </div>
+                  </section>
+                )}
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <label className="space-y-2 text-sm font-medium text-slate-700">
-                  <span>Filter status</span>
-                  <select
-                    value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  >
-                    <option value="all">Semua status</option>
-                    <option value="active">Active</option>
-                    <option value="acknowledged">Acknowledged</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
-                </label>
+                <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <label className="space-y-2 text-sm font-medium text-slate-700">
+                      <span>Filter status</span>
+                      <select
+                        value={statusFilter}
+                        onChange={(event) => setStatusFilter(event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                      >
+                        <option value="all">Semua status</option>
+                        <option value="active">Active</option>
+                        <option value="acknowledged">Acknowledged</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
+                    </label>
 
-                <label className="space-y-2 text-sm font-medium text-slate-700">
-                  <span>Filter severity</span>
-                  <select
-                    value={severityFilter}
-                    onChange={(event) => setSeverityFilter(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  >
-                    <option value="all">Semua severity</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </select>
-                </label>
+                    <label className="space-y-2 text-sm font-medium text-slate-700">
+                      <span>Filter severity</span>
+                      <select
+                        value={severityFilter}
+                        onChange={(event) => setSeverityFilter(event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                      >
+                        <option value="all">Semua severity</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </label>
 
-                <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 xl:col-span-2">
-                  <p className="text-sm text-slate-600">
-                    Menampilkan {paginatedNotifications.length} dari {filteredNotifications.length} alert
-                  </p>
-                  <p className="mt-2 text-sm text-slate-600">
-                    Halaman {notificationPage} dari {totalNotificationPages}
-                  </p>
-                </div>
-              </div>
-            </section>
+                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 xl:col-span-2">
+                      <p className="text-sm text-slate-600">
+                        Menampilkan {paginatedNotifications.length} dari {filteredNotifications.length} alert
+                      </p>
+                      <p className="mt-2 text-sm text-slate-600">
+                        Halaman {notificationPage} dari {totalNotificationPages}
+                      </p>
+                    </div>
+                  </div>
+                </section>
 
-            <section className="space-y-4">
-              {filteredNotifications.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-                  Belum ada alert operasional aktif. Ini bagus, tapi bukan berarti tidak ada pekerjaan. Biasanya langkah berikutnya adalah cek Action Center atau Chat Review Center.
-                </div>
-              ) : (
-                paginatedNotifications.map((item) => (
-                  <article
-                    key={item.id}
-                    className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
-                  >
+                <section className="space-y-4">
+                  {filteredNotifications.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                      Tidak ada alert yang cocok dengan filter saat ini. Coba ubah status atau severity untuk melihat histori alert lain.
+                    </div>
+                  ) : (
+                    paginatedNotifications.map((item) => (
+                      <article
+                        key={item.id}
+                        className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+                      >
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -406,9 +563,14 @@ export default function NotificationsPage() {
                       </div>
 
                       <div className="flex w-full flex-col gap-2 md:w-64">
-                        {item.target_href ? (
+                        {resolveNotificationTargetHref(item.target_href, currentUser?.role) ? (
                           <Link
-                            href={item.target_href}
+                            href={
+                              resolveNotificationTargetHref(
+                                item.target_href,
+                                currentUser?.role,
+                              ) as string
+                            }
                             className="inline-flex justify-center rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
                           >
                             Buka Tindakan
@@ -463,43 +625,93 @@ export default function NotificationsPage() {
                           </button>
                         ) : null}
                       </div>
-                    </div>
-                  </article>
-                ))
-              )}
-            </section>
+                      </div>
+                    </article>
+                    ))
+                  )}
+                </section>
 
-            {filteredNotifications.length > pageSize ? (
-              <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm text-slate-600">Navigasi daftar alert</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setNotificationPage((current) => Math.max(1, current - 1))
-                      }
-                      disabled={notificationPage === 1}
-                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                {filteredNotifications.length > pageSize ? (
+                  <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-slate-600">Navigasi daftar alert</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNotificationPage((current) => Math.max(1, current - 1))
+                          }
+                          disabled={notificationPage === 1}
+                          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Sebelumnya
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setNotificationPage((current) =>
+                              Math.min(totalNotificationPages, current + 1),
+                            )
+                          }
+                          disabled={notificationPage === totalNotificationPages}
+                          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Berikutnya
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+              </>
+            ) : (
+              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  Lanjutkan Dari Sini
+                </p>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                  {isHeadMonitorView
+                    ? "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role head, langkah berikutnya biasanya memantau kesehatan lintas team, coaching queue, dan pipeline lead yang masih tertahan."
+                    : "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role manager, langkah berikutnya biasanya memantau disiplin tim, coaching review, atau status lead yang masih tertahan."}
+                </p>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  {isHeadMonitorView ? (
+                    <Link
+                      href="/dashboard/kpi"
+                      className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
                     >
-                      Sebelumnya
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setNotificationPage((current) =>
-                          Math.min(totalNotificationPages, current + 1),
-                        )
-                      }
-                      disabled={notificationPage === totalNotificationPages}
-                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      Buka KPI Dashboard
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/dashboard/manager-insights"
+                      className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
                     >
-                      Berikutnya
-                    </button>
-                  </div>
+                      Buka Manager Insights
+                    </Link>
+                  )}
+                  <Link
+                    href="/dashboard/approvals"
+                    className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                  >
+                    Buka Chat Review Center
+                  </Link>
+                  <Link
+                    href="/dashboard/crm"
+                    className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                  >
+                    Buka Lead Management
+                  </Link>
+                  {isHeadMonitorView ? (
+                    <Link
+                      href="/dashboard/manager-insights"
+                      className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                    >
+                      Buka Manager Insights
+                    </Link>
+                  ) : null}
                 </div>
               </section>
-            ) : null}
+            )}
           </>
         )}
       </div>
