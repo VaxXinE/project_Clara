@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -32,6 +32,10 @@ export default function NotificationsPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [severityFilter, setSeverityFilter] = useState("all");
+  const [notificationPage, setNotificationPage] = useState(1);
+  const pageSize = 5;
 
   function updateNotificationLocally(
     notificationId: string,
@@ -158,12 +162,45 @@ export default function NotificationsPage() {
     }
   }
 
+  const filteredNotifications = useMemo(() => {
+    const items = notifications?.items ?? [];
+
+    return items.filter((item) => {
+      const matchesStatus =
+        statusFilter === "all" || item.status === statusFilter;
+      const matchesSeverity =
+        severityFilter === "all" || item.severity === severityFilter;
+
+      return matchesStatus && matchesSeverity;
+    });
+  }, [notifications?.items, severityFilter, statusFilter]);
+
+  const totalNotificationPages = Math.max(
+    1,
+    Math.ceil(filteredNotifications.length / pageSize),
+  );
+
+  const paginatedNotifications = useMemo(() => {
+    const startIndex = (notificationPage - 1) * pageSize;
+    return filteredNotifications.slice(startIndex, startIndex + pageSize);
+  }, [filteredNotifications, notificationPage]);
+
+  useEffect(() => {
+    setNotificationPage(1);
+  }, [statusFilter, severityFilter]);
+
+  useEffect(() => {
+    if (notificationPage > totalNotificationPages) {
+      setNotificationPage(totalNotificationPages);
+    }
+  }, [notificationPage, totalNotificationPages]);
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Operational orchestration"
-      title="Notification Center"
-      description="Tempat untuk melihat sinyal operasional yang harus segera ditindak: follow-up overdue, approval queue kritis, dan alert KPI yang relevan dengan role Anda."
+      title="Alert Center"
+      description="Tempat untuk melihat sinyal operasional yang harus segera ditindak: follow-up overdue, chat review kritis, dan alert KPI yang relevan dengan role Anda."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
@@ -172,13 +209,13 @@ export default function NotificationsPage() {
             href="/dashboard/follow-up"
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
           >
-            AI Worklist
+            Action Center
           </Link>
           <Link
             href="/dashboard/approvals"
             className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
           >
-            Approval Queue
+            Chat Review Center
           </Link>
         </>
       }
@@ -211,15 +248,15 @@ export default function NotificationsPage() {
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                     {notifications.items.length === 0
-                      ? "Kalau notification center kosong, itu berarti operasional relatif stabil. Tetap cek AI Worklist untuk memastikan tidak ada task yang harus ditindak."
-                      : "Notification Center dipakai untuk aksi cepat pada sinyal operasional. Baca severity, age, dan target tindakan sebelum memilih acknowledge, resolve, atau escalate."}
+                      ? "Kalau Alert Center kosong, itu berarti operasional relatif stabil. Tetap cek Action Center untuk memastikan tidak ada task yang harus ditindak."
+                      : "Alert Center dipakai untuk aksi cepat pada sinyal operasional. Baca severity, age, dan target tindakan sebelum memilih acknowledge, resolve, atau escalate."}
                   </p>
                 </div>
                 <Link
                   href={notifications.items[0]?.target_href ?? "/dashboard/follow-up"}
                   className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
                 >
-                  {notifications.items[0] ? "Buka Notifikasi Teratas" : "Buka AI Worklist"}
+                  {notifications.items[0] ? "Buka Alert Teratas" : "Buka Action Center"}
                 </Link>
               </div>
             </section>
@@ -276,13 +313,54 @@ export default function NotificationsPage() {
               </div>
             </section>
 
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <span>Filter status</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                  >
+                    <option value="all">Semua status</option>
+                    <option value="active">Active</option>
+                    <option value="acknowledged">Acknowledged</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <span>Filter severity</span>
+                  <select
+                    value={severityFilter}
+                    onChange={(event) => setSeverityFilter(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                  >
+                    <option value="all">Semua severity</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </label>
+
+                <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 xl:col-span-2">
+                  <p className="text-sm text-slate-600">
+                    Menampilkan {paginatedNotifications.length} dari {filteredNotifications.length} alert
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Halaman {notificationPage} dari {totalNotificationPages}
+                  </p>
+                </div>
+              </div>
+            </section>
+
             <section className="space-y-4">
-              {notifications.items.length === 0 ? (
+              {filteredNotifications.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-                  Belum ada notifikasi operasional aktif. Ini bagus, tapi bukan berarti tidak ada pekerjaan. Biasanya langkah berikutnya adalah cek AI Worklist atau Approval Queue.
+                  Belum ada alert operasional aktif. Ini bagus, tapi bukan berarti tidak ada pekerjaan. Biasanya langkah berikutnya adalah cek Action Center atau Chat Review Center.
                 </div>
               ) : (
-                notifications.items.map((item) => (
+                paginatedNotifications.map((item) => (
                   <article
                     key={item.id}
                     className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
@@ -390,6 +468,38 @@ export default function NotificationsPage() {
                 ))
               )}
             </section>
+
+            {filteredNotifications.length > pageSize ? (
+              <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-slate-600">Navigasi daftar alert</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNotificationPage((current) => Math.max(1, current - 1))
+                      }
+                      disabled={notificationPage === 1}
+                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Sebelumnya
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNotificationPage((current) =>
+                          Math.min(totalNotificationPages, current + 1),
+                        )
+                      }
+                      disabled={notificationPage === totalNotificationPages}
+                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                </div>
+              </section>
+            ) : null}
           </>
         )}
       </div>

@@ -31,23 +31,23 @@ export default function StartHerePage() {
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Onboarding flow"
-      title="Mulai dari Sini"
-      description="Halaman ini tetap tersedia sebagai panduan terpisah, tapi inti alur role-based Clara sekarang juga muncul langsung di halaman dashboard utama setelah login."
+      title="Workflow Guide"
+      description="Panduan ringkas ini dipakai kalau user masih bingung harus mulai dari halaman mana. Dashboard utama tetap jadi home, tapi halaman ini merangkum alur kerja Clara dengan istilah yang konsisten."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
         <>
           <Link
-            href="/dashboard"
+            href="/dashboard/follow-up"
             className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
           >
-            Kembali ke Dashboard
+            Buka Action Center
           </Link>
           <Link
             href="/dashboard/upload"
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
           >
-            Import Chat
+            Buka Lead Capture
           </Link>
         </>
       }

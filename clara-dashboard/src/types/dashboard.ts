@@ -212,6 +212,9 @@ export type LeadListItem = {
   updated_at: string;
   conversation_count: number;
   latest_conversation_id: string | null;
+  deal_status: string | null;
+  discipline_compliance_status: string;
+  needs_deal_sync: boolean;
 };
 
 export type LeadTaskItem = {
@@ -460,6 +463,7 @@ export type ManagerTeamDisciplineRow = {
   unit_name: string | null;
   manager_user_name: string | null;
   member_count: number;
+  members: ManagerTeamMemberItem[];
   lead_count: number;
   missing_or_stale_logs: number;
   overdue_follow_ups: number;
@@ -467,6 +471,13 @@ export type ManagerTeamDisciplineRow = {
   pending_knowledge_proposals: number;
   discipline_compliance_rate: number;
   follow_up_compliance_rate: number;
+};
+
+export type ManagerTeamMemberItem = {
+  id: string;
+  name: string;
+  role: string;
+  is_active: boolean;
 };
 
 export type ManagerCoachingPriorityItem = {

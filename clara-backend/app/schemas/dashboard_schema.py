@@ -247,6 +247,13 @@ class ChatReviewCenterResponse(BaseModel):
     items: list[ChatReviewQueueItem]
 
 
+class ManagerTeamMemberItem(BaseModel):
+    id: UUID
+    name: str
+    role: str
+    is_active: bool
+
+
 class ManagerTeamDisciplineRow(BaseModel):
     team_id: UUID | None
     team_name: str
@@ -254,6 +261,7 @@ class ManagerTeamDisciplineRow(BaseModel):
     unit_name: str | None
     manager_user_name: str | None
     member_count: int
+    members: list[ManagerTeamMemberItem]
     lead_count: int
     missing_or_stale_logs: int
     overdue_follow_ups: int

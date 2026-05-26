@@ -265,6 +265,11 @@ def build_lead_list_item(lead: Lead) -> LeadListItem:
         reverse=True,
     )
     latest_conversation = ordered_conversations[0] if ordered_conversations else None
+    discipline_summary = build_lead_discipline_summary(lead)
+    deal_status = lead.deal.status if lead.deal else None
+    needs_deal_sync = (
+        lead.current_stage in {"won", "lost"} and deal_status != lead.current_stage
+    )
 
     return LeadListItem(
         id=lead.id,
@@ -288,6 +293,9 @@ def build_lead_list_item(lead: Lead) -> LeadListItem:
         updated_at=lead.updated_at,
         conversation_count=len(lead.conversations),
         latest_conversation_id=latest_conversation.id if latest_conversation else None,
+        deal_status=deal_status,
+        discipline_compliance_status=discipline_summary.compliance_status,
+        needs_deal_sync=needs_deal_sync,
     )
 
 

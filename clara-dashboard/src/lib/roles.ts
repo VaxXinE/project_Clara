@@ -37,6 +37,18 @@ export function isSalesLike(role?: string | null): boolean {
   return normalizeWorkspaceRole(role) === "sales";
 }
 
+export function canAccessManagerInsights(role?: string | null): boolean {
+  return isManagerLike(role);
+}
+
+export function canAccessStrategicInsights(role?: string | null): boolean {
+  return isAdminLike(role);
+}
+
+export function canAccessAdminPages(role?: string | null): boolean {
+  return isAdminLike(role);
+}
+
 export function getRoleDisplayLabel(role?: string | null): string {
   switch (normalizeWorkspaceRole(role)) {
     case "sales":

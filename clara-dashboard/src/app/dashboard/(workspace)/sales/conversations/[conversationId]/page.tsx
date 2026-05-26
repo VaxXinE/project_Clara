@@ -64,6 +64,65 @@ function formatKnowledgeProposalStatus(value: string): string {
   return formatStatusLabel(value);
 }
 
+function buildConversationActionPlan(detail: SalesConversationDetail) {
+  const extraction = detail.latest_ai_extraction;
+  const suggestion = detail.latest_reply_suggestion;
+  const sentCount = detail.sent_messages.length;
+  const items: Array<{
+    condition: string;
+    action: string;
+    detail: string;
+  }> = [];
+
+  items.push({
+    condition: "Jika baru buka conversation",
+    action: "Baca 5-10 chat terakhir dulu sebelum klik tombol apa pun.",
+    detail:
+      "Tujuannya supaya user tidak balas berdasarkan summary lama. Konteks terbaru customer tetap sumber keputusan utama.",
+  });
+
+  if (!extraction) {
+    items.push({
+      condition: "Jika AI analysis belum ada",
+      action: "Jalankan AI analysis dulu.",
+      detail:
+        "Tanpa ini user belum punya ringkasan stage, risk, objection, dan next best action. Jangan lompat langsung bikin balasan.",
+    });
+  } else if (!suggestion) {
+    items.push({
+      condition: "Jika AI analysis sudah ada tapi draft belum ada",
+      action: "Generate reply suggestion lalu review hasilnya.",
+      detail:
+        "Tujuannya bukan asal cepat, tapi supaya user mulai dari draft yang sudah mempertimbangkan objection dan risk yang terdeteksi.",
+    });
+  } else if (sentCount === 0) {
+    items.push({
+      condition: "Jika draft sudah ada tapi belum ada pesan terkirim",
+      action: "Review draft, lalu kirim atau ajukan approval sesuai level risikonya.",
+      detail:
+        "Pastikan jawaban relevan dengan pertanyaan terakhir customer dan tidak mengandung klaim sensitif yang belum diverifikasi.",
+    });
+  } else {
+    items.push({
+      condition: "Jika chat sudah ditindaklanjuti",
+      action: "Tutup loop ke CRM dengan update lead detail.",
+      detail:
+        "Setelah balasan terkirim, user harus cek apakah stage, follow-up berikutnya, discipline log, atau task lanjutan perlu diperbarui.",
+    });
+  }
+
+  if (extraction?.risk_level === "high") {
+    items.push({
+      condition: "Jika risk level = high",
+      action: "Jangan kirim balasan langsung tanpa review manusia atau approval.",
+      detail:
+        "Baca reasoning AI dengan teliti. Kalau ada potensi mis-selling, janji berlebihan, atau klaim sensitif, eskalasikan dulu.",
+    });
+  }
+
+  return items.slice(0, 4);
+}
+
 export default function SalesConversationDetailPage() {
   const params = useParams<{ conversationId: string }>();
   const conversationId = params.conversationId;
@@ -602,6 +661,7 @@ function ConversationUsageGuide({
   const extraction = detail.latest_ai_extraction;
   const suggestion = detail.latest_reply_suggestion;
   const sentCount = detail.sent_messages.length;
+  const actionPlan = buildConversationActionPlan(detail);
 
   const nextStep = !extraction
     ? {
@@ -638,19 +698,29 @@ function ConversationUsageGuide({
           <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
             {nextStep.description}
           </p>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {actionPlan.map((item) => (
+              <UsageCard
+                key={item.condition}
+                title={item.condition}
+                description={`${item.action} ${item.detail}`}
+              />
+            ))}
+          </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
           <UsageCard
-            title="1. Baca chat dulu"
-            description="Pahami konteks terbaru sebelum melihat analisis atau draft."
+            title="Kalau customer masih nanya"
+            description="Fokus ke AI analysis lalu reply suggestion supaya balasan cepat dan tetap terarah."
           />
           <UsageCard
-            title="2. Lihat AI analysis"
-            description="Gunakan stage, risk, objection, dan next action sebagai panduan keputusan."
+            title="Kalau sudah dibalas"
+            description="Jangan berhenti di conversation. Pindahkan konteksnya ke lead detail agar follow-up berikutnya tercatat."
           />
           <UsageCard
-            title="3. Putuskan aksi"
-            description="Entah generate draft, approve/kirim, atau pindah ke lead detail untuk follow-up."
+            title="Kalau ada risiko tinggi"
+            description="Naikkan ke approval atau coaching review. Hindari kirim jawaban sensitif tanpa pengecekan."
           />
         </div>
       </div>
@@ -763,22 +833,41 @@ function ConversationDetailContent({
   const canReviewProposal = canReviewKnowledgeProposal(currentUser?.role);
   const reviewCase = detail.chat_review_case;
   const knowledgeProposal = detail.knowledge_update_proposal;
+  const [activePanel, setActivePanel] = useState<
+    "ai_reply" | "coaching" | "knowledge" | "sent_logs"
+  >("ai_reply");
+  const [showAllMessages, setShowAllMessages] = useState(false);
+  const visibleMessages = showAllMessages
+    ? detail.messages
+    : detail.messages.slice(Math.max(detail.messages.length - 12, 0));
 
   return (
     <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
       <div className="clara-card rounded-[30px] p-5 sm:p-6">
-        <div>
-          <p className="clara-kicker">Chat Timeline</p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
-            Timeline percakapan
-          </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Pesan hasil parsing dari export WhatsApp.
-          </p>
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="clara-kicker">Chat Timeline</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+              Timeline percakapan
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Fokus ke pesan terbaru dulu. Expand penuh hanya saat butuh membaca konteks lama.
+            </p>
+          </div>
+
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">
+            Menampilkan {visibleMessages.length} dari {detail.messages.length} pesan
+          </div>
         </div>
 
         <div className="mt-5 space-y-3">
-          {detail.messages.map((message) => {
+          {!showAllMessages && detail.messages.length > visibleMessages.length ? (
+            <div className="rounded-[22px] border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+              {detail.messages.length - visibleMessages.length} pesan lama disembunyikan dulu supaya halaman tetap ringkas.
+            </div>
+          ) : null}
+
+          {visibleMessages.map((message) => {
             const isSales = message.sender_type === "sales";
 
             return (
@@ -813,566 +902,639 @@ function ConversationDetailContent({
             );
           })}
         </div>
+
+        {detail.messages.length > 12 ? (
+          <div className="mt-5 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowAllMessages((current) => !current)}
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            >
+              {showAllMessages ? "Tampilkan ringkas" : "Tampilkan semua pesan"}
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      <aside className="space-y-6">
-        <ConversationAiActions
-          conversationId={detail.conversation_id}
-          hasAiExtraction={Boolean(extraction)}
-          hasReplySuggestion={Boolean(suggestion)}
-          onUpdated={onUpdated}
-        />
+      <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+        <section className="clara-card rounded-[30px] p-5">
+          <div className="flex flex-wrap gap-2">
+            <PanelTab
+              label="AI & Reply"
+              isActive={activePanel === "ai_reply"}
+              onClick={() => setActivePanel("ai_reply")}
+            />
+            <PanelTab
+              label="Coaching"
+              isActive={activePanel === "coaching"}
+              onClick={() => setActivePanel("coaching")}
+            />
+            <PanelTab
+              label="Knowledge"
+              isActive={activePanel === "knowledge"}
+              onClick={() => setActivePanel("knowledge")}
+            />
+            <PanelTab
+              label="Sent Logs"
+              isActive={activePanel === "sent_logs"}
+              onClick={() => setActivePanel("sent_logs")}
+            />
+          </div>
 
-        <div className="clara-card rounded-[30px] p-5">
-          <p className="clara-kicker">AI Analysis</p>
-          <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-            Hasil pembacaan Clara
-          </h2>
+          <div className="mt-5">
+            {activePanel === "ai_reply" ? (
+              <div className="space-y-6">
+                <ConversationAiActions
+                  conversationId={detail.conversation_id}
+                  hasAiExtraction={Boolean(extraction)}
+                  hasReplySuggestion={Boolean(suggestion)}
+                  onUpdated={onUpdated}
+                />
 
-          {extraction ? (
-            <div className="mt-4 space-y-3 text-sm">
-              <InfoBlock
-                label="Pipeline stage"
-                value={formatStatusLabel(extraction.pipeline_stage)}
-              />
-              <InfoBlock
-                label="Sentiment"
-                value={formatStatusLabel(extraction.sentiment)}
-              />
-              <div className="clara-card-soft rounded-[22px] p-4">
-                <p className="clara-kicker text-[11px]">Main objections</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {extraction.main_objections.length > 0 ? (
-                    extraction.main_objections.map((objection) => (
-                      <span
-                        key={objection}
-                        className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
-                      >
-                        {objection}
-                      </span>
-                    ))
+                <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+                  <p className="clara-kicker">AI Analysis</p>
+                  <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                    Hasil pembacaan Clara
+                  </h2>
+
+                  {extraction ? (
+                    <div className="mt-4 space-y-3 text-sm">
+                      <InfoBlock
+                        label="Pipeline stage"
+                        value={formatStatusLabel(extraction.pipeline_stage)}
+                      />
+                      <InfoBlock
+                        label="Sentiment"
+                        value={formatStatusLabel(extraction.sentiment)}
+                      />
+                      <div className="clara-card-soft rounded-[22px] p-4">
+                        <p className="clara-kicker text-[11px]">Main objections</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {extraction.main_objections.length > 0 ? (
+                            extraction.main_objections.map((objection) => (
+                              <span
+                                key={objection}
+                                className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                              >
+                                {objection}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-slate-600">Tidak ada objection.</p>
+                          )}
+                        </div>
+                      </div>
+                      <InfoBlock
+                        label="Next best action"
+                        value={extraction.next_best_action}
+                      />
+                      <InfoBlock
+                        label="Confidence"
+                        value={`${(extraction.confidence_score * 100).toFixed(0)}%`}
+                      />
+                    </div>
                   ) : (
-                    <p className="text-slate-600">Tidak ada objection.</p>
+                    <div className="clara-card-outline mt-4 rounded-[24px] p-4 text-sm text-slate-600">
+                      Conversation ini belum dianalisis AI.
+                    </div>
                   )}
                 </div>
-              </div>
-              <InfoBlock
-                label="Next best action"
-                value={extraction.next_best_action}
-              />
-              <InfoBlock
-                label="Confidence"
-                value={`${(extraction.confidence_score * 100).toFixed(0)}%`}
-              />
-            </div>
-          ) : (
-            <div className="clara-card-outline mt-4 rounded-[24px] p-4 text-sm text-slate-600">
-              Conversation ini belum dianalisis AI.
-            </div>
-          )}
-        </div>
 
-        {suggestion ? (
-          <ReplySuggestionActions
-            replySuggestionId={suggestion.id}
-            suggestedReplies={suggestion.suggested_replies}
-            approvalStatus={suggestion.approval_status}
-            hasBeenSent={detail.sent_messages.some(
-              (sentMessage) =>
-                sentMessage.reply_suggestion_id === suggestion.id,
-            )}
-            onUpdated={onUpdated}
-          />
-        ) : (
-          <div className="clara-card-outline rounded-[30px] p-5">
-            <h2 className="text-lg font-semibold text-slate-950">
-              Belum ada reply suggestion
-            </h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Generate reply suggestion dulu, lalu review approval status
-              sebelum memutuskan kirim balasan.
-            </p>
-          </div>
-        )}
-
-        <div className="clara-card rounded-[30px] p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="clara-kicker">Coaching Review</p>
-              <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-                Review case manusia untuk manager dan head
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Gunakan section ini untuk memberi label coaching, menunjuk reviewer,
-                dan menyimpan manager note yang persisten per conversation.
-              </p>
-            </div>
-            {reviewCase ? (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                {formatReviewCaseStatus(reviewCase.status)} ·{" "}
-                {formatReviewCaseLabel(reviewCase.review_label)}
-              </span>
-            ) : (
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                Belum ada review case
-              </span>
-            )}
-          </div>
-
-          {reviewSuccessMessage ? (
-            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-              {reviewSuccessMessage}
-            </div>
-          ) : null}
-
-          {reviewErrorMessage ? (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              {reviewErrorMessage}
-            </div>
-          ) : null}
-
-          {reviewSuggestionHint ? (
-            <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-700">
-              {reviewSuggestionHint}
-            </div>
-          ) : null}
-
-          {canManage ? (
-            <form onSubmit={onSaveReviewCase} className="mt-5 space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                <label className="space-y-2 text-sm font-medium text-slate-700">
-                  <span>Status review</span>
-                  <select
-                    value={reviewStatusInput}
-                    onChange={(event) => onReviewStatusChange(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  >
-                    {CHAT_REVIEW_STATUS_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {formatReviewCaseStatus(option)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="space-y-2 text-sm font-medium text-slate-700">
-                  <span>Label coaching</span>
-                  <select
-                    value={reviewLabelInput}
-                    onChange={(event) => onReviewLabelChange(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  >
-                    {CHAT_REVIEW_LABEL_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {formatReviewCaseLabel(option)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="space-y-2 text-sm font-medium text-slate-700">
-                  <span>Reviewer</span>
-                  <select
-                    value={reviewerUserInput}
-                    onChange={(event) => onReviewerUserChange(event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                  >
-                    <option value="">Belum ditunjuk</option>
-                    {reviewerCandidates.map((candidate) => (
-                      <option key={candidate.id} value={candidate.id}>
-                        {candidate.name} · {candidate.role}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label className="block space-y-2 text-sm font-medium text-slate-700">
-                <span>Ringkasan review</span>
-                <textarea
-                  value={reviewSummaryInput}
-                  onChange={(event) => onReviewSummaryChange(event.target.value)}
-                  rows={3}
-                  className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
-                  placeholder="Tulis konteks singkat percakapan dan alasan kenapa case ini perlu coaching."
-                />
-              </label>
-
-              <label className="block space-y-2 text-sm font-medium text-slate-700">
-                <span>Fokus coaching</span>
-                <textarea
-                  value={coachingFocusInput}
-                  onChange={(event) => onCoachingFocusChange(event.target.value)}
-                  rows={3}
-                  className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
-                  placeholder="Contoh: handling objection legalitas, tone closing, atau cara mengarahkan next step."
-                />
-              </label>
-
-              <label className="block space-y-2 text-sm font-medium text-slate-700">
-                <span>Recommended action</span>
-                <textarea
-                  value={recommendedActionInput}
-                  onChange={(event) =>
-                    onRecommendedActionChange(event.target.value)
-                  }
-                  rows={3}
-                  className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
-                  placeholder="Jelaskan apa yang sales harus lakukan setelah coaching ini dibaca."
-                />
-              </label>
-
-              <div className="flex justify-end">
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void onPrefillReviewCase()}
-                    disabled={isPrefillingReviewCase}
-                    className="inline-flex rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isPrefillingReviewCase
-                      ? "Clara sedang mengisi..."
-                      : "Prefill dengan Clara"}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSavingReviewCase}
-                    className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isSavingReviewCase ? "Menyimpan review..." : "Simpan Review Case"}
-                  </button>
-                </div>
-              </div>
-            </form>
-          ) : reviewCase ? (
-            <div className="mt-5 space-y-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              <InfoBlock
-                label="Reviewer"
-                value={reviewCase.reviewer_user_name ?? "Belum ditunjuk"}
-              />
-              <InfoBlock
-                label="Ringkasan review"
-                value={reviewCase.review_summary ?? "-"}
-              />
-              <InfoBlock
-                label="Fokus coaching"
-                value={reviewCase.coaching_focus ?? "-"}
-              />
-              <InfoBlock
-                label="Recommended action"
-                value={reviewCase.recommended_action ?? "-"}
-              />
-            </div>
-          ) : (
-            <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Belum ada review case coaching untuk percakapan ini.
-            </div>
-          )}
-
-          {reviewCase ? (
-            <div className="mt-6 space-y-4">
-              <div>
-                <p className="clara-kicker">Manager Notes</p>
-                <h3 className="mt-2 text-lg font-semibold text-slate-950">
-                  Catatan coaching yang tersimpan
-                </h3>
-              </div>
-
-              {canManage ? (
-                <form onSubmit={onAddReviewNote} className="space-y-3">
-                  <textarea
-                    value={reviewNoteInput}
-                    onChange={(event) => onReviewNoteChange(event.target.value)}
-                    rows={3}
-                    className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
-                    placeholder="Tulis catatan coaching, instruksi rework, atau alasan eskalasi."
+                {suggestion ? (
+                  <ReplySuggestionActions
+                    replySuggestionId={suggestion.id}
+                    suggestedReplies={suggestion.suggested_replies}
+                    approvalStatus={suggestion.approval_status}
+                    hasBeenSent={detail.sent_messages.some(
+                      (sentMessage) =>
+                        sentMessage.reply_suggestion_id === suggestion.id,
+                    )}
+                    onUpdated={onUpdated}
                   />
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={isAddingReviewNote || !reviewCase}
-                      className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isAddingReviewNote ? "Menyimpan note..." : "Tambah Manager Note"}
-                    </button>
+                ) : (
+                  <div className="clara-card-outline rounded-[30px] p-5">
+                    <h2 className="text-lg font-semibold text-slate-950">
+                      Belum ada reply suggestion
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Generate reply suggestion dulu, lalu review approval status
+                      sebelum memutuskan kirim balasan.
+                    </p>
                   </div>
-                </form>
-              ) : null}
+                )}
+              </div>
+            ) : null}
 
-              {reviewCase.notes.length > 0 ? (
-                <div className="space-y-3">
-                  {reviewCase.notes.map((note) => (
-                    <article
-                      key={note.id}
-                      className="rounded-[22px] border border-slate-200 bg-white p-4"
-                    >
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                        <span className="font-semibold text-slate-700">
-                          {note.author_user_name ?? "System"}
-                        </span>
-                        <span>{formatDateTime(note.created_at)}</span>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">
-                          {formatReviewCaseLabel(note.note_type)}
-                        </span>
+            {activePanel === "coaching" ? (
+              <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="clara-kicker">Coaching Review</p>
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                      Review case manusia untuk manager dan head
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Gunakan section ini untuk memberi label coaching, menunjuk reviewer,
+                      dan menyimpan manager note yang persisten per conversation.
+                    </p>
+                  </div>
+                  {reviewCase ? (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                      {formatReviewCaseStatus(reviewCase.status)} ·{" "}
+                      {formatReviewCaseLabel(reviewCase.review_label)}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                      Belum ada review case
+                    </span>
+                  )}
+                </div>
+
+                {reviewSuccessMessage ? (
+                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                    {reviewSuccessMessage}
+                  </div>
+                ) : null}
+
+                {reviewErrorMessage ? (
+                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {reviewErrorMessage}
+                  </div>
+                ) : null}
+
+                {reviewSuggestionHint ? (
+                  <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-700">
+                    {reviewSuggestionHint}
+                  </div>
+                ) : null}
+
+                {canManage ? (
+                  <form onSubmit={onSaveReviewCase} className="mt-5 space-y-4">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <label className="space-y-2 text-sm font-medium text-slate-700">
+                        <span>Status review</span>
+                        <select
+                          value={reviewStatusInput}
+                          onChange={(event) => onReviewStatusChange(event.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                        >
+                          {CHAT_REVIEW_STATUS_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {formatReviewCaseStatus(option)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="space-y-2 text-sm font-medium text-slate-700">
+                        <span>Label coaching</span>
+                        <select
+                          value={reviewLabelInput}
+                          onChange={(event) => onReviewLabelChange(event.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                        >
+                          {CHAT_REVIEW_LABEL_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {formatReviewCaseLabel(option)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="space-y-2 text-sm font-medium text-slate-700">
+                        <span>Reviewer</span>
+                        <select
+                          value={reviewerUserInput}
+                          onChange={(event) => onReviewerUserChange(event.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                        >
+                          <option value="">Belum ditunjuk</option>
+                          {reviewerCandidates.map((candidate) => (
+                            <option key={candidate.id} value={candidate.id}>
+                              {candidate.name} · {candidate.role}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <label className="block space-y-2 text-sm font-medium text-slate-700">
+                      <span>Ringkasan review</span>
+                      <textarea
+                        value={reviewSummaryInput}
+                        onChange={(event) => onReviewSummaryChange(event.target.value)}
+                        rows={3}
+                        className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                        placeholder="Tulis konteks singkat percakapan dan alasan kenapa case ini perlu coaching."
+                      />
+                    </label>
+
+                    <label className="block space-y-2 text-sm font-medium text-slate-700">
+                      <span>Fokus coaching</span>
+                      <textarea
+                        value={coachingFocusInput}
+                        onChange={(event) => onCoachingFocusChange(event.target.value)}
+                        rows={3}
+                        className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                        placeholder="Contoh: handling objection legalitas, tone closing, atau cara mengarahkan next step."
+                      />
+                    </label>
+
+                    <label className="block space-y-2 text-sm font-medium text-slate-700">
+                      <span>Recommended action</span>
+                      <textarea
+                        value={recommendedActionInput}
+                        onChange={(event) =>
+                          onRecommendedActionChange(event.target.value)
+                        }
+                        rows={3}
+                        className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                        placeholder="Jelaskan apa yang sales harus lakukan setelah coaching ini dibaca."
+                      />
+                    </label>
+
+                    <div className="flex justify-end">
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => void onPrefillReviewCase()}
+                          disabled={isPrefillingReviewCase}
+                          className="inline-flex rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {isPrefillingReviewCase
+                            ? "Clara sedang mengisi..."
+                            : "Prefill dengan Clara"}
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSavingReviewCase}
+                          className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {isSavingReviewCase ? "Menyimpan review..." : "Simpan Review Case"}
+                        </button>
                       </div>
-                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                        {note.body}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                  Belum ada manager note di review case ini.
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="clara-card rounded-[30px] p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="clara-kicker">Knowledge Update Queue</p>
-              <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-                Usulan knowledge dari kasus lapangan
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Setelah coaching case jelas, naikkan insight penting jadi proposal knowledge
-                supaya bisa direview dan dipublish ke knowledge base resmi.
-              </p>
-            </div>
-            {knowledgeProposal ? (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                {formatKnowledgeProposalStatus(knowledgeProposal.status)}
-              </span>
-            ) : (
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                Belum ada proposal
-              </span>
-            )}
-          </div>
-
-          {!reviewCase ? (
-            <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Buat dan simpan coaching review dulu. Proposal knowledge Tahap 4 sengaja
-              diikat ke review case supaya audit trail-nya jelas.
-            </div>
-          ) : (
-            <>
-              {knowledgeProposalSuccessMessage ? (
-                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-                  {knowledgeProposalSuccessMessage}
-                </div>
-              ) : null}
-
-              {knowledgeProposalErrorMessage ? (
-                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                  {knowledgeProposalErrorMessage}
-                </div>
-              ) : null}
-
-              {canManage ? (
-                <form onSubmit={onSaveKnowledgeProposal} className="mt-5 space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <label className="space-y-2 text-sm font-medium text-slate-700">
-                      <span>Judul proposal</span>
-                      <input
-                        value={knowledgeProposalTitleInput}
-                        onChange={(event) =>
-                          onKnowledgeProposalTitleChange(event.target.value)
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                        placeholder="Contoh: Playbook handling objection legalitas"
-                      />
-                    </label>
-                    <label className="space-y-2 text-sm font-medium text-slate-700">
-                      <span>Kategori</span>
-                      <input
-                        value={knowledgeProposalCategoryInput}
-                        onChange={(event) =>
-                          onKnowledgeProposalCategoryChange(event.target.value)
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                        placeholder="legalitas / objection / trust"
-                      />
-                    </label>
+                    </div>
+                  </form>
+                ) : reviewCase ? (
+                  <div className="mt-5 space-y-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <InfoBlock
+                      label="Reviewer"
+                      value={reviewCase.reviewer_user_name ?? "Belum ditunjuk"}
+                    />
+                    <InfoBlock
+                      label="Ringkasan review"
+                      value={reviewCase.review_summary ?? "-"}
+                    />
+                    <InfoBlock
+                      label="Fokus coaching"
+                      value={reviewCase.coaching_focus ?? "-"}
+                    />
+                    <InfoBlock
+                      label="Recommended action"
+                      value={reviewCase.recommended_action ?? "-"}
+                    />
                   </div>
+                ) : (
+                  <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    Belum ada review case coaching untuk percakapan ini.
+                  </div>
+                )}
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <label className="space-y-2 text-sm font-medium text-slate-700">
-                      <span>Source type</span>
-                      <input
-                        value={knowledgeProposalSourceTypeInput}
-                        onChange={(event) =>
-                          onKnowledgeProposalSourceTypeChange(event.target.value)
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                        placeholder="coaching_case"
-                      />
-                    </label>
-                    <label className="space-y-2 text-sm font-medium text-slate-700">
-                      <span>Status proposal</span>
-                      <select
-                        value={knowledgeProposalStatusInput}
-                        onChange={(event) =>
-                          onKnowledgeProposalStatusChange(event.target.value)
-                        }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-                      >
-                        {KNOWLEDGE_PROPOSAL_STATUS_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {formatKnowledgeProposalStatus(option)}
-                          </option>
+                {reviewCase ? (
+                  <div className="mt-6 space-y-4">
+                    <div>
+                      <p className="clara-kicker">Manager Notes</p>
+                      <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                        Catatan coaching yang tersimpan
+                      </h3>
+                    </div>
+
+                    {canManage ? (
+                      <form onSubmit={onAddReviewNote} className="space-y-3">
+                        <textarea
+                          value={reviewNoteInput}
+                          onChange={(event) => onReviewNoteChange(event.target.value)}
+                          rows={3}
+                          className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                          placeholder="Tulis catatan coaching, instruksi rework, atau alasan eskalasi."
+                        />
+                        <div className="flex justify-end">
+                          <button
+                            type="submit"
+                            disabled={isAddingReviewNote || !reviewCase}
+                            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isAddingReviewNote ? "Menyimpan note..." : "Tambah Manager Note"}
+                          </button>
+                        </div>
+                      </form>
+                    ) : null}
+
+                    {reviewCase.notes.length > 0 ? (
+                      <div className="space-y-3">
+                        {reviewCase.notes.map((note) => (
+                          <article
+                            key={note.id}
+                            className="rounded-[22px] border border-slate-200 bg-white p-4"
+                          >
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                              <span className="font-semibold text-slate-700">
+                                {note.author_user_name ?? "System"}
+                              </span>
+                              <span>{formatDateTime(note.created_at)}</span>
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">
+                                {formatReviewCaseLabel(note.note_type)}
+                              </span>
+                            </div>
+                            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                              {note.body}
+                            </p>
+                          </article>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    ) : (
+                      <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                        Belum ada manager note di review case ini.
+                      </div>
+                    )}
                   </div>
+                ) : null}
+              </div>
+            ) : null}
 
-                  <label className="block space-y-2 text-sm font-medium text-slate-700">
-                    <span>Rationale</span>
-                    <textarea
-                      value={knowledgeProposalRationaleInput}
-                      onChange={(event) =>
-                        onKnowledgeProposalRationaleChange(event.target.value)
-                      }
-                      rows={3}
-                      className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
-                      placeholder="Jelaskan kenapa kasus ini layak dinaikkan ke knowledge base."
-                    />
-                  </label>
-
-                  <label className="block space-y-2 text-sm font-medium text-slate-700">
-                    <span>Isi knowledge yang diusulkan</span>
-                    <textarea
-                      value={knowledgeProposalContentInput}
-                      onChange={(event) =>
-                        onKnowledgeProposalContentChange(event.target.value)
-                      }
-                      rows={8}
-                      className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
-                      placeholder="Tulis knowledge final yang nantinya akan dipublish ke product knowledge."
-                    />
-                  </label>
-
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={
-                        isSavingKnowledgeProposal ||
-                        knowledgeProposalTitleInput.trim().length === 0 ||
-                        knowledgeProposalCategoryInput.trim().length === 0 ||
-                        knowledgeProposalContentInput.trim().length === 0 ||
-                        knowledgeProposalSourceTypeInput.trim().length === 0
-                      }
-                      className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isSavingKnowledgeProposal
-                        ? "Menyimpan proposal..."
-                        : "Simpan Proposal Knowledge"}
-                    </button>
+            {activePanel === "knowledge" ? (
+              <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="clara-kicker">Knowledge Update Queue</p>
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                      Usulan knowledge dari kasus lapangan
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Setelah coaching case jelas, naikkan insight penting jadi proposal knowledge
+                      supaya bisa direview dan dipublish ke knowledge base resmi.
+                    </p>
                   </div>
-                </form>
-              ) : null}
-
-              {knowledgeProposal ? (
-                <div className="mt-5 space-y-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  <InfoBlock
-                    label="Pengusul"
-                    value={knowledgeProposal.proposed_by_user_name ?? "-"}
-                  />
-                  <InfoBlock
-                    label="Rationale"
-                    value={knowledgeProposal.rationale ?? "-"}
-                  />
-                  <InfoBlock
-                    label="Review decision note"
-                    value={knowledgeProposal.review_decision_note ?? "-"}
-                  />
-                  <InfoBlock
-                    label="Published knowledge"
-                    value={
-                      knowledgeProposal.published_product_knowledge_title ?? "-"
-                    }
-                  />
+                  {knowledgeProposal ? (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                      {formatKnowledgeProposalStatus(knowledgeProposal.status)}
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                      Belum ada proposal
+                    </span>
+                  )}
                 </div>
-              ) : null}
 
-              {canReviewProposal && knowledgeProposal ? (
-                <div className="mt-5 space-y-3 rounded-[24px] border border-amber-200 bg-amber-50/70 p-4">
-                  <label className="block space-y-2 text-sm font-medium text-slate-700">
-                    <span>Catatan keputusan approval</span>
-                    <textarea
-                      value={knowledgeProposalDecisionNoteInput}
-                      onChange={(event) =>
-                        onKnowledgeProposalDecisionNoteChange(event.target.value)
-                      }
-                      rows={3}
-                      className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
-                      placeholder="Tulis alasan approve/reject atau catatan revisi."
-                    />
-                  </label>
-                  <div className="flex flex-wrap justify-end gap-3">
-                    <button
-                      type="button"
-                      disabled={isReviewingKnowledgeProposal}
-                      onClick={() => void onReviewKnowledgeProposal("rejected")}
-                      className="inline-flex rounded-full border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isReviewingKnowledgeProposal ? "Memproses..." : "Reject"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isReviewingKnowledgeProposal}
-                      onClick={() => void onReviewKnowledgeProposal("approved")}
-                      className="inline-flex rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isReviewingKnowledgeProposal
-                        ? "Memproses..."
-                        : "Approve & Publish"}
-                    </button>
+                {!reviewCase ? (
+                  <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                    Buat dan simpan coaching review dulu. Proposal knowledge Tahap 4 sengaja
+                    diikat ke review case supaya audit trail-nya jelas.
                   </div>
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
+                ) : (
+                  <>
+                    {knowledgeProposalSuccessMessage ? (
+                      <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                        {knowledgeProposalSuccessMessage}
+                      </div>
+                    ) : null}
 
-        <div className="clara-card rounded-[30px] p-5">
-          <p className="clara-kicker">Sent Messages</p>
-          <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-            Riwayat balasan terkirim
-          </h2>
+                    {knowledgeProposalErrorMessage ? (
+                      <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        {knowledgeProposalErrorMessage}
+                      </div>
+                    ) : null}
 
-          {detail.sent_messages.length > 0 ? (
-            <div className="mt-4 space-y-3">
-              {detail.sent_messages.map((sentMessage) => (
-                <div
-                  key={sentMessage.id}
-                  className="rounded-[22px] border border-green-200/80 bg-green-50/88 p-4 text-sm text-green-900"
-                >
-                  <p className="font-semibold">
-                    Sent by {sentMessage.sent_by_name}
+                    {canManage ? (
+                      <form onSubmit={onSaveKnowledgeProposal} className="mt-5 space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                            <span>Judul proposal</span>
+                            <input
+                              value={knowledgeProposalTitleInput}
+                              onChange={(event) =>
+                                onKnowledgeProposalTitleChange(event.target.value)
+                              }
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                              placeholder="Contoh: Playbook handling objection legalitas"
+                            />
+                          </label>
+                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                            <span>Kategori</span>
+                            <input
+                              value={knowledgeProposalCategoryInput}
+                              onChange={(event) =>
+                                onKnowledgeProposalCategoryChange(event.target.value)
+                              }
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                              placeholder="legalitas / objection / trust"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                            <span>Source type</span>
+                            <input
+                              value={knowledgeProposalSourceTypeInput}
+                              onChange={(event) =>
+                                onKnowledgeProposalSourceTypeChange(event.target.value)
+                              }
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                              placeholder="coaching_case"
+                            />
+                          </label>
+                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                            <span>Status proposal</span>
+                            <select
+                              value={knowledgeProposalStatusInput}
+                              onChange={(event) =>
+                                onKnowledgeProposalStatusChange(event.target.value)
+                              }
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                            >
+                              {KNOWLEDGE_PROPOSAL_STATUS_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {formatKnowledgeProposalStatus(option)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+
+                        <label className="block space-y-2 text-sm font-medium text-slate-700">
+                          <span>Rationale</span>
+                          <textarea
+                            value={knowledgeProposalRationaleInput}
+                            onChange={(event) =>
+                              onKnowledgeProposalRationaleChange(event.target.value)
+                            }
+                            rows={3}
+                            className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                            placeholder="Jelaskan kenapa kasus ini layak dinaikkan ke knowledge base."
+                          />
+                        </label>
+
+                        <label className="block space-y-2 text-sm font-medium text-slate-700">
+                          <span>Isi knowledge yang diusulkan</span>
+                          <textarea
+                            value={knowledgeProposalContentInput}
+                            onChange={(event) =>
+                              onKnowledgeProposalContentChange(event.target.value)
+                            }
+                            rows={8}
+                            className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                            placeholder="Tulis knowledge final yang nantinya akan dipublish ke product knowledge."
+                          />
+                        </label>
+
+                        <div className="flex justify-end">
+                          <button
+                            type="submit"
+                            disabled={
+                              isSavingKnowledgeProposal ||
+                              knowledgeProposalTitleInput.trim().length === 0 ||
+                              knowledgeProposalCategoryInput.trim().length === 0 ||
+                              knowledgeProposalContentInput.trim().length === 0 ||
+                              knowledgeProposalSourceTypeInput.trim().length === 0
+                            }
+                            className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isSavingKnowledgeProposal
+                              ? "Menyimpan proposal..."
+                              : "Simpan Proposal Knowledge"}
+                          </button>
+                        </div>
+                      </form>
+                    ) : null}
+
+                    {knowledgeProposal ? (
+                      <div className="mt-5 space-y-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                        <InfoBlock
+                          label="Pengusul"
+                          value={knowledgeProposal.proposed_by_user_name ?? "-"}
+                        />
+                        <InfoBlock
+                          label="Rationale"
+                          value={knowledgeProposal.rationale ?? "-"}
+                        />
+                        <InfoBlock
+                          label="Review decision note"
+                          value={knowledgeProposal.review_decision_note ?? "-"}
+                        />
+                        <InfoBlock
+                          label="Published knowledge"
+                          value={
+                            knowledgeProposal.published_product_knowledge_title ?? "-"
+                          }
+                        />
+                      </div>
+                    ) : null}
+
+                    {canReviewProposal && knowledgeProposal ? (
+                      <div className="mt-5 space-y-3 rounded-[24px] border border-amber-200 bg-amber-50/70 p-4">
+                        <label className="block space-y-2 text-sm font-medium text-slate-700">
+                          <span>Catatan keputusan approval</span>
+                          <textarea
+                            value={knowledgeProposalDecisionNoteInput}
+                            onChange={(event) =>
+                              onKnowledgeProposalDecisionNoteChange(event.target.value)
+                            }
+                            rows={3}
+                            className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                            placeholder="Tulis alasan approve/reject atau catatan revisi."
+                          />
+                        </label>
+                        <div className="flex flex-wrap justify-end gap-3">
+                          <button
+                            type="button"
+                            disabled={isReviewingKnowledgeProposal}
+                            onClick={() => void onReviewKnowledgeProposal("rejected")}
+                            className="inline-flex rounded-full border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isReviewingKnowledgeProposal ? "Memproses..." : "Reject"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isReviewingKnowledgeProposal}
+                            onClick={() => void onReviewKnowledgeProposal("approved")}
+                            className="inline-flex rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isReviewingKnowledgeProposal
+                              ? "Memproses..."
+                              : "Approve & Publish"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ) : null}
+
+            {activePanel === "sent_logs" ? (
+              <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+                <p className="clara-kicker">Sent Messages</p>
+                <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                  Riwayat balasan terkirim
+                </h2>
+
+                {detail.sent_messages.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {detail.sent_messages.map((sentMessage) => (
+                      <div
+                        key={sentMessage.id}
+                        className="rounded-[22px] border border-green-200/80 bg-green-50/88 p-4 text-sm text-green-900"
+                      >
+                        <p className="font-semibold">
+                          Sent by {sentMessage.sent_by_name}
+                        </p>
+                        <p className="mt-1 text-xs text-green-700">
+                          {formatDateTime(sentMessage.sent_at)} &bull;{" "}
+                          {sentMessage.send_mode}
+                        </p>
+                        <p className="mt-3 whitespace-pre-wrap leading-6">
+                          {sentMessage.message_text}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-600">
+                    Belum ada pesan yang ditandai terkirim. Kalau balasan sudah
+                    benar-benar dikirim, pastikan status ini ikut tercatat.
                   </p>
-                  <p className="mt-1 text-xs text-green-700">
-                    {formatDateTime(sentMessage.sent_at)} &bull;{" "}
-                    {sentMessage.send_mode}
-                  </p>
-                  <p className="mt-3 whitespace-pre-wrap leading-6">
-                    {sentMessage.message_text}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-slate-600">
-              Belum ada pesan yang ditandai terkirim. Kalau balasan sudah
-              benar-benar dikirim, pastikan status ini ikut tercatat.
-            </p>
-          )}
-        </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </section>
       </aside>
     </section>
+  );
+}
+
+function PanelTab({
+  label,
+  isActive,
+  onClick,
+}: {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+        isActive
+          ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
+          : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 

@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import { canAccessAdminPages } from "@/lib/roles";
 import type { CurrentUser, OpsDatabaseOverview } from "@/types/dashboard";
 
 export default function AdminOpsPage() {
+  const router = useRouter();
   const [overview, setOverview] = useState<OpsDatabaseOverview | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -17,12 +20,18 @@ export default function AdminOpsPage() {
   useEffect(() => {
     async function loadOverview() {
       try {
-        const [overviewData, me] = await Promise.all([
-          apiFetch<OpsDatabaseOverview>("/dashboard/admin/ops-overview"),
-          apiFetch<CurrentUser>("/auth/me"),
-        ]);
-        setOverview(overviewData);
+        const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
+
+        if (!canAccessAdminPages(me.role)) {
+          router.replace("/dashboard");
+          return;
+        }
+
+        const overviewData = await apiFetch<OpsDatabaseOverview>(
+          "/dashboard/admin/ops-overview",
+        );
+        setOverview(overviewData);
       } catch (error) {
         setErrorMessage(
           error instanceof Error
@@ -35,7 +44,7 @@ export default function AdminOpsPage() {
     }
 
     void loadOverview();
-  }, []);
+  }, [router]);
 
   return (
     <WorkspaceShell

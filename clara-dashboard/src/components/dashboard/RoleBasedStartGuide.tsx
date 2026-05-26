@@ -45,8 +45,8 @@ const HEAD_WORKFLOW_STEPS = [
     step: "1",
     title: "Cek Action Center",
     description:
-      "Mulai dari action center untuk melihat overdue follow-up, hot lead belum disentuh, dan alert operasional yang perlu perhatian cepat.",
-    href: "/dashboard/notifications",
+      "Mulai dari Action Center untuk melihat overdue follow-up, hot lead belum disentuh, dan prioritas kerja tim hari ini.",
+    href: "/dashboard/follow-up",
     cta: "Buka Action Center",
   },
   {
@@ -69,7 +69,7 @@ const HEAD_WORKFLOW_STEPS = [
     step: "4",
     title: "Ambil Keputusan dari Dashboard",
     description:
-      "Kalau operasional sudah cukup jelas, gunakan ops dashboard dan chat insight untuk membaca performa tim dan arah intervensi berikutnya.",
+      "Kalau operasional sudah cukup jelas, gunakan Ops Dashboard dan Chat Insight untuk membaca performa tim dan arah intervensi berikutnya.",
     href: "/dashboard/kpi",
     cta: "Buka Ops Dashboard",
   },
@@ -124,7 +124,7 @@ function buildRoleTasks(role?: string) {
     },
     {
       title: "Saya mau lihat lead yang harus dikejar",
-      description: "Masuk ke Lead Management atau Action Center tergantung Anda ingin lihat board atau prioritas harian.",
+    description: "Masuk ke Lead Management atau Action Center tergantung Anda ingin lihat board atau prioritas harian.",
       href: "/dashboard/follow-up",
     },
   ];
@@ -177,11 +177,11 @@ function buildRoleStartCopy(role?: string) {
       eyebrow: "Head flow",
       title: "Mulai dari bottleneck tim, lalu rapikan lead dan kontrol akses",
       description:
-        "Sebagai head, workspace ini paling efektif saat Anda memakai action center, chat review center, dan dashboard KPI untuk melihat titik macet tim sebelum masuk ke lead dan kontrol akses.",
-      primaryHref: "/dashboard/notifications",
+        "Sebagai head, workspace ini paling efektif saat Anda memakai Action Center, Alert Center, dan Chat Review Center untuk melihat titik macet tim sebelum masuk ke lead dan kontrol akses.",
+      primaryHref: "/dashboard/follow-up",
       primaryLabel: "Buka Action Center",
-      secondaryHref: "/dashboard/approvals",
-      secondaryLabel: "Buka Chat Review",
+      secondaryHref: "/dashboard/notifications",
+      secondaryLabel: "Buka Alert Center",
     };
   }
 
@@ -189,7 +189,7 @@ function buildRoleStartCopy(role?: string) {
     eyebrow: "Sales flow",
     title: "Mulai dari queue, lalu ubah jadi lead dan tindakan harian",
     description:
-      "Sebagai sales, alur kerja paling masuk akal tetap dimulai dari lead capture atau queue: review percakapan, analisis, lalu lanjutkan ke lead dan follow-up.",
+      "Sebagai sales, alur kerja paling masuk akal tetap dimulai dari Lead Capture atau Queue: review percakapan, analisis, lalu lanjutkan ke Action Center dan Lead Management.",
     primaryHref: "/dashboard/upload",
     primaryLabel: "Mulai Lead Capture",
     secondaryHref: "/dashboard/sales",
@@ -314,7 +314,7 @@ export function RoleBasedStartGuide({
                 antrian triase chat, draft, atau eskalasi yang perlu review manusia.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Notifications</span>:
+                <span className="font-semibold text-slate-950">Alert Center</span>:
                 sinyal operasional yang perlu acknowledge, resolve, atau escalate.
               </p>
               <p>

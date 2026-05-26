@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Fragment, useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import { canAccessManagerInsights } from "@/lib/roles";
 import type {
   CurrentUser,
   ManagerInsightsResponse,
@@ -15,20 +17,84 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(0)}%`;
 }
 
+function getCoachingPriorityAction(item: {
+  review_status: string;
+  risk_level: string | null;
+  review_label: string;
+}) {
+  if (item.review_status === "in_review") {
+    return {
+      title: "Manager harus review kasus ini sekarang",
+      description:
+        "Baca conversation, pastikan masalah utamanya jelas, lalu isi coaching note atau putuskan apakah case ini perlu `needs_rework`, `coaching_done`, atau `escalated`.",
+      primaryLabel: "Buka Chat Review Center",
+      primaryHref: "/dashboard/approvals",
+    };
+  }
+
+  if (item.review_status === "needs_rework") {
+    return {
+      title: "Manager harus beri arahan revisi yang tegas",
+      description:
+        "Kasus ini belum selesai. Buka review center, tulis revisi yang harus dilakukan sales, dan pastikan next action tidak ambigu.",
+      primaryLabel: "Lanjutkan Review",
+      primaryHref: "/dashboard/approvals",
+    };
+  }
+
+  if (item.review_status === "escalated") {
+    return {
+      title: "Kasus ini perlu keputusan level lebih tinggi",
+      description:
+        "Cek alasan eskalasinya, validasi risiko atau klaim sensitifnya, lalu tentukan apakah perlu dinaikkan lagi atau dikembalikan dengan arahan yang jelas.",
+      primaryLabel: "Buka Chat Review Center",
+      primaryHref: "/dashboard/approvals",
+    };
+  }
+
+  if (item.risk_level === "high") {
+    return {
+      title: "Kasus ini berisiko tinggi",
+      description:
+        "Jangan cukup baca summary. Manager perlu buka conversation dan pastikan tidak ada jawaban yang berpotensi mis-selling atau klaim sensitif.",
+      primaryLabel: "Buka Conversation",
+      primaryHref: null,
+    };
+  }
+
+  return {
+    title: "Manager perlu pastikan arah coaching-nya jelas",
+    description:
+      item.review_label === "unik"
+        ? "Kasus ini unik, jadi manager perlu memastikan insight utamanya terdokumentasi dan tidak hilang setelah dibaca."
+        : "Buka case ini dan pastikan keputusan review-nya jelas, bukan cuma dibaca lalu ditinggalkan.",
+    primaryLabel: "Buka Chat Review Center",
+    primaryHref: "/dashboard/approvals",
+  };
+}
+
 export function ManagerInsightsPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [insights, setInsights] = useState<ManagerInsightsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [expandedTeamIds, setExpandedTeamIds] = useState<string[]>([]);
 
   useEffect(() => {
     async function loadPage() {
       try {
-        const [me, response] = await Promise.all([
-          apiFetch<CurrentUser>("/auth/me"),
-          apiFetch<ManagerInsightsResponse>("/dashboard/manager-insights"),
-        ]);
+        const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
+
+        if (!canAccessManagerInsights(me.role)) {
+          router.replace("/dashboard");
+          return;
+        }
+
+        const response = await apiFetch<ManagerInsightsResponse>(
+          "/dashboard/manager-insights",
+        );
         setInsights(response);
       } catch (error) {
         setErrorMessage(
@@ -42,7 +108,19 @@ export function ManagerInsightsPage() {
     }
 
     void loadPage();
-  }, []);
+  }, [router]);
+
+  function toggleTeamMembers(teamId: string | null) {
+    if (!teamId) {
+      return;
+    }
+
+    setExpandedTeamIds((current) =>
+      current.includes(teamId)
+        ? current.filter((id) => id !== teamId)
+        : [...current, teamId],
+    );
+  }
 
   return (
     <WorkspaceShell
@@ -181,45 +259,7 @@ export function ManagerInsightsPage() {
                     <EmptyText text="Belum ada coaching case aktif di scope ini." />
                   ) : (
                     insights.coaching_priority.map((item) => (
-                      <article
-                        key={item.review_case_id}
-                        className="rounded-[22px] border border-slate-200 bg-white p-4"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-slate-950">
-                            {item.lead_name}
-                          </p>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                            {formatStatusLabel(item.review_status)}
-                          </span>
-                          <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                            {item.review_label.replaceAll("_", " ")}
-                          </span>
-                          {item.risk_level ? (
-                            <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
-                              Risk {item.risk_level}
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-600">
-                          {item.recommended_action ?? "Belum ada recommended action."}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                          <span>Owner: {item.sales_owner_name ?? "-"}</span>
-                          <span>&bull;</span>
-                          <span>Reviewer: {item.reviewer_user_name ?? "-"}</span>
-                          <span>&bull;</span>
-                          <span>Score: {item.priority_score}</span>
-                          <span>&bull;</span>
-                          <span>Last message: {formatDateTime(item.latest_message_at)}</span>
-                        </div>
-                        <Link
-                          href={`/dashboard/sales/conversations/${item.conversation_id}`}
-                          className="mt-4 inline-flex rounded-full bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-                        >
-                          Buka Conversation
-                        </Link>
-                      </article>
+                      <CoachingPriorityCard key={item.review_case_id} item={item} />
                     ))
                   )}
                 </div>
@@ -241,37 +281,106 @@ export function ManagerInsightsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {insights.team_discipline.map((row) => (
-                        <tr key={row.team_id ?? row.team_name} className="border-b border-slate-100">
-                          <td className="px-3 py-3 align-top">
-                            <div className="font-semibold text-slate-950">{row.team_name}</div>
-                            <div className="text-xs text-slate-500">
-                              {row.unit_name ?? "Tanpa unit"} • Manager: {row.manager_user_name ?? "-"}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 align-top text-slate-700">
-                            {row.lead_count}
-                          </td>
-                          <td className="px-3 py-3 align-top text-slate-700">
-                            {formatPercent(row.discipline_compliance_rate)}
-                            <div className="text-xs text-slate-500">
-                              {row.missing_or_stale_logs} stale/missing
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 align-top text-slate-700">
-                            {formatPercent(row.follow_up_compliance_rate)}
-                            <div className="text-xs text-slate-500">
-                              {row.overdue_follow_ups} overdue
-                            </div>
-                          </td>
-                          <td className="px-3 py-3 align-top text-slate-700">
-                            {row.open_coaching_cases}
-                          </td>
-                          <td className="px-3 py-3 align-top text-slate-700">
-                            {row.pending_knowledge_proposals}
-                          </td>
-                        </tr>
-                      ))}
+                      {insights.team_discipline.map((row) => {
+                        const teamKey = row.team_id ?? row.team_name;
+                        const isExpanded =
+                          row.team_id !== null && expandedTeamIds.includes(row.team_id);
+
+                        return (
+                          <Fragment key={teamKey}>
+                            <tr className="border-b border-slate-100">
+                              <td className="px-3 py-3 align-top">
+                                {row.team_id ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleTeamMembers(row.team_id)}
+                                    className="text-left"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-semibold text-slate-950 hover:text-slate-700">
+                                        {row.team_name}
+                                      </span>
+                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                        {isExpanded ? "Hide members" : "Show members"}
+                                      </span>
+                                    </div>
+                                  </button>
+                                ) : (
+                                  <div className="font-semibold text-slate-950">{row.team_name}</div>
+                                )}
+                                <div className="text-xs text-slate-500">
+                                  {row.unit_name ?? "Tanpa unit"} • Manager: {row.manager_user_name ?? "-"} • {row.member_count} member
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 align-top text-slate-700">
+                                {row.lead_count}
+                              </td>
+                              <td className="px-3 py-3 align-top text-slate-700">
+                                {formatPercent(row.discipline_compliance_rate)}
+                                <div className="text-xs text-slate-500">
+                                  {row.missing_or_stale_logs} stale/missing
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 align-top text-slate-700">
+                                {formatPercent(row.follow_up_compliance_rate)}
+                                <div className="text-xs text-slate-500">
+                                  {row.overdue_follow_ups} overdue
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 align-top text-slate-700">
+                                {row.open_coaching_cases}
+                              </td>
+                              <td className="px-3 py-3 align-top text-slate-700">
+                                {row.pending_knowledge_proposals}
+                              </td>
+                            </tr>
+
+                            {isExpanded ? (
+                              <tr className="border-b border-slate-100 bg-slate-50/70">
+                                <td colSpan={6} className="px-3 py-4">
+                                  <div className="rounded-[18px] border border-slate-200 bg-white p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                      Anggota Team
+                                    </p>
+                                    {row.members.length === 0 ? (
+                                      <p className="mt-3 text-sm text-slate-500">
+                                        Belum ada anggota team yang bisa ditampilkan.
+                                      </p>
+                                    ) : (
+                                      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                        {row.members.map((member) => (
+                                          <div
+                                            key={member.id}
+                                            className="rounded-[16px] border border-slate-200 bg-slate-50 p-3"
+                                          >
+                                            <div className="flex items-center justify-between gap-2">
+                                              <p className="text-sm font-semibold text-slate-950">
+                                                {member.name}
+                                              </p>
+                                              <span
+                                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                                  member.is_active
+                                                    ? "bg-emerald-100 text-emerald-700"
+                                                    : "bg-slate-200 text-slate-600"
+                                                }`}
+                                              >
+                                                {member.is_active ? "Active" : "Inactive"}
+                                              </span>
+                                            </div>
+                                            <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">
+                                              {member.role}
+                                            </p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : null}
+                          </Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -305,6 +414,71 @@ export function ManagerInsightsPage() {
         ) : null}
       </div>
     </WorkspaceShell>
+  );
+}
+
+function CoachingPriorityCard({
+  item,
+}: {
+  item: ManagerInsightsResponse["coaching_priority"][number];
+}) {
+  const action = getCoachingPriorityAction(item);
+
+  return (
+    <article className="rounded-[22px] border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-semibold text-slate-950">{item.lead_name}</p>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+          {formatStatusLabel(item.review_status)}
+        </span>
+        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+          {item.review_label.replaceAll("_", " ")}
+        </span>
+        {item.risk_level ? (
+          <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+            Risk {item.risk_level}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50/70 p-4">
+        <p className="text-sm font-semibold text-slate-950">{action.title}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-700">
+          {action.description}
+        </p>
+      </div>
+
+      <p className="mt-3 text-sm leading-6 text-slate-600">
+        {item.recommended_action ?? "Belum ada recommended action."}
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+        <span>Owner: {item.sales_owner_name ?? "-"}</span>
+        <span>&bull;</span>
+        <span>Reviewer: {item.reviewer_user_name ?? "-"}</span>
+        <span>&bull;</span>
+        <span>Score: {item.priority_score}</span>
+        <span>&bull;</span>
+        <span>Last message: {formatDateTime(item.latest_message_at)}</span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {action.primaryHref ? (
+          <Link
+            href={action.primaryHref}
+            className="inline-flex rounded-full bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+          >
+            {action.primaryLabel}
+          </Link>
+        ) : null}
+        <Link
+          href={`/dashboard/sales/conversations/${item.conversation_id}`}
+          className="inline-flex rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+        >
+          Buka Conversation
+        </Link>
+      </div>
+    </article>
   );
 }
 

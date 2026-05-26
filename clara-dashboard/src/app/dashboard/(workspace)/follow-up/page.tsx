@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -17,6 +17,127 @@ function getWorklistItemKey(item: SalesWorklistItem): string {
   return `${item.lead_id}:${item.task_type}:${item.task_id ?? "derived"}`;
 }
 
+const ACTION_BUCKET_OPTIONS = [
+  { value: "all", label: "Semua prioritas" },
+  { value: "critical", label: "Kritis" },
+  { value: "due_today", label: "Hari ini" },
+  { value: "ready_to_send", label: "Siap kirim" },
+  { value: "needs_analysis", label: "Perlu analisis" },
+  { value: "hot_lead", label: "Hot lead" },
+  { value: "other", label: "Lainnya" },
+] as const;
+
+type ActionBucketKey =
+  | "critical"
+  | "due_today"
+  | "ready_to_send"
+  | "needs_analysis"
+  | "hot_lead"
+  | "other";
+
+function getTimeLabel(value: string | null): string {
+  if (!value) {
+    return "Belum dijadwalkan";
+  }
+
+  const target = new Date(value).getTime();
+  const diffMinutes = Math.round((target - Date.now()) / (1000 * 60));
+
+  if (Math.abs(diffMinutes) < 60) {
+    if (diffMinutes < 0) {
+      return `Telat ${Math.abs(diffMinutes)}m`;
+    }
+    return `Jatuh tempo ${diffMinutes}m lagi`;
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) {
+    if (diffHours < 0) {
+      return `Telat ${Math.abs(diffHours)} jam`;
+    }
+    return `Jatuh tempo ${diffHours} jam lagi`;
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays < 0) {
+    return `Telat ${Math.abs(diffDays)} hari`;
+  }
+  return `Jatuh tempo ${diffDays} hari lagi`;
+}
+
+function isOverdue(item: SalesWorklistItem): boolean {
+  if (!item.next_follow_up_at) {
+    return false;
+  }
+  return new Date(item.next_follow_up_at).getTime() <= Date.now();
+}
+
+function getActionBucket(item: SalesWorklistItem): ActionBucketKey {
+  const label = `${item.task_label} ${item.reason} ${item.recommended_action}`.toLowerCase();
+  const nextFollowUpTime = item.next_follow_up_at
+    ? new Date(item.next_follow_up_at).getTime()
+    : null;
+  const hoursOverdue =
+    nextFollowUpTime !== null ? (Date.now() - nextFollowUpTime) / (1000 * 60 * 60) : 0;
+
+  if (isOverdue(item) && hoursOverdue >= 24) {
+    return "critical";
+  }
+
+  if (label.includes("ready to send") || label.includes("reply")) {
+    return "ready_to_send";
+  }
+
+  if (label.includes("analysis") || label.includes("analisis")) {
+    return "needs_analysis";
+  }
+
+  if (item.lead_temperature === "hot") {
+    return "hot_lead";
+  }
+
+  if (isOverdue(item) || item.next_follow_up_at) {
+    return "due_today";
+  }
+
+  return "other";
+}
+
+function getActionBucketConfig(bucket: ActionBucketKey) {
+  switch (bucket) {
+    case "critical":
+      return {
+        label: "Kritis",
+        description: "Item yang sudah telat berat atau perlu intervensi cepat sebelum makin stale.",
+      };
+    case "due_today":
+      return {
+        label: "Hari Ini",
+        description: "Item yang jatuh tempo hari ini atau baru lewat sedikit dan harus dibersihkan di sesi kerja sekarang.",
+      };
+    case "ready_to_send":
+      return {
+        label: "Siap Kirim",
+        description: "Item yang paling dekat ke aksi kirim atau follow-up final dan tidak butuh banyak prep lagi.",
+      };
+    case "needs_analysis":
+      return {
+        label: "Perlu Analisis",
+        description: "Item yang masih butuh pembacaan AI atau konteks tambahan sebelum aman ditindak.",
+      };
+    case "hot_lead":
+      return {
+        label: "Hot Lead",
+        description: "Lead dengan temperatur tinggi yang harus dijaga momentum komunikasinya.",
+      };
+    default:
+      return {
+        label: "Lainnya",
+        description: "Item yang tetap aktif, tapi urgensinya di bawah kelompok prioritas utama.",
+      };
+  }
+}
+
 export default function FollowUpPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [worklist, setWorklist] = useState<SalesWorklistResponse | null>(null);
@@ -25,6 +146,8 @@ export default function FollowUpPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [hiddenItemKeys, setHiddenItemKeys] = useState<string[]>([]);
+  const [actionBucketFilter, setActionBucketFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   async function loadWorklist() {
     try {
@@ -96,13 +219,54 @@ export default function FollowUpPage() {
   const visibleUpcomingItems = (worklist?.upcoming_items ?? []).filter(
     (item) => !hiddenItemKeys.includes(getWorklistItemKey(item))
   );
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredVisibleItems = useMemo(() => {
+    return visibleItems.filter((item) => {
+      if (actionBucketFilter !== "all" && getActionBucket(item) !== actionBucketFilter) {
+        return false;
+      }
+
+      if (!normalizedSearchQuery) {
+        return true;
+      }
+
+      return [
+        item.lead_name,
+        item.task_label,
+        item.reason,
+        item.recommended_action,
+        item.assigned_user_name ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearchQuery);
+    });
+  }, [actionBucketFilter, normalizedSearchQuery, visibleItems]);
+  const todaySections = useMemo(() => {
+    const orderedBuckets: ActionBucketKey[] = [
+      "critical",
+      "due_today",
+      "ready_to_send",
+      "needs_analysis",
+      "hot_lead",
+      "other",
+    ];
+
+    return orderedBuckets
+      .map((bucket) => ({
+        bucket,
+        config: getActionBucketConfig(bucket),
+        items: filteredVisibleItems.filter((item) => getActionBucket(item) === bucket),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [filteredVisibleItems]);
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Action center"
-      title="Queue Action Center"
-      description="Halaman ini menjawab pertanyaan operasional paling penting: hari ini lead mana yang harus dieksekusi dulu, kenapa, dan lifecycle action apa yang harus dilakukan sekarang."
+      title="Action Center"
+      description="Halaman ini menjawab pertanyaan operasional paling penting: hari ini lead mana yang harus dieksekusi dulu, kenapa, dan tindakan follow-up apa yang harus dilakukan sekarang."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
@@ -111,7 +275,7 @@ export default function FollowUpPage() {
             href="/dashboard/notifications"
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
           >
-            Notifications
+            Alert Center
           </Link>
           <Link
             href="/dashboard/sales"
@@ -156,25 +320,25 @@ export default function FollowUpPage() {
                     Langkah Berikutnya
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    {visibleItems.length === 0
+                    {filteredVisibleItems.length === 0
                       ? "Queue sedang relatif aman"
-                      : "Kerjakan item urutan teratas lebih dulu"}
+                      : "Kerjakan bucket paling kritis lebih dulu"}
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    {visibleItems.length === 0
+                    {filteredVisibleItems.length === 0
                       ? "Kalau tidak ada item prioritas, kembali cek Queue atau Lead Management. Bisa jadi task aktif Anda memang dijadwalkan untuk besok atau hari berikutnya."
-                      : "Halaman ini bukan untuk membaca semua detail dari awal. Fungsinya adalah memilih tindakan harian tercepat: buka conversation, dismiss, atau tandai done."}
+                      : "Action Center ini dipakai untuk triase harian. Bersihkan item kritis dulu, lalu lanjutkan ke task yang jatuh tempo hari ini dan hot lead."}
                   </p>
                 </div>
                 <Link
                   href={
-                    visibleItems[0]?.conversation_id
-                      ? `/dashboard/sales/conversations/${visibleItems[0].conversation_id}`
+                    filteredVisibleItems[0]?.conversation_id
+                      ? `/dashboard/sales/conversations/${filteredVisibleItems[0].conversation_id}`
                       : "/dashboard/sales"
                   }
                   className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
                 >
-                  {visibleItems[0] ? "Buka Prioritas Teratas" : "Buka Queue"}
+                  {filteredVisibleItems[0] ? "Buka Prioritas Teratas" : "Buka Queue"}
                 </Link>
               </div>
             </section>
@@ -234,6 +398,76 @@ export default function FollowUpPage() {
               />
             </section>
 
+            <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#fff7ed_100%)] p-5 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+              <div className="space-y-4 rounded-[24px] border border-white/70 bg-white/80 p-4 backdrop-blur-sm">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="max-w-2xl">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                      Kontrol Action Center
+                    </p>
+                    <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                      Prioritaskan task harian dari satu toolbar
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Gunakan pencarian dan bucket kerja untuk memisahkan item kritis, due today, dan pekerjaan yang masih butuh analisis.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <ActionMetaPill
+                      label="Kritis"
+                      value={String(worklist.overdue_24h_count)}
+                    />
+                    <ActionMetaPill
+                      label="Due Today"
+                      value={String(worklist.due_today_count)}
+                    />
+                    <ActionMetaPill
+                      label="Hot Lead"
+                      value={String(worklist.hot_lead_count)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                  <label className="space-y-2 text-sm font-medium text-slate-700">
+                    <span>Cari lead atau alasan task</span>
+                    <input
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Cari lead, task label, reason, atau recommended action..."
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700">
+                    <span>Filter bucket kerja</span>
+                    <select
+                      value={actionBucketFilter}
+                      onChange={(event) => setActionBucketFilter(event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                    >
+                      {ACTION_BUCKET_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[22px] border border-slate-200 bg-slate-950 px-4 py-3 text-sm text-slate-200 shadow-[0_12px_24px_rgba(15,23,42,0.1)]">
+                <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-100">
+                  Hasil
+                </span>
+                <span>
+                  Menampilkan <span className="font-semibold text-white">{filteredVisibleItems.length}</span> dari{" "}
+                  <span className="font-semibold text-white">{visibleItems.length}</span> item prioritas hari ini.
+                </span>
+              </div>
+            </section>
+
             <section className="clara-card rounded-[28px] p-5">
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
@@ -241,7 +475,7 @@ export default function FollowUpPage() {
                     Prioritas Hari Ini
                   </p>
                   <h2 className="mt-1 text-2xl font-bold text-slate-950">
-                    {visibleItems.length} item kerja siap ditindak
+                    {filteredVisibleItems.length} item kerja siap ditindak
                   </h2>
                 </div>
                 <p className="text-sm text-slate-500">
@@ -249,25 +483,44 @@ export default function FollowUpPage() {
                 </p>
               </div>
 
-              <div className="mt-5 space-y-4">
-                {visibleItems.length === 0 ? (
+              <div className="mt-5 space-y-5">
+                {filteredVisibleItems.length === 0 ? (
                   <div className="clara-empty-state text-sm text-slate-500">
                     Belum ada task prioritas. Inbox Anda sedang relatif aman.
                   </div>
                 ) : (
-                    visibleItems.map((item, index) => (
-                      <WorklistRow
-                        key={`${item.lead_id}-${item.task_type}-${item.task_id ?? "derived"}`}
-                        item={item}
-                        index={index}
-                        isUpdating={
-                          updatingTaskId === (item.task_id ?? item.lead_id)
-                        }
-                        onTaskAction={handleTaskAction}
-                      />
-                    ))
-                  )}
-                </div>
+                  todaySections.map((section) => (
+                    <div key={section.bucket} className="space-y-4">
+                      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            {section.config.label}
+                          </p>
+                          <h3 className="mt-1 text-xl font-bold text-slate-950">
+                            {section.items.length} item
+                          </h3>
+                        </div>
+                        <p className="max-w-2xl text-sm leading-6 text-slate-500">
+                          {section.config.description}
+                        </p>
+                      </div>
+
+                      {section.items.map((item, index) => (
+                        <WorklistRow
+                          key={`${item.lead_id}-${item.task_type}-${item.task_id ?? "derived"}`}
+                          item={item}
+                          index={index}
+                          bucket={section.bucket}
+                          isUpdating={
+                            updatingTaskId === (item.task_id ?? item.lead_id)
+                          }
+                          onTaskAction={handleTaskAction}
+                        />
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
             </section>
 
             <section className="clara-card rounded-[28px] p-5">
@@ -296,6 +549,7 @@ export default function FollowUpPage() {
                       key={`${item.lead_id}-${item.task_type}-${item.task_id ?? "derived"}-upcoming`}
                       item={item}
                       index={index}
+                      bucket={getActionBucket(item)}
                       isUpdating={
                         updatingTaskId === (item.task_id ?? item.lead_id)
                       }
@@ -341,11 +595,13 @@ function MetricCard({ label, value }: { label: string; value: string }) {
 function WorklistRow({
   item,
   index,
+  bucket,
   isUpdating,
   onTaskAction,
 }: {
   item: SalesWorklistItem;
   index: number;
+  bucket: ActionBucketKey;
   isUpdating: boolean;
   onTaskAction: (
     item: SalesWorklistItem,
@@ -367,6 +623,10 @@ function WorklistRow({
     };
   }
 
+  const bucketConfig = getActionBucketConfig(bucket);
+  const slaLabel = getTimeLabel(item.next_follow_up_at);
+  const isItemOverdue = isOverdue(item);
+
   return (
     <article className="clara-card rounded-[24px] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -376,6 +636,9 @@ function WorklistRow({
               #{index + 1}
             </span>
             <h3 className="text-lg font-semibold text-slate-950">{item.lead_name}</h3>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              {bucketConfig.label}
+            </span>
             <span
               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
                 item.lead_temperature
@@ -391,6 +654,15 @@ function WorklistRow({
                 Task: {formatStatusLabel(item.task_status)}
               </span>
             ) : null}
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                isItemOverdue
+                  ? "bg-rose-100 text-rose-700"
+                  : "bg-emerald-100 text-emerald-700"
+              }`}
+            >
+              {slaLabel}
+            </span>
           </div>
 
           <p className="mt-3 text-sm font-semibold text-slate-900">{item.task_label}</p>
@@ -532,5 +804,16 @@ function WorklistRow({
         </div>
       </div>
     </article>
+  );
+}
+
+function ActionMetaPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-full border border-slate-200 bg-white px-3.5 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </span>
+      <span className="ml-2 text-sm font-semibold text-slate-700">{value}</span>
+    </div>
   );
 }

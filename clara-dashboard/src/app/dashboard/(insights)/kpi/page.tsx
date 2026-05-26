@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { canAccessStrategicInsights } from "@/lib/roles";
 import type {
   CurrentUser,
   KpiAlertHistoryResponse,
@@ -32,6 +34,7 @@ function formatPercent(value: number | undefined | null): string {
 }
 
 export default function KpiCommandCenterPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
   const [alertHistory, setAlertHistory] =
@@ -54,14 +57,19 @@ export default function KpiCommandCenterPage() {
           : `/dashboard/kpi/command-center?source_channel=${encodeURIComponent(
               sourceChannelFilter,
             )}`;
-      const [me, kpiResponse, alertsResponse, snapshotsResponse] =
-        await Promise.all([
-          apiFetch<CurrentUser>("/auth/me"),
-          apiFetch<KpiCommandCenterResponse>(kpiPath),
-          apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts"),
-          apiFetch<KpiSnapshotHistoryResponse>("/dashboard/kpi/snapshots"),
-        ]);
+      const me = await apiFetch<CurrentUser>("/auth/me");
       setCurrentUser(me);
+
+      if (!canAccessStrategicInsights(me.role)) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      const [kpiResponse, alertsResponse, snapshotsResponse] = await Promise.all([
+        apiFetch<KpiCommandCenterResponse>(kpiPath),
+        apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts"),
+        apiFetch<KpiSnapshotHistoryResponse>("/dashboard/kpi/snapshots"),
+      ]);
       setKpi(kpiResponse);
       setAlertHistory(alertsResponse);
       setSnapshotHistory(snapshotsResponse);
@@ -82,7 +90,7 @@ export default function KpiCommandCenterPage() {
     }, 0);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [router, sourceChannelFilter]);
 
   async function reloadAlertHistory() {
     const alertsResponse = await apiFetch<KpiAlertHistoryResponse>(
@@ -173,7 +181,7 @@ export default function KpiCommandCenterPage() {
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="KPI foundation"
-      title="KPI Command Center"
+      title="Ops Dashboard"
       description="Superadmin dan head bisa membaca kesehatan pipeline, produktivitas sales, dan performa organization dari data conversation yang benar-benar sudah ada."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
@@ -222,14 +230,14 @@ export default function KpiCommandCenterPage() {
                     Mulai dari alert dan observation, bukan dari semua angka sekaligus
                   </h2>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    KPI Command Center ini paling berguna kalau dibaca berurutan: lihat alert aktif, baca observation utama, lalu turun ke leaderboard, source performance, dan snapshot history hanya saat perlu verifikasi lebih dalam.
+                    Ops Dashboard ini paling berguna kalau dibaca berurutan: lihat alert aktif, baca observation utama, lalu turun ke leaderboard, source performance, dan snapshot history hanya saat perlu verifikasi lebih dalam.
                   </p>
                 </div>
                 <Link
                   href="/dashboard/notifications"
                   className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
                 >
-                  Buka Notification Center
+                  Buka Alert Center
                 </Link>
               </div>
             </section>

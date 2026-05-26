@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import { canAccessStrategicInsights } from "@/lib/roles";
 import type {
   CurrentUser,
   MarketingExecutionItem,
@@ -47,6 +49,7 @@ function toDateTimeLocal(value: string | null): string {
 }
 
 export default function MarketingInsightsPage() {
+  const router = useRouter();
   const [insights, setInsights] = useState<MarketingInsightsPreview | null>(null);
   const [snapshots, setSnapshots] = useState<MarketingInsightSnapshot[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -70,17 +73,25 @@ export default function MarketingInsightsPage() {
   useEffect(() => {
     async function loadInsights() {
       try {
-        const [insightData, snapshotData, me, scopedUsers] = await Promise.all([
-          apiFetch<MarketingInsightsPreview>("/dashboard/marketing/insights-preview"),
+        const me = await apiFetch<CurrentUser>("/auth/me");
+        setCurrentUser(me);
+
+        if (!canAccessStrategicInsights(me.role)) {
+          router.replace("/dashboard");
+          return;
+        }
+
+        const [insightData, snapshotData, scopedUsers] = await Promise.all([
+          apiFetch<MarketingInsightsPreview>(
+            "/dashboard/marketing/insights-preview"
+          ),
           apiFetch<MarketingInsightSnapshot[]>(
             "/dashboard/marketing/insight-snapshots"
           ),
-          apiFetch<CurrentUser>("/auth/me"),
           apiFetch<CurrentUser[]>("/auth/users"),
         ]);
         setInsights(insightData);
         setSnapshots(snapshotData);
-        setCurrentUser(me);
         setUsers(
           scopedUsers.filter(
             (user) =>
@@ -100,7 +111,7 @@ export default function MarketingInsightsPage() {
     }
 
     void loadInsights();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (!insights) {

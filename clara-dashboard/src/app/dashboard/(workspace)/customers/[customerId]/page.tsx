@@ -83,7 +83,7 @@ export default function CustomerProfilePage() {
       title={profile?.display_name ?? "Customer Profile"}
       description="Satu profil customer ini menggabungkan konteks lead dan channel, supaya tim tidak lagi melihat orang yang sama sebagai entitas terpisah."
       backHref="/dashboard/crm"
-      backLabel="Kembali ke Lead Pipeline"
+      backLabel="Kembali ke Lead Management"
     >
       <div className="space-y-6">
         {isLoading && (

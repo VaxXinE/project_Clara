@@ -42,6 +42,7 @@ from app.schemas.dashboard_schema import (
     KnowledgeUpdateProposalItem,
     ManagerBoundaryAlertItem,
     ManagerCoachingPriorityItem,
+    ManagerTeamMemberItem,
     ManagerInsightsResponse,
     ManagerObjectionTrendItem,
     ManagerTeamDisciplineRow,
@@ -1473,6 +1474,23 @@ def get_manager_insights(
                         if accessible_user_ids is None or member.id in accessible_user_ids
                     ]
                 ),
+                members=[
+                    ManagerTeamMemberItem(
+                        id=member.id,
+                        name=member.name,
+                        role=member.role,
+                        is_active=member.is_active,
+                    )
+                    for member in sorted(
+                        [
+                            member
+                            for member in team.members
+                            if accessible_user_ids is None
+                            or member.id in accessible_user_ids
+                        ],
+                        key=lambda member: (member.role != "manager", member.name.lower()),
+                    )
+                ],
                 lead_count=lead_count,
                 missing_or_stale_logs=missing_or_stale_logs,
                 overdue_follow_ups=overdue_follow_ups,

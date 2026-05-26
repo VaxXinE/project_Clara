@@ -1,7 +1,9 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -132,6 +134,7 @@ function getUserTeamDisplay(
 }
 
 export default function AdminAccessPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
   const [units, setUnits] = useState<SalesUnitItem[]>([]);
@@ -143,6 +146,7 @@ export default function AdminAccessPage() {
   const [teamForm, setTeamForm] = useState<CreateSalesTeamRequest>(EMPTY_TEAM_FORM);
   const [userForm, setUserForm] = useState<CreateUserRequest>(EMPTY_USER_FORM);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<UpdateUserRequest>(EMPTY_EDIT_FORM);
   const [resettingPasswordUserId, setResettingPasswordUserId] = useState<
     string | null
@@ -159,12 +163,17 @@ export default function AdminAccessPage() {
   const [actionUserId, setActionUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [userStatusFilter, setUserStatusFilter] = useState("all");
+  const [userPage, setUserPage] = useState(1);
 
   const canManageOrganizations = isOwnerLike(currentUser?.role);
   const isAdminScoped =
     currentUser !== null &&
     isAdminLike(currentUser.role) &&
     !isOwnerLike(currentUser.role);
+  const userPageSize = 5;
 
   async function loadPageData(me?: CurrentUser) {
     const activeUser = me ?? currentUser;
@@ -221,9 +230,7 @@ export default function AdminAccessPage() {
         setCurrentUser(me);
 
         if (!isAdminLike(me.role)) {
-          setErrorMessage(
-            "Halaman ini hanya bisa diakses oleh head atau superadmin.",
-          );
+          router.replace("/dashboard");
           return;
         }
 
@@ -241,9 +248,10 @@ export default function AdminAccessPage() {
 
     void bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router]);
 
   function beginEdit(user: CurrentUser) {
+    setExpandedUserId(user.id);
     setEditingUserId(user.id);
     setEditForm({
       name: user.name,
@@ -262,6 +270,7 @@ export default function AdminAccessPage() {
   }
 
   function beginPasswordReset(userId: string) {
+    setExpandedUserId(userId);
     setResettingPasswordUserId(userId);
     setPasswordForm({ password: "" });
     setErrorMessage("");
@@ -396,6 +405,7 @@ export default function AdminAccessPage() {
       });
       setSuccessMessage("User berhasil diupdate.");
       cancelEdit();
+      setExpandedUserId(userId);
       await loadPageData();
     } catch (error) {
       setErrorMessage(
@@ -443,6 +453,7 @@ export default function AdminAccessPage() {
       });
       setSuccessMessage("Password user berhasil diubah.");
       cancelPasswordReset();
+      setExpandedUserId(userId);
       await loadPageData();
     } catch (error) {
       setErrorMessage(
@@ -454,6 +465,56 @@ export default function AdminAccessPage() {
       setActionUserId(null);
     }
   }
+
+  const filteredUsers = useMemo(() => {
+    const normalizedQuery = userSearchQuery.trim().toLowerCase();
+
+    return users.filter((user) => {
+      const matchesQuery =
+        normalizedQuery.length === 0 ||
+        [
+          user.name,
+          user.email,
+          user.role,
+          user.created_by_user_name ?? "",
+          user.team_name ?? "",
+          user.unit_name ?? "",
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery);
+
+      const matchesRole =
+        userRoleFilter === "all" || user.role === userRoleFilter;
+
+      const matchesStatus =
+        userStatusFilter === "all" ||
+        (userStatusFilter === "active" && user.is_active) ||
+        (userStatusFilter === "inactive" && !user.is_active);
+
+      return matchesQuery && matchesRole && matchesStatus;
+    });
+  }, [userRoleFilter, userSearchQuery, userStatusFilter, users]);
+
+  const totalUserPages = Math.max(
+    1,
+    Math.ceil(filteredUsers.length / userPageSize),
+  );
+
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (userPage - 1) * userPageSize;
+    return filteredUsers.slice(startIndex, startIndex + userPageSize);
+  }, [filteredUsers, userPage]);
+
+  useEffect(() => {
+    setUserPage(1);
+  }, [userRoleFilter, userSearchQuery, userStatusFilter]);
+
+  useEffect(() => {
+    if (userPage > totalUserPages) {
+      setUserPage(totalUserPages);
+    }
+  }, [totalUserPages, userPage]);
 
   return (
     <WorkspaceShell
@@ -996,310 +1057,407 @@ export default function AdminAccessPage() {
                     <EmptyText text="Belum ada user." />
                   ) : (
                     <div className="space-y-4">
-                      {users.map((user) => {
-                        const isEditing = editingUserId === user.id;
-                        const isResettingPassword =
-                          resettingPasswordUserId === user.id;
-                        const isSelf = currentUser.id === user.id;
-                        const teamDisplay = getUserTeamDisplay(user, teams);
-                        const canResetPassword =
-                          isOwnerLike(currentUser.role) ||
-                          user.created_by_user_id === currentUser.id;
-                        const passwordStrength = getPasswordStrength(
-                          passwordForm.password,
-                        );
+                      <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_42%,#fff7ed_100%)] p-4">
+                        <div className="grid gap-3 md:grid-cols-3">
+                          <div>
+                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Search User
+                            </label>
+                            <input
+                              value={userSearchQuery}
+                              onChange={(event) =>
+                                setUserSearchQuery(event.target.value)
+                              }
+                              placeholder="Cari nama, email, team, unit..."
+                              className="clara-input mt-2"
+                            />
+                          </div>
 
-                        return (
-                          <article
-                            key={user.id}
-                            className="rounded-2xl border border-slate-200 p-4"
-                          >
-                            {isEditing ? (
-                              <div className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                  <InputField
-                                    label="Name"
-                                    value={editForm.name ?? ""}
-                                    onChange={(value) =>
-                                      setEditForm((current) => ({
-                                        ...current,
-                                        name: value,
-                                      }))
-                                    }
-                                    placeholder="Name"
-                                  />
-                                  <InputField
-                                    label="Email"
-                                    value={editForm.email ?? ""}
-                                    onChange={(value) =>
-                                      setEditForm((current) => ({
-                                        ...current,
-                                        email: value,
-                                      }))
-                                    }
-                                    placeholder="Email"
-                                    type="email"
-                                  />
-                                </div>
+                          <div>
+                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Filter Role
+                            </label>
+                            <select
+                              value={userRoleFilter}
+                              onChange={(event) =>
+                                setUserRoleFilter(event.target.value)
+                              }
+                              className="clara-select mt-2"
+                            >
+                              <option value="all">Semua role</option>
+                              <option value="sales">sales</option>
+                              <option value="manager">manager</option>
+                              <option value="head">head</option>
+                              <option value="superadmin">superadmin</option>
+                            </select>
+                          </div>
 
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                  <SelectField
-                                    label="Role"
-                                    value={editForm.role ?? "sales"}
-                                    onChange={(value) =>
-                                      setEditForm((current) => ({
-                                        ...current,
-                                        role: value,
-                                      }))
-                                    }
-                                    options={[
-                                      {
-                                        value: "sales",
-                                        label: getRoleDisplayLabel("sales"),
-                                      },
-                                      {
-                                        value: "manager",
-                                        label: getRoleDisplayLabel("manager"),
-                                      },
-                                      {
-                                        value: "head",
-                                        label: getRoleDisplayLabel("head"),
-                                      },
-                                      ...(isOwnerLike(currentUser.role)
-                                        ? [
-                                            {
-                                              value: "superadmin",
-                                              label: getRoleDisplayLabel("superadmin"),
-                                            },
-                                          ]
-                                        : []),
-                                    ]}
-                                    disabled={isSelf}
-                                  />
-                                  <SelectField
-                                    label="Organization"
-                                    value={editForm.organization_id ?? ""}
-                                    onChange={(value) =>
-                                      setEditForm((current) => ({
-                                        ...current,
-                                        organization_id: value || null,
-                                        team_id: null,
-                                      }))
-                                    }
-                                    options={[
-                                      {
-                                        value: "",
-                                        label: "Pilih organization",
-                                      },
-                                      ...organizations.map((organization) => ({
-                                        value: organization.id,
-                                        label: `${organization.name} (${organization.slug})`,
-                                      })),
-                                    ]}
-                                    disabled={isAdminScoped}
-                                  />
-                                </div>
+                          <div>
+                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              Filter Status
+                            </label>
+                            <select
+                              value={userStatusFilter}
+                              onChange={(event) =>
+                                setUserStatusFilter(event.target.value)
+                              }
+                              className="clara-select mt-2"
+                            >
+                              <option value="all">Semua status</option>
+                              <option value="active">Active</option>
+                              <option value="inactive">Inactive</option>
+                            </select>
+                          </div>
+                        </div>
 
-                                <SelectField
-                                  label="Sales Team"
-                                  value={editForm.team_id ?? ""}
-                                  onChange={(value) =>
-                                    setEditForm((current) => ({
-                                      ...current,
-                                      team_id: value || null,
-                                    }))
-                                  }
-                                  options={[
-                                    {
-                                      value: "",
-                                      label: "Belum di-assign",
-                                    },
-                                    ...getTeamOptions(editForm.organization_id ?? null, teams).map((team) => ({
-                                      value: team.id,
-                                      label: `${team.name}${team.unit_name ? ` • ${team.unit_name}` : ""}`,
-                                    })),
-                                  ]}
-                                />
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+                          <p>
+                            Menampilkan {paginatedUsers.length} dari {filteredUsers.length} user
+                          </p>
+                          <p>
+                            Halaman {userPage} dari {totalUserPages}
+                          </p>
+                        </div>
+                      </div>
 
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => void handleSaveEdit(user.id)}
-                                    disabled={actionUserId === user.id}
-                                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    {actionUserId === user.id
-                                      ? "Saving..."
-                                      : "Save Changes"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={cancelEdit}
-                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : isResettingPassword ? (
-                              <div className="space-y-4">
-                                <div>
-                                  <p className="text-sm font-semibold text-slate-950">
-                                    Reset password untuk {user.email}
-                                  </p>
-                                  <p className="mt-1 text-sm text-slate-600">
-                                    Superadmin bisa mengganti semua password user.
-                                    Head hanya bisa mengganti password user
-                                    yang dia buat sendiri.
-                                  </p>
-                                </div>
+                      {filteredUsers.length === 0 ? (
+                        <EmptyText text="Tidak ada user yang cocok dengan filter saat ini." />
+                      ) : (
+                        <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white">
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full text-left text-sm">
+                              <thead className="bg-slate-50 text-slate-500">
+                                <tr>
+                                  <th className="px-4 py-3 font-medium">User</th>
+                                  <th className="px-4 py-3 font-medium">Role</th>
+                                  <th className="px-4 py-3 font-medium">Status</th>
+                                  <th className="px-4 py-3 font-medium">Org / Team</th>
+                                  <th className="px-4 py-3 font-medium">Created</th>
+                                  <th className="px-4 py-3 font-medium text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {paginatedUsers.map((user) => {
+                                  const isEditing = editingUserId === user.id;
+                                  const isResettingPassword =
+                                    resettingPasswordUserId === user.id;
+                                  const isExpanded = expandedUserId === user.id;
+                                  const isSelf = currentUser.id === user.id;
+                                  const teamDisplay = getUserTeamDisplay(user, teams);
+                                  const canResetPassword =
+                                    isOwnerLike(currentUser.role) ||
+                                    user.created_by_user_id === currentUser.id;
+                                  const passwordStrength = getPasswordStrength(
+                                    passwordForm.password,
+                                  );
 
-                                <InputField
-                                  label="New Password"
-                                  value={passwordForm.password}
-                                  onChange={(value) =>
-                                    setPasswordForm({ password: value })
-                                  }
-                                  placeholder="Minimum 8 karakter"
-                                  type="password"
-                                />
-
-                                <PasswordStrengthHint
-                                  password={passwordForm.password}
-                                  strength={passwordStrength}
-                                />
-
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      void handleResetPassword(user.id)
-                                    }
-                                    disabled={actionUserId === user.id}
-                                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    {actionUserId === user.id
-                                      ? "Saving..."
-                                      : "Save New Password"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={cancelPasswordReset}
-                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                  <div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <p className="text-sm font-semibold text-slate-950">
-                                        {user.email}
-                                      </p>
-                                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                        {formatStatusLabel(user.role)}
-                                      </span>
-                                      <span
-                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                          user.is_active
-                                            ? "bg-green-100 text-green-700"
-                                            : "bg-red-100 text-red-700"
-                                        }`}
+                                  return (
+                                    <Fragment key={user.id}>
+                                      <tr
+                                        className="border-t border-slate-100 align-top"
                                       >
-                                        {user.is_active ? "active" : "inactive"}
-                                      </span>
-                                    </div>
-                                    <p className="mt-1 text-sm text-slate-600">
-                                      {user.name}
-                                    </p>
-                                    <div className="mt-2 grid gap-1 text-xs text-slate-500">
-                                      <p>
-                                        org:{" "}
-                                        {getOrganizationLabel(
-                                          user.organization_id,
-                                          organizations,
-                                        )}
-                                      </p>
-                                      <p>
-                                        created by:{" "}
-                                        {user.created_by_user_name ?? "-"}
-                                      </p>
-                                      <p>team: {teamDisplay.teamName}</p>
-                                      <p>unit: {teamDisplay.unitName}</p>
-                                      {teamDisplay.managedTeamLabel ? (
-                                        <p>
-                                          manager of: {teamDisplay.managedTeamLabel}
-                                        </p>
+                                        <td className="px-4 py-3">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setExpandedUserId((current) =>
+                                                current === user.id ? null : user.id,
+                                              )
+                                            }
+                                            className="text-left"
+                                          >
+                                            <div className="font-semibold text-slate-950">
+                                              {user.name}
+                                            </div>
+                                            <div className="mt-1 text-xs text-slate-500">
+                                              {user.email}
+                                            </div>
+                                          </button>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                            {formatStatusLabel(user.role)}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <span
+                                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                              user.is_active
+                                                ? "bg-green-100 text-green-700"
+                                                : "bg-red-100 text-red-700"
+                                            }`}
+                                          >
+                                            {user.is_active ? "active" : "inactive"}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-xs text-slate-600">
+                                          <div>{getOrganizationLabel(user.organization_id, organizations)}</div>
+                                          <div className="mt-1">
+                                            {teamDisplay.teamName} {teamDisplay.unitName !== "-" ? `• ${teamDisplay.unitName}` : ""}
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-xs text-slate-600">
+                                          {formatDateTime(user.created_at)}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <div className="flex justify-end gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => beginEdit(user)}
+                                              className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+                                            >
+                                              Edit
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => beginPasswordReset(user.id)}
+                                              disabled={!canResetPassword}
+                                              className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                              Reset
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => void handleToggleActive(user)}
+                                              disabled={actionUserId === user.id || isSelf}
+                                              className={`rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+                                                user.is_active
+                                                  ? "border border-red-300 text-red-700"
+                                                  : "border border-green-300 text-green-700"
+                                              }`}
+                                            >
+                                              {actionUserId === user.id
+                                                ? "..."
+                                                : user.is_active
+                                                  ? "Deactivate"
+                                                  : "Activate"}
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+
+                                      {isExpanded ? (
+                                        <tr className="border-t border-slate-100 bg-slate-50/60">
+                                          <td colSpan={6} className="px-4 py-4">
+                                            {isEditing ? (
+                                              <div className="space-y-4 rounded-[20px] border border-slate-200 bg-white p-4">
+                                                <div className="grid gap-4 sm:grid-cols-2">
+                                                  <InputField
+                                                    label="Name"
+                                                    value={editForm.name ?? ""}
+                                                    onChange={(value) =>
+                                                      setEditForm((current) => ({
+                                                        ...current,
+                                                        name: value,
+                                                      }))
+                                                    }
+                                                    placeholder="Name"
+                                                  />
+                                                  <InputField
+                                                    label="Email"
+                                                    value={editForm.email ?? ""}
+                                                    onChange={(value) =>
+                                                      setEditForm((current) => ({
+                                                        ...current,
+                                                        email: value,
+                                                      }))
+                                                    }
+                                                    placeholder="Email"
+                                                    type="email"
+                                                  />
+                                                </div>
+
+                                                <div className="grid gap-4 sm:grid-cols-2">
+                                                  <SelectField
+                                                    label="Role"
+                                                    value={editForm.role ?? "sales"}
+                                                    onChange={(value) =>
+                                                      setEditForm((current) => ({
+                                                        ...current,
+                                                        role: value,
+                                                      }))
+                                                    }
+                                                    options={[
+                                                      { value: "sales", label: getRoleDisplayLabel("sales") },
+                                                      { value: "manager", label: getRoleDisplayLabel("manager") },
+                                                      { value: "head", label: getRoleDisplayLabel("head") },
+                                                      ...(isOwnerLike(currentUser.role)
+                                                        ? [{ value: "superadmin", label: getRoleDisplayLabel("superadmin") }]
+                                                        : []),
+                                                    ]}
+                                                    disabled={isSelf}
+                                                  />
+                                                  <SelectField
+                                                    label="Organization"
+                                                    value={editForm.organization_id ?? ""}
+                                                    onChange={(value) =>
+                                                      setEditForm((current) => ({
+                                                        ...current,
+                                                        organization_id: value || null,
+                                                        team_id: null,
+                                                      }))
+                                                    }
+                                                    options={[
+                                                      { value: "", label: "Pilih organization" },
+                                                      ...organizations.map((organization) => ({
+                                                        value: organization.id,
+                                                        label: `${organization.name} (${organization.slug})`,
+                                                      })),
+                                                    ]}
+                                                    disabled={isAdminScoped}
+                                                  />
+                                                </div>
+
+                                                <SelectField
+                                                  label="Sales Team"
+                                                  value={editForm.team_id ?? ""}
+                                                  onChange={(value) =>
+                                                    setEditForm((current) => ({
+                                                      ...current,
+                                                      team_id: value || null,
+                                                    }))
+                                                  }
+                                                  options={[
+                                                    { value: "", label: "Belum di-assign" },
+                                                    ...getTeamOptions(editForm.organization_id ?? null, teams).map((team) => ({
+                                                      value: team.id,
+                                                      label: `${team.name}${team.unit_name ? ` • ${team.unit_name}` : ""}`,
+                                                    })),
+                                                  ]}
+                                                />
+
+                                                <div className="flex flex-wrap gap-2">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => void handleSaveEdit(user.id)}
+                                                    disabled={actionUserId === user.id}
+                                                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                                  >
+                                                    {actionUserId === user.id ? "Saving..." : "Save Changes"}
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={cancelEdit}
+                                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                                                  >
+                                                    Cancel
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            ) : isResettingPassword ? (
+                                              <div className="space-y-4 rounded-[20px] border border-slate-200 bg-white p-4">
+                                                <div>
+                                                  <p className="text-sm font-semibold text-slate-950">
+                                                    Reset password untuk {user.email}
+                                                  </p>
+                                                  <p className="mt-1 text-sm text-slate-600">
+                                                    Superadmin bisa mengganti semua password user. Head hanya bisa mengganti password user yang dia buat sendiri.
+                                                  </p>
+                                                </div>
+
+                                                <InputField
+                                                  label="New Password"
+                                                  value={passwordForm.password}
+                                                  onChange={(value) =>
+                                                    setPasswordForm({ password: value })
+                                                  }
+                                                  placeholder="Minimum 8 karakter"
+                                                  type="password"
+                                                />
+
+                                                <PasswordStrengthHint
+                                                  password={passwordForm.password}
+                                                  strength={passwordStrength}
+                                                />
+
+                                                <div className="flex flex-wrap gap-2">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => void handleResetPassword(user.id)}
+                                                    disabled={actionUserId === user.id}
+                                                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                                  >
+                                                    {actionUserId === user.id ? "Saving..." : "Save New Password"}
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={cancelPasswordReset}
+                                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                                                  >
+                                                    Cancel
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+                                                <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                                                  <p>org: {getOrganizationLabel(user.organization_id, organizations)}</p>
+                                                  <p>created by: {user.created_by_user_name ?? "-"}</p>
+                                                  <p>team: {teamDisplay.teamName}</p>
+                                                  <p>unit: {teamDisplay.unitName}</p>
+                                                  {teamDisplay.managedTeamLabel ? (
+                                                    <p>manager of: {teamDisplay.managedTeamLabel}</p>
+                                                  ) : null}
+                                                  <p>created: {formatDateTime(user.created_at)}</p>
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                  {isSelf ? (
+                                                    <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
+                                                      Akun yang sedang Anda pakai tidak bisa dinonaktifkan dari sesi ini sendiri.
+                                                    </p>
+                                                  ) : null}
+                                                  {!canResetPassword ? (
+                                                    <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
+                                                      Head hanya bisa mengganti password user yang dibuat dari akunnya sendiri.
+                                                    </p>
+                                                  ) : null}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </td>
+                                        </tr>
                                       ) : null}
-                                      <p>
-                                        created:{" "}
-                                        {formatDateTime(user.created_at)}
-                                      </p>
-                                    </div>
-                                  </div>
+                                    </Fragment>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
 
-                                  <div className="flex flex-wrap gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => beginEdit(user)}
-                                      className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        beginPasswordReset(user.id)
-                                      }
-                                      disabled={!canResetPassword}
-                                      className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      Reset Password
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        void handleToggleActive(user)
-                                      }
-                                      disabled={
-                                        actionUserId === user.id || isSelf
-                                      }
-                                      className={`rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
-                                        user.is_active
-                                          ? "border border-red-300 text-red-700"
-                                          : "border border-green-300 text-green-700"
-                                      }`}
-                                    >
-                                      {actionUserId === user.id
-                                        ? "Processing..."
-                                        : user.is_active
-                                          ? "Deactivate"
-                                          : "Activate"}
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {isSelf && (
-                                  <p className="mt-3 rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
-                                    Akun yang sedang Anda pakai tidak bisa
-                                    dinonaktifkan dari sesi ini sendiri.
-                                  </p>
-                                )}
-
-                                {!canResetPassword && (
-                                  <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
-                                    Head hanya bisa mengganti password user
-                                    yang dibuat dari akunnya sendiri.
-                                  </p>
-                                )}
-                              </>
-                            )}
-                          </article>
-                        );
-                      })}
+                      {filteredUsers.length > userPageSize ? (
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-sm text-slate-600">
+                            Navigasi daftar user
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUserPage((current) => Math.max(1, current - 1))
+                              }
+                              disabled={userPage === 1}
+                              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Sebelumnya
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setUserPage((current) =>
+                                  Math.min(totalUserPages, current + 1),
+                                )
+                              }
+                              disabled={userPage === totalUserPages}
+                              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Berikutnya
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </Panel>

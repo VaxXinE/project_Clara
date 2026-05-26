@@ -180,6 +180,9 @@ class LeadListItem(BaseModel):
     updated_at: datetime
     conversation_count: int
     latest_conversation_id: UUID | None
+    deal_status: str | None = None
+    discipline_compliance_status: str = "missing_today_log"
+    needs_deal_sync: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

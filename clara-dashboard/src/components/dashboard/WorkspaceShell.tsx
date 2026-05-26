@@ -15,6 +15,7 @@ import {
   faComments,
   faGaugeHigh,
   faRightFromBracket,
+  faTriangleExclamation,
   faUsersGear,
   faWandSparkles,
   faXmark,
@@ -66,8 +67,8 @@ function getRolePrinciples(role?: string) {
     return {
       title: "Mode Superadmin",
       items: [
-        "Mulai dari manager insights, ops dashboard, dan knowledge untuk membaca kesehatan organisasi lebih dulu.",
-        "Turun ke queue, lead management, atau chat review center saat ada sinyal yang perlu intervensi langsung.",
+        "Mulai dari Ops Dashboard dan Alert Center untuk membaca kesehatan organisasi lebih dulu.",
+        "Turun ke Queue, Action Center, Lead Management, atau Chat Review Center saat ada sinyal yang perlu intervensi langsung.",
         "Access control dipakai saat ada perubahan boundary user, struktur tim, atau governance akses.",
       ],
     };
@@ -77,9 +78,9 @@ function getRolePrinciples(role?: string) {
     return {
       title: "Mode Head",
       items: [
-        "Mulai dari manager insights dan chat review center agar bottleneck tim cepat terlihat.",
-        "Gunakan queue dan lead management saat perlu turun langsung ke percakapan atau lead yang bermasalah.",
-        "Knowledge, ops dashboard, dan access control dipakai untuk approval, governance, dan pembacaan organisasi.",
+        "Mulai dari Action Center, Alert Center, dan Chat Review Center agar bottleneck tim cepat terlihat.",
+        "Gunakan Queue dan Lead Management saat perlu turun langsung ke percakapan atau lead yang bermasalah.",
+        "Knowledge Base, Ops Dashboard, dan Access Control dipakai untuk approval, governance, dan pembacaan organisasi.",
       ],
     };
   }
@@ -89,8 +90,8 @@ function getRolePrinciples(role?: string) {
       title: "Mode Manager",
       items: [
         "Mulai dari manager insights untuk membaca discipline, coaching priority, dan alert tim.",
-        "Turun ke queue atau lead management saat perlu menindak percakapan dan lead tertentu.",
-        "Gunakan chat review center untuk coaching case yang memang butuh pembinaan atau eskalasi.",
+        "Turun ke Queue, Action Center, atau Lead Management saat perlu menindak percakapan dan lead tertentu.",
+        "Gunakan Chat Review Center untuk coaching case yang memang butuh pembinaan atau eskalasi.",
       ],
     };
   }
@@ -98,9 +99,9 @@ function getRolePrinciples(role?: string) {
   return {
     title: "Mode Sales",
     items: [
-      "Mulai dari queue, lalu bergerak ke lead management saat percakapan sudah jelas arahnya.",
+      "Mulai dari Queue atau Lead Capture, lalu bergerak ke Action Center dan Lead Management saat percakapan sudah jelas arahnya.",
       "Gunakan AI analysis dan draft sebagai alat bantu, bukan pengganti pengecekan konteks chat.",
-      "Gunakan lead capture saat perlu memasukkan chat atau lead baru secara manual.",
+      "Gunakan Lead Capture saat perlu memasukkan chat atau lead baru secara manual.",
     ],
   };
 }
@@ -117,13 +118,25 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       href: "/dashboard/sales",
       label: "Queue",
       icon: faComments,
-      description: "Eksekusi prioritas harian",
+      description: "Kerja percakapan customer",
+    },
+    {
+      href: "/dashboard/follow-up",
+      label: "Action Center",
+      icon: faCalendarCheck,
+      description: "Prioritas follow-up harian",
     },
     {
       href: "/dashboard/crm",
       label: "Lead Management",
       icon: faBriefcase,
       description: "Status, owner, dan timeline lead",
+    },
+    {
+      href: "/dashboard/notifications",
+      label: "Alert Center",
+      icon: faTriangleExclamation,
+      description: "Alert operasional yang perlu ditindak",
     },
   ];
 
@@ -136,6 +149,15 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       label: "Lead Capture",
       icon: faCloudArrowUp,
       description: "Masukkan chat atau lead baru",
+    });
+  }
+
+  if (currentUser && isAdminLike(currentUser.role)) {
+    workspaceItems.push({
+      href: "/dashboard/channels",
+      label: "Channels",
+      icon: faBars,
+      description: "Lihat sumber channel dan ingestion",
     });
   }
 

@@ -240,28 +240,34 @@ export default function DashboardHomePage() {
       actions={
         <>
           <Link
-            href="/dashboard/start"
+            href="/dashboard/follow-up"
             className="clara-button clara-button-primary"
           >
-            Mulai dari Sini
+            Action Center
           </Link>
           <Link
             href="/dashboard/sales"
             className="clara-button clara-button-secondary"
           >
-            Buka Queue
+            Queue
           </Link>
           <Link
-            href="/dashboard/channels"
+            href="/dashboard/crm"
             className="clara-button clara-button-secondary"
           >
-            Channels
+            Lead Management
           </Link>
           <Link
             href="/dashboard/notifications"
             className="clara-button clara-button-secondary"
           >
-            Notifications
+            Alert Center
+          </Link>
+          <Link
+            href="/dashboard/upload"
+            className="clara-button clara-button-secondary"
+          >
+            Lead Capture
           </Link>
           <button
             type="button"
@@ -465,7 +471,7 @@ export default function DashboardHomePage() {
 
           <div className="space-y-6">
             <PanelFrame
-              eyebrow="AI Worklist"
+              eyebrow="Action Center"
               title="Prioritas follow-up hari ini"
               actionLabel="Lihat semua"
               actionHref="/dashboard/follow-up"
@@ -644,30 +650,30 @@ function buildQuickLinks(
   const links: QuickLink[] = [
     {
       href: "/dashboard/sales",
-      title: "Conversation Inbox",
+      title: "Queue",
       description: "Masuk ke antrian percakapan dan lanjutkan follow-up customer.",
       eyebrow: "Sales",
       icon: faComments,
     },
     {
       href: "/dashboard/upload",
-      title: "Upload WhatsApp TXT",
+      title: "Lead Capture",
       description: "Masukkan export chat baru untuk diparse menjadi conversation dan message.",
       eyebrow: "Input",
       icon: faCloudArrowUp,
     },
     {
       href: "/dashboard/crm",
-      title: "Lead Pipeline",
+      title: "Lead Management",
       description: "Lihat lead yang terbentuk dari percakapan dan atur tahap CRM dasarnya.",
       eyebrow: "CRM",
       icon: faBriefcase,
     },
     {
       href: "/dashboard/follow-up",
-      title: "AI Worklist",
+      title: "Action Center",
       description: "Pantau hot lead, overdue follow-up, dan draft siap kirim.",
-      eyebrow: "AI Tasks",
+      eyebrow: "Follow-up",
       icon: faCalendarCheck,
     },
   ];
@@ -752,7 +758,7 @@ function getDashboardNextStep({
       description:
         "Workspace masih kosong. Langkah paling masuk akal sekarang adalah import atau paste chat agar Clara mulai membentuk conversation dan lead.",
       href: "/dashboard/upload",
-      actionLabel: "Import Chat",
+      actionLabel: "Buka Lead Capture",
     };
   }
 
@@ -769,12 +775,12 @@ function getDashboardNextStep({
   }
 
   if (worklist && worklist.items.length > 0) {
-    return {
-      title: "Ada tindakan harian yang sudah siap dikerjakan",
-      description:
-        "AI Worklist sudah menyusun prioritas follow-up. Fokus ke sana dulu supaya tidak kehilangan hot lead atau task yang overdue.",
+      return {
+        title: "Ada tindakan harian yang sudah siap dikerjakan",
+        description:
+        "Action Center sudah menyusun prioritas follow-up. Fokus ke sana dulu supaya tidak kehilangan hot lead atau task yang overdue.",
       href: "/dashboard/follow-up",
-      actionLabel: "Buka AI Worklist",
+      actionLabel: "Buka Action Center",
     };
   }
 
@@ -796,9 +802,9 @@ function getDashboardNextStep({
   return {
     title: "Lead sudah terbentuk, saatnya rapikan pipeline",
     description:
-      "Masuk ke Lead Pipeline untuk memastikan stage, follow-up, dan identitas customer sudah rapi sebelum volume chat bertambah.",
+      "Masuk ke Lead Management untuk memastikan stage, follow-up, dan identitas customer sudah rapi sebelum volume chat bertambah.",
     href: "/dashboard/crm",
-    actionLabel: "Buka Lead Pipeline",
+    actionLabel: "Buka Lead Management",
   };
 }
 

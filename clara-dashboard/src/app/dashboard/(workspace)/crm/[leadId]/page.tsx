@@ -136,6 +136,87 @@ function leadNeedsDealMetricsSync(
   return explicitDealStatus !== currentStage;
 }
 
+function isLeadOverdue(nextFollowUpAt: string | null): boolean {
+  if (!nextFollowUpAt) {
+    return false;
+  }
+
+  return new Date(nextFollowUpAt).getTime() <= Date.now();
+}
+
+function buildLeadActionPlan(lead: LeadDetail) {
+  const items: Array<{
+    condition: string;
+    action: string;
+    detail: string;
+  }> = [];
+
+  if (isLeadOverdue(lead.next_follow_up_at)) {
+    items.push({
+      condition: "Jika next follow-up sudah overdue",
+      action: "Review conversation terakhir lalu ubah field Next follow-up ke jadwal baru yang pasti akan dikerjakan.",
+      detail:
+        "Kalau customer sudah tidak responsif, tetap catat hasil terakhir di discipline log. Jangan biarkan lead aktif tanpa tanggal follow-up yang hidup.",
+    });
+  }
+
+  if (lead.discipline_summary.compliance_status === "stale_log") {
+    items.push({
+      condition: "Jika compliance = stale log",
+      action: "Isi Daily Discipline Log baru hari ini dengan aktivitas terbaru yang benar-benar dilakukan.",
+      detail:
+        "Minimal isi result status, objection utama, mood customer, dan next follow-up. Ini dipakai untuk menghidupkan kembali ritme kerja lead ini.",
+    });
+  }
+
+  if (lead.discipline_summary.compliance_status === "missing_today_log") {
+    items.push({
+      condition: "Jika compliance = missing today log",
+      action: "Catat satu aktivitas kerja hari ini walaupun hasilnya masih waiting customer atau no response.",
+      detail:
+        "Status ini bukan berarti gagal, tapi artinya belum ada bukti aksi hari ini. User harus meninggalkan jejak kerja yang jelas.",
+    });
+  }
+
+  if (leadNeedsDealMetricsSync(lead.current_stage, lead.deal?.status ?? null)) {
+    items.push({
+      condition: "Jika deal metrics belum sinkron",
+      action: "Scroll ke Deal Metrics, sesuaikan deal status dengan kondisi lead saat ini, lalu klik Simpan Deal Metrics.",
+      detail:
+        "Ini wajib terutama saat stage sudah `won` atau `lost`. Kalau tidak disinkronkan, dashboard KPI akan membaca data yang salah.",
+    });
+  }
+
+  if (!lead.summary?.trim() || !lead.assigned_user_name) {
+    items.push({
+      condition: "Jika summary atau owner belum rapi",
+      action: "Lengkapi Lead Context: isi summary 2-3 kalimat, pastikan owner benar, dan simpan.",
+      detail:
+        "Targetnya agar siapa pun yang buka lead ini langsung paham posisi customer tanpa harus baca seluruh riwayat dari nol.",
+    });
+  }
+
+  if (!lead.tasks.some((task) => task.status === "open" || task.status === "snoozed")) {
+    items.push({
+      condition: "Jika masih ada pekerjaan lanjutan tapi belum ada task",
+      action: "Buat Follow-up Task untuk pekerjaan manual seperti telepon ulang, kirim proposal, atau koordinasi internal.",
+      detail:
+        "Jangan hanya simpan di kepala atau notes. Task dipakai supaya pekerjaan berikutnya bisa ditracking dan tidak hilang.",
+    });
+  }
+
+  if (!items.length) {
+    items.push({
+      condition: "Jika tidak ada alarm utama",
+      action: "Cukup cek cepat conversation terakhir lalu lanjut ke lead berikutnya.",
+      detail:
+        "Artinya lead ini sudah punya konteks, jadwal, dan jejak kerja yang cukup aman untuk sekarang.",
+    });
+  }
+
+  return items.slice(0, 4);
+}
+
 export default function LeadDetailPage() {
   const params = useParams<{ leadId: string }>();
   const leadId = params.leadId;
@@ -157,6 +238,7 @@ export default function LeadDetailPage() {
   const [disciplineSuccessMessage, setDisciplineSuccessMessage] = useState("");
   const [disciplineSuggestionHint, setDisciplineSuggestionHint] = useState("");
   const [dealErrorMessage, setDealErrorMessage] = useState("");
+  const [timelinePage, setTimelinePage] = useState(1);
 
   const [summaryInput, setSummaryInput] = useState("");
   const [notesInput, setNotesInput] = useState("");
@@ -319,6 +401,29 @@ export default function LeadDetailPage() {
     () => (lead?.tasks ?? []).filter((task) => task.status === "open" || task.status === "snoozed"),
     [lead]
   );
+  const leadActionPlan = useMemo(() => (lead ? buildLeadActionPlan(lead) : []), [lead]);
+  const timelinePageSize = 2;
+  const timelineTotalPages = lead
+    ? Math.max(1, Math.ceil(lead.timeline.length / timelinePageSize))
+    : 1;
+  const visibleTimeline = useMemo(() => {
+    if (!lead) {
+      return [];
+    }
+
+    const startIndex = (timelinePage - 1) * timelinePageSize;
+    return lead.timeline.slice(startIndex, startIndex + timelinePageSize);
+  }, [lead, timelinePage]);
+
+  useEffect(() => {
+    setTimelinePage(1);
+  }, [leadId]);
+
+  useEffect(() => {
+    if (timelinePage > timelineTotalPages) {
+      setTimelinePage(timelineTotalPages);
+    }
+  }, [timelinePage, timelineTotalPages]);
 
   async function handleSaveLead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -527,7 +632,7 @@ export default function LeadDetailPage() {
       title={lead?.display_name ?? "Lead Detail"}
       description="Halaman ini dipakai untuk merapikan konteks lead, menyetel follow-up berikutnya, dan membuat task yang benar-benar persisten."
       backHref="/dashboard/crm"
-      backLabel="Kembali ke Lead Pipeline"
+      backLabel="Kembali ke Lead Management"
       actions={
         <div className="flex flex-wrap gap-3">
           {lead?.customer_profile_id ? (
@@ -594,6 +699,35 @@ export default function LeadDetailPage() {
                   />
                 </dl>
               </div>
+
+              <section className="rounded-[28px] border border-amber-200 bg-amber-50/60 p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-800">
+                      Apa yang harus dilakukan di lead ini
+                    </p>
+                    <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+                      Rapikan next step sebelum pindah ke lead lain
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                      Halaman ini bukan cuma untuk membaca data. Target akhirnya adalah lead punya
+                      owner yang jelas, follow-up yang hidup, discipline log terbaru, dan bila perlu
+                      task atau deal metrics yang sudah sinkron.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  {leadActionPlan.map((item) => (
+                    <LeadActionCard
+                      key={item.condition}
+                      title={item.condition}
+                      action={item.action}
+                      detail={item.detail}
+                    />
+                  ))}
+                </div>
+              </section>
 
               <form
                 onSubmit={(event) => void handleSaveLead(event)}
@@ -1286,45 +1420,79 @@ export default function LeadDetailPage() {
                       Belum ada aktivitas yang tercatat untuk lead ini.
                     </div>
                   ) : (
-                    lead.timeline.map((event) => (
-                      <article
-                        key={event.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <h3 className="text-sm font-semibold text-slate-950">
-                              {event.title}
-                            </h3>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {event.actor_user_name ?? "System"} · {formatDateTime(event.created_at)}
-                            </p>
-                          </div>
-                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            {event.event_type.replaceAll("_", " ")}
-                          </span>
-                        </div>
+                    <>
+                      <div className="space-y-4">
+                        {visibleTimeline.map((event) => (
+                          <article
+                            key={event.id}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-slate-950">
+                                  {event.title}
+                                </h3>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {event.actor_user_name ?? "System"} · {formatDateTime(event.created_at)}
+                                </p>
+                              </div>
+                              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                {event.event_type.replaceAll("_", " ")}
+                              </span>
+                            </div>
 
-                        {event.description && (
-                          <p className="mt-3 text-sm leading-6 text-slate-600">
-                            {event.description}
+                            {event.description && (
+                              <p className="mt-3 text-sm leading-6 text-slate-600">
+                                {event.description}
+                              </p>
+                            )}
+
+                            {(event.from_value || event.to_value) && (
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <Metric
+                                  label="Dari"
+                                  value={formatTimelineValue(event.from_value)}
+                                />
+                                <Metric
+                                  label="Menjadi"
+                                  value={formatTimelineValue(event.to_value)}
+                                />
+                              </div>
+                            )}
+                          </article>
+                        ))}
+                      </div>
+
+                      {lead.timeline.length > timelinePageSize ? (
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-sm text-slate-600">
+                            Halaman {timelinePage} dari {timelineTotalPages} · menampilkan {visibleTimeline.length} dari {lead.timeline.length} aktivitas.
                           </p>
-                        )}
-
-                        {(event.from_value || event.to_value) && (
-                          <div className="mt-3 grid gap-3 md:grid-cols-2">
-                            <Metric
-                              label="Dari"
-                              value={formatTimelineValue(event.from_value)}
-                            />
-                            <Metric
-                              label="Menjadi"
-                              value={formatTimelineValue(event.to_value)}
-                            />
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setTimelinePage((current) => Math.max(1, current - 1))}
+                              disabled={timelinePage === 1}
+                              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Sebelumnya
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setTimelinePage((current) =>
+                                  Math.min(timelineTotalPages, current + 1),
+                                )
+                              }
+                              disabled={timelinePage === timelineTotalPages}
+                              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Berikutnya
+                            </button>
                           </div>
-                        )}
-                      </article>
-                    ))
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
               </section>
@@ -1350,6 +1518,26 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function LeadActionCard({
+  title,
+  action,
+  detail,
+}: {
+  title: string;
+  action: string;
+  detail: string;
+}) {
+  return (
+    <article className="rounded-[22px] border border-amber-200 bg-white/90 p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm font-medium leading-6 text-slate-800">
+        {action}
+      </p>
+      <p className="mt-2 text-sm leading-6 text-slate-700">{detail}</p>
+    </article>
   );
 }
 
