@@ -16,6 +16,7 @@ from app.schemas.auth_schema import (
     ResetUserPasswordRequest,
     SessionResponse,
     TokenResponse,
+    UpdateSelfProfileRequest,
     UpdateUserRequest,
 )
 from app.services.audit_service import create_audit_log
@@ -25,6 +26,7 @@ from app.services.auth_service import (
     change_user_password,
     create_access_token,
     create_user,
+    delete_user,
     get_user_by_id,
     list_users,
     set_user_active_status,
@@ -147,6 +149,42 @@ def get_me(
     current_user: User = Depends(get_current_user),
 ):
     return build_user_response(current_user)
+
+
+@router.patch("/me", response_model=CurrentUserResponse)
+def update_me(
+    payload: UpdateSelfProfileRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        updated_user = update_user(
+            db=db,
+            user=current_user,
+            payload=UpdateUserRequest(
+                name=payload.name,
+                email=payload.email,
+            ),
+        )
+        create_audit_log(
+            db=db,
+            action="auth.user.update_self",
+            resource_type="user",
+            resource_id=str(updated_user.id),
+            current_user=updated_user,
+            request=request,
+            metadata={
+                "email": updated_user.email,
+                "role": updated_user.role,
+            },
+        )
+        return build_user_response(updated_user)
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post("/access-token", response_model=TokenResponse)
@@ -541,3 +579,71 @@ def reset_user_password_endpoint(
         metadata={"email": updated_user.email},
     )
     return build_user_response(updated_user)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_endpoint(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("head")),
+):
+    try:
+        target_user = get_user_by_id(db=db, user_id=UUID(user_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user id.",
+        ) from exc
+
+    if target_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    if current_user.id == target_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot delete your own account.",
+        )
+
+    current_role = normalize_role(current_user.role)
+
+    if is_head_like(current_role) and not is_superadmin_like(current_role):
+        if current_user.organization_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Head has no organization assigned.",
+            )
+        if target_user.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+        if is_superadmin_like(target_user.role):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Head cannot delete superadmin users.",
+            )
+
+    deleted_user_id = str(target_user.id)
+    deleted_email = target_user.email
+
+    try:
+        delete_user(db=db, user=target_user)
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    create_audit_log(
+        db=db,
+        action="auth.user.delete",
+        resource_type="user",
+        resource_id=deleted_user_id,
+        current_user=current_user,
+        request=request,
+        metadata={"email": deleted_email},
+    )

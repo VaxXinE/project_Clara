@@ -145,7 +145,7 @@ const SUPERADMIN_WORKFLOW_STEPS = [
     title: "Intervensi Akses atau Pengetahuan",
     description:
       "Gunakan access control, system ops, atau knowledge base saat perlu membenahi governance, akses, atau landasan jawaban tim.",
-    href: "/dashboard/admin/access",
+    href: "/admin/access",
     cta: "Buka Access Control",
   },
 ] as const;

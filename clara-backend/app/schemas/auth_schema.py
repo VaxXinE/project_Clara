@@ -61,3 +61,8 @@ class ResetUserPasswordRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=8, max_length=255)
     new_password: str = Field(min_length=8, max_length=255)
+
+
+class UpdateSelfProfileRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    email: str | None = Field(default=None, min_length=3, max_length=255)

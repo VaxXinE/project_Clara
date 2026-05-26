@@ -10,6 +10,7 @@ import {
   faCalendarCheck,
   faChartColumn,
   faChartLine,
+  faChevronDown,
   faCloudArrowUp,
   faComments,
   faGaugeHigh,
@@ -28,6 +29,7 @@ import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
 import { apiFetch } from "@/lib/api";
 import {
   canAccessQueueAndActionCenter,
+  getRoleDisplayLabel,
   isAdminLike,
   isManagerLike,
   isOwnerLike,
@@ -198,6 +200,10 @@ function getWorkspaceTitle(currentUser?: CurrentUser | null) {
   return currentUser.name;
 }
 
+function getAccountProfileHref() {
+  return "/profile";
+}
+
 function getGlobalAlertNotifications(
   notifications: OpsNotificationItem[],
 ): OpsNotificationItem[] {
@@ -231,6 +237,7 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
   const resolvedCurrentUser = currentUser ?? dashboardUser?.currentUser ?? null;
   const navGroups = buildNavGroups(resolvedCurrentUser);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [globalNotifications, setGlobalNotifications] = useState<
     OpsNotificationItem[]
@@ -257,6 +264,10 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
       document.body.style.removeProperty("overflow");
     };
   }, [mobileNavOpen]);
+
+  useEffect(() => {
+    setAccountMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!resolvedCurrentUser) {
@@ -410,51 +421,84 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
             ))}
           </div>
 
-          <div className="relative mt-auto border-t border-[#f0cb73]/12 px-4 py-4">
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              disabled={isLoggingOut}
-              className="flex w-full items-center gap-3 rounded-[22px] border border-red-500/10 bg-red-500/6 px-3 py-3 text-left text-red-100 hover:border-red-500/16 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-red-500/10 bg-red-500/8 text-red-100">
-                <FontAwesomeIcon
-                  icon={faRightFromBracket}
-                  className="h-4 w-4"
-                />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">
-                  {isLoggingOut ? "Keluar..." : "Logout"}
-                </span>
-              </span>
-            </button>
-          </div>
         </aside>
 
         <section className="min-w-0 px-5 pb-5 pt-28 sm:px-7 sm:pb-7 sm:pt-32 xl:px-7 xl:pb-7 xl:pt-32">
           <div className="fixed inset-x-0 top-0 z-30 px-4 pt-3 sm:px-6 sm:pt-4 xl:left-[292px] xl:right-0 xl:px-7">
             <div className="clara-surface flex items-center justify-between rounded-[26px] border border-[#f0cb73]/14 bg-[linear-gradient(135deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.96)_100%)] px-4 py-3 shadow-[0_18px_38px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:px-5 sm:py-3.5">
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                  SCC Workspace
-                </p>
-                <p className="truncate text-sm font-semibold text-[#fff0c9]">
-                  {resolvedCurrentUser?.name ??
-                    getWorkspaceTitle(resolvedCurrentUser)}
-                </p>
+              <div className="flex min-w-0 items-center gap-3">
+                <button
+                  type="button"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_12px_24px_rgba(0,0,0,0.22)] xl:hidden"
+                  onClick={() => setMobileNavOpen(true)}
+                  aria-label="Buka menu"
+                  aria-expanded={mobileNavOpen}
+                  aria-controls="clara-mobile-sidebar"
+                >
+                  <FontAwesomeIcon icon={faBars} className="h-4 w-4" />
+                </button>
+
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                    SCC Workspace
+                  </p>
+                  <p className="truncate text-sm font-semibold text-[#fff0c9]">
+                    {resolvedCurrentUser?.name ??
+                      getWorkspaceTitle(resolvedCurrentUser)}
+                  </p>
+                </div>
               </div>
 
-              <button
-                type="button"
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_12px_24px_rgba(0,0,0,0.22)] xl:hidden"
-                onClick={() => setMobileNavOpen(true)}
-                aria-label="Buka menu"
-                aria-expanded={mobileNavOpen}
-                aria-controls="clara-mobile-sidebar"
-              >
-                <FontAwesomeIcon icon={faBars} className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAccountMenuOpen((current) => !current)}
+                    className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#7a5520]/18 bg-[#2b1c0f] px-3 text-xs font-semibold text-[#f0cb73] shadow-[0_10px_20px_rgba(0,0,0,0.18)] transition hover:bg-[#362312]"
+                    aria-label="Buka menu akun"
+                    aria-expanded={accountMenuOpen}
+                  >
+                    <span className="hidden sm:inline">
+                      {resolvedCurrentUser
+                        ? getRoleDisplayLabel(resolvedCurrentUser.role)
+                        : "Account"}
+                    </span>
+                    <FontAwesomeIcon icon={faChevronDown} className="h-3.5 w-3.5" />
+                  </button>
+
+                  {accountMenuOpen ? (
+                    <div className="absolute right-0 top-[calc(100%+0.6rem)] z-40 w-[188px] overflow-hidden rounded-[14px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.98)_0%,rgba(18,13,10,0.98)_100%)] text-[#fff0c9] shadow-[0_16px_34px_rgba(0,0,0,0.28)]">
+                      <div className="border-b border-[#f0cb73]/12 px-3.5 py-3">
+                        <p className="text-lg font-semibold leading-5 text-[#fff0c9]">
+                          {resolvedCurrentUser?.name ?? "AdminNM"}
+                        </p>
+                        <p className="mt-1 text-xs italic text-[#b89a62]">
+                          {resolvedCurrentUser
+                            ? getRoleDisplayLabel(resolvedCurrentUser.role)
+                            : "Admin"}
+                        </p>
+                      </div>
+
+                      <div className="px-2.5 py-2">
+                        <Link
+                          href={getAccountProfileHref()}
+                          className="block rounded-lg px-3 py-2 text-sm font-medium text-[#f0cb73] transition hover:bg-[#f0cb73]/10"
+                        >
+                          Profile
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => void handleLogout()}
+                          disabled={isLoggingOut}
+                          className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#e1c27c] transition hover:bg-[#f0cb73]/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isLoggingOut ? "Signing Out..." : "Sign Out"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
           </div>
 

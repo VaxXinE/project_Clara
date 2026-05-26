@@ -3,6 +3,7 @@ from uuid import UUID
 
 import jwt
 from pwdlib import PasswordHash
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -232,6 +233,20 @@ def set_user_password(
     db.commit()
     db.refresh(user)
     return user
+
+
+def delete_user(
+    db: Session,
+    user: User,
+) -> None:
+    try:
+        db.delete(user)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise AuthError(
+            "User tidak bisa dihapus karena masih dipakai oleh data lain."
+        ) from exc
 
 
 def change_user_password(

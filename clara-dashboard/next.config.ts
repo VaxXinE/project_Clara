@@ -25,6 +25,10 @@ const nextConfig: NextConfig = {
         destination: "/dashboard",
       },
       {
+        source: "/profile",
+        destination: "/dashboard/profile",
+      },
+      {
         source: "/start",
         destination: "/dashboard/start",
       },

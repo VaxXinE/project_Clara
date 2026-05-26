@@ -56,7 +56,7 @@ export default function AdminOpsPage() {
       backLabel="Kembali ke overview"
       actions={
         <Link
-          href="/dashboard/admin/access"
+          href="/admin/access"
           className="clara-button clara-button-ghost"
         >
           Manage Users

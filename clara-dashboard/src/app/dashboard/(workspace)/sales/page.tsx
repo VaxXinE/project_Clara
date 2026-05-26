@@ -331,7 +331,7 @@ export default function SalesInboxPage() {
           )}
           {canAccessAdminOps && (
             <Link
-              href="/dashboard/admin/ops"
+              href="/admin/ops"
               className="clara-button clara-button-ghost"
             >
               Admin Ops
@@ -339,7 +339,7 @@ export default function SalesInboxPage() {
           )}
           {canAccessAdminOps && (
             <Link
-              href="/dashboard/admin/access"
+              href="/admin/access"
               className="clara-button clara-button-ghost"
             >
               Manage Users

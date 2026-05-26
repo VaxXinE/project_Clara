@@ -3,33 +3,21 @@
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
   faArrowRight,
-  faBookOpen,
-  faBriefcase,
   faBullseye,
-  faCalendarCheck,
   faChartLine,
-  faCloudArrowUp,
   faComments,
-  faShieldHalved,
   faTriangleExclamation,
-  faUsersGear,
   faWandSparkles,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { RoleBasedStartGuide } from "@/components/dashboard/RoleBasedStartGuide";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
-import {
-  formatDateTime,
-  formatStatusLabel,
-  getPasswordStrength,
-} from "@/lib/format";
-import { canAccessQueueAndActionCenter, isAdminLike, isManagerLike } from "@/lib/roles";
+import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import { canAccessQueueAndActionCenter, isAdminLike } from "@/lib/roles";
 import type {
-  ChangePasswordRequest,
   CurrentUser,
   KpiCommandCenterResponse,
   MarketingInsightsPreview,
@@ -44,14 +32,6 @@ type OverviewMetrics = {
   highRiskCount: number;
 };
 
-type QuickLink = {
-  href: string;
-  title: string;
-  description: string;
-  eyebrow: string;
-  icon: IconDefinition;
-};
-
 const EMPTY_METRICS: OverviewMetrics = {
   inboxCount: 0,
   analyzedCount: 0,
@@ -59,54 +39,26 @@ const EMPTY_METRICS: OverviewMetrics = {
   highRiskCount: 0,
 };
 
-const EMPTY_CHANGE_PASSWORD_FORM: ChangePasswordRequest = {
-  current_password: "",
-  new_password: "",
-};
-
-const roleCopy: Record<
-  string,
-  { title: string; summary: string; focus: string[] }
-> = {
+const roleCopy: Record<string, { title: string; summary: string }> = {
   superadmin: {
     title: "Superadmin Command Center",
     summary:
-      "Lihat kesehatan operasional, quality insight, dan arah intervensi lintas organization dari satu control room yang ringkas.",
-    focus: [
-      "Pantau conversation berisiko tinggi sebelum mengganggu closing.",
-      "Validasi insight mingguan agar tim sales dan head bergerak sinkron.",
-      "Jaga knowledge base tetap rapi supaya balasan sistem tetap grounded.",
-    ],
+      "Ringkasan kesehatan operasional, insight, dan pipeline lintas organization dari satu tempat.",
   },
   head: {
     title: "Head Control Room",
     summary:
-      "Atur ritme kerja tim, follow-up, dan akses operasional tanpa harus lompat dari satu modul ke modul lain.",
-    focus: [
-      "Pastikan worklist tim tetap bergerak untuk lead panas dan overdue.",
-      "Jaga akses user dan pipeline supaya tidak ada bottleneck operasional.",
-      "Gunakan preview KPI untuk memutuskan prioritas tim hari ini.",
-    ],
+      "Ringkasan ritme kerja tim, pressure operasional, dan arah prioritas harian.",
   },
   manager: {
     title: "Manager Action Room",
     summary:
-      "Pantau review percakapan tim, baca boundary alert, dan jaga disiplin lead tetap rapi di scope team atau unit Anda.",
-    focus: [
-      "Gunakan Chat Review Center untuk coaching case dan chat yang butuh intervensi.",
-      "Baca Manager Insights untuk melihat stale lead, discipline issue, dan prioritas tim.",
-      "Rapikan lead penting tanpa harus masuk ke queue operasional sales.",
-    ],
+      "Ringkasan discipline tim, review pressure, dan status lead yang perlu perhatian.",
   },
   sales: {
     title: "Sales Workspace",
     summary:
-      "Masuk ke queue, upload percakapan baru, lalu teruskan analisis customer dengan alur yang lebih fokus dan minim distraksi.",
-    focus: [
-      "Upload chat baru dan cek parsing agar tidak ada data yang tertinggal.",
-      "Lanjutkan follow-up conversation yang sudah aktif kembali hari ini.",
-      "Gunakan knowledge resmi saat menghadapi legalitas, harga, atau klaim sensitif.",
-    ],
+      "Ringkasan conversation aktif, coverage AI, dan aktivitas terbaru yang perlu ditindak.",
   },
 };
 
@@ -117,12 +69,8 @@ export default function DashboardHomePage() {
     useState<SalesInboxItem | null>(null);
   const [worklist, setWorklist] = useState<SalesWorklistResponse | null>(null);
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
-  const [changePasswordForm, setChangePasswordForm] =
-    useState<ChangePasswordRequest>(EMPTY_CHANGE_PASSWORD_FORM);
   const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   useEffect(() => {
     async function loadDashboardHome() {
@@ -140,12 +88,12 @@ export default function DashboardHomePage() {
             ]);
             nextMetrics.inboxCount = inbox.length;
             nextMetrics.analyzedCount = inbox.filter(
-              (item) => item.latest_ai_extraction !== null
+              (item) => item.latest_ai_extraction !== null,
             ).length;
             setLatestConversation(inbox[0] ?? null);
             setWorklist(worklistResponse);
           } catch {
-            // Owner bisa gagal karena route inbox masih bukan primary focus untuk role ini.
+            // Some roles do not rely on queue data as their primary workspace.
           }
         }
 
@@ -153,7 +101,7 @@ export default function DashboardHomePage() {
           try {
             const [insights, kpiResponse] = await Promise.all([
               apiFetch<MarketingInsightsPreview>(
-                "/dashboard/marketing/insights-preview"
+                "/dashboard/marketing/insights-preview",
               ),
               apiFetch<KpiCommandCenterResponse>("/dashboard/kpi/command-center"),
             ]);
@@ -162,7 +110,7 @@ export default function DashboardHomePage() {
               insights.kpi_summary.high_risk_conversation_count;
             setKpi(kpiResponse);
           } catch {
-            // Biarkan dashboard home tetap usable walau insight belum tersedia.
+            // Keep homepage usable even if insight snapshots are not available yet.
           }
         }
 
@@ -171,7 +119,7 @@ export default function DashboardHomePage() {
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : "Gagal memuat dashboard overview."
+            : "Gagal memuat dashboard overview.",
         );
       } finally {
         setIsLoading(false);
@@ -181,52 +129,23 @@ export default function DashboardHomePage() {
     void loadDashboardHome();
   }, []);
 
-  async function handleLogout() {
-    try {
-      await apiFetch<void>("/auth/logout", { method: "POST" });
-    } catch {
-      // Ignore logout API failure.
-    } finally {
-      window.location.href = "/login";
-    }
-  }
-
-  async function handleChangePassword(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
-    event.preventDefault();
-    setErrorMessage("");
-    setSuccessMessage("");
-    setIsChangingPassword(true);
-
-    try {
-      await apiFetch<CurrentUser>("/auth/change-password", {
-        method: "POST",
-        body: changePasswordForm,
-      });
-      setSuccessMessage("Password akun berhasil diubah.");
-      setChangePasswordForm(EMPTY_CHANGE_PASSWORD_FORM);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal mengubah password akun."
-      );
-    } finally {
-      setIsChangingPassword(false);
-    }
-  }
-
   const roleLabel = currentUser ? roleCopy[currentUser.role] : null;
   const canAccessInsights = currentUser !== null && isAdminLike(currentUser.role);
-  const canAccessAdmin = currentUser !== null && isAdminLike(currentUser.role);
-  const passwordStrength = getPasswordStrength(changePasswordForm.new_password);
-  const quickLinks = buildQuickLinks(currentUser, canAccessInsights, canAccessAdmin);
-  const nextStep = getDashboardNextStep({
-    currentUser,
-    latestConversation,
-    worklist,
-    metrics,
-    canAccessInsights,
-  });
+  const aiCoverage =
+    metrics.inboxCount > 0
+      ? `${metrics.analyzedCount}/${metrics.inboxCount}`
+      : "0/0";
+  const pendingAiCount = Math.max(metrics.inboxCount - metrics.analyzedCount, 0);
+  const openTaskCount = worklist?.items.length ?? 0;
+  const latestActivityHref = latestConversation
+    ? `/sales/conversations/${latestConversation.conversation_id}`
+    : "/upload";
+  const latestActivityLabel = latestConversation
+    ? "Buka Conversation"
+    : "Buka Lead Capture";
+  const topSales = kpi?.sales_performance[0] ?? null;
+  const topOrganization = kpi?.organization_performance[0] ?? null;
+  const primaryObservation = kpi?.key_observations[0] ?? null;
 
   return (
     <WorkspaceShell
@@ -235,61 +154,7 @@ export default function DashboardHomePage() {
       title={currentUser ? `Halo, ${currentUser.name}.` : "SCC Workspace"}
       description={
         roleLabel?.summary ??
-        "Pusat kerja harian untuk mengubah percakapan customer menjadi tindakan operasional dan insight yang bisa dipakai tim."
-      }
-      actions={
-        <>
-          {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
-            <>
-              <Link
-                href="/dashboard/follow-up"
-                className="clara-button clara-button-primary"
-              >
-                Action Center
-              </Link>
-              <Link
-                href="/dashboard/sales"
-                className="clara-button clara-button-secondary"
-              >
-                Queue
-              </Link>
-            </>
-          ) : (
-            <Link
-              href="/dashboard/approvals"
-              className="clara-button clara-button-primary"
-            >
-              Chat Review Center
-            </Link>
-          )}
-          <Link
-            href="/dashboard/crm"
-            className="clara-button clara-button-secondary"
-          >
-            Lead Management
-          </Link>
-          <Link
-            href="/dashboard/notifications"
-            className="clara-button clara-button-secondary"
-          >
-            Alert Center
-          </Link>
-          <Link
-            href="/dashboard/upload"
-            className="clara-button clara-button-secondary"
-          >
-            Lead Capture
-          </Link>
-          <button
-            type="button"
-            onClick={() => {
-              void handleLogout();
-            }}
-            className="clara-button clara-button-ghost"
-          >
-            Logout
-          </button>
-        </>
+        "Ringkasan data operasional harian yang lebih ringkas dan lebih mudah dipindai."
       }
     >
       <div className="space-y-6">
@@ -299,98 +164,101 @@ export default function DashboardHomePage() {
           </section>
         )}
 
-        {successMessage && (
-          <section className="clara-alert clara-alert-success">
-            {successMessage}
-          </section>
-        )}
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            label="Percakapan Aktif"
+            value={isLoading ? "..." : String(metrics.inboxCount)}
+            hint="Jumlah percakapan aktif yang sedang hidup di workspace."
+            icon={faComments}
+            accent="from-[#f7dfa2] to-[#be8d2f]"
+          />
+          <MetricCard
+            label="Sudah Dianalisis"
+            value={isLoading ? "..." : String(metrics.analyzedCount)}
+            hint="Conversation yang sudah punya pembacaan AI."
+            icon={faWandSparkles}
+            accent="from-[#f3d48a] to-[#9f7121]"
+          />
+          <MetricCard
+            label="Cakupan Insight"
+            value={isLoading ? "..." : String(metrics.insightConversationCount)}
+            hint="Percakapan yang ikut membentuk insight saat ini."
+            icon={faChartLine}
+            accent="from-[#f1cf7a] to-[#7f5a1a]"
+          />
+          <MetricCard
+            label="Risiko Tinggi"
+            value={isLoading ? "..." : String(metrics.highRiskCount)}
+            hint="Percakapan sensitif yang perlu perhatian lebih cepat."
+            icon={faTriangleExclamation}
+            accent="from-[#f6dc9d] to-[#b67d27]"
+          />
+        </section>
 
-        <section className="grid gap-6 2xl:grid-cols-[minmax(0,1.45fr)_360px]">
-          <div className="clara-panel overflow-hidden rounded-[34px] p-6 sm:p-8">
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_250px]">
-              <div>
-                <span className="inline-flex rounded-full border border-[#f0cb73]/24 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
-                  {roleLabel?.title ?? "Workspace"}
-                </span>
-                <h2 className="mt-5 max-w-3xl text-3xl font-bold tracking-[-0.05em] text-slate-950 sm:text-[2.85rem]">
-                  Dashboard yang lebih fokus untuk operasional, insight, dan eksekusi harian.
-                </h2>
-                <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">
-                  {roleLabel?.summary ??
-                    "Semua titik kerja penting Clara dikumpulkan dalam satu workspace yang lebih tenang, lebih jelas, dan lebih cepat dipindai."}
-                </p>
-
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <SignalPill
-                    label="Percakapan"
-                    value={isLoading ? "..." : String(metrics.inboxCount)}
-                  />
-                  <SignalPill
-                    label="AI Analyzed"
-                    value={isLoading ? "..." : String(metrics.analyzedCount)}
-                  />
-                  <SignalPill
-                    label="High Risk"
-                    value={isLoading ? "..." : String(metrics.highRiskCount)}
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-[30px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(30,22,14,0.98)_0%,rgba(17,12,8,0.98)_100%)] p-5 text-white shadow-[0_20px_40px_rgba(0,0,0,0.26)]">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                  Fokus Hari Ini
-                </p>
-                <ul className="mt-4 space-y-3">
-                  {(roleLabel?.focus ?? []).map((item) => (
-                    <li
-                      key={item}
-                      className="rounded-2xl border border-[#f0cb73]/14 bg-[#f0cb73]/8 px-4 py-3 text-sm leading-6 text-[#f7e7b7]"
-                    >
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
+          <PanelFrame eyebrow="Summary Data" title="Snapshot hari ini">
+            <div className="grid gap-4 md:grid-cols-2">
+              <MiniInsightCard
+                label="Role aktif"
+                title={roleLabel?.title ?? "Workspace"}
+                description={
+                  roleLabel?.summary ??
+                  "Pusat kerja harian untuk membaca data percakapan, insight, dan pipeline."
+                }
+              />
+              <MiniInsightCard
+                label="Tekanan operasional"
+                title={
+                  openTaskCount > 0
+                    ? `${openTaskCount} follow-up aktif`
+                    : "Belum ada follow-up aktif"
+                }
+                description={
+                  pendingAiCount > 0
+                    ? `${pendingAiCount} conversation masih menunggu analisis AI.`
+                    : "Seluruh conversation aktif sudah terbaca AI."
+                }
+                icon={faBullseye}
+              />
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <section className="clara-panel-soft rounded-[28px] p-5">
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
-                  <FontAwesomeIcon icon={faBullseye} className="h-4 w-4" />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
-                    System Pulse
-                  </p>
-                  <h3 className="mt-1 text-lg font-semibold text-slate-950">
-                    Ringkas, tapi langsung berguna
-                  </h3>
-                </div>
-              </div>
-              <div className="mt-4 space-y-3 text-sm text-slate-600">
-                <PulseRow
-                  label="Conversation aktif"
-                  value={isLoading ? "..." : String(metrics.inboxCount)}
-                />
-                <PulseRow
-                  label="Insight coverage"
-                  value={isLoading ? "..." : String(metrics.insightConversationCount)}
-                />
-                <PulseRow
-                  label="Status workspace"
-                  value={canAccessInsights ? "Extended view" : "Operational view"}
-                />
-              </div>
-            </section>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <PulseRow label="Coverage AI" value={isLoading ? "..." : aiCoverage} />
+              <PulseRow
+                label="Workspace view"
+                value={canAccessInsights ? "Extended" : "Operational"}
+              />
+              <PulseRow
+                label="Last update"
+                value={
+                  latestConversation?.last_message_at
+                    ? formatDateTime(latestConversation.last_message_at)
+                    : "-"
+                }
+              />
+            </div>
 
-            <section className="clara-panel-soft rounded-[28px] p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
-                Aktivitas Terakhir
-              </p>
-              {latestConversation ? (
-                <div className="mt-4 rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
+            {primaryObservation ? (
+              <div className="mt-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(30,22,14,0.98)_0%,rgba(17,12,8,0.98)_100%)] p-4 text-white">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
+                  Observation
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[#f7e7b7]">
+                  {primaryObservation}
+                </p>
+              </div>
+            ) : null}
+          </PanelFrame>
+
+          <PanelFrame
+            eyebrow="Aktivitas"
+            title="Conversation terbaru"
+            actionLabel={latestActivityLabel}
+            actionHref={latestActivityHref}
+          >
+            {latestConversation ? (
+              <div className="space-y-4">
+                <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
                   <p className="text-base font-semibold text-slate-950">
                     {latestConversation.title}
                   </p>
@@ -398,488 +266,82 @@ export default function DashboardHomePage() {
                     {latestConversation.latest_message?.message_text ??
                       "Belum ada pesan terakhir yang bisa ditampilkan."}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                    <span>
-                      Last update: {formatDateTime(latestConversation.last_message_at)}
-                    </span>
-                    <span>&bull;</span>
-                    <span>
-                      Status: {formatStatusLabel(latestConversation.ui_status)}
-                    </span>
-                  </div>
-                  <Link
-                    href={`/dashboard/sales/conversations/${latestConversation.conversation_id}`}
-                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14"
-                  >
-                    Buka Conversation
-                    <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3" />
-                  </Link>
                 </div>
-              ) : (
-                <div className="mt-4 rounded-[24px] border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-slate-600">
-                  Belum ada conversation yang tampil. Kalau baru mulai, upload
-                  chat WhatsApp pertama dulu agar workspace ini mulai terasa
-                  hidup.
-                </div>
-              )}
-            </section>
-          </div>
-        </section>
-
-        <NextStepBanner
-          title={nextStep.title}
-          description={nextStep.description}
-          href={nextStep.href}
-          actionLabel={nextStep.actionLabel}
-        />
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard
-            label="Percakapan Aktif"
-            value={isLoading ? "..." : String(metrics.inboxCount)}
-            hint="Jumlah percakapan yang sedang bisa ditindak lanjuti dari workspace."
-            icon={faComments}
-            accent="from-[#f7dfa2] to-[#be8d2f]"
-          />
-          <MetricCard
-            label="Sudah Dianalisis"
-            value={isLoading ? "..." : String(metrics.analyzedCount)}
-            hint="Conversation yang sudah punya pembacaan AI dan next action."
-            icon={faWandSparkles}
-            accent="from-[#f3d48a] to-[#9f7121]"
-          />
-          <MetricCard
-            label="Cakupan Insight"
-            value={isLoading ? "..." : String(metrics.insightConversationCount)}
-            hint="Percakapan yang ikut membentuk insight marketing saat ini."
-            icon={faChartLine}
-            accent="from-[#f1cf7a] to-[#7f5a1a]"
-          />
-          <MetricCard
-            label="Risiko Tinggi"
-            value={isLoading ? "..." : String(metrics.highRiskCount)}
-            hint="Percakapan sensitif yang sebaiknya ditangani atau ditinjau lebih cepat."
-            icon={faTriangleExclamation}
-            accent="from-[#f6dc9d] to-[#b67d27]"
-          />
-        </section>
-
-        <RoleBasedStartGuide currentUser={currentUser} compact />
-
-        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <PanelFrame
-            eyebrow="Quick Routes"
-            title="Akses modul yang paling sering dipakai"
-            actionLabel={
-              currentUser && canAccessQueueAndActionCenter(currentUser.role)
-                ? "Lihat inbox"
-                : "Buka review center"
-            }
-            actionHref={
-              currentUser && canAccessQueueAndActionCenter(currentUser.role)
-                ? "/dashboard/sales"
-                : "/dashboard/approvals"
-            }
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              {quickLinks.map((item) => (
-                <ActionCard key={item.href} item={item} />
-              ))}
-            </div>
-          </PanelFrame>
-
-          <div className="space-y-6">
-            {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
-              <PanelFrame
-                eyebrow="Action Center"
-                title="Prioritas follow-up hari ini"
-                actionLabel="Lihat semua"
-                actionHref="/dashboard/follow-up"
-              >
                 <div className="space-y-3">
-                  {worklist && worklist.items.length > 0 ? (
-                    worklist.items.slice(0, 3).map((item) => (
-                      <div
-                        key={`${item.lead_id}-${item.task_type}`}
-                        className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-semibold text-slate-950">
-                            {item.lead_name}
-                          </p>
-                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
-                            {item.task_label}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-600">
-                          {item.recommended_action}
-                        </p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-[24px] border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-slate-600">
-                      Belum ada follow-up yang mendesak.
-                    </div>
-                  )}
+                  <PulseRow
+                    label="Status"
+                    value={formatStatusLabel(latestConversation.ui_status)}
+                  />
+                  <PulseRow
+                    label="Update terakhir"
+                    value={formatDateTime(latestConversation.last_message_at)}
+                  />
+                  <PulseRow
+                    label="Insight"
+                    value={
+                      latestConversation.latest_ai_extraction
+                        ? "Sudah dibaca AI"
+                        : "Belum dibaca AI"
+                    }
+                  />
                 </div>
-              </PanelFrame>
-            ) : (
-              <PanelFrame
-                eyebrow="Manager Queue"
-                title="Triase review dan disiplin tim"
-                actionLabel="Buka review center"
-                actionHref="/dashboard/approvals"
-              >
-                <div className="space-y-3">
-                  <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
-                    <p className="font-semibold text-slate-950">Chat Review Center</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Manager fokus ke bottleneck percakapan, coaching case, dan approval, bukan kerja dari Queue harian.
-                    </p>
-                  </div>
-                  <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
-                    <p className="font-semibold text-slate-950">Manager Insights</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Gunakan manager insights untuk lihat disiplin tim, coaching priority, dan boundary alert sebelum turun ke lead tertentu.
-                    </p>
-                  </div>
-                </div>
-              </PanelFrame>
-            )}
-
-            {canAccessAdmin && (
-              <PanelFrame
-                eyebrow="KPI Preview"
-                title="Health pipeline & sales snapshot"
-                actionLabel="Buka KPI Center"
-                actionHref="/dashboard/kpi"
-              >
-                {kpi ? (
-                  <div className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <MiniInsightCard
-                        label="Top Sales"
-                        title={kpi.sales_performance[0]?.user_name ?? "Belum ada data"}
-                        description={
-                          kpi.sales_performance[0]
-                            ? `${kpi.sales_performance[0].replies_sent} replies sent / ${kpi.sales_performance[0].closing_leads} closing leads`
-                            : "Tambahkan lebih banyak activity untuk mulai melihat ranking."
-                        }
-                      />
-                      <MiniInsightCard
-                        label="Top Organization"
-                        title={
-                          kpi.organization_performance[0]?.organization_name ??
-                          "Belum ada data"
-                        }
-                        description={
-                          kpi.organization_performance[0]
-                            ? `${kpi.organization_performance[0].hot_leads} hot leads / ${(kpi.organization_performance[0].reply_sent_rate * 100).toFixed(0)}% reply sent rate`
-                            : "Organization performance akan muncul ketika data pipeline mulai cukup."
-                        }
-                      />
-                    </div>
-
-                    <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(30,22,14,0.98)_0%,rgba(17,12,8,0.98)_100%)] p-4 text-white">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
-                        Observation
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-[#f7e7b7]">
-                        {kpi.key_observations[0] ??
-                          "Belum ada observasi yang cukup kuat untuk ditampilkan."}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-[24px] border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-slate-600">
-                    KPI preview belum tersedia untuk role ini atau data pipeline
-                    masih tipis.
-                  </div>
-                )}
-              </PanelFrame>
-            )}
-          </div>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[1fr_0.92fr]">
-          <PanelFrame eyebrow="Security" title="Jaga akses akun tetap aman">
-            <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-              <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(30,22,14,0.98)_0%,rgba(17,12,8,0.98)_100%)] p-5 text-white">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f0cb73]/10 text-[#f7dfa2]">
-                    <FontAwesomeIcon icon={faShieldHalved} className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
-                      Account Safety
-                    </p>
-                    <h3 className="mt-1 text-xl font-semibold">Keamanan akun Clara</h3>
-                  </div>
-                </div>
-                <ul className="mt-5 space-y-3 text-sm leading-6 text-slate-200">
-                  <li>Gunakan kombinasi password yang kuat dan unik.</li>
-                  <li>Jangan berbagi akses dashboard lintas role tanpa kebutuhan operasional.</li>
-                  <li>Update password ketika ada pergantian personel atau device.</li>
-                </ul>
               </div>
-
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <PasswordField
-                  label="Current Password"
-                  value={changePasswordForm.current_password}
-                  onChange={(value) =>
-                    setChangePasswordForm((current) => ({
-                      ...current,
-                      current_password: value,
-                    }))
-                  }
-                />
-                <PasswordField
-                  label="New Password"
-                  value={changePasswordForm.new_password}
-                  onChange={(value) =>
-                    setChangePasswordForm((current) => ({
-                      ...current,
-                      new_password: value,
-                    }))
-                  }
-                />
-
-                <PasswordStrengthHint
-                  password={changePasswordForm.new_password}
-                  strength={passwordStrength}
-                />
-
-                <button
-                  type="submit"
-                  disabled={isChangingPassword}
-                  className="rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_12px_28px_rgba(0,0,0,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isChangingPassword ? "Saving..." : "Update Password"}
-                </button>
-              </form>
-            </div>
-          </PanelFrame>
-
-          <PanelFrame eyebrow="Operating Notes" title="Pegangan harian tim">
-            <div className="space-y-3">
-              <NoteCard
-                icon={faComments}
-                title="Conversation first"
-                description="Buka inbox lebih dulu saat mulai kerja agar semua lead aktif langsung terlihat."
-              />
-              <NoteCard
-                icon={faCloudArrowUp}
-                title="Raw chat discipline"
-                description="Setelah upload, cek parsing dan status data sebelum analisis lanjutan dijalankan."
-              />
-              <NoteCard
-                icon={faBookOpen}
-                title="Grounded replies"
-                description="Saat ada pembahasan legalitas, policy, atau harga sensitif, selalu rujuk knowledge resmi."
-              />
-            </div>
+            ) : (
+              <div className="rounded-[24px] border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-slate-600">
+                Belum ada conversation yang tampil. Upload chat pertama untuk
+                mulai mengisi summary operasional di beranda ini.
+              </div>
+            )}
           </PanelFrame>
         </section>
+
+        {(topSales || topOrganization) && (
+          <section className="grid gap-6 xl:grid-cols-2">
+            {topSales ? (
+              <PanelFrame eyebrow="Top Sales" title={topSales.user_name}>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <PulseRow
+                    label="Replies Sent"
+                    value={String(topSales.replies_sent)}
+                  />
+                  <PulseRow
+                    label="Closing Leads"
+                    value={String(topSales.closing_leads)}
+                  />
+                  <PulseRow
+                    label="Hot Leads"
+                    value={String(topSales.hot_leads)}
+                  />
+                </div>
+              </PanelFrame>
+            ) : null}
+
+            {topOrganization ? (
+              <PanelFrame
+                eyebrow="Top Organization"
+                title={topOrganization.organization_name}
+              >
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <PulseRow
+                    label="Hot Leads"
+                    value={String(topOrganization.hot_leads)}
+                  />
+                  <PulseRow
+                    label="Reply Rate"
+                    value={`${(topOrganization.reply_sent_rate * 100).toFixed(0)}%`}
+                  />
+                  <PulseRow
+                    label="Won Rate"
+                    value={`${(topOrganization.won_rate * 100).toFixed(0)}%`}
+                  />
+                </div>
+              </PanelFrame>
+            ) : null}
+          </section>
+        )}
       </div>
     </WorkspaceShell>
   );
-}
-
-function buildQuickLinks(
-  currentUser: CurrentUser | null,
-  canAccessInsights: boolean,
-  canAccessAdmin: boolean
-): QuickLink[] {
-  const links: QuickLink[] = [
-    {
-      href: "/dashboard/upload",
-      title: "Lead Capture",
-      description: "Masukkan export chat baru untuk diparse menjadi conversation dan message.",
-      eyebrow: "Input",
-      icon: faCloudArrowUp,
-    },
-    {
-      href: "/dashboard/crm",
-      title: "Lead Management",
-      description: "Lihat lead yang terbentuk dari percakapan dan atur tahap CRM dasarnya.",
-      eyebrow: "CRM",
-      icon: faBriefcase,
-    },
-  ];
-
-  if (currentUser && canAccessQueueAndActionCenter(currentUser.role)) {
-    links.unshift({
-      href: "/dashboard/sales",
-      title: "Queue",
-      description: "Masuk ke antrian percakapan dan lanjutkan follow-up customer.",
-      eyebrow: "Sales",
-      icon: faComments,
-    });
-
-    links.push({
-      href: "/dashboard/follow-up",
-      title: "Action Center",
-      description: "Pantau hot lead, overdue follow-up, dan draft siap kirim.",
-      eyebrow: "Follow-up",
-      icon: faCalendarCheck,
-    });
-  } else {
-    links.unshift({
-      href: "/dashboard/approvals",
-      title: "Chat Review Center",
-      description: "Triase chat yang macet, butuh coaching, atau perlu approval manusia.",
-      eyebrow: "Review",
-      icon: faWandSparkles,
-    });
-
-    links.push({
-      href: "/dashboard/manager-insights",
-      title: "Manager Insights",
-      description: "Pantau disiplin tim, coaching priority, dan alert per boundary team.",
-      eyebrow: "Insights",
-      icon: faChartLine,
-    });
-  }
-
-  if (canAccessInsights) {
-    links.push({
-      href: "/dashboard/marketing",
-      title: "Marketing Insights",
-      description: "Baca tren objection, snapshot insight, dan sinyal market dari customer.",
-      eyebrow: "Insights",
-      icon: faChartLine,
-    });
-  } else {
-    links.push({
-      href: "/dashboard/knowledge",
-      title: "Product Knowledge",
-      description: "Kelola fakta produk, legalitas, dan policy agar reply AI tetap grounded.",
-      eyebrow: "Knowledge",
-      icon: faBookOpen,
-    });
-  }
-
-  if (canAccessAdmin) {
-    links.push({
-      href: "/dashboard/admin/access",
-      title: "User Access",
-      description: "Kelola akses user dan organization sesuai role yang berwenang.",
-      eyebrow: "Administration",
-      icon: faUsersGear,
-    });
-  }
-
-  return links;
-}
-
-function SignalPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="clara-card-soft rounded-2xl px-4 py-3">
-      <p className="clara-kicker text-xs">{label}</p>
-      <p className="mt-1.5 text-xl font-bold tracking-tight text-slate-950">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function PulseRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="clara-card-soft flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
-      <span className="text-slate-600">{label}</span>
-      <span className="font-semibold text-slate-950">{value}</span>
-    </div>
-  );
-}
-
-function getDashboardNextStep({
-  currentUser,
-  latestConversation,
-  worklist,
-  metrics,
-  canAccessInsights,
-}: {
-  currentUser: CurrentUser | null;
-  latestConversation: SalesInboxItem | null;
-  worklist: SalesWorklistResponse | null;
-  metrics: OverviewMetrics;
-  canAccessInsights: boolean;
-}) {
-  if (!currentUser) {
-    return {
-      title: "Mulai dari halaman panduan",
-      description:
-        "Kalau Anda baru masuk ke Clara, buka panduan singkat dulu supaya alurnya cepat kebaca.",
-      href: "/dashboard/start",
-      actionLabel: "Buka Panduan",
-    };
-  }
-
-  if (metrics.inboxCount === 0) {
-    return {
-      title: "Masukkan chat pertama Anda",
-      description:
-        "Workspace masih kosong. Langkah paling masuk akal sekarang adalah import atau paste chat agar Clara mulai membentuk conversation dan lead.",
-      href: "/dashboard/upload",
-      actionLabel: "Buka Lead Capture",
-    };
-  }
-
-  if (metrics.analyzedCount < metrics.inboxCount) {
-    return {
-      title: "Masih ada chat yang belum dibaca AI",
-      description:
-        "Buka Chat Masuk lalu jalankan AI analysis pada conversation yang belum punya insight. Ini langkah paling penting sebelum reply atau memindahkan lead.",
-      href: latestConversation
-        ? `/dashboard/sales/conversations/${latestConversation.conversation_id}`
-        : "/dashboard/sales",
-      actionLabel: latestConversation ? "Buka Chat Terbaru" : "Buka Chat Masuk",
-    };
-  }
-
-  if (isManagerLike(currentUser.role)) {
-    return {
-      title: "Mulai dari review center dan manager insights",
-      description:
-        "Role manager tidak lagi memakai Queue atau Action Center. Fokuskan kerja ke Chat Review Center, Manager Insights, dan Lead Management untuk intervensi tim.",
-      href: "/dashboard/approvals",
-      actionLabel: "Buka Chat Review Center",
-    };
-  }
-
-  if (worklist && worklist.items.length > 0) {
-      return {
-        title: "Ada tindakan harian yang sudah siap dikerjakan",
-        description:
-        "Action Center sudah menyusun prioritas follow-up. Fokus ke sana dulu supaya tidak kehilangan hot lead atau task yang overdue.",
-      href: "/dashboard/follow-up",
-      actionLabel: "Buka Action Center",
-    };
-  }
-
-  if (canAccessInsights) {
-    return {
-      title: "Operasional sudah cukup stabil, lanjut baca insight",
-      description:
-        "Kalau inbox dan follow-up relatif aman, langkah berikutnya yang paling bernilai adalah membaca Marketing Insights atau KPI untuk mengambil keputusan level tim.",
-      href: currentUser.role === "superadmin" || currentUser.role === "head"
-        ? "/dashboard/marketing"
-        : "/dashboard/sales",
-      actionLabel:
-        currentUser.role === "superadmin" || currentUser.role === "head"
-          ? "Buka Marketing Insights"
-          : "Buka Workspace",
-    };
-  }
-
-  return {
-    title: "Lead sudah terbentuk, saatnya rapikan pipeline",
-    description:
-      "Masuk ke Lead Management untuk memastikan stage, follow-up, dan identitas customer sudah rapi sebelum volume chat bertambah.",
-    href: "/dashboard/crm",
-    actionLabel: "Buka Lead Management",
-  };
 }
 
 function MetricCard({
@@ -915,40 +377,6 @@ function MetricCard({
   );
 }
 
-function NextStepBanner({
-  title,
-  description,
-  href,
-  actionLabel,
-}: {
-  title: string;
-  description: string;
-  href: string;
-  actionLabel: string;
-}) {
-  return (
-    <section className="rounded-3xl border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-6 text-white shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
-            Langkah Berikutnya
-          </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-tight">{title}</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-[#ecd2a0]">
-            {description}
-          </p>
-        </div>
-        <Link
-          href={href}
-          className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] hover:brightness-105"
-        >
-          {actionLabel}
-        </Link>
-      </div>
-    </section>
-  );
-}
-
 function PanelFrame({
   eyebrow,
   title,
@@ -973,10 +401,7 @@ function PanelFrame({
         </div>
 
         {actionHref && actionLabel ? (
-          <Link
-            href={actionHref}
-            className="clara-button clara-button-ghost"
-          >
+          <Link href={actionHref} className="clara-button clara-button-ghost">
             {actionLabel}
             <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3" />
           </Link>
@@ -988,50 +413,12 @@ function PanelFrame({
   );
 }
 
-function ActionCard({
-  item,
-  href,
-  title,
-  description,
-  eyebrow,
-  icon,
-}: {
-  item?: QuickLink;
-  href?: string;
-  title?: string;
-  description?: string;
-  eyebrow?: string;
-  icon?: IconDefinition;
-}) {
-  const resolvedHref = item?.href ?? href ?? "/dashboard";
-  const resolvedTitle = item?.title ?? title ?? "Workspace";
-  const resolvedDescription =
-    item?.description ?? description ?? "Buka modul Clara yang relevan.";
-  const resolvedEyebrow = item?.eyebrow ?? eyebrow ?? "Clara";
-  const resolvedIcon = item?.icon ?? icon ?? faArrowRight;
-
+function PulseRow({ label, value }: { label: string; value: string }) {
   return (
-    <Link
-      href={resolvedHref}
-      className="clara-card-soft group rounded-[26px] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(0,0,0,0.16)]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="clara-kicker text-xs">{resolvedEyebrow}</p>
-          <h3 className="mt-2 text-base font-semibold text-slate-950">
-            {resolvedTitle}
-          </h3>
-        </div>
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
-          <FontAwesomeIcon icon={resolvedIcon} className="h-4 w-4" />
-        </span>
-      </div>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{resolvedDescription}</p>
-      <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#f0cb73]">
-        Buka modul
-        <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3 transition group-hover:translate-x-0.5" />
-      </span>
-    </Link>
+    <div className="clara-card-soft flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
+      <span className="text-slate-600">{label}</span>
+      <span className="font-semibold text-slate-950">{value}</span>
+    </div>
   );
 }
 
@@ -1059,100 +446,6 @@ function MiniInsightCard({
             {description}
           </p>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function NoteCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: IconDefinition;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="clara-card-soft rounded-[24px] p-4">
-      <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
-          <FontAwesomeIcon icon={icon} className="h-4 w-4" />
-        </span>
-        <div>
-          <h3 className="text-base font-semibold text-slate-950">{title}</h3>
-          <p className="mt-1.5 text-sm leading-6 text-slate-600">
-            {description}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PasswordField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div>
-      <label className="text-sm font-semibold text-slate-900">{label}</label>
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        type="password"
-        className="mt-2 w-full rounded-2xl border border-[#f0cb73]/20 bg-[#17120d]/90 px-4 py-3 text-sm text-[#f7e7b7] outline-none focus:border-[#f0cb73]"
-        placeholder="Minimum 8 karakter"
-      />
-    </div>
-  );
-}
-
-function PasswordStrengthHint({
-  password,
-  strength,
-}: {
-  password: string;
-  strength: ReturnType<typeof getPasswordStrength>;
-}) {
-  if (!password) {
-    return (
-      <p className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.92)_0%,rgba(18,13,10,0.92)_100%)] p-3 text-xs text-slate-600">
-        Hint: gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol.
-      </p>
-    );
-  }
-
-  return (
-    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.92)_0%,rgba(18,13,10,0.92)_100%)] p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6737]">
-          Password Strength
-        </p>
-        <span
-          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${strength.badgeClassName}`}
-        >
-          {strength.label}
-        </span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {strength.checks.map((check) => (
-          <span
-            key={check.label}
-            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-              check.passed
-                ? "bg-green-100 text-green-700"
-                : "bg-slate-200 text-slate-600"
-            }`}
-          >
-            {check.label}
-          </span>
-        ))}
       </div>
     </div>
   );
