@@ -20,12 +20,12 @@ import type {
 
 function getSeverityClass(severity: string) {
   if (severity === "high") {
-    return "bg-red-100 text-red-700";
+    return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
   }
   if (severity === "medium") {
-    return "bg-amber-100 text-amber-700";
+    return "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]";
   }
-  return "bg-slate-100 text-slate-700";
+  return "border border-[#f0cb73]/18 bg-[#1f170f] text-[#f0cb73]";
 }
 
 function resolveNotificationTargetHref(
@@ -256,21 +256,21 @@ export default function NotificationsPage() {
           {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
             <Link
               href="/dashboard/follow-up"
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
             >
               Action Center
             </Link>
           ) : (
             <Link
               href="/dashboard/manager-insights"
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
             >
               Manager Insights
             </Link>
           )}
           <Link
             href="/dashboard/approvals"
-            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+            className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
           >
             Chat Review Center
           </Link>
@@ -279,23 +279,23 @@ export default function NotificationsPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
             Loading notifications...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
             {errorMessage}
           </div>
         )}
 
         {notifications && !isLoading && !errorMessage && (
           <>
-            <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#eef2ff_0%,#ffffff_45%,#f8fafc_100%)] p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[28px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                     Langkah Berikutnya
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -303,7 +303,7 @@ export default function NotificationsPage() {
                       ? "Tidak ada notifikasi aktif sekarang"
                       : "Ambil notifikasi active yang paling kritis lebih dulu"}
                   </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
                     {notifications.items.length === 0
                       ? currentUser && canAccessQueueAndActionCenter(currentUser.role)
                         ? "Kalau Alert Center kosong, itu berarti operasional relatif stabil. Tetap cek Action Center untuk memastikan tidak ada task yang harus ditindak."
@@ -321,7 +321,7 @@ export default function NotificationsPage() {
                       ? "/dashboard/follow-up"
                       : "/dashboard/manager-insights")
                   }
-                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
                 >
                   {notifications.items[0]
                     ? "Buka Alert Teratas"
@@ -336,8 +336,8 @@ export default function NotificationsPage() {
               <>
                 {!showActiveEmptyState ? (
                   <>
-                    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.18)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                         Cara Pakai Halaman Ini
                       </p>
                       <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -388,7 +388,7 @@ export default function NotificationsPage() {
                       <MetricCard label="Resolved" value={String(notifications.resolved_count)} />
                     </section>
 
-                    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                    <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
                       <div
                         className={`grid gap-4 ${isOversightAlertView ? "md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-4"}`}
                       >
@@ -401,8 +401,8 @@ export default function NotificationsPage() {
                           value={formatDateTime(notifications.generated_at)}
                         />
                         {!isOversightAlertView ? (
-                          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 md:col-span-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          <div className="rounded-[28px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-6 md:col-span-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
                               Resolution Note
                             </p>
                             <textarea
@@ -411,7 +411,7 @@ export default function NotificationsPage() {
                                 setResolutionNote(event.target.value);
                               }}
                               placeholder="Catatan saat resolve notification..."
-                              className="mt-3 min-h-[88px] w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+                              className="mt-3 min-h-[88px] w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] p-3 text-sm text-[#f7e7b7] outline-none placeholder:text-[#907953]"
                             />
                           </div>
                         ) : null}
@@ -419,16 +419,16 @@ export default function NotificationsPage() {
                     </section>
                   </>
                 ) : (
-                  <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                  <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                           Tidak Ada Alert Aktif
                         </p>
                         <h3 className="mt-2 text-lg font-semibold text-slate-950">
                           Tidak ada sinyal operasional yang perlu ditangani sekarang
                         </h3>
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#e3c990]">
                           Fokus halaman ini adalah alert aktif. Karena sekarang kosong, lanjutkan kerja dari{" "}
                           {canAccessQueue ? "Action Center, Queue, atau Lead Management" : "Manager Insights, KPI, atau Chat Review Center"}.
                           {notifications.resolved_count > 0
@@ -440,13 +440,13 @@ export default function NotificationsPage() {
                         <button
                           type="button"
                           onClick={() => setStatusFilter("resolved")}
-                          className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                          className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                         >
                           Lihat Histori Alert
                         </button>
                         <Link
                           href={canAccessQueue ? "/dashboard/follow-up" : isHeadMonitorView ? "/dashboard/kpi" : "/dashboard/manager-insights"}
-                          className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
+                          className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
                         >
                           {canAccessQueue
                             ? "Buka Action Center"
@@ -470,14 +470,14 @@ export default function NotificationsPage() {
                   </section>
                 )}
 
-                <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <label className="space-y-2 text-sm font-medium text-slate-700">
+                    <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                       <span>Filter status</span>
                       <select
                         value={statusFilter}
                         onChange={(event) => setStatusFilter(event.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                        className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none"
                       >
                         <option value="all">Semua status</option>
                         <option value="active">Active</option>
@@ -486,12 +486,12 @@ export default function NotificationsPage() {
                       </select>
                     </label>
 
-                    <label className="space-y-2 text-sm font-medium text-slate-700">
+                    <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                       <span>Filter severity</span>
                       <select
                         value={severityFilter}
                         onChange={(event) => setSeverityFilter(event.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                        className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none"
                       >
                         <option value="all">Semua severity</option>
                         <option value="high">High</option>
@@ -500,11 +500,11 @@ export default function NotificationsPage() {
                       </select>
                     </label>
 
-                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 xl:col-span-2">
-                      <p className="text-sm text-slate-600">
+                    <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4 xl:col-span-2">
+                      <p className="text-sm text-[#d8bc84]">
                         Menampilkan {paginatedNotifications.length} dari {filteredNotifications.length} alert
                       </p>
-                      <p className="mt-2 text-sm text-slate-600">
+                      <p className="mt-2 text-sm text-[#d8bc84]">
                         Halaman {notificationPage} dari {totalNotificationPages}
                       </p>
                     </div>
@@ -513,14 +513,14 @@ export default function NotificationsPage() {
 
                 <section className="space-y-4">
                   {filteredNotifications.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                    <div className="clara-empty-state border-dashed p-8 text-center text-sm text-[#d6bb84]">
                       Tidak ada alert yang cocok dengan filter saat ini. Coba ubah status atau severity untuk melihat histori alert lain.
                     </div>
                   ) : (
                     paginatedNotifications.map((item) => (
                       <article
                         key={item.id}
-                        className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+                        className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
                       >
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -535,28 +535,28 @@ export default function NotificationsPage() {
                           >
                             {item.severity.toUpperCase()}
                           </span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                             {formatStatusLabel(item.status)}
                           </span>
-                          <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                             Delivery: {formatStatusLabel(item.delivery_status)}
                           </span>
-                          <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
+                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                             Escalation: {formatStatusLabel(item.escalation_level)}
                           </span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                             Age: {formatStatusLabel(item.age_bucket)}
                           </span>
                         </div>
-                        <p className="mt-2 text-sm leading-7 text-slate-600">
+                        <p className="mt-2 text-sm leading-7 text-[#d6bb84]">
                           {item.body}
                         </p>
-                        <p className="mt-3 text-xs text-slate-500">
+                        <p className="mt-3 text-xs text-[#b89a62]">
                           Dibuat: {formatDateTime(item.created_at)} • Update:{" "}
                           {formatDateTime(item.updated_at)}
                         </p>
                         {item.resolution_note ? (
-                          <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
+                          <p className="mt-3 rounded-xl border border-[#f0cb73]/16 bg-[#1d150d] p-3 text-sm text-[#f0cb73]">
                             Resolution note: {item.resolution_note}
                           </p>
                         ) : null}
@@ -571,7 +571,7 @@ export default function NotificationsPage() {
                                 currentUser?.role,
                               ) as string
                             }
-                            className="inline-flex justify-center rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
+                            className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
                           >
                             Buka Tindakan
                           </Link>
@@ -584,7 +584,7 @@ export default function NotificationsPage() {
                               onClick={() => {
                                 void handleAcknowledge(item);
                               }}
-                              className="inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-70"
+                              className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
                             >
                               {updatingId === item.id ? "Memproses..." : "Acknowledge"}
                             </button>
@@ -594,7 +594,7 @@ export default function NotificationsPage() {
                               onClick={() => {
                                 void handleResolve(item);
                               }}
-                              className="inline-flex justify-center rounded-full border border-emerald-300 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                              className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-70"
                             >
                               Resolve
                             </button>
@@ -605,7 +605,7 @@ export default function NotificationsPage() {
                                 onClick={() => {
                                   void handleEscalate(item);
                                 }}
-                                className="inline-flex justify-center rounded-full border border-violet-300 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 disabled:cursor-not-allowed disabled:opacity-70"
+                                className="inline-flex justify-center rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-4 py-2.5 text-sm font-semibold text-[#f0cb73] disabled:cursor-not-allowed disabled:opacity-70"
                               >
                                 Escalate
                               </button>
@@ -619,7 +619,7 @@ export default function NotificationsPage() {
                             onClick={() => {
                               void handleReopen(item);
                             }}
-                            className="inline-flex justify-center rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
                           >
                             Reopen
                           </button>
@@ -632,9 +632,9 @@ export default function NotificationsPage() {
                 </section>
 
                 {filteredNotifications.length > pageSize ? (
-                  <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                  <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-4 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-slate-600">Navigasi daftar alert</p>
+                      <p className="text-sm text-[#d8bc84]">Navigasi daftar alert</p>
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
@@ -642,7 +642,7 @@ export default function NotificationsPage() {
                             setNotificationPage((current) => Math.max(1, current - 1))
                           }
                           disabled={notificationPage === 1}
-                          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Sebelumnya
                         </button>
@@ -654,7 +654,7 @@ export default function NotificationsPage() {
                             )
                           }
                           disabled={notificationPage === totalNotificationPages}
-                          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Berikutnya
                         </button>
@@ -664,11 +664,11 @@ export default function NotificationsPage() {
                 ) : null}
               </>
             ) : (
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                   Lanjutkan Dari Sini
                 </p>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-[#e3c990]">
                   {isHeadMonitorView
                     ? "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role head, langkah berikutnya biasanya memantau kesehatan lintas team, coaching queue, dan pipeline lead yang masih tertahan."
                     : "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role manager, langkah berikutnya biasanya memantau disiplin tim, coaching review, atau status lead yang masih tertahan."}
@@ -677,34 +677,34 @@ export default function NotificationsPage() {
                   {isHeadMonitorView ? (
                     <Link
                       href="/dashboard/kpi"
-                      className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
+                      className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
                     >
                       Buka KPI Dashboard
                     </Link>
                   ) : (
                     <Link
                       href="/dashboard/manager-insights"
-                      className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white"
+                      className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
                     >
                       Buka Manager Insights
                     </Link>
                   )}
                   <Link
                     href="/dashboard/approvals"
-                    className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                    className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                   >
                     Buka Chat Review Center
                   </Link>
                   <Link
                     href="/dashboard/crm"
-                    className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                    className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                   >
                     Buka Lead Management
                   </Link>
                   {isHeadMonitorView ? (
                     <Link
                       href="/dashboard/manager-insights"
-                      className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                      className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                     >
                       Buka Manager Insights
                     </Link>
@@ -727,20 +727,20 @@ function UsageHint({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4">
+    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
       <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
     </div>
   );
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+    <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#140f08]">
         {label}
       </p>
-      <p className="mt-3 text-3xl font-bold text-slate-950">{value}</p>
+      <p className="mt-3 text-3xl font-bold text-[#140f08]">{value}</p>
     </article>
   );
 }

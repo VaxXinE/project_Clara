@@ -199,7 +199,7 @@ export default function ChatReviewCenterPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="clara-empty-state text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-[#d6bb84]">
             Loading chat review center...
           </div>
         )}
@@ -210,10 +210,10 @@ export default function ChatReviewCenterPage() {
 
         {queue && !isLoading && !errorMessage && (
           <>
-            <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#eef6ff_0%,#ffffff_42%,#f8fafc_100%)] p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[28px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                     Langkah Berikutnya
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -221,7 +221,7 @@ export default function ChatReviewCenterPage() {
                       ? emptyStateTitle
                       : "Ambil item paling berisiko atau paling lama menunggu dulu"}
                   </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
                     {queue.items.length === 0
                       ? emptyStateDescription
                       : "Halaman ini dipakai untuk triase cepat. Utamakan escalation, chat high risk, atau item stale sebelum Anda turun ke item yang lebih ringan."}
@@ -233,15 +233,15 @@ export default function ChatReviewCenterPage() {
                       ? `/dashboard/sales/conversations/${queue.items[0].conversation_id}`
                       : fallbackHref
                   }
-                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
                 >
                   {queue.items[0] ? "Buka Item Teratas" : fallbackLabel}
                 </Link>
               </div>
             </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.18)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                 Cara Pakai Halaman Ini
               </p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -293,13 +293,13 @@ export default function ChatReviewCenterPage() {
               />
             </section>
 
-            <section className="grid gap-3 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)] md:grid-cols-4">
-              <label className="space-y-2 text-sm font-medium text-slate-700">
+            <section className="grid gap-3 rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)] md:grid-cols-4">
+              <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                 <span>Filter bucket</span>
                 <select
                   value={reviewBucketFilter}
                   onChange={(event) => setReviewBucketFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                  className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
                 >
                   <option value="all">Semua bucket</option>
                   <option value="needs_analysis">Butuh AI analysis</option>
@@ -312,12 +312,12 @@ export default function ChatReviewCenterPage() {
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm font-medium text-slate-700">
+              <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                 <span>Filter risk</span>
                 <select
                   value={riskLevelFilter}
                   onChange={(event) => setRiskLevelFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                  className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
                 >
                   <option value="all">Semua risk</option>
                   <option value="high">High</option>
@@ -326,12 +326,12 @@ export default function ChatReviewCenterPage() {
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm font-medium text-slate-700">
+              <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                 <span>Filter age</span>
                 <select
                   value={ageBucketFilter}
                   onChange={(event) => setAgeBucketFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                  className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
                 >
                   <option value="all">Semua age</option>
                   <option value="fresh">Fresh (&lt;24 jam)</option>
@@ -340,12 +340,12 @@ export default function ChatReviewCenterPage() {
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm font-medium text-slate-700">
+              <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                 <span>Filter channel</span>
                 <select
                   value={sourceChannelFilter}
                   onChange={(event) => setSourceChannelFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                  className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
                 >
                   <option value="all">Semua channel</option>
                   <option value="whatsapp">WhatsApp</option>
@@ -388,7 +388,7 @@ export default function ChatReviewCenterPage() {
 
             <section className="space-y-4">
               {queue.items.length === 0 ? (
-                <div className="clara-empty-state text-sm text-slate-500">
+                <div className="clara-empty-state text-sm text-[#d6bb84]">
                   Tidak ada item review yang cocok dengan filter saat ini. Halaman ini hanya memuat chat yang benar-benar perlu analisis, draft, approval, escalation, atau sudah stale.
                 </div>
               ) : (
@@ -468,11 +468,11 @@ function ReviewCard({
             </span>
           </div>
 
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-[#d6bb84]">
             {item.conversation_title} &bull; {formatStatusLabel(item.current_stage)}{" "}
             &bull; {item.source_label}
           </p>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-[#b89a62]">
             Owner: {item.sales_owner_name ?? "-"} &bull; Queue since:{" "}
             {formatDateTime(item.queue_since_at)}
           </p>
@@ -480,16 +480,16 @@ function ReviewCard({
 
         <div className="flex flex-wrap gap-2">
           {item.latest_reply_suggestion && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
               {formatStatusLabel(item.latest_reply_suggestion.approval_status)}
             </span>
           )}
           {item.latest_reply_suggestion && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
               {formatStatusLabel(item.latest_reply_suggestion.action_mode)}
             </span>
           )}
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+          <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
             Score {item.priority_score}
           </span>
         </div>
@@ -498,10 +498,10 @@ function ReviewCard({
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="clara-card-soft rounded-2xl p-4">
           <p className="clara-kicker text-xs">Latest Customer Context</p>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#fff0c9]">
             {item.latest_message_preview ?? "Belum ada preview pesan terbaru."}
           </p>
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-[#b89a62]">
             Last message: {formatDateTime(item.latest_message_at)}
           </p>
         </div>
@@ -509,21 +509,21 @@ function ReviewCard({
         <div className="space-y-4">
           <div className="clara-card-soft rounded-2xl p-4">
             <p className="clara-kicker text-xs">Recommended Action</p>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
+            <p className="mt-3 text-sm leading-7 text-[#fff0c9]">
               {item.recommended_action}
             </p>
           </div>
 
           {item.active_review_case_id ? (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="clara-kicker text-xs text-amber-700">
+            <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
+              <p className="clara-kicker text-xs text-[#f0cb73]">
                 Active Coaching Case
               </p>
-              <p className="mt-3 text-sm font-semibold text-amber-900">
+              <p className="mt-3 text-sm font-semibold text-[#fff0c9]">
                 {formatStatusLabel(item.active_review_status ?? "draft")} ·{" "}
                 {(item.active_review_label ?? "unik").replaceAll("_", " ")}
               </p>
-              <p className="mt-2 text-sm leading-6 text-amber-800">
+              <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
                 Reviewer: {item.active_review_reviewer_name ?? "Belum ditunjuk"}
               </p>
             </div>
@@ -601,9 +601,9 @@ function UsageHint({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4">
+    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
       <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
     </div>
   );
 }
@@ -618,19 +618,19 @@ function QueueMetric({
   hint: string;
 }) {
   return (
-    <article className="clara-card rounded-[28px] p-6">
-      <p className="clara-kicker text-xs text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold text-slate-950">{value}</p>
-      <p className="mt-2 text-sm text-slate-600">{hint}</p>
+    <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#140f08]">{label}</p>
+      <p className="mt-3 text-3xl font-bold text-[#140f08]">{value}</p>
+      <p className="mt-2 text-sm text-[#2f210f]">{hint}</p>
     </article>
   );
 }
 
 function MetaCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white p-4">
+    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
       <p className="clara-kicker text-[11px]">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+      <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
     </div>
   );
 }
@@ -638,29 +638,29 @@ function MetaCard({ label, value }: { label: string; value: string }) {
 function getReviewBucketBadgeClass(reviewBucket: string) {
   switch (reviewBucket) {
     case "human_escalation":
-      return "bg-red-100 text-red-700";
+      return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
     case "pending_approval":
     case "draft_review":
-      return "bg-amber-100 text-amber-700";
+      return "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]";
     case "needs_analysis":
-      return "bg-blue-100 text-blue-700";
+      return "border border-[#f0cb73]/18 bg-[#241a10] text-[#f0cb73]";
     case "needs_reply_suggestion":
     case "needs_rework":
-      return "bg-violet-100 text-violet-700";
+      return "border border-[#f0cb73]/18 bg-[#2b2013] text-[#f0cb73]";
     case "ready_to_send":
-      return "bg-green-100 text-green-700";
+      return "border border-[#f0cb73]/18 bg-[#1f170f] text-[#f0cb73]";
     default:
-      return "bg-slate-100 text-slate-700";
+      return "border border-[#f0cb73]/18 bg-[#1d150d] text-[#f0cb73]";
   }
 }
 
 function getAgeBucketBadgeClass(ageBucket: string) {
   switch (ageBucket) {
     case "stale":
-      return "bg-red-100 text-red-700";
+      return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
     case "aging":
-      return "bg-amber-100 text-amber-700";
+      return "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]";
     default:
-      return "bg-slate-100 text-slate-700";
+      return "border border-[#f0cb73]/18 bg-[#1d150d] text-[#f0cb73]";
   }
 }

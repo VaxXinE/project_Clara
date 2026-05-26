@@ -309,7 +309,7 @@ export default function DashboardHomePage() {
           <div className="clara-panel overflow-hidden rounded-[34px] p-6 sm:p-8">
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_250px]">
               <div>
-                <span className="inline-flex rounded-full border border-[#e5d2b3] bg-[#fff5e5] px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-[#8d6737]">
+                <span className="inline-flex rounded-full border border-[#f0cb73]/24 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
                   {roleLabel?.title ?? "Workspace"}
                 </span>
                 <h2 className="mt-5 max-w-3xl text-3xl font-bold tracking-[-0.05em] text-slate-950 sm:text-[2.85rem]">
@@ -336,15 +336,15 @@ export default function DashboardHomePage() {
                 </div>
               </div>
 
-              <div className="rounded-[30px] bg-[linear-gradient(180deg,#10172d_0%,#172241_100%)] p-5 text-white shadow-[0_20px_40px_rgba(16,23,45,0.22)]">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d4b07b]">
+              <div className="rounded-[30px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(30,22,14,0.98)_0%,rgba(17,12,8,0.98)_100%)] p-5 text-white shadow-[0_20px_40px_rgba(0,0,0,0.26)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                   Fokus Hari Ini
                 </p>
                 <ul className="mt-4 space-y-3">
                   {(roleLabel?.focus ?? []).map((item) => (
                     <li
                       key={item}
-                      className="rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm leading-6 text-slate-100"
+                      className="rounded-2xl border border-[#f0cb73]/14 bg-[#f0cb73]/8 px-4 py-3 text-sm leading-6 text-[#f7e7b7]"
                     >
                       {item}
                     </li>
@@ -357,11 +357,11 @@ export default function DashboardHomePage() {
           <div className="space-y-4">
             <section className="clara-panel-soft rounded-[28px] p-5">
               <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#10172d] text-[#f4e7d3]">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
                   <FontAwesomeIcon icon={faBullseye} className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8d6737]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
                     System Pulse
                   </p>
                   <h3 className="mt-1 text-lg font-semibold text-slate-950">
@@ -386,11 +386,11 @@ export default function DashboardHomePage() {
             </section>
 
             <section className="clara-panel-soft rounded-[28px] p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#8d6737]">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
                 Aktivitas Terakhir
               </p>
               {latestConversation ? (
-                <div className="mt-4 rounded-[24px] border border-white/80 bg-white/80 p-4">
+                <div className="mt-4 rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
                   <p className="text-base font-semibold text-slate-950">
                     {latestConversation.title}
                   </p>
@@ -409,14 +409,14 @@ export default function DashboardHomePage() {
                   </div>
                   <Link
                     href={`/dashboard/sales/conversations/${latestConversation.conversation_id}`}
-                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14"
                   >
                     Buka Conversation
                     <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3" />
                   </Link>
                 </div>
               ) : (
-                <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-white/70 p-5 text-sm text-slate-600">
+                <div className="mt-4 rounded-[24px] border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-slate-600">
                   Belum ada conversation yang tampil. Kalau baru mulai, upload
                   chat WhatsApp pertama dulu agar workspace ini mulai terasa
                   hidup.
@@ -439,28 +439,28 @@ export default function DashboardHomePage() {
             value={isLoading ? "..." : String(metrics.inboxCount)}
             hint="Jumlah percakapan yang sedang bisa ditindak lanjuti dari workspace."
             icon={faComments}
-            accent="from-[#fff4e5] to-[#f5dcc0]"
+            accent="from-[#f7dfa2] to-[#be8d2f]"
           />
           <MetricCard
             label="Sudah Dianalisis"
             value={isLoading ? "..." : String(metrics.analyzedCount)}
             hint="Conversation yang sudah punya pembacaan AI dan next action."
             icon={faWandSparkles}
-            accent="from-[#eef4ff] to-[#dfe8fb]"
+            accent="from-[#f3d48a] to-[#9f7121]"
           />
           <MetricCard
             label="Cakupan Insight"
             value={isLoading ? "..." : String(metrics.insightConversationCount)}
             hint="Percakapan yang ikut membentuk insight marketing saat ini."
             icon={faChartLine}
-            accent="from-[#ebfaf4] to-[#d5eedf]"
+            accent="from-[#f1cf7a] to-[#7f5a1a]"
           />
           <MetricCard
             label="Risiko Tinggi"
             value={isLoading ? "..." : String(metrics.highRiskCount)}
             hint="Percakapan sensitif yang sebaiknya ditangani atau ditinjau lebih cepat."
             icon={faTriangleExclamation}
-            accent="from-[#fff0ea] to-[#f7d7c8]"
+            accent="from-[#f6dc9d] to-[#b67d27]"
           />
         </section>
 
@@ -501,13 +501,13 @@ export default function DashboardHomePage() {
                     worklist.items.slice(0, 3).map((item) => (
                       <div
                         key={`${item.lead_id}-${item.task_type}`}
-                        className="rounded-[24px] border border-slate-200/80 bg-[#fffdf8] p-4"
+                        className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-semibold text-slate-950">
                             {item.lead_name}
                           </p>
-                          <span className="rounded-full bg-[#fff0da] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6737]">
+                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                             {item.task_label}
                           </span>
                         </div>
@@ -517,7 +517,7 @@ export default function DashboardHomePage() {
                       </div>
                     ))
                   ) : (
-                    <div className="rounded-[24px] border border-dashed border-slate-300 bg-[#fffdf8] p-5 text-sm text-slate-600">
+                    <div className="rounded-[24px] border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-slate-600">
                       Belum ada follow-up yang mendesak.
                     </div>
                   )}
@@ -531,13 +531,13 @@ export default function DashboardHomePage() {
                 actionHref="/dashboard/approvals"
               >
                 <div className="space-y-3">
-                  <div className="rounded-[24px] border border-slate-200/80 bg-[#fffdf8] p-4">
+                  <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
                     <p className="font-semibold text-slate-950">Chat Review Center</p>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
                       Manager fokus ke bottleneck percakapan, coaching case, dan approval, bukan kerja dari Queue harian.
                     </p>
                   </div>
-                  <div className="rounded-[24px] border border-slate-200/80 bg-[#fffdf8] p-4">
+                  <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
                     <p className="font-semibold text-slate-950">Manager Insights</p>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
                       Gunakan manager insights untuk lihat disiplin tim, coaching priority, dan boundary alert sebelum turun ke lead tertentu.
@@ -580,18 +580,18 @@ export default function DashboardHomePage() {
                       />
                     </div>
 
-                    <div className="rounded-[24px] bg-[linear-gradient(180deg,#10172d_0%,#172241_100%)] p-4 text-white">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#d4b07b]">
+                    <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(30,22,14,0.98)_0%,rgba(17,12,8,0.98)_100%)] p-4 text-white">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                         Observation
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-100">
+                      <p className="mt-2 text-sm leading-6 text-[#f7e7b7]">
                         {kpi.key_observations[0] ??
                           "Belum ada observasi yang cukup kuat untuk ditampilkan."}
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-[24px] border border-dashed border-slate-300 bg-[#fffdf8] p-5 text-sm text-slate-600">
+                  <div className="rounded-[24px] border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-slate-600">
                     KPI preview belum tersedia untuk role ini atau data pipeline
                     masih tipis.
                   </div>
@@ -604,13 +604,13 @@ export default function DashboardHomePage() {
         <section className="grid gap-6 xl:grid-cols-[1fr_0.92fr]">
           <PanelFrame eyebrow="Security" title="Jaga akses akun tetap aman">
             <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-              <div className="rounded-[24px] bg-[linear-gradient(180deg,#10172d_0%,#172241_100%)] p-5 text-white">
+              <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(30,22,14,0.98)_0%,rgba(17,12,8,0.98)_100%)] p-5 text-white">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#f4e7d3]">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f0cb73]/10 text-[#f7dfa2]">
                     <FontAwesomeIcon icon={faShieldHalved} className="h-4 w-4" />
                   </span>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#d4b07b]">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
                       Account Safety
                     </p>
                     <h3 className="mt-1 text-xl font-semibold">Keamanan akun Clara</h3>
@@ -653,7 +653,7 @@ export default function DashboardHomePage() {
                 <button
                   type="submit"
                   disabled={isChangingPassword}
-                  className="rounded-full bg-[#10172d] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(16,23,45,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_12px_28px_rgba(0,0,0,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isChangingPassword ? "Saving..." : "Update Password"}
                 </button>
@@ -927,20 +927,20 @@ function NextStepBanner({
   actionLabel: string;
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_55%,#334155_100%)] p-6 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+    <section className="rounded-3xl border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-6 text-white shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
             Langkah Berikutnya
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight">{title}</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-200">
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-[#ecd2a0]">
             {description}
           </p>
         </div>
         <Link
           href={href}
-          className="inline-flex rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-slate-100"
+          className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] hover:brightness-105"
         >
           {actionLabel}
         </Link>
@@ -1013,7 +1013,7 @@ function ActionCard({
   return (
     <Link
       href={resolvedHref}
-      className="clara-card-soft group rounded-[26px] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(16,23,45,0.08)]"
+      className="clara-card-soft group rounded-[26px] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_16px_30px_rgba(0,0,0,0.16)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -1022,12 +1022,12 @@ function ActionCard({
             {resolvedTitle}
           </h3>
         </div>
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#10172d] text-[#f4e7d3]">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
           <FontAwesomeIcon icon={resolvedIcon} className="h-4 w-4" />
         </span>
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-600">{resolvedDescription}</p>
-      <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#7d5b32]">
+      <span className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#f0cb73]">
         Buka modul
         <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3 transition group-hover:translate-x-0.5" />
       </span>
@@ -1049,7 +1049,7 @@ function MiniInsightCard({
   return (
     <div className="clara-card-soft rounded-[24px] p-4">
       <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#10172d] text-[#f4e7d3]">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />
         </span>
         <div>
@@ -1076,7 +1076,7 @@ function NoteCard({
   return (
     <div className="clara-card-soft rounded-[24px] p-4">
       <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#10172d] text-[#f4e7d3]">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />
         </span>
         <div>
@@ -1106,7 +1106,7 @@ function PasswordField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         type="password"
-        className="mt-2 w-full rounded-2xl border border-slate-300/90 bg-white/85 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#cdae7c]"
+        className="mt-2 w-full rounded-2xl border border-[#f0cb73]/20 bg-[#17120d]/90 px-4 py-3 text-sm text-[#f7e7b7] outline-none focus:border-[#f0cb73]"
         placeholder="Minimum 8 karakter"
       />
     </div>
@@ -1122,14 +1122,14 @@ function PasswordStrengthHint({
 }) {
   if (!password) {
     return (
-      <p className="rounded-2xl border border-slate-200/80 bg-[#fffdf8] p-3 text-xs text-slate-600">
+      <p className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.92)_0%,rgba(18,13,10,0.92)_100%)] p-3 text-xs text-slate-600">
         Hint: gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol.
       </p>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-[#fffdf8] p-3">
+    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.92)_0%,rgba(18,13,10,0.92)_100%)] p-3">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6737]">
           Password Strength

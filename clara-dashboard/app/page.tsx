@@ -78,9 +78,9 @@ const operatingNotes = [
 export default function HomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden px-4 py-6 sm:px-6 sm:py-8">
-      <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(212,176,123,0.26),_transparent_62%)]" />
-      <div className="absolute right-0 top-24 h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(16,23,45,0.12),_transparent_68%)] blur-3xl" />
-      <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-[radial-gradient(circle,_rgba(212,176,123,0.12),_transparent_72%)] blur-3xl" />
+      <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,_rgba(240,203,115,0.22),_transparent_62%)]" />
+      <div className="absolute right-0 top-24 h-72 w-72 rounded-full bg-[radial-gradient(circle,_rgba(194,144,50,0.14),_transparent_68%)] blur-3xl" />
+      <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-[radial-gradient(circle,_rgba(240,203,115,0.14),_transparent_72%)] blur-3xl" />
 
       <section className="relative mx-auto flex w-full max-w-7xl flex-col gap-6">
         <header className="clara-surface rounded-[30px] px-5 py-4 sm:px-6">
@@ -110,7 +110,7 @@ export default function HomePage() {
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_380px]">
           <div className="space-y-6">
-            <article className="clara-card rounded-[36px] p-6 sm:p-8 h-fit">
+            <article className="clara-card h-fit rounded-[36px] p-6 sm:p-8">
               <span className="clara-chip">Operational Truth Layer</span>
               <h2 className="mt-5 max-w-4xl text-4xl font-bold tracking-[-0.06em] text-slate-950 sm:text-[3.5rem] sm:leading-[1.02]">
                 Dari chat harian tim operasional menjadi insight yang siap
@@ -131,7 +131,7 @@ export default function HomePage() {
                   Buka Workspace
                 </Link>
                 <Link
-                  href="/dashboard/start"
+                  href="/start"
                   className="clara-button clara-button-secondary"
                 >
                   Lihat Core Workflow
@@ -189,7 +189,7 @@ export default function HomePage() {
 
           <div className="space-y-6">
             <section className="clara-card-dark rounded-[34px] p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#d4b07b]">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                 Core Workflow
               </p>
               <ol className="mt-5 space-y-3">
@@ -222,7 +222,7 @@ export default function HomePage() {
                 {operatingNotes.map((note) => (
                   <div
                     key={note}
-                    className="rounded-[22px] border border-white/80 bg-white/80 px-4 py-3 text-sm leading-6 text-slate-600"
+                    className="rounded-[22px] border border-white/10 bg-white/6 px-4 py-3 text-sm leading-6 text-slate-600"
                   >
                     {note}
                   </div>

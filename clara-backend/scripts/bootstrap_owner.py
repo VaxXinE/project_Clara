@@ -9,6 +9,7 @@ from sqlalchemy import select
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.db.session import SessionLocal
+from app.core.config import settings
 from app.models.ai_extraction import AIExtraction  # noqa: F401
 from app.models.approval_log import ApprovalLog  # noqa: F401
 from app.models.conversation import Conversation  # noqa: F401
@@ -48,7 +49,33 @@ class BootstrapError(RuntimeError):
 
 
 def load_config() -> BootstrapConfig | None:
-    values = {key: os.getenv(key, "").strip() for key in ENV_KEYS}
+    values = {
+        "BOOTSTRAP_OWNER_NAME": (
+            os.getenv("BOOTSTRAP_OWNER_NAME")
+            or settings.bootstrap_owner_name
+            or ""
+        ).strip(),
+        "BOOTSTRAP_OWNER_EMAIL": (
+            os.getenv("BOOTSTRAP_OWNER_EMAIL")
+            or settings.bootstrap_owner_email
+            or ""
+        ).strip(),
+        "BOOTSTRAP_OWNER_PASSWORD": (
+            os.getenv("BOOTSTRAP_OWNER_PASSWORD")
+            or settings.bootstrap_owner_password
+            or ""
+        ).strip(),
+        "BOOTSTRAP_ORGANIZATION_NAME": (
+            os.getenv("BOOTSTRAP_ORGANIZATION_NAME")
+            or settings.bootstrap_organization_name
+            or ""
+        ).strip(),
+        "BOOTSTRAP_ORGANIZATION_SLUG": (
+            os.getenv("BOOTSTRAP_ORGANIZATION_SLUG")
+            or settings.bootstrap_organization_slug
+            or ""
+        ).strip(),
+    }
 
     if not any(values.values()):
         return None

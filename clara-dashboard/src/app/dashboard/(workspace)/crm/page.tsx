@@ -448,23 +448,23 @@ export default function CrmPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
             Loading Lead Management...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
             {errorMessage}
           </div>
         )}
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#eef2ff_0%,#ffffff_45%,#f8fafc_100%)] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            <section className="rounded-[24px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                     Lead Ops View
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -472,13 +472,13 @@ export default function CrmPage() {
                       ? "Belum ada lead yang cocok dengan filter ini"
                       : `${visibleLeads.length} lead siap dibaca cepat`}
                   </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
                     Fokus utamanya bukan membaca semua lead satu-satu, tapi menemukan mana yang perlu tindakan, mana yang belum sinkron, dan mana yang sudah aman.
                   </p>
                 </div>
                 <Link
                   href={visibleLeads[0] ? `/dashboard/crm/${visibleLeads[0].id}` : "/dashboard/upload"}
-                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
                 >
                   {visibleLeads[0] ? "Buka Lead Prioritas" : "Buka Lead Capture"}
                 </Link>
@@ -494,17 +494,17 @@ export default function CrmPage() {
               <BoardMetric label="Won" value={String(summary.won)} hint="Lead yang sudah closing berhasil." />
             </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#fff7ed_100%)] p-5 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
-              <div className="space-y-4 rounded-[24px] border border-white/70 bg-white/80 p-4 backdrop-blur-sm">
+            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+              <div className="space-y-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-4 backdrop-blur-sm">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="max-w-2xl">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                       Kontrol Lead
                     </p>
                     <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
                       Atur lead yang mau discan dari satu toolbar
                     </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-[#e3c990]">
                       Gunakan search, sort, channel, quick filter, dan bucket view supaya list lead tetap bersih walau volume hariannya tinggi.
                     </p>
                   </div>
@@ -517,22 +517,22 @@ export default function CrmPage() {
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr]">
-                  <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                     <span>Cari lead</span>
                     <input
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
                       placeholder="Cari nama lead, owner, customer profile, source, atau summary..."
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
+                      className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
                     />
                   </label>
 
-                  <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                     <span>Sort</span>
                     <select
                       value={sortBy}
                       onChange={(event) => setSortBy(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                      className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
                     >
                       {SORT_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -542,12 +542,12 @@ export default function CrmPage() {
                     </select>
                   </label>
 
-                  <label className="space-y-2 text-sm font-medium text-slate-700">
+                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                     <span>Channel</span>
                     <select
                       value={sourceChannelFilter}
                       onChange={(event) => setSourceChannelFilter(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                      className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
                     >
                       {SOURCE_CHANNEL_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -560,7 +560,7 @@ export default function CrmPage() {
 
                 <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                       Quick Filters
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -573,8 +573,8 @@ export default function CrmPage() {
                             onClick={() => setQuickFilter(option.value)}
                             className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                               isActive
-                                ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
-                                : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                                ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+                                : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
                             }`}
                           >
                             {option.label}
@@ -585,7 +585,7 @@ export default function CrmPage() {
                   </div>
 
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                       Bucket View
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -602,8 +602,8 @@ export default function CrmPage() {
                             onClick={() => setBucketFilter(option.value)}
                             className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                               isActive
-                                ? "bg-amber-500 text-slate-950 shadow-[0_10px_24px_rgba(245,158,11,0.28)]"
-                                : "border border-amber-200 bg-amber-50 text-amber-900 hover:border-amber-300"
+                                ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+                                : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
                             }`}
                           >
                             {option.label}{" "}
@@ -616,27 +616,27 @@ export default function CrmPage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[22px] border border-slate-200 bg-slate-950 px-4 py-3 text-sm text-slate-200 shadow-[0_12px_24px_rgba(15,23,42,0.1)]">
-                <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-100">
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[22px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] px-4 py-3 text-sm text-[#d8bc84] shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
+                <span className="rounded-full bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
                   Hasil
                 </span>
                 <span>
-                  Menampilkan <span className="font-semibold text-white">{paginatedVisibleLeads.length}</span> dari{" "}
-                  <span className="font-semibold text-white">{visibleLeads.length}</span> lead pada halaman ini.
+                  Menampilkan <span className="font-semibold text-[#fff0c9]">{paginatedVisibleLeads.length}</span> dari{" "}
+                  <span className="font-semibold text-[#fff0c9]">{visibleLeads.length}</span> lead pada halaman ini.
                 </span>
               </div>
             </section>
 
-            <section className="rounded-[24px] border border-amber-200 bg-amber-50/60 p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            <section className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-3xl">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-800">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                     Cara Kerja Halaman Ini
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                     Jangan baca semua lead. Selesaikan yang paling butuh aksi.
                   </h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">
+                  <p className="mt-2 text-sm leading-6 text-[#e3c990]">
                     Kalau Anda bingung harus mulai dari mana, pakai urutan ini:
                     pilih bucket <span className="font-semibold">Perlu tindakan</span>,
                     buka lead yang punya badge <span className="font-semibold">Overdue</span>,
@@ -661,24 +661,24 @@ export default function CrmPage() {
               </div>
             </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-2 pb-4">
+            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-4 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+              <div className="flex items-center justify-between gap-3 border-b border-[#f0cb73]/12 px-2 pb-4">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                     Lead List
                   </p>
                   <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                     Scan cepat dengan bucket operasional
                   </h3>
                 </div>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-[#c8ad75]">
                   {paginatedVisibleLeads.length} / {visibleLeads.length} lead tampil di halaman ini
                 </p>
               </div>
 
               <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
                 {paginatedVisibleLeads.length === 0 ? (
-                  <div className="clara-empty-state p-6 text-sm text-slate-500">
+                  <div className="clara-empty-state p-6 text-sm text-[#d6bb84]">
                     Tidak ada lead yang cocok dengan filter saat ini.
                   </div>
                 ) : (
@@ -724,8 +724,8 @@ export default function CrmPage() {
                         })}
 
                       {totalLeadPages > 1 ? (
-                        <div className="flex items-center justify-between gap-3 rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                          <p className="text-sm text-slate-600">
+                        <div className="flex items-center justify-between gap-3 rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
+                          <p className="text-sm text-[#d8bc84]">
                             Halaman {leadPage} dari {totalLeadPages}
                           </p>
                           <div className="flex gap-2">
@@ -733,7 +733,7 @@ export default function CrmPage() {
                               type="button"
                               disabled={leadPage === 1}
                               onClick={() => setLeadPage((current) => Math.max(1, current - 1))}
-                              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Sebelumnya
                             </button>
@@ -743,7 +743,7 @@ export default function CrmPage() {
                               onClick={() =>
                                 setLeadPage((current) => Math.min(totalLeadPages, current + 1))
                               }
-                              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Berikutnya
                             </button>
@@ -752,18 +752,18 @@ export default function CrmPage() {
                       ) : null}
                     </div>
 
-                    <aside className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 xl:sticky xl:top-6 xl:self-start">
+                    <aside className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-5 xl:sticky xl:top-6 xl:self-start">
                       {selectedLead ? (
                         <>
-                          <div className="border-b border-slate-100 pb-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                          <div className="border-b border-[#f0cb73]/12 pb-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                               Lead Preview
                             </p>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               <h3 className="text-xl font-bold tracking-tight text-slate-950">
                                 {selectedLead.display_name}
                               </h3>
-                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                                 {STAGE_LABELS[selectedLead.current_stage] ??
                                   selectedLead.current_stage}
                               </span>
@@ -775,36 +775,36 @@ export default function CrmPage() {
                                 {selectedLead.lead_temperature.toUpperCase()}
                               </span>
                             </div>
-                            <p className="mt-3 text-sm leading-6 text-slate-600">
+                            <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
                               {selectedLead.summary ??
                                 "Belum ada summary lead. Buka detail penuh kalau mau update konteks atau review AI lebih dalam."}
                             </p>
                           </div>
 
                           <div className="mt-4 space-y-4">
-                            <section className="rounded-[20px] border border-slate-200 bg-white p-4">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                            <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
                                 Sync Health
                               </p>
                               <div className="mt-3 flex flex-wrap gap-2">
-                                <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold text-white">
+                                <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
                                   {selectedLead.needs_deal_sync
                                     ? "Need deal sync"
                                     : "CRM sync ok"}
                                 </span>
                                 {isOverdueLead(selectedLead) && (
-                                  <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
                                     Follow-up overdue
                                   </span>
                                 )}
                                 {selectedLead.discipline_compliance_status !== "logged_today" ? (
-                                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-800">
+                                   <span className="rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
                                     {DISCIPLINE_LABELS[
                                       selectedLead.discipline_compliance_status
                                     ] ?? selectedLead.discipline_compliance_status}
                                   </span>
                                 ) : (
-                                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                   <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
                                     Discipline ok
                                   </span>
                                 )}
@@ -841,8 +841,8 @@ export default function CrmPage() {
                               />
                             </section>
 
-                            <section className="rounded-[20px] border border-slate-200 bg-white p-4">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                            <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
                                 Apa yang harus dilakukan
                               </p>
                               <div className="mt-3 space-y-3">
@@ -857,8 +857,8 @@ export default function CrmPage() {
                               </div>
                             </section>
 
-                            <section className="rounded-[20px] border border-slate-200 bg-white p-4">
-                              <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                              <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
                                 Update stage cepat
                               </label>
                               <select
@@ -899,7 +899,7 @@ export default function CrmPage() {
                           </div>
                         </>
                       ) : (
-                        <div className="clara-empty-state p-6 text-sm text-slate-500">
+                        <div className="clara-empty-state p-6 text-sm text-[#d6bb84]">
                           Pilih satu lead dari panel kiri untuk melihat preview cepatnya.
                         </div>
                       )}
@@ -934,14 +934,14 @@ function renderBucketSection({
     <section className="space-y-3">
       <div className="px-1">
         <div className="flex items-center justify-between gap-3">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.22em] text-slate-700">
+          <h4 className="text-sm font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
             {title}
           </h4>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+          <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
             {leads.length} lead
           </span>
         </div>
-        <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
+        <p className="mt-2 text-sm leading-6 text-[#c8ad75]">{description}</p>
       </div>
 
       <div className="space-y-3">
@@ -976,8 +976,8 @@ function LeadListRow({
       onClick={onSelect}
       className={`block w-full rounded-[22px] border p-4 text-left transition ${
         isSelected
-          ? "border-slate-950 bg-[linear-gradient(180deg,#ffffff_0%,#eff6ff_100%)] shadow-[0_16px_32px_rgba(15,23,42,0.10)]"
-          : "border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] hover:border-slate-300"
+          ? "border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(60,42,17,0.98)_0%,rgba(27,20,14,0.98)_100%)] shadow-[0_16px_32px_rgba(0,0,0,0.22)]"
+          : "border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] hover:border-[#f0cb73]/28"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -986,7 +986,7 @@ function LeadListRow({
             <h2 className="text-base font-semibold text-slate-950">
               {lead.display_name}
             </h2>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
               {STAGE_LABELS[lead.current_stage] ?? lead.current_stage}
             </span>
             <span
@@ -997,60 +997,60 @@ function LeadListRow({
               {lead.lead_temperature.toUpperCase()}
             </span>
             {lead.account_category !== "unknown" && (
-              <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                 {lead.account_category}
               </span>
             )}
             {isOverdue && (
-              <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                 Overdue
               </span>
             )}
             {lead.needs_deal_sync && (
-              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                 Need sync
               </span>
             )}
             {lead.discipline_compliance_status !== "logged_today" && (
-              <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-800">
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                 {DISCIPLINE_LABELS[lead.discipline_compliance_status] ??
                   lead.discipline_compliance_status}
               </span>
             )}
           </div>
 
-          <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
+          <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#d6bb84]">
             {lead.summary ??
               "Belum ada summary lead. Jalankan AI analysis dulu kalau konteksnya masih mentah."}
           </p>
 
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
-            <p className="rounded-full bg-slate-50 px-3 py-1.5">
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[#c8ad75]">
+            <p className="rounded-full border border-[#f0cb73]/14 bg-[#1d150d] px-3 py-1.5">
               Owner:{" "}
-              <span className="font-semibold text-slate-700">
+              <span className="font-semibold text-[#f0cb73]">
                 {lead.assigned_user_name ?? "Belum ada owner"}
               </span>
             </p>
-            <p className="rounded-full bg-slate-50 px-3 py-1.5">
+            <p className="rounded-full border border-[#f0cb73]/14 bg-[#1d150d] px-3 py-1.5">
               Last contact:{" "}
-              <span className="font-semibold text-slate-700">
+              <span className="font-semibold text-[#f0cb73]">
                 {formatDateTime(lead.last_contact_at)}
               </span>
             </p>
-            <p className="rounded-full bg-slate-50 px-3 py-1.5">
+            <p className="rounded-full border border-[#f0cb73]/14 bg-[#1d150d] px-3 py-1.5">
               Next follow-up:{" "}
-              <span className="font-semibold text-slate-700">
+              <span className="font-semibold text-[#f0cb73]">
                 {formatDateTime(lead.next_follow_up_at)}
               </span>
             </p>
-            <p className="rounded-full bg-slate-50 px-3 py-1.5">
+            <p className="rounded-full border border-[#f0cb73]/14 bg-[#1d150d] px-3 py-1.5">
               Priority:{" "}
-              <span className="font-semibold text-slate-700">{priorityScore}</span>
+              <span className="font-semibold text-[#f0cb73]">{priorityScore}</span>
             </p>
           </div>
         </div>
 
-        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+        <div className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
           {lead.source_label}
         </div>
       </div>
@@ -1060,11 +1060,11 @@ function LeadListRow({
 
 function LeadMetaPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-full border border-slate-200 bg-white px-3.5 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+    <div className="rounded-full border border-[#f0cb73]/18 bg-[#1d150d] px-3.5 py-2 shadow-[0_8px_18px_rgba(0,0,0,0.14)]">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b58d43]">
         {label}
       </span>
-      <span className="ml-2 text-sm font-semibold text-slate-700">{value}</span>
+      <span className="ml-2 text-sm font-semibold text-[#f0cb73]">{value}</span>
     </div>
   );
 }
@@ -1077,11 +1077,11 @@ function PreviewStat({
   value: string;
 }) {
   return (
-    <article className="rounded-[18px] border border-slate-200 bg-white p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+    <article className="rounded-[18px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+      <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
     </article>
   );
 }
@@ -1096,12 +1096,12 @@ function BoardMetric({
   hint: string;
 }) {
   return (
-    <article className="clara-card rounded-[24px] p-5">
-      <p className="clara-kicker text-[11px] text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+    <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#140f08]">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
         {value}
       </p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{hint}</p>
+      <p className="mt-2 text-sm leading-6 text-[#2f210f]">{hint}</p>
     </article>
   );
 }
@@ -1114,9 +1114,9 @@ function BoardGuideCard({
   description: string;
 }) {
   return (
-    <article className="rounded-[20px] border border-amber-200 bg-white/80 p-4">
+    <article className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
       <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-700">{description}</p>
+      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
     </article>
   );
 }
@@ -1131,12 +1131,12 @@ function ActionGuideCard({
   detail: string;
 }) {
   return (
-    <article className="rounded-[18px] border border-slate-200 bg-slate-50 p-4">
-      <h4 className="text-sm font-semibold text-slate-900">{title}</h4>
-      <p className="mt-2 text-sm font-medium leading-6 text-slate-800">
+    <article className="rounded-[18px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+      <h4 className="text-sm font-semibold text-slate-950">{title}</h4>
+      <p className="mt-2 text-sm font-medium leading-6 text-[#fff0c9]">
         {action}
       </p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
+      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{detail}</p>
     </article>
   );
 }

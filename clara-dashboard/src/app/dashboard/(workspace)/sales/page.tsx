@@ -382,10 +382,10 @@ export default function SalesInboxPage() {
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#fff7ed_0%,#ffffff_45%,#eff6ff_100%)] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            <section className="rounded-[24px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                     Langkah Berikutnya
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -395,7 +395,7 @@ export default function SalesInboxPage() {
                         : "Inbox masih kosong"
                       : "Kerjakan bucket paling atas lebih dulu"}
                   </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
                     {filteredInboxItems.length === 0
                       ? archiveScope === "archived"
                         ? "Belum ada chat yang masuk arsip otomatis. Conversation yang tidak aktif akan muncul di sini setelah melewati batas inactivity."
@@ -409,15 +409,15 @@ export default function SalesInboxPage() {
                       ? `/dashboard/sales/conversations/${filteredInboxItems[0].conversation_id}`
                       : "/dashboard/upload"
                   }
-                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
                 >
                   {filteredInboxItems[0] ? "Buka Chat Prioritas" : "Buka Lead Capture"}
                 </Link>
               </div>
             </section>
 
-            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            <section className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                 Cara Pakai Halaman Ini
               </p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -464,17 +464,17 @@ export default function SalesInboxPage() {
               />
             </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_42%,#fff7ed_100%)] p-5 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
-              <div className="space-y-4 rounded-[24px] border border-white/70 bg-white/80 p-4 backdrop-blur-sm">
+            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+              <div className="space-y-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-4 backdrop-blur-sm">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="max-w-2xl">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                       Kontrol Queue
                     </p>
                     <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
                       Atur queue kerja dari satu toolbar
                     </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-[#e3c990]">
                       Atur scope conversation, channel, pencarian, dan bucket kerja dari satu tempat supaya scanning queue lebih cepat.
                     </p>
                   </div>
@@ -501,8 +501,8 @@ export default function SalesInboxPage() {
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-[1.05fr_1.25fr]">
-                  <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
                       Scope Conversation
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -517,8 +517,8 @@ export default function SalesInboxPage() {
                             }}
                             className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                               isActive
-                                ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
-                                : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                                ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+                                : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
                             }`}
                           >
                             {option.label}
@@ -528,17 +528,17 @@ export default function SalesInboxPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-[22px] border border-slate-200 bg-slate-50/80 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
                       Filter Cepat
                     </p>
                     <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                      <label className="space-y-2 text-sm font-medium text-slate-700">
+                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                         <span>Channel</span>
                         <select
                           value={sourceChannelFilter}
                           onChange={(event) => setSourceChannelFilter(event.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
+                          className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
                         >
                           {SOURCE_CHANNEL_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -548,12 +548,12 @@ export default function SalesInboxPage() {
                         </select>
                       </label>
 
-                      <label className="space-y-2 text-sm font-medium text-slate-700">
+                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                         <span>Bucket kerja</span>
                         <select
                           value={queueBucketFilter}
                           onChange={(event) => setQueueBucketFilter(event.target.value)}
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]"
+                          className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
                         >
                           {QUEUE_BUCKET_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -566,26 +566,26 @@ export default function SalesInboxPage() {
                   </div>
                 </div>
 
-                <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)]">
-                  <label className="space-y-2 text-sm font-medium text-slate-700">
+                <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                     <span>Cari conversation</span>
                     <input
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
                       placeholder="Cari nama, isi pesan, owner, atau next action..."
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.65)] placeholder:text-slate-400"
+                      className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
                     />
                   </label>
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[22px] border border-slate-200 bg-slate-950 px-4 py-3 text-sm text-slate-200 shadow-[0_12px_24px_rgba(15,23,42,0.1)]">
-                <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-100">
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[22px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] px-4 py-3 text-sm text-[#d8bc84] shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
+                <span className="rounded-full bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
                   Hasil
                 </span>
                 <span>
-                  Menampilkan <span className="font-semibold text-white">{filteredInboxItems.length}</span> dari{" "}
-                  <span className="font-semibold text-white">{inboxItems.length}</span> conversation.
+                  Menampilkan <span className="font-semibold text-[#fff0c9]">{filteredInboxItems.length}</span> dari{" "}
+                  <span className="font-semibold text-[#fff0c9]">{inboxItems.length}</span> conversation.
                 </span>
               </div>
             </section>
@@ -733,7 +733,7 @@ export default function SalesInboxPage() {
                                       onClick={() => {
                                         void handleAnalyze(item.conversation_id);
                                       }}
-                                      className="inline-flex rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                                      className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                       {isActing ? "Analyzing..." : "Analyze"}
                                     </button>
@@ -746,7 +746,7 @@ export default function SalesInboxPage() {
                                       onClick={() => {
                                         void handleGenerateDraft(item.conversation_id);
                                       }}
-                                      className="inline-flex rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                                      className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                       {isActing ? "Generating..." : "Generate Draft"}
                                     </button>
@@ -754,7 +754,7 @@ export default function SalesInboxPage() {
 
                                   <Link
                                     href={`/dashboard/sales/conversations/${item.conversation_id}`}
-                                    className="inline-flex rounded-full bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                                    className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
                                   >
                                     Buka Chat
                                   </Link>
@@ -822,7 +822,7 @@ function UsageHint({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4">
+    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
       <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
     </div>
@@ -831,11 +831,11 @@ function UsageHint({
 
 function QueueMetaPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-full border border-slate-200 bg-white px-3.5 py-2 shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+    <div className="rounded-full border border-[#f0cb73]/18 bg-[#1d150d] px-3.5 py-2 shadow-[0_8px_18px_rgba(0,0,0,0.14)]">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b58d43]">
         {label}
       </span>
-      <span className="ml-2 text-sm font-semibold text-slate-700">{value}</span>
+      <span className="ml-2 text-sm font-semibold text-[#f0cb73]">{value}</span>
     </div>
   );
 }
@@ -851,19 +851,19 @@ function OverviewTile({
 }) {
   const toneClass =
     tone === "blue"
-      ? "from-sky-50 to-white text-sky-700"
+      ? "from-[#f3d48a] to-[#9f7121]"
       : tone === "green"
-        ? "from-emerald-50 to-white text-emerald-700"
+        ? "from-[#f1cf7a] to-[#7f5a1a]"
         : tone === "amber"
-          ? "from-amber-50 to-white text-amber-700"
-          : "from-slate-50 to-white text-slate-700";
+          ? "from-[#f6dc9d] to-[#b67d27]"
+          : "from-[#f7dfa2] to-[#be8d2f]";
 
   return (
     <article
-      className={`clara-card rounded-[26px] bg-gradient-to-br p-5 ${toneClass}`}
+      className={`rounded-[26px] border border-[#f0cb73]/18 bg-gradient-to-br p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)] ${toneClass}`}
     >
-      <p className="clara-kicker text-[11px] text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#140f08]">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
         {value}
       </p>
     </article>

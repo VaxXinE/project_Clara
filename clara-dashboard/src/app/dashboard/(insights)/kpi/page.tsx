@@ -188,7 +188,7 @@ export default function KpiCommandCenterPage() {
       actions={
         <div className="flex flex-wrap items-center gap-3">
           {kpi ? (
-            <div className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600">
+            <div className="rounded-full border border-[#f0cb73]/18 bg-[#1d150d] px-4 py-2.5 text-sm text-[#d6bb84]">
               Generated: {formatDateTime(kpi.generated_at)}
             </div>
           ) : null}
@@ -198,7 +198,7 @@ export default function KpiCommandCenterPage() {
               void handleRefreshSnapshot();
             }}
             disabled={isRefreshing}
-            className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+            className="rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isRefreshing ? "Refreshing..." : "Refresh Snapshot"}
           </button>
@@ -207,43 +207,43 @@ export default function KpiCommandCenterPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
             Loading KPI command center...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
             {errorMessage}
           </div>
         )}
 
         {kpi && !isLoading && !errorMessage && (
           <>
-            <section className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#eff6ff_100%)] p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            <section className="rounded-[24px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                     Langkah Berikutnya
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                     Mulai dari alert dan observation, bukan dari semua angka sekaligus
                   </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
                     Ops Dashboard ini paling berguna kalau dibaca berurutan: lihat alert aktif, baca observation utama, lalu turun ke leaderboard, source performance, dan snapshot history hanya saat perlu verifikasi lebih dalam.
                   </p>
                 </div>
                 <Link
                   href="/dashboard/notifications"
-                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
                 >
                   Buka Alert Center
                 </Link>
               </div>
             </section>
 
-            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            <section className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                 Cara Pakai Halaman Ini
               </p>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -285,13 +285,13 @@ export default function KpiCommandCenterPage() {
               />
             </section>
 
-            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            <section className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                     Filter Channel
                   </p>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-[#d6bb84]">
                     Summary KPI live bisa difokuskan ke WhatsApp atau Telegram.
                   </p>
                 </div>
@@ -308,8 +308,8 @@ export default function KpiCommandCenterPage() {
                         }}
                         className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                           isActive
-                            ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
-                            : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                            ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+                            : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
                         }`}
                       >
                         {option.label}
@@ -369,17 +369,17 @@ export default function KpiCommandCenterPage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                       Executive Summary
                     </p>
                     <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                       Health snapshot
                     </h2>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                     {kpi.scope_type}
                   </span>
                 </div>
@@ -423,15 +423,15 @@ export default function KpiCommandCenterPage() {
                   />
                 </div>
 
-                <div className="mt-6 rounded-[24px] bg-slate-950 p-5 text-white">
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+                <div className="mt-6 rounded-[24px] bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-5 text-[#fff0c9]">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                     Observations
                   </p>
                   <div className="mt-4 space-y-3">
                     {kpi.key_observations.map((item) => (
                       <div
                         key={item}
-                        className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-100"
+                        className="rounded-2xl border border-[#f0cb73]/14 bg-[#1d150d] p-4 text-sm leading-6 text-[#fff0c9]"
                       >
                         {item}
                       </div>
@@ -440,10 +440,10 @@ export default function KpiCommandCenterPage() {
                 </div>
               </section>
 
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                       Sales Leaderboard
                     </p>
                     <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -452,7 +452,7 @@ export default function KpiCommandCenterPage() {
                   </div>
                   <Link
                     href="/dashboard/follow-up"
-                    className="rounded-full border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                    className="rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
                   >
                     Buka Worklist
                   </Link>
@@ -465,22 +465,22 @@ export default function KpiCommandCenterPage() {
                     kpi.sales_performance.map((row, index) => (
                       <article
                         key={row.user_id}
-                        className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
                               Rank {index + 1}
                             </p>
                             <h3 className="mt-1 text-lg font-semibold text-slate-950">
                               {row.user_name}
                             </h3>
-                            <p className="mt-1 text-sm text-slate-500">
+                            <p className="mt-1 text-sm text-[#b89a62]">
                               {row.organization_name ?? "No organization"}
                             </p>
                           </div>
-                          <div className="rounded-2xl bg-slate-950 px-4 py-3 text-right text-white">
-                            <p className="text-xs uppercase tracking-[0.16em] text-slate-300">
+                          <div className="rounded-2xl bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.98)_100%)] px-4 py-3 text-right text-[#fff0c9]">
+                            <p className="text-xs uppercase tracking-[0.16em] text-[#f0cb73]">
                               Replies Sent
                             </p>
                             <p className="mt-1 text-2xl font-bold">
@@ -538,10 +538,10 @@ export default function KpiCommandCenterPage() {
               </section>
             </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                     Source Performance
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -558,14 +558,14 @@ export default function KpiCommandCenterPage() {
                   kpi.source_performance.map((row) => (
                     <article
                       key={row.source_key}
-                      className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                      className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h3 className="text-lg font-semibold text-slate-950">
                             {row.source_label}
                           </h3>
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className="mt-1 text-sm text-[#b89a62]">
                             Channel: {row.source_channel}
                           </p>
                         </div>
@@ -605,8 +605,8 @@ export default function KpiCommandCenterPage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                   Alerts
                 </p>
                 <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -620,14 +620,14 @@ export default function KpiCommandCenterPage() {
                     kpi.alerts.map((alert) => (
                       <article
                         key={`${alert.severity}-${alert.title}`}
-                        className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                       >
                         <div className="flex flex-wrap items-center gap-3">
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
                               alert.severity === "high"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-amber-100 text-amber-700"
+                                ? "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
+                                : "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]"
                             }`}
                           >
                             {alert.severity}
@@ -636,21 +636,21 @@ export default function KpiCommandCenterPage() {
                             {alert.title}
                           </h3>
                         </div>
-                        <p className="mt-3 text-sm leading-6 text-slate-600">
+                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
                           {alert.description}
                         </p>
-                        <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <div className="mt-4 rounded-2xl bg-[#1d150d] p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                             Recommended action
                           </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-700">
+                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
                             {alert.recommended_action}
                           </p>
                         </div>
                         {alert.target_href ? (
                           <Link
                             href={alert.target_href}
-                            className="mt-4 inline-flex rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                            className="mt-4 inline-flex rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
                           >
                             Buka area terkait
                           </Link>
@@ -661,8 +661,8 @@ export default function KpiCommandCenterPage() {
                 </div>
               </section>
 
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                   Executive Actions
                 </p>
                 <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -676,31 +676,31 @@ export default function KpiCommandCenterPage() {
                     kpi.recommendations.map((recommendation) => (
                       <article
                         key={`${recommendation.owner_role}-${recommendation.title}`}
-                        className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                       >
                         <div className="flex flex-wrap items-center gap-3">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                             {recommendation.owner_role}
                           </span>
                           <h3 className="text-base font-semibold text-slate-950">
                             {recommendation.title}
                           </h3>
                         </div>
-                        <p className="mt-3 text-sm leading-6 text-slate-600">
+                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
                           {recommendation.rationale}
                         </p>
-                        <div className="mt-4 rounded-2xl bg-slate-950 p-4 text-white">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+                        <div className="mt-4 rounded-2xl bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-4 text-[#fff0c9]">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                             Next step
                           </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-100">
+                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
                             {recommendation.next_step}
                           </p>
                         </div>
                         {recommendation.target_href ? (
                           <Link
                             href={recommendation.target_href}
-                            className="mt-4 inline-flex rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                            className="mt-4 inline-flex rounded-xl border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
                           >
                             Jalankan sekarang
                           </Link>
@@ -713,10 +713,10 @@ export default function KpiCommandCenterPage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                       Persistent Alerts
                     </p>
                     <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -739,14 +739,14 @@ export default function KpiCommandCenterPage() {
                     alertHistory.items.slice(0, 8).map((alert) => (
                       <article
                         key={alert.id}
-                        className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex flex-wrap items-center gap-3">
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                               {alert.status}
                             </span>
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700">
+                            <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                               {alert.severity}
                             </span>
                             <h3 className="text-base font-semibold text-slate-950">
@@ -759,29 +759,29 @@ export default function KpiCommandCenterPage() {
                               onClick={() => {
                                 void handleAcknowledgeAlert(alert.id);
                               }}
-                              className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                               className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
                             >
                               Acknowledge
                             </button>
                           )}
                         </div>
-                        <p className="mt-3 text-sm leading-6 text-slate-600">
+                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
                           {alert.description}
                         </p>
-                        <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <div className="mt-4 rounded-2xl bg-[#1d150d] p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                             Recommended action
                           </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-700">
+                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
                             {alert.recommended_action}
                           </p>
                         </div>
                         {alert.resolution_note ? (
-                          <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                          <div className="mt-4 rounded-2xl border border-[#f0cb73]/16 bg-[#1d150d] p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
                               Resolution note
                             </p>
-                            <p className="mt-2 text-sm leading-6 text-emerald-900">
+                            <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
                               {alert.resolution_note}
                             </p>
                           </div>
@@ -798,7 +798,7 @@ export default function KpiCommandCenterPage() {
                                 }));
                               }}
                               placeholder="Catatan resolusi opsional sebelum alert ditutup..."
-                              className="min-h-[96px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-slate-400"
+                              className="min-h-[96px] w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm leading-6 text-[#f7e7b7] outline-none transition placeholder:text-[#907953] focus:border-[#f0cb73]/28"
                             />
                             <div className="flex flex-wrap gap-3">
                               {alert.status === "active" && (
@@ -807,7 +807,7 @@ export default function KpiCommandCenterPage() {
                                   onClick={() => {
                                     void handleAcknowledgeAlert(alert.id);
                                   }}
-                                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                                  className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
                                 >
                                   Acknowledge
                                 </button>
@@ -817,7 +817,7 @@ export default function KpiCommandCenterPage() {
                                 onClick={() => {
                                   void handleResolveAlert(alert.id);
                                 }}
-                                className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                                className="rounded-xl border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
                               >
                                 Resolve
                               </button>
@@ -825,7 +825,7 @@ export default function KpiCommandCenterPage() {
                           </div>
                         ) : (
                           <div className="mt-4 flex flex-wrap items-center gap-3">
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-[#b89a62]">
                               Resolved:{" "}
                               {alert.resolved_at
                                 ? formatDateTime(alert.resolved_at)
@@ -836,13 +836,13 @@ export default function KpiCommandCenterPage() {
                               onClick={() => {
                                 void handleReopenAlert(alert.id);
                               }}
-                              className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                               className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
                             >
                               Reopen
                             </button>
                           </div>
                         )}
-                        <p className="mt-3 text-xs text-slate-500">
+                        <p className="mt-3 text-xs text-[#b89a62]">
                           First detected:{" "}
                           {formatDateTime(alert.first_detected_at)} • Last
                           detected: {formatDateTime(alert.last_detected_at)}
@@ -855,8 +855,8 @@ export default function KpiCommandCenterPage() {
                 </div>
               </section>
 
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
-                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+                <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                   Snapshot History
                 </p>
                 <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -868,11 +868,11 @@ export default function KpiCommandCenterPage() {
                     snapshotHistory.items.slice(0, 8).map((snapshot, index) => (
                       <article
                         key={snapshot.id}
-                        className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
                               Snapshot {snapshotHistory.items.length - index}
                             </p>
                             <h3 className="mt-1 text-base font-semibold text-slate-950">
@@ -923,10 +923,10 @@ export default function KpiCommandCenterPage() {
               </section>
             </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                     Organization Health
                   </p>
                   <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
@@ -935,7 +935,7 @@ export default function KpiCommandCenterPage() {
                 </div>
                 <Link
                   href="/dashboard/marketing"
-                  className="rounded-full border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                  className="rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
                 >
                   Buka Marketing Insights
                 </Link>
@@ -948,7 +948,7 @@ export default function KpiCommandCenterPage() {
                   kpi.organization_performance.map((row) => (
                     <article
                       key={row.organization_id}
-                      className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                      className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <h3 className="text-lg font-semibold text-slate-950">
@@ -1019,9 +1019,9 @@ function UsageHint({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4">
+    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
       <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
     </div>
   );
 }
@@ -1036,12 +1036,12 @@ function MetricCard({
   hint: string;
 }) {
   return (
-    <article className="clara-card rounded-[24px] p-5">
-      <p className="clara-kicker text-xs text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+    <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#140f08]">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
         {value}
       </p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{hint}</p>
+      <p className="mt-2 text-sm leading-6 text-[#2f210f]">{hint}</p>
     </article>
   );
 }
@@ -1049,8 +1049,8 @@ function MetricCard({
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="clara-card-soft flex items-center justify-between rounded-2xl px-4 py-3">
-      <span className="text-sm text-slate-600">{label}</span>
-      <span className="text-sm font-semibold text-slate-950">{value}</span>
+      <span className="text-sm text-[#d6bb84]">{label}</span>
+      <span className="text-sm font-semibold text-[#fff0c9]">{value}</span>
     </div>
   );
 }
@@ -1058,8 +1058,8 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 function SummaryTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="clara-card-soft rounded-2xl px-4 py-3">
-      <p className="clara-kicker text-xs text-slate-500">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
+      <p className="clara-kicker text-xs text-[#b89a62]">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-[#fff0c9]">{value}</p>
     </div>
   );
 }
@@ -1074,6 +1074,6 @@ function Badge({ label }: { label: string }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="clara-empty-state p-5 text-sm text-slate-600">{text}</div>
+    <div className="clara-empty-state p-5 text-sm text-[#d6bb84]">{text}</div>
   );
 }

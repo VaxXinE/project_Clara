@@ -568,7 +568,7 @@ export default function AdminAccessPage() {
         </section>
 
         {isLoading && (
-          <div className="clara-empty-state text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-[#d6bb84]">
             Loading access management...
           </div>
         )}
@@ -593,16 +593,16 @@ export default function AdminAccessPage() {
                   className="clara-card space-y-5 rounded-[30px] p-5"
                 >
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-950">
+                    <h2 className="text-lg font-semibold text-[#fff0c9]">
                       Organization Management
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-[#d6bb84]">
                       Create organization hanya dibuka untuk superadmin.
                     </p>
                   </div>
 
                   <div>
-                    <label className="text-sm font-semibold text-slate-900">
+                    <label className="text-sm font-semibold text-[#fff0c9]">
                       Name
                     </label>
                     <input
@@ -622,7 +622,7 @@ export default function AdminAccessPage() {
                   </div>
 
                   <div>
-                    <label className="text-sm font-semibold text-slate-900">
+                    <label className="text-sm font-semibold text-[#fff0c9]">
                       Slug
                     </label>
                     <input
@@ -642,7 +642,7 @@ export default function AdminAccessPage() {
                   </div>
 
                   {!canManageOrganizations && (
-                    <p className="clara-card-soft rounded-xl p-3 text-sm text-amber-700">
+                    <p className="clara-card-soft rounded-xl p-3 text-sm text-[#f0cb73]">
                       Head tidak bisa membuat organization baru dari UI ini.
                     </p>
                   )}
@@ -665,10 +665,10 @@ export default function AdminAccessPage() {
                   className="clara-card space-y-5 rounded-[30px] p-5"
                 >
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-950">
+                    <h2 className="text-lg font-semibold text-[#fff0c9]">
                       Create User
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-[#d6bb84]">
                       Head otomatis terikat ke organization miliknya sendiri.
                     </p>
                   </div>
@@ -791,10 +791,10 @@ export default function AdminAccessPage() {
                   className="clara-card space-y-5 rounded-[30px] p-5"
                 >
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-950">
+                    <h2 className="text-lg font-semibold text-[#fff0c9]">
                       Create Sales Unit
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-[#d6bb84]">
                       Strukturkan cabang, area, atau business cluster sebelum
                       team dan assignment user dibuat.
                     </p>
@@ -851,10 +851,10 @@ export default function AdminAccessPage() {
                   className="clara-card space-y-5 rounded-[30px] p-5"
                 >
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-950">
+                    <h2 className="text-lg font-semibold text-[#fff0c9]">
                       Create Sales Team
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-[#d6bb84]">
                       Team selalu terikat ke organization dan bisa dipetakan ke
                       unit serta head yang memimpin.
                     </p>
@@ -966,20 +966,20 @@ export default function AdminAccessPage() {
                   ) : (
                     <div className="space-y-3">
                       {organizations.map((organization) => (
-                        <div
-                          key={organization.id}
-                          className="rounded-xl border border-slate-200 p-4"
-                        >
-                          <p className="text-sm font-semibold text-slate-950">
-                            {organization.name}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            slug: {organization.slug}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            created: {formatDateTime(organization.created_at)}
-                          </p>
-                        </div>
+                          <div
+                            key={organization.id}
+                            className="rounded-xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
+                          >
+                            <p className="text-sm font-semibold text-[#fff0c9]">
+                              {organization.name}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              slug: {organization.slug}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              created: {formatDateTime(organization.created_at)}
+                            </p>
+                          </div>
                       ))}
                     </div>
                   )}
@@ -996,23 +996,23 @@ export default function AdminAccessPage() {
                   ) : (
                     <div className="space-y-3">
                       {units.map((unit) => (
-                        <div
-                          key={unit.id}
-                          className="rounded-xl border border-slate-200 p-4"
-                        >
-                          <p className="text-sm font-semibold text-slate-950">
-                            {unit.name}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            code: {unit.code}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            org: {unit.organization_name ?? unit.organization_id}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            teams: {unit.team_count}
-                          </p>
-                        </div>
+                          <div
+                            key={unit.id}
+                            className="rounded-xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
+                          >
+                            <p className="text-sm font-semibold text-[#fff0c9]">
+                              {unit.name}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              code: {unit.code}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              org: {unit.organization_name ?? unit.organization_id}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              teams: {unit.team_count}
+                            </p>
+                          </div>
                       ))}
                     </div>
                   )}
@@ -1027,17 +1027,17 @@ export default function AdminAccessPage() {
                   ) : (
                     <div className="space-y-3">
                       {teams.map((team) => (
-                        <div
-                          key={team.id}
-                          className="rounded-xl border border-slate-200 p-4"
-                        >
-                          <p className="text-sm font-semibold text-slate-950">
-                            {team.name}
-                          </p>
-                          <div className="mt-1 space-y-1 text-xs text-slate-500">
-                            <p>code: {team.code}</p>
-                            <p>org: {team.organization_name ?? team.organization_id}</p>
-                            <p>unit: {team.unit_name ?? "-"}</p>
+                          <div
+                            key={team.id}
+                            className="rounded-xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
+                          >
+                            <p className="text-sm font-semibold text-[#fff0c9]">
+                              {team.name}
+                            </p>
+                            <div className="mt-1 space-y-1 text-xs text-[#b89a62]">
+                              <p>code: {team.code}</p>
+                              <p>org: {team.organization_name ?? team.organization_id}</p>
+                              <p>unit: {team.unit_name ?? "-"}</p>
                             <p>manager: {team.manager_user_name ?? "-"}</p>
                             <p>members: {team.member_count}</p>
                           </div>
@@ -1057,10 +1057,10 @@ export default function AdminAccessPage() {
                     <EmptyText text="Belum ada user." />
                   ) : (
                     <div className="space-y-4">
-                      <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_42%,#fff7ed_100%)] p-4">
+                      <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-4">
                         <div className="grid gap-3 md:grid-cols-3">
                           <div>
-                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
                               Search User
                             </label>
                             <input
@@ -1074,7 +1074,7 @@ export default function AdminAccessPage() {
                           </div>
 
                           <div>
-                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
                               Filter Role
                             </label>
                             <select
@@ -1093,7 +1093,7 @@ export default function AdminAccessPage() {
                           </div>
 
                           <div>
-                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
                               Filter Status
                             </label>
                             <select
@@ -1110,7 +1110,7 @@ export default function AdminAccessPage() {
                           </div>
                         </div>
 
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-[#d6bb84]">
                           <p>
                             Menampilkan {paginatedUsers.length} dari {filteredUsers.length} user
                           </p>
@@ -1123,10 +1123,10 @@ export default function AdminAccessPage() {
                       {filteredUsers.length === 0 ? (
                         <EmptyText text="Tidak ada user yang cocok dengan filter saat ini." />
                       ) : (
-                        <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white">
+                        <div className="overflow-hidden rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)]">
                           <div className="overflow-x-auto">
                             <table className="min-w-full text-left text-sm">
-                              <thead className="bg-slate-50 text-slate-500">
+                              <thead className="bg-[#1d150d] text-[#b89a62]">
                                 <tr>
                                   <th className="px-4 py-3 font-medium">User</th>
                                   <th className="px-4 py-3 font-medium">Role</th>
@@ -1154,7 +1154,7 @@ export default function AdminAccessPage() {
                                   return (
                                     <Fragment key={user.id}>
                                       <tr
-                                        className="border-t border-slate-100 align-top"
+                                        className="border-t border-[#f0cb73]/10 align-top"
                                       >
                                         <td className="px-4 py-3">
                                           <button
@@ -1166,16 +1166,16 @@ export default function AdminAccessPage() {
                                             }
                                             className="text-left"
                                           >
-                                            <div className="font-semibold text-slate-950">
+                                            <div className="font-semibold text-[#fff0c9]">
                                               {user.name}
                                             </div>
-                                            <div className="mt-1 text-xs text-slate-500">
+                                            <div className="mt-1 text-xs text-[#b89a62]">
                                               {user.email}
                                             </div>
                                           </button>
                                         </td>
                                         <td className="px-4 py-3">
-                                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                                             {formatStatusLabel(user.role)}
                                           </span>
                                         </td>
@@ -1183,20 +1183,20 @@ export default function AdminAccessPage() {
                                           <span
                                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                                               user.is_active
-                                                ? "bg-green-100 text-green-700"
-                                                : "bg-red-100 text-red-700"
+                                                ? "border border-[#f0cb73]/18 bg-[#f0cb73]/10 text-[#f0cb73]"
+                                                : "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
                                             }`}
                                           >
                                             {user.is_active ? "active" : "inactive"}
                                           </span>
                                         </td>
-                                        <td className="px-4 py-3 text-xs text-slate-600">
+                                        <td className="px-4 py-3 text-xs text-[#d6bb84]">
                                           <div>{getOrganizationLabel(user.organization_id, organizations)}</div>
                                           <div className="mt-1">
                                             {teamDisplay.teamName} {teamDisplay.unitName !== "-" ? `• ${teamDisplay.unitName}` : ""}
                                           </div>
                                         </td>
-                                        <td className="px-4 py-3 text-xs text-slate-600">
+                                        <td className="px-4 py-3 text-xs text-[#d6bb84]">
                                           {formatDateTime(user.created_at)}
                                         </td>
                                         <td className="px-4 py-3">
@@ -1204,7 +1204,7 @@ export default function AdminAccessPage() {
                                             <button
                                               type="button"
                                               onClick={() => beginEdit(user)}
-                                              className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+                                              className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
                                             >
                                               Edit
                                             </button>
@@ -1212,7 +1212,7 @@ export default function AdminAccessPage() {
                                               type="button"
                                               onClick={() => beginPasswordReset(user.id)}
                                               disabled={!canResetPassword}
-                                              className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                              className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
                                             >
                                               Reset
                                             </button>
@@ -1222,9 +1222,9 @@ export default function AdminAccessPage() {
                                               disabled={actionUserId === user.id || isSelf}
                                               className={`rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
                                                 user.is_active
-                                                  ? "border border-red-300 text-red-700"
-                                                  : "border border-green-300 text-green-700"
-                                              }`}
+                                                  ? "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
+                                                  : "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08]"
+                                               }`}
                                             >
                                               {actionUserId === user.id
                                                 ? "..."
@@ -1237,10 +1237,10 @@ export default function AdminAccessPage() {
                                       </tr>
 
                                       {isExpanded ? (
-                                        <tr className="border-t border-slate-100 bg-slate-50/60">
+                                        <tr className="border-t border-[#f0cb73]/10 bg-[#1a130d]/70">
                                           <td colSpan={6} className="px-4 py-4">
                                             {isEditing ? (
-                                              <div className="space-y-4 rounded-[20px] border border-slate-200 bg-white p-4">
+                                              <div className="space-y-4 rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
                                                 <div className="grid gap-4 sm:grid-cols-2">
                                                   <InputField
                                                     label="Name"
@@ -1331,26 +1331,26 @@ export default function AdminAccessPage() {
                                                     type="button"
                                                     onClick={() => void handleSaveEdit(user.id)}
                                                     disabled={actionUserId === user.id}
-                                                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                                    className="rounded-xl border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-50"
                                                   >
                                                     {actionUserId === user.id ? "Saving..." : "Save Changes"}
                                                   </button>
                                                   <button
                                                     type="button"
                                                     onClick={cancelEdit}
-                                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                                                    className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                                                   >
                                                     Cancel
                                                   </button>
                                                 </div>
                                               </div>
                                             ) : isResettingPassword ? (
-                                              <div className="space-y-4 rounded-[20px] border border-slate-200 bg-white p-4">
+                                              <div className="space-y-4 rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
                                                 <div>
-                                                  <p className="text-sm font-semibold text-slate-950">
+                                                  <p className="text-sm font-semibold text-[#fff0c9]">
                                                     Reset password untuk {user.email}
                                                   </p>
-                                                  <p className="mt-1 text-sm text-slate-600">
+                                                  <p className="mt-1 text-sm text-[#d6bb84]">
                                                     Superadmin bisa mengganti semua password user. Head hanya bisa mengganti password user yang dia buat sendiri.
                                                   </p>
                                                 </div>
@@ -1375,14 +1375,14 @@ export default function AdminAccessPage() {
                                                     type="button"
                                                     onClick={() => void handleResetPassword(user.id)}
                                                     disabled={actionUserId === user.id}
-                                                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                                    className="rounded-xl border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-50"
                                                   >
                                                     {actionUserId === user.id ? "Saving..." : "Save New Password"}
                                                   </button>
                                                   <button
                                                     type="button"
                                                     onClick={cancelPasswordReset}
-                                                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700"
+                                                    className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                                                   >
                                                     Cancel
                                                   </button>
@@ -1390,7 +1390,7 @@ export default function AdminAccessPage() {
                                               </div>
                                             ) : (
                                               <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
-                                                <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                                                <div className="grid gap-2 text-sm text-[#d6bb84] md:grid-cols-2">
                                                   <p>org: {getOrganizationLabel(user.organization_id, organizations)}</p>
                                                   <p>created by: {user.created_by_user_name ?? "-"}</p>
                                                   <p>team: {teamDisplay.teamName}</p>
@@ -1403,12 +1403,12 @@ export default function AdminAccessPage() {
 
                                                 <div className="space-y-2">
                                                   {isSelf ? (
-                                                    <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
+                                                    <p className="rounded-xl border border-[#f0cb73]/14 bg-[#1d150d] p-3 text-xs text-[#d6bb84]">
                                                       Akun yang sedang Anda pakai tidak bisa dinonaktifkan dari sesi ini sendiri.
                                                     </p>
                                                   ) : null}
                                                   {!canResetPassword ? (
-                                                    <p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-700">
+                                                    <p className="rounded-xl border border-[#f0cb73]/14 bg-[#241a10] p-3 text-xs text-[#f0cb73]">
                                                       Head hanya bisa mengganti password user yang dibuat dari akunnya sendiri.
                                                     </p>
                                                   ) : null}
@@ -1428,8 +1428,8 @@ export default function AdminAccessPage() {
                       )}
 
                       {filteredUsers.length > userPageSize ? (
-                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-                          <p className="text-sm text-slate-600">
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)] p-4">
+                          <p className="text-sm text-[#d6bb84]">
                             Navigasi daftar user
                           </p>
                           <div className="flex flex-wrap gap-2">
@@ -1439,7 +1439,7 @@ export default function AdminAccessPage() {
                                 setUserPage((current) => Math.max(1, current - 1))
                               }
                               disabled={userPage === 1}
-                              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Sebelumnya
                             </button>
@@ -1451,7 +1451,7 @@ export default function AdminAccessPage() {
                                 )
                               }
                               disabled={userPage === totalUserPages}
-                              className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Berikutnya
                             </button>
@@ -1479,12 +1479,12 @@ function InfoCard({
   description: string;
 }) {
   return (
-    <article className="clara-card rounded-[24px] p-5">
-      <p className="clara-kicker text-xs text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+    <article className="rounded-[24px] border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#d1a44b_52%,#a06d20_100%)] p-5 text-[#140f08] shadow-[0_18px_48px_rgba(0,0,0,0.24)]">
+      <p className="clara-kicker text-xs text-[#5c3a12]">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
         {value}
       </p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      <p className="mt-2 text-sm leading-6 text-[#3a2811]">{description}</p>
     </article>
   );
 }
@@ -1501,8 +1501,8 @@ function Panel({
   return (
     <section className="clara-card rounded-[28px] p-5">
       <div>
-        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-        <p className="mt-1 text-sm text-slate-600">{description}</p>
+        <h2 className="text-lg font-semibold text-[#fff0c9]">{title}</h2>
+        <p className="mt-1 text-sm text-[#d6bb84]">{description}</p>
       </div>
       <div className="mt-5">{children}</div>
     </section>
@@ -1510,7 +1510,7 @@ function Panel({
 }
 
 function EmptyText({ text }: { text: string }) {
-  return <p className="text-sm text-slate-500">{text}</p>;
+  return <p className="text-sm text-[#b89a62]">{text}</p>;
 }
 
 function InputField({
@@ -1528,7 +1528,7 @@ function InputField({
 }) {
   return (
     <div>
-      <label className="text-sm font-semibold text-slate-900">{label}</label>
+      <label className="text-sm font-semibold text-[#fff0c9]">{label}</label>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -1555,7 +1555,7 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="text-sm font-semibold text-slate-900">{label}</label>
+      <label className="text-sm font-semibold text-[#fff0c9]">{label}</label>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -1581,20 +1581,27 @@ function PasswordStrengthHint({
 }) {
   if (!password) {
     return (
-      <p className="clara-card-soft rounded-xl p-3 text-xs text-slate-600">
+      <p className="clara-card-soft rounded-xl border border-[#f0cb73]/14 p-3 text-xs text-[#d6bb84]">
         Hint: gunakan kombinasi huruf besar, huruf kecil, angka, dan simbol.
       </p>
     );
   }
 
+  const strengthBadgeClassName =
+    strength.label === "strong"
+      ? "border border-[#f0cb73]/18 bg-[#f0cb73]/12 text-[#f7dfa2]"
+      : strength.label === "medium"
+        ? "border border-[#d3a74b]/18 bg-[#5c4015] text-[#f0cb73]"
+        : "border border-[#7a5520]/18 bg-[#38250f] text-[#d6bb84]";
+
   return (
-    <div className="clara-card-soft rounded-xl p-3">
+    <div className="clara-card-soft rounded-xl border border-[#f0cb73]/14 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
           Password Strength
         </p>
         <span
-          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${strength.badgeClassName}`}
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${strengthBadgeClassName}`}
         >
           {strength.label}
         </span>
@@ -1605,8 +1612,8 @@ function PasswordStrengthHint({
             key={check.label}
             className={`rounded-full px-2.5 py-1 text-xs font-medium ${
               check.passed
-                ? "bg-green-100 text-green-700"
-                : "bg-slate-200 text-slate-600"
+                ? "border border-[#f0cb73]/18 bg-[#f0cb73]/10 text-[#f0cb73]"
+                : "border border-[#3c2c16] bg-[#22190f] text-[#c8ad75]"
             }`}
           >
             {check.label}

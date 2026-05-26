@@ -9,6 +9,7 @@ from sqlalchemy import select
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.db.session import SessionLocal
+from app.core.config import settings
 # Import related models so SQLAlchemy relationship registry is fully configured.
 from app.models.ai_extraction import AIExtraction  # noqa: F401
 from app.models.approval_log import ApprovalLog  # noqa: F401
@@ -62,7 +63,11 @@ def get_repo_root() -> Path:
 
 
 def get_knowledge_dir() -> Path:
-    custom_dir = os.getenv("CLARA_KNOWLEDGE_DIR", "").strip()
+    custom_dir = (
+        os.getenv("CLARA_KNOWLEDGE_DIR")
+        or settings.clara_knowledge_dir
+        or ""
+    ).strip()
     if custom_dir:
         return Path(custom_dir).expanduser().resolve()
 
@@ -135,7 +140,11 @@ def main() -> int:
         print(f"Import gagal: folder knowledge tidak ditemukan di {knowledge_dir}")
         return 1
 
-    owner_email = os.getenv("CLARA_KNOWLEDGE_OWNER_EMAIL", "").strip()
+    owner_email = (
+        os.getenv("CLARA_KNOWLEDGE_OWNER_EMAIL")
+        or settings.clara_knowledge_owner_email
+        or ""
+    ).strip()
     created_by_user_id = None
 
     db = SessionLocal()

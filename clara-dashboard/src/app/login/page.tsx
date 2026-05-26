@@ -25,7 +25,7 @@ function getDashboardPathForRole(role: string): string {
     case "head":
     case "superadmin":
     default:
-      return "/dashboard";
+      return "/workspace";
   }
 }
 
@@ -80,8 +80,8 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 sm:px-6">
-      <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,_rgba(212,176,123,0.28),_transparent_65%)]" />
-      <div className="absolute bottom-0 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(16,23,45,0.12),_transparent_70%)] blur-3xl" />
+      <div className="absolute inset-x-0 top-0 h-56 bg-[radial-gradient(circle_at_top,_rgba(240,203,115,0.24),_transparent_65%)]" />
+      <div className="absolute bottom-0 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,_rgba(194,144,50,0.14),_transparent_70%)] blur-3xl" />
 
       <div className="relative grid w-full max-w-5xl gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="clara-card-dark rounded-[34px] p-7 sm:p-8">
@@ -96,7 +96,7 @@ export default function LoginPage() {
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <div className="rounded-[24px] border border-white/10 bg-white/7 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4b07b]">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                 Queue
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-100">
@@ -104,7 +104,7 @@ export default function LoginPage() {
               </p>
             </div>
             <div className="rounded-[24px] border border-white/10 bg-white/7 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4b07b]">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                 AI Review
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-100">
@@ -112,7 +112,7 @@ export default function LoginPage() {
               </p>
             </div>
             <div className="rounded-[24px] border border-white/10 bg-white/7 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#d4b07b]">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                 Governance
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-100">
@@ -164,7 +164,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((current) => !current)}
-                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                  className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#d4b06a]/20 bg-[#17120d] text-[#cdb37a] hover:border-[#f0cb73]/34 hover:text-[#fff0c9]"
                   aria-label={
                     showPassword ? "Sembunyikan password" : "Tampilkan password"
                   }
