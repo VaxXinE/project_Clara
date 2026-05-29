@@ -336,7 +336,7 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
           <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top,_rgba(240,203,115,0.22),_transparent_70%)] opacity-90" />
           <div className="absolute inset-y-0 right-0 hidden w-px bg-[#f0cb73]/10 xl:block" />
 
-          <div className="relative shrink-0 border-b border-[#f0cb73]/12 px-5 py-5">
+          <div className="relative shrink-0 border-b border-[#f0cb73]/12 px-5 py-5 xl:min-h-[86px] xl:px-0 xl:py-0">
             <div className="mb-4 flex items-center justify-between xl:hidden">
               <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#f0cb73]">
                 Navigation
@@ -351,17 +351,17 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
               </button>
             </div>
 
-            <div className="rounded-[28px] border border-[#f0cb73]/12 bg-[#f0cb73]/7 p-4 shadow-[0_18px_34px_rgba(0,0,0,0.24)] backdrop-blur-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f7dfa2_0%,#bf8f31_100%)] text-[#140f08] shadow-[0_12px_22px_rgba(0,0,0,0.22)]">
+            <div className="clara-surface rounded-[26px] border border-[#f0cb73]/14 bg-[linear-gradient(135deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.96)_100%)] shadow-[0_18px_38px_rgba(0,0,0,0.26)] backdrop-blur-xl xl:rounded-none xl:border-0 xl:bg-transparent xl:shadow-none xl:backdrop-blur-none">
+              <div className="flex min-h-[72px] items-center gap-3 px-4 py-3 sm:px-5 sm:py-3.5 xl:min-h-[85px] xl:px-6 xl:py-0">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_12px_24px_rgba(0,0,0,0.22)] xl:h-10 xl:w-10 xl:rounded-xl xl:shadow-none">
                   <FontAwesomeIcon icon={faArrowTrendUp} className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-base font-semibold leading-5 text-white">
-                    {SITE_TITLE}
-                  </p>
-                  <p className="truncate text-sm text-slate-300">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73] xl:hidden">
                     {SITE_SUBTITLE}
+                  </p>
+                  <p className="truncate text-sm font-semibold text-[#fff0c9] xl:text-base">
+                    {SITE_TITLE}
                   </p>
                 </div>
               </div>
@@ -383,7 +383,7 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
                         key={item.href}
                         href={item.href}
                         onClick={() => setMobileNavOpen(false)}
-                        className={`group flex items-center gap-3 rounded-[22px] px-3 py-3 transition ${
+                        className={`group flex items-center gap-3 rounded-xl px-3 py-3 transition ${
                           active
                             ? "border border-[#f7dfa2]/20 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_14px_28px_rgba(0,0,0,0.22)]"
                             : "border border-white/0 text-slate-200 hover:border-[#f0cb73]/12 hover:bg-[#f0cb73]/8 hover:text-white"
@@ -420,12 +420,11 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
               </div>
             ))}
           </div>
-
         </aside>
 
         <section className="min-w-0 px-5 pb-5 pt-28 sm:px-7 sm:pb-7 sm:pt-32 xl:px-7 xl:pb-7 xl:pt-32">
-          <div className="fixed inset-x-0 top-0 z-30 px-4 pt-3 sm:px-6 sm:pt-4 xl:left-[292px] xl:right-0 xl:px-7">
-            <div className="clara-surface flex items-center justify-between rounded-[26px] border border-[#f0cb73]/14 bg-[linear-gradient(135deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.96)_100%)] px-4 py-3 shadow-[0_18px_38px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:px-5 sm:py-3.5">
+          <div className="fixed inset-x-0 top-0 z-30 px-4 pt-3 sm:px-6 sm:pt-4 xl:left-[292px] xl:right-0 xl:px-0 xl:pt-0">
+            <div className="clara-surface flex items-center justify-between rounded-[26px] border border-[#f0cb73]/14 bg-[linear-gradient(135deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.96)_100%)] px-4 py-3 shadow-[0_18px_38px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:px-5 sm:py-3.5 xl:min-h-[86px] xl:rounded-none xl:border-x-0 xl:border-t-0 xl:bg-[linear-gradient(180deg,rgba(21,16,10,0.96)_0%,rgba(16,12,8,0.94)_100%)] xl:px-8 xl:py-0 xl:shadow-[0_10px_24px_rgba(0,0,0,0.18)] xl:backdrop-blur-none">
               <div className="flex min-w-0 items-center gap-3">
                 <button
                   type="button"
@@ -454,16 +453,19 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
                   <button
                     type="button"
                     onClick={() => setAccountMenuOpen((current) => !current)}
-                    className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#7a5520]/18 bg-[#2b1c0f] px-3 text-xs font-semibold text-[#f0cb73] shadow-[0_10px_20px_rgba(0,0,0,0.18)] transition hover:bg-[#362312]"
+                    className="inline-flex h-10 w-10 items-center text-center gap-1.5 rounded-full border border-[#7a5520]/18 bg-[#2b1c0f] px-3 text-xs font-semibold uppercase text-[#f0cb73] shadow-[0_10px_20px_rgba(0,0,0,0.18)] transition hover:bg-[#362312]"
                     aria-label="Buka menu akun"
                     aria-expanded={accountMenuOpen}
                   >
-                    <span className="hidden sm:inline">
-                      {resolvedCurrentUser
-                        ? getRoleDisplayLabel(resolvedCurrentUser.role)
-                        : "Account"}
+                    <span className="hidden sm:inline mx-auto">
+                      {resolvedCurrentUser?.name
+                        ? resolvedCurrentUser.name
+                            .split(" ")
+                            .map((word) => word[0])
+                            .join("")
+                            .toUpperCase()
+                        : "A"}
                     </span>
-                    <FontAwesomeIcon icon={faChevronDown} className="h-3.5 w-3.5" />
                   </button>
 
                   {accountMenuOpen ? (
