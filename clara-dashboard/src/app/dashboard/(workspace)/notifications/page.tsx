@@ -292,93 +292,10 @@ export default function NotificationsPage() {
 
         {notifications && !isLoading && !errorMessage && (
           <>
-            <section className="rounded-[28px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    Langkah Berikutnya
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    {notifications.items.length === 0
-                      ? "Tidak ada notifikasi aktif sekarang"
-                      : "Ambil notifikasi active yang paling kritis lebih dulu"}
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
-                    {notifications.items.length === 0
-                      ? currentUser && canAccessQueueAndActionCenter(currentUser.role)
-                        ? "Kalau Alert Center kosong, itu berarti operasional relatif stabil. Tetap cek Action Center untuk memastikan tidak ada task yang harus ditindak."
-                        : "Kalau Alert Center kosong, itu berarti operasional relatif stabil. Lanjutkan cek Manager Insights atau Chat Review Center untuk memantau bottleneck tim."
-                      : "Alert Center dipakai untuk aksi cepat pada sinyal operasional. Baca severity, age, dan target tindakan sebelum memilih acknowledge, resolve, atau escalate."}
-                  </p>
-                </div>
-                <Link
-                  href={
-                    resolveNotificationTargetHref(
-                      notifications.items[0]?.target_href,
-                      currentUser?.role,
-                    ) ??
-                    (canAccessQueue
-                      ? "/dashboard/follow-up"
-                      : "/dashboard/manager-insights")
-                  }
-                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
-                >
-                  {notifications.items[0]
-                    ? "Buka Alert Teratas"
-                    : canAccessQueue
-                      ? "Buka Action Center"
-                      : "Buka Manager Insights"}
-                </Link>
-              </div>
-            </section>
-
             {hasAnyNotifications ? (
               <>
                 {!showActiveEmptyState ? (
                   <>
-                    <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.18)]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                        Cara Pakai Halaman Ini
-                      </p>
-                      <div className="mt-3 grid gap-3 md:grid-cols-3">
-                        {isOversightAlertView ? (
-                          <>
-                            <UsageHint
-                              title="1. Baca severity dan target tindakan"
-                              description="Role oversight memakai alert untuk membaca bottleneck paling cepat, bukan untuk kerja seperti operator."
-                            />
-                            <UsageHint
-                              title="2. Buka chat review atau lead terkait"
-                              description="Masuk ke Chat Review Center atau Lead Management saat alert butuh keputusan, coaching, atau follow-up lanjutan."
-                            />
-                            <UsageHint
-                              title="3. Pantau pola, bukan cuma satu alert"
-                              description={
-                                isHeadMonitorView
-                                  ? "Kalau alert serupa muncul berulang, lanjutkan ke KPI atau Manager Insights untuk baca pola lintas team."
-                                  : "Kalau alert serupa muncul berulang, lanjutkan ke Manager Insights untuk baca akar masalah per team."
-                              }
-                            />
-                          </>
-                        ) : (
-                          <>
-                            <UsageHint
-                              title="1. Baca title dan severity"
-                              description="Itu memberi konteks tercepat soal seberapa kritis notifikasi ini."
-                            />
-                            <UsageHint
-                              title="2. Pakai Acknowledge untuk tandai sedang ditangani"
-                              description="Resolve dipakai kalau isu memang selesai, bukan sekadar sudah dibaca."
-                            />
-                            <UsageHint
-                              title="3. Escalate kalau perlu level keputusan lebih tinggi"
-                              description="Gunakan escalation untuk isu yang tidak bisa diselesaikan di level operator saat ini."
-                            />
-                          </>
-                        )}
-                      </div>
-                    </section>
-
                     <section className="grid gap-4 md:grid-cols-3">
                       <MetricCard label="Active" value={String(notifications.active_count)} />
                       <MetricCard
@@ -716,21 +633,6 @@ export default function NotificationsPage() {
         )}
       </div>
     </WorkspaceShell>
-  );
-}
-
-function UsageHint({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
-    </div>
   );
 }
 

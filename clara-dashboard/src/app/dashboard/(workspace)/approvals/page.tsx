@@ -210,56 +210,6 @@ export default function ChatReviewCenterPage() {
 
         {queue && !isLoading && !errorMessage && (
           <>
-            <section className="rounded-[28px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    Langkah Berikutnya
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    {queue.items.length === 0
-                      ? emptyStateTitle
-                      : "Ambil item paling berisiko atau paling lama menunggu dulu"}
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
-                    {queue.items.length === 0
-                      ? emptyStateDescription
-                      : "Halaman ini dipakai untuk triase cepat. Utamakan escalation, chat high risk, atau item stale sebelum Anda turun ke item yang lebih ringan."}
-                  </p>
-                </div>
-                <Link
-                  href={
-                    queue.items[0]
-                      ? `/dashboard/sales/conversations/${queue.items[0].conversation_id}`
-                      : fallbackHref
-                  }
-                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
-                >
-                  {queue.items[0] ? "Buka Item Teratas" : fallbackLabel}
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.18)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                Cara Pakai Halaman Ini
-              </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <UsageHint
-                  title="1. Kelompokkan bottleneck"
-                  description="Filter berdasarkan bucket review agar item yang perlu AI, draft, approval, atau escalation tidak tercampur."
-                />
-                <UsageHint
-                  title="2. Ambil quick action di sini"
-                  description="Untuk item yang hanya perlu analisis atau draft baru, eksekusi langsung tanpa masuk ke detail chat."
-                />
-                <UsageHint
-                  title="3. Turun ke detail saat butuh konteks"
-                  description="Buka conversation atau lead detail kalau keputusan perlu membaca timeline penuh, draft, atau histori follow-up."
-                />
-              </div>
-            </section>
-
             <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
               <QueueMetric
                 label="Total Review"
@@ -590,21 +540,6 @@ function ReviewCard({
         )}
       </div>
     </article>
-  );
-}
-
-function UsageHint({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
-    </div>
   );
 }
 

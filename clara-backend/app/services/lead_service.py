@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, load_only, selectinload
 
 from app.models.conversation import Conversation
 from app.models.customer_profile import CustomerProfile
@@ -30,6 +30,8 @@ from app.services.lead_activity_service import (
     list_lead_activity_events,
 )
 from app.services.customer_profile_service import (
+    customer_profile_contact_fields_supported,
+    customer_profile_load_only_columns,
     build_customer_profile_summary,
     ensure_customer_profile_for_lead,
 )
@@ -163,7 +165,12 @@ def ensure_conversation_lead(
         actor_user_id=conversation.sales_user_id,
         to_value=lead.display_name,
     )
-    ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
+    if customer_profile_contact_fields_supported(db):
+        ensure_customer_profile_for_lead(
+            db=db,
+            lead=lead,
+            preferred_name=lead.display_name,
+        )
 
     return lead
 
@@ -249,7 +256,12 @@ def sync_lead_from_conversation(
 
     db.add(lead)
     db.flush()
-    ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
+    if customer_profile_contact_fields_supported(db):
+        ensure_customer_profile_for_lead(
+            db=db,
+            lead=lead,
+            preferred_name=lead.display_name,
+        )
     if next_follow_up_at is not None:
         upsert_follow_up_task_for_lead(db=db, lead=lead)
     return lead
@@ -376,17 +388,18 @@ def get_lead_model_for_user(
     lead_id: UUID,
     current_user: User,
 ) -> Lead:
+    customer_profile_loader = selectinload(Lead.customer_profile).options(
+        load_only(*customer_profile_load_only_columns(db)),
+        selectinload(CustomerProfile.assigned_user),
+        selectinload(CustomerProfile.leads).selectinload(Lead.conversations),
+    )
     statement = (
         select(Lead)
         .where(Lead.id == lead_id)
         .options(
             selectinload(Lead.conversations),
             selectinload(Lead.assigned_user),
-            selectinload(Lead.customer_profile)
-            .selectinload(CustomerProfile.assigned_user),
-            selectinload(Lead.customer_profile)
-            .selectinload(CustomerProfile.leads)
-            .selectinload(Lead.conversations),
+            customer_profile_loader,
             selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
             selectinload(Lead.deal).selectinload(LeadDeal.owner_user),
             selectinload(Lead.activity_events).selectinload(LeadActivityEvent.actor_user),
@@ -433,13 +446,16 @@ def get_leads_for_user(
     source_channel: str | None = None,
     account_category: str | None = None,
 ) -> list[LeadListItem]:
+    customer_profile_loader = selectinload(Lead.customer_profile).options(
+        load_only(*customer_profile_load_only_columns(db)),
+    )
     if current_user.organization_id is None and not is_superadmin_like(current_user.role):
         return []
 
     statement = select(Lead).options(
         selectinload(Lead.conversations),
         selectinload(Lead.assigned_user),
-        selectinload(Lead.customer_profile),
+        customer_profile_loader,
     )
     if not is_superadmin_like(current_user.role):
         statement = statement.where(Lead.organization_id == current_user.organization_id)
@@ -459,8 +475,9 @@ def get_leads_for_user(
         and matches_account_category(lead.account_category, account_category)
     ]
     backfilled = False
+    can_backfill_customer_profiles = customer_profile_contact_fields_supported(db)
     for lead in leads:
-        if lead.customer_profile_id is None:
+        if can_backfill_customer_profiles and lead.customer_profile_id is None:
             ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
             backfilled = True
     if backfilled:
@@ -479,7 +496,10 @@ def get_lead_for_user(
         lead_id=lead_id,
         current_user=current_user,
     )
-    if lead.customer_profile_id is None:
+    if (
+        customer_profile_contact_fields_supported(db)
+        and lead.customer_profile_id is None
+    ):
         ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
         db.commit()
         db.refresh(lead)

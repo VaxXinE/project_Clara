@@ -69,65 +69,6 @@ function formatKnowledgeProposalStatus(value: string): string {
   return formatStatusLabel(value);
 }
 
-function buildConversationActionPlan(detail: SalesConversationDetail) {
-  const extraction = detail.latest_ai_extraction;
-  const suggestion = detail.latest_reply_suggestion;
-  const sentCount = detail.sent_messages.length;
-  const items: Array<{
-    condition: string;
-    action: string;
-    detail: string;
-  }> = [];
-
-  items.push({
-    condition: "Jika baru buka conversation",
-    action: "Baca 5-10 chat terakhir dulu sebelum klik tombol apa pun.",
-    detail:
-      "Tujuannya supaya user tidak balas berdasarkan summary lama. Konteks terbaru customer tetap sumber keputusan utama.",
-  });
-
-  if (!extraction) {
-    items.push({
-      condition: "Jika AI analysis belum ada",
-      action: "Jalankan AI analysis dulu.",
-      detail:
-        "Tanpa ini user belum punya ringkasan stage, risk, objection, dan next best action. Jangan lompat langsung bikin balasan.",
-    });
-  } else if (!suggestion) {
-    items.push({
-      condition: "Jika AI analysis sudah ada tapi draft belum ada",
-      action: "Generate reply suggestion lalu review hasilnya.",
-      detail:
-        "Tujuannya bukan asal cepat, tapi supaya user mulai dari draft yang sudah mempertimbangkan objection dan risk yang terdeteksi.",
-    });
-  } else if (sentCount === 0) {
-    items.push({
-      condition: "Jika draft sudah ada tapi belum ada pesan terkirim",
-      action: "Review draft, lalu kirim atau ajukan approval sesuai level risikonya.",
-      detail:
-        "Pastikan jawaban relevan dengan pertanyaan terakhir customer dan tidak mengandung klaim sensitif yang belum diverifikasi.",
-    });
-  } else {
-    items.push({
-      condition: "Jika chat sudah ditindaklanjuti",
-      action: "Tutup loop ke CRM dengan update lead detail.",
-      detail:
-        "Setelah balasan terkirim, user harus cek apakah stage, follow-up berikutnya, discipline log, atau task lanjutan perlu diperbarui.",
-    });
-  }
-
-  if (extraction?.risk_level === "high") {
-    items.push({
-      condition: "Jika risk level = high",
-      action: "Jangan kirim balasan langsung tanpa review manusia atau approval.",
-      detail:
-        "Baca reasoning AI dengan teliti. Kalau ada potensi mis-selling, janji berlebihan, atau klaim sensitif, eskalasikan dulu.",
-    });
-  }
-
-  return items.slice(0, 4);
-}
-
 export default function SalesConversationDetailPage() {
   const params = useParams<{ conversationId: string }>();
   const conversationId = params.conversationId;
@@ -694,98 +635,6 @@ function ConversationDetailHeader({
   );
 }
 
-function ConversationUsageGuide({
-  detail,
-}: {
-  detail: SalesConversationDetail;
-}) {
-  const extraction = detail.latest_ai_extraction;
-  const suggestion = detail.latest_reply_suggestion;
-  const sentCount = detail.sent_messages.length;
-  const actionPlan = buildConversationActionPlan(detail);
-
-  const nextStep = !extraction
-    ? {
-        title: "Jalankan AI analysis dulu",
-        description:
-          "Tanpa AI analysis, Anda belum punya ringkasan stage, risiko, objection, dan next best action. Ini langkah pertama yang paling masuk akal.",
-      }
-    : !suggestion
-      ? {
-          title: "Buat draft balasan",
-          description:
-            "Analisis sudah ada. Langkah berikutnya adalah menghasilkan reply suggestion supaya conversation ini bisa ditindaklanjuti dengan cepat.",
-        }
-      : sentCount === 0
-        ? {
-            title: "Review lalu kirim atau approve draft",
-            description:
-              "Draft sudah tersedia. Sekarang fokus Anda adalah mengecek kesesuaian bahasa, approval status, dan apakah balasan sudah siap dikirim.",
-          }
-        : {
-            title: "Naikkan konteksnya ke lead dan follow-up",
-            description:
-              "Percakapan ini sudah punya jejak balasan. Pastikan lead stage, task, dan follow-up berikutnya di CRM sudah ikut rapi.",
-          };
-
-  return (
-    <section className="clara-card rounded-[30px] p-5 sm:p-6">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)] xl:items-start">
-        <div>
-          <p className="clara-kicker">Langkah Berikutnya</p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
-            {nextStep.title}
-          </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-            {nextStep.description}
-          </p>
-
-          <div className="mt-5 space-y-3">
-            {actionPlan.map((item, index) => (
-              <div
-                key={item.condition}
-                className="clara-card-soft rounded-[22px] p-4"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f0cb73]/14 text-xs font-semibold text-[#7c541d]">
-                    0{index + 1}
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-950">
-                      {item.condition}
-                    </h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {item.action}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
-                      {item.detail}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <UsageCard
-            title="Kalau customer masih nanya"
-            description="Fokus ke AI analysis lalu reply suggestion supaya balasan cepat dan tetap terarah."
-          />
-          <UsageCard
-            title="Kalau sudah dibalas"
-            description="Jangan berhenti di conversation. Pindahkan konteksnya ke lead detail agar follow-up berikutnya tercatat."
-          />
-          <UsageCard
-            title="Kalau ada risiko tinggi"
-            description="Naikkan ke approval atau coaching review. Hindari kirim jawaban sensitif tanpa pengecekan."
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function ConversationDetailContent({
   currentUser,
   detail,
@@ -891,31 +740,6 @@ function ConversationDetailContent({
   const canReviewProposal = canReviewKnowledgeProposal(currentUser?.role);
   const reviewCase = detail.chat_review_case;
   const knowledgeProposal = detail.knowledge_update_proposal;
-  const sentCount = detail.sent_messages.length;
-  const actionPlan = buildConversationActionPlan(detail);
-  const nextStep = !extraction
-    ? {
-        title: "Jalankan AI analysis dulu",
-        description:
-          "Tanpa AI analysis, Anda belum punya ringkasan stage, risiko, objection, dan next best action. Ini langkah pertama yang paling masuk akal.",
-      }
-    : !suggestion
-      ? {
-          title: "Buat draft balasan",
-          description:
-            "Analisis sudah ada. Langkah berikutnya adalah menghasilkan reply suggestion supaya conversation ini bisa ditindaklanjuti dengan cepat.",
-        }
-      : sentCount === 0
-        ? {
-            title: "Review lalu kirim atau approve draft",
-            description:
-              "Draft sudah tersedia. Sekarang fokus Anda adalah mengecek kesesuaian bahasa, approval status, dan apakah balasan sudah siap dikirim.",
-          }
-        : {
-            title: "Naikkan konteksnya ke lead dan follow-up",
-            description:
-              "Percakapan ini sudah punya jejak balasan. Pastikan lead stage, task, dan follow-up berikutnya di CRM sudah ikut rapi.",
-          };
   const [activePanel, setActivePanel] = useState<
     "ai_reply" | "coaching" | "knowledge" | "sent_logs"
   >("ai_reply");
@@ -1000,60 +824,7 @@ function ConversationDetailContent({
 
   return (
     <section className="space-y-6">
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] xl:items-start">
-        <div className="clara-card rounded-[30px] p-5 sm:p-6">
-          <div>
-            <p className="clara-kicker">Langkah Berikutnya</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
-              {nextStep.title}
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              {nextStep.description}
-            </p>
-
-            <div className="mt-5 space-y-3">
-              {actionPlan.map((item, index) => (
-                <div
-                  key={item.condition}
-                  className="clara-card-soft rounded-[22px] p-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#f0cb73]/14 text-xs font-semibold text-[#7c541d]">
-                      0{index + 1}
-                    </span>
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-950">
-                        {item.condition}
-                      </h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
-                        {item.action}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {item.detail}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 space-y-3">
-              <UsageCard
-                title="Kalau customer masih nanya"
-                description="Fokus ke AI analysis lalu reply suggestion supaya balasan cepat dan tetap terarah."
-              />
-              <UsageCard
-                title="Kalau sudah dibalas"
-                description="Jangan berhenti di conversation. Pindahkan konteksnya ke lead detail agar follow-up berikutnya tercatat."
-              />
-              <UsageCard
-                title="Kalau ada risiko tinggi"
-                description="Naikkan ke approval atau coaching review. Hindari kirim jawaban sensitif tanpa pengecekan."
-              />
-            </div>
-          </div>
-        </div>
-
+      <section>
         <section className="clara-card rounded-[30px] p-5">
           <div>
             <p className="clara-kicker">Workspace Panel</p>
@@ -1716,17 +1487,3 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
-function UsageCard({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="clara-card-soft rounded-[22px] p-4">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-    </div>
-  );
-}

@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import inspect as sqlalchemy_inspect, select
+from sqlalchemy.orm import Session, load_only, selectinload
 
 from app.models.conversation import Conversation
 from app.models.customer_profile import CustomerProfile
@@ -17,6 +17,121 @@ from app.services.role_service import is_superadmin_like
 from app.services.source_intelligence_service import build_source_label, normalize_source_channel
 
 ALLOWED_CUSTOMER_PROFILE_STATUSES = {"active", "inactive"}
+CUSTOMER_PROFILE_CONTACT_FIELD_NAMES = {"phone", "email", "address", "status"}
+CUSTOMER_PROFILE_SCHEMA_MISMATCH_DETAIL = (
+    "Schema database customer_profiles belum memuat kolom contact fields terbaru. "
+    "Jalankan migration Alembic terbaru untuk customer profile."
+)
+_CUSTOMER_PROFILE_COLUMN_CACHE: dict[str, set[str]] = {}
+
+
+def _get_customer_profile_column_names(db: Session) -> set[str]:
+    bind = db.get_bind()
+    engine = getattr(bind, "engine", bind)
+    cache_key = str(engine.url)
+    cached = _CUSTOMER_PROFILE_COLUMN_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    inspector = sqlalchemy_inspect(bind)
+    columns = {
+        column["name"]
+        for column in inspector.get_columns("customer_profiles")
+    }
+    _CUSTOMER_PROFILE_COLUMN_CACHE[cache_key] = columns
+    return columns
+
+
+def customer_profile_contact_fields_supported(db: Session) -> bool:
+    return CUSTOMER_PROFILE_CONTACT_FIELD_NAMES.issubset(
+        _get_customer_profile_column_names(db),
+    )
+
+
+def customer_profile_load_only_columns(db: Session) -> list:
+    column_names = _get_customer_profile_column_names(db)
+    columns = [
+        CustomerProfile.id,
+        CustomerProfile.organization_id,
+        CustomerProfile.assigned_user_id,
+        CustomerProfile.display_name,
+        CustomerProfile.canonical_key,
+        CustomerProfile.last_contact_at,
+        CustomerProfile.created_at,
+        CustomerProfile.updated_at,
+    ]
+    optional_columns = {
+        "phone": CustomerProfile.phone,
+        "email": CustomerProfile.email,
+        "address": CustomerProfile.address,
+        "status": CustomerProfile.status,
+        "identity_confidence": CustomerProfile.identity_confidence,
+        "match_strategy": CustomerProfile.match_strategy,
+        "merge_notes": CustomerProfile.merge_notes,
+        "merged_into_profile_id": CustomerProfile.merged_into_profile_id,
+    }
+    for name, column in optional_columns.items():
+        if name in column_names:
+            columns.append(column)
+    return columns
+
+
+def _get_loaded_profile_value(
+    profile: CustomerProfile,
+    field_name: str,
+    default: object = None,
+):
+    return sqlalchemy_inspect(profile).dict.get(field_name, default)
+
+
+def _get_profile_phone(profile: CustomerProfile) -> str | None:
+    value = _get_loaded_profile_value(profile, "phone")
+    return value if isinstance(value, str) else None
+
+
+def _get_profile_email(profile: CustomerProfile) -> str | None:
+    value = _get_loaded_profile_value(profile, "email")
+    return value if isinstance(value, str) else None
+
+
+def _get_profile_address(profile: CustomerProfile) -> str | None:
+    value = _get_loaded_profile_value(profile, "address")
+    return value if isinstance(value, str) else None
+
+
+def _get_profile_status(profile: CustomerProfile) -> str:
+    value = _get_loaded_profile_value(profile, "status")
+    return value if isinstance(value, str) and value.strip() else "active"
+
+
+def _get_profile_identity_confidence(profile: CustomerProfile) -> float:
+    value = _get_loaded_profile_value(profile, "identity_confidence")
+    return float(value) if isinstance(value, (int, float)) else 0.92
+
+
+def _get_profile_match_strategy(profile: CustomerProfile) -> str:
+    value = _get_loaded_profile_value(profile, "match_strategy")
+    return value if isinstance(value, str) and value.strip() else "name_exact"
+
+
+def _get_profile_merge_notes(profile: CustomerProfile) -> str | None:
+    value = _get_loaded_profile_value(profile, "merge_notes")
+    return value if isinstance(value, str) else None
+
+
+def _get_profile_merged_into_profile_id(profile: CustomerProfile) -> UUID | None:
+    value = _get_loaded_profile_value(profile, "merged_into_profile_id")
+    return value if isinstance(value, UUID) else None
+
+
+def _require_customer_profile_contact_fields(db: Session) -> None:
+    if customer_profile_contact_fields_supported(db):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=CUSTOMER_PROFILE_SCHEMA_MISMATCH_DETAIL,
+    )
 
 
 def ensure_aware_utc(value: datetime | None) -> datetime | None:
@@ -95,7 +210,7 @@ def build_merge_candidates(
 ) -> list[dict]:
     candidates: list[dict] = []
     for candidate in visible_profiles:
-        if candidate.id == profile.id or candidate.merged_into_profile_id is not None:
+        if candidate.id == profile.id or _get_profile_merged_into_profile_id(candidate) is not None:
             continue
 
         match_score, overlap_reason = calculate_profile_match_score(profile, candidate)
@@ -108,8 +223,8 @@ def build_merge_candidates(
                 "id": candidate.id,
                 "display_name": candidate.display_name,
                 "canonical_key": candidate.canonical_key,
-                "identity_confidence": candidate.identity_confidence,
-                "match_strategy": candidate.match_strategy,
+                "identity_confidence": _get_profile_identity_confidence(candidate),
+                "match_strategy": _get_profile_match_strategy(candidate),
                 "match_score": match_score,
                 "overlap_reason": overlap_reason,
                 "lead_count": len(candidate_leads),
@@ -162,11 +277,13 @@ def ensure_customer_profile_for_lead(
     )
 
     existing_profile = db.scalars(
-        select(CustomerProfile).where(
+        select(CustomerProfile)
+        .where(
             CustomerProfile.organization_id == lead.organization_id,
             CustomerProfile.canonical_key == canonical_key,
             CustomerProfile.merged_into_profile_id.is_(None),
         )
+        .options(load_only(*customer_profile_load_only_columns(db)))
     ).first()
 
     if existing_profile is None:
@@ -253,15 +370,15 @@ def build_customer_profile_summary(
         "assigned_user_id": profile.assigned_user_id,
         "assigned_user_name": profile.assigned_user.name if profile.assigned_user else None,
         "display_name": profile.display_name,
-        "phone": profile.phone,
-        "email": profile.email,
-        "address": profile.address,
-        "status": profile.status,
+        "phone": _get_profile_phone(profile),
+        "email": _get_profile_email(profile),
+        "address": _get_profile_address(profile),
+        "status": _get_profile_status(profile),
         "canonical_key": profile.canonical_key,
-        "identity_confidence": profile.identity_confidence,
-        "match_strategy": profile.match_strategy,
-        "merge_notes": profile.merge_notes,
-        "merged_into_profile_id": profile.merged_into_profile_id,
+        "identity_confidence": _get_profile_identity_confidence(profile),
+        "match_strategy": _get_profile_match_strategy(profile),
+        "merge_notes": _get_profile_merge_notes(profile),
+        "merged_into_profile_id": _get_profile_merged_into_profile_id(profile),
         "lead_count": len(leads),
         "conversation_count": conversation_count,
         "source_channels": source_channels,
@@ -291,16 +408,16 @@ def build_customer_profile_list_item(
         "assigned_user_id": profile.assigned_user_id,
         "assigned_user_name": profile.assigned_user.name if profile.assigned_user else None,
         "display_name": profile.display_name,
-        "phone": profile.phone,
-        "email": profile.email,
-        "status": profile.status,
+        "phone": _get_profile_phone(profile),
+        "email": _get_profile_email(profile),
+        "status": _get_profile_status(profile),
         "lead_count": len(leads),
         "active_lead_count": active_lead_count,
         "conversation_count": conversation_count,
         "hot_lead_count": hot_lead_count,
         "source_labels": sorted({build_source_label(lead.source) for lead in leads}),
         "last_contact_at": profile.last_contact_at,
-        "identity_confidence": profile.identity_confidence,
+        "identity_confidence": _get_profile_identity_confidence(profile),
     }
 
 
@@ -314,6 +431,7 @@ def get_customer_profile_model_for_user(
         select(CustomerProfile)
         .where(CustomerProfile.id == customer_profile_id)
         .options(
+            load_only(*customer_profile_load_only_columns(db)),
             selectinload(CustomerProfile.assigned_user),
             selectinload(CustomerProfile.leads).selectinload(Lead.conversations),
         )
@@ -365,7 +483,7 @@ def get_customer_profile_for_user(
         customer_profile_id=customer_profile_id,
         current_user=current_user,
     )
-    if profile.merged_into_profile_id is not None:
+    if _get_profile_merged_into_profile_id(profile) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Customer profile sudah digabung ke profil lain.",
@@ -388,6 +506,7 @@ def get_customer_profile_for_user(
         .where(
             CustomerProfile.organization_id == profile.organization_id,
         )
+        .options(load_only(*customer_profile_load_only_columns(db)))
         .options(selectinload(CustomerProfile.leads).selectinload(Lead.conversations))
     ).all()
     if accessible_user_ids is not None:
@@ -415,6 +534,7 @@ def list_customer_profiles_for_user(
         select(CustomerProfile)
         .where(CustomerProfile.merged_into_profile_id.is_(None))
         .options(
+            load_only(*customer_profile_load_only_columns(db)),
             selectinload(CustomerProfile.assigned_user),
             selectinload(CustomerProfile.leads).selectinload(Lead.conversations),
         )
@@ -447,14 +567,14 @@ def list_customer_profiles_for_user(
         if not visible_leads:
             continue
 
-        if normalized_status and profile.status != normalized_status:
+        if normalized_status and _get_profile_status(profile) != normalized_status:
             continue
 
         if normalized_query:
             haystacks = [
                 profile.display_name,
-                profile.phone,
-                profile.email,
+                _get_profile_phone(profile),
+                _get_profile_email(profile),
                 profile.assigned_user.name if profile.assigned_user else None,
                 profile.canonical_key,
             ]
@@ -493,12 +613,14 @@ def update_customer_profile_for_user(
     status_value: str,
     current_user: User,
 ) -> dict:
+    _require_customer_profile_contact_fields(db)
+
     profile = get_customer_profile_model_for_user(
         db=db,
         customer_profile_id=customer_profile_id,
         current_user=current_user,
     )
-    if profile.merged_into_profile_id is not None:
+    if _get_profile_merged_into_profile_id(profile) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Customer profile sudah digabung ke profil lain.",
@@ -550,6 +672,8 @@ def merge_customer_profiles(
     merge_notes: str | None,
     current_user: User,
 ) -> dict:
+    _require_customer_profile_contact_fields(db)
+
     source_profile = get_customer_profile_model_for_user(
         db=db,
         customer_profile_id=source_profile_id,
@@ -563,9 +687,9 @@ def merge_customer_profiles(
 
     if source_profile.id == target_profile.id:
         raise ValueError("Source dan target customer profile tidak boleh sama.")
-    if source_profile.merged_into_profile_id is not None:
+    if _get_profile_merged_into_profile_id(source_profile) is not None:
         raise ValueError("Source customer profile sudah pernah digabung.")
-    if target_profile.merged_into_profile_id is not None:
+    if _get_profile_merged_into_profile_id(target_profile) is not None:
         raise ValueError("Target customer profile sudah digabung ke profil lain.")
     if source_profile.organization_id != target_profile.organization_id:
         raise ValueError("Customer profile harus berasal dari organization yang sama.")
@@ -633,6 +757,7 @@ def merge_customer_profiles(
     visible_profiles = db.scalars(
         select(CustomerProfile)
         .where(CustomerProfile.organization_id == refreshed_target_profile.organization_id)
+        .options(load_only(*customer_profile_load_only_columns(db)))
         .options(selectinload(CustomerProfile.leads).selectinload(Lead.conversations))
     ).all()
     if accessible_user_ids is not None:

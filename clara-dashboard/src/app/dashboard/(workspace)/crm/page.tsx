@@ -461,30 +461,6 @@ export default function CrmPage() {
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="rounded-[24px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    Lead Ops View
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    {filteredLeads.length === 0
-                      ? "Belum ada lead yang cocok dengan filter ini"
-                      : `${visibleLeads.length} lead siap dibaca cepat`}
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
-                    Fokus utamanya bukan membaca semua lead satu-satu, tapi menemukan mana yang perlu tindakan, mana yang belum sinkron, dan mana yang sudah aman.
-                  </p>
-                </div>
-                <Link
-                  href={visibleLeads[0] ? `/dashboard/crm/${visibleLeads[0].id}` : "/dashboard/upload"}
-                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
-                >
-                  {visibleLeads[0] ? "Buka Lead Prioritas" : "Buka Lead Capture"}
-                </Link>
-              </div>
-            </section>
-
             <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
               <BoardMetric label="Total Leads" value={String(summary.total)} hint="Semua lead yang masuk scope Anda." />
               <BoardMetric label="Perlu tindakan" value={String(summary.needsAction)} hint="Lead yang sebaiknya dicek hari ini." />

@@ -215,7 +215,7 @@ export default function CustomerProfilePage() {
                         href={`/dashboard/crm/${topPriorityLead.id}`}
                         className="inline-flex rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-950"
                       >
-                        Buka Lead Prioritas
+                        Buka Detail Lead
                       </Link>
                       {topPriorityLead.latest_conversation_id ? (
                         <Link

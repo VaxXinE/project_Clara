@@ -382,60 +382,6 @@ export default function SalesInboxPage() {
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="rounded-[24px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    Langkah Berikutnya
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    {filteredInboxItems.length === 0
-                      ? archiveScope === "archived"
-                        ? "Belum ada conversation yang terarsip"
-                        : "Inbox masih kosong"
-                      : "Kerjakan bucket paling atas lebih dulu"}
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
-                    {filteredInboxItems.length === 0
-                      ? archiveScope === "archived"
-                        ? "Belum ada chat yang masuk arsip otomatis. Conversation yang tidak aktif akan muncul di sini setelah melewati batas inactivity."
-                        : "Kalau belum ada percakapan, langkah paling masuk akal adalah import chat dulu supaya Clara punya bahan kerja."
-                      : "Queue ini sekarang dipisah per jenis pekerjaan. Ambil bucket yang paling kritis dulu, jalankan quick action yang perlu, lalu baru buka detail chat kalau memang butuh konteks penuh."}
-                  </p>
-                </div>
-                <Link
-                  href={
-                    filteredInboxItems[0]
-                      ? `/dashboard/sales/conversations/${filteredInboxItems[0].conversation_id}`
-                      : "/dashboard/upload"
-                  }
-                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
-                >
-                  {filteredInboxItems[0] ? "Buka Chat Prioritas" : "Buka Lead Capture"}
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                Cara Pakai Halaman Ini
-              </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <UsageHint
-                  title="1. Mulai dari bucket kerja"
-                  description="Pisahkan chat yang perlu analisis, draft, review, atau langsung dibalas supaya user tidak scan list campur."
-                />
-                <UsageHint
-                  title="2. Pakai quick action dulu"
-                  description="Kalau tugasnya hanya analisis atau draft, kerjakan langsung dari queue tanpa wajib buka detail."
-                />
-                <UsageHint
-                  title="3. Buka detail saat perlu konteks"
-                  description="Turun ke conversation detail hanya saat butuh membaca transcript, review case, atau update CRM lebih dalam."
-                />
-              </div>
-            </section>
-
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <OverviewTile
                 label="Total Percakapan"
@@ -811,21 +757,6 @@ export default function SalesInboxPage() {
         )}
       </div>
     </WorkspaceShell>
-  );
-}
-
-function UsageHint({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-    </div>
   );
 }
 

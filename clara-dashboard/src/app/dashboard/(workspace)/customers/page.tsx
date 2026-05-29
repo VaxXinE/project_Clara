@@ -67,36 +67,6 @@ export default function CustomerListPage() {
       description="Daftar ini dipakai untuk melihat semua customer yang sudah dikenali Clara. Dari sini user bisa cari customer, cek ringkasan singkatnya, lalu masuk ke detail customer."
     >
       <div className="space-y-6">
-        <section className="rounded-[30px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(32,24,17,0.96)_0%,rgba(18,13,10,0.98)_52%,rgba(54,40,18,0.94)_100%)] p-6 shadow-[0_18px_40px_rgba(0,0,0,0.24)]">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-[#f0cb73]">
-                Direktori Customer
-              </p>
-              <h2 className="mt-3 text-2xl font-semibold text-[#fff0c9]">
-                Cari customer dari satu halaman, lalu buka detailnya saat butuh
-                konteks lebih dalam.
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-[#e5c98b]">
-                Halaman ini cocok dipakai kalau tim sudah tahu nama customer atau
-                ingin memastikan apakah satu customer punya beberapa lead aktif.
-                Fokusnya bukan mengedit semua hal sekaligus, tetapi menemukan
-                customer yang tepat lalu turun ke detailnya.
-              </p>
-            </div>
-            <div className="rounded-[26px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.98)_0%,rgba(18,13,10,0.98)_100%)] p-5 text-white shadow-[0_16px_34px_rgba(0,0,0,0.22)] lg:max-w-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
-                Cara Pakai
-              </p>
-              <ul className="mt-3 space-y-2 text-sm leading-7 text-[#f3d694]">
-                <li>1. Cari nama customer atau kontaknya.</li>
-                <li>2. Lihat jumlah lead aktif dan hot lead.</li>
-                <li>3. Tekan tombol detail kalau butuh konteks penuh.</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
         <section className="grid gap-4 md:grid-cols-3">
           <MetricCard label="Total Customer" value={String(customers.length)} />
           <MetricCard label="Customer Aktif" value={String(activeCount)} />

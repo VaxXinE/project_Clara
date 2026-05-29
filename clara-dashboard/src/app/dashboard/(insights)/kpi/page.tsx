@@ -220,48 +220,6 @@ export default function KpiCommandCenterPage() {
 
         {kpi && !isLoading && !errorMessage && (
           <>
-            <section className="rounded-[24px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    Langkah Berikutnya
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    Mulai dari alert dan observation, bukan dari semua angka sekaligus
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
-                    Ops Dashboard ini paling berguna kalau dibaca berurutan: lihat alert aktif, baca observation utama, lalu turun ke leaderboard, source performance, dan snapshot history hanya saat perlu verifikasi lebih dalam.
-                  </p>
-                </div>
-                <Link
-                  href="/dashboard/notifications"
-                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
-                >
-                  Buka Alert Center
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                Cara Pakai Halaman Ini
-              </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <UsageHint
-                  title="1. Baca health summary dulu"
-                  description="Angka paling atas memberi gambaran cepat apakah pipeline sehat atau butuh intervensi."
-                />
-                <UsageHint
-                  title="2. Fokus ke alert dan executive action"
-                  description="Dua blok ini adalah bagian yang paling dekat ke keputusan nyata, bukan hanya observasi."
-                />
-                <UsageHint
-                  title="3. Gunakan history untuk validasi tren"
-                  description="Snapshot history dan persistent alert dipakai saat Anda ingin memastikan apakah masalahnya insidental atau berulang."
-                />
-              </div>
-            </section>
-
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Total Leads"
@@ -1008,21 +966,6 @@ export default function KpiCommandCenterPage() {
         )}
       </div>
     </WorkspaceShell>
-  );
-}
-
-function UsageHint({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
-    </div>
   );
 }
 

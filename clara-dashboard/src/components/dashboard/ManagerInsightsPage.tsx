@@ -159,27 +159,6 @@ export function ManagerInsightsPage() {
 
         {insights && !isLoading && !errorMessage ? (
           <>
-            <section className="rounded-[24px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    Langkah Berikutnya
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    Mulai dari boundary alert, lalu turun ke tim yang paling bocor
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
-                    Manager view ini paling berguna kalau dibaca berurutan:
-                    lihat alert tim atau unit dulu, cek compliance discipline dan
-                    follow-up, lalu baru turun ke coaching case dan objection trend.
-                  </p>
-                </div>
-                <div className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-4 py-2 text-sm font-medium text-[#f0cb73]">
-                  {insights.scope_label}
-                </div>
-              </div>
-            </section>
-
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Scope Teams"

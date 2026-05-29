@@ -327,56 +327,6 @@ export default function FollowUpPage() {
 
         {!isLoading && worklist && (
           <>
-            <section className="rounded-[24px] border border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(24,18,12,0.98)_0%,rgba(34,25,17,0.96)_55%,rgba(54,39,16,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.22)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    Langkah Berikutnya
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    {filteredVisibleItems.length === 0
-                      ? "Queue sedang relatif aman"
-                      : "Kerjakan bucket paling kritis lebih dulu"}
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#ecd2a0]">
-                    {filteredVisibleItems.length === 0
-                      ? "Kalau tidak ada item prioritas, kembali cek Queue atau Lead Management. Bisa jadi task aktif Anda memang dijadwalkan untuk besok atau hari berikutnya."
-                      : "Action Center ini dipakai untuk triase harian. Bersihkan item kritis dulu, lalu lanjutkan ke task yang jatuh tempo hari ini dan hot lead."}
-                  </p>
-                </div>
-                <Link
-                  href={
-                    filteredVisibleItems[0]?.conversation_id
-                      ? `/dashboard/sales/conversations/${filteredVisibleItems[0].conversation_id}`
-                      : "/dashboard/sales"
-                  }
-                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
-                >
-                  {filteredVisibleItems[0] ? "Buka Prioritas Teratas" : "Buka Queue"}
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                Cara Pakai Halaman Ini
-              </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <UsageHint
-                  title="1. Ambil item paling atas"
-                  description="Urutannya sudah diprioritaskan. Anda tidak perlu memilah dari nol kecuali ada konteks khusus."
-                />
-                <UsageHint
-                  title="2. Putuskan lifecycle action"
-                  description="Buka conversation kalau perlu konteks, dismiss kalau tidak relevan sementara, dan done kalau task benar-benar selesai."
-                />
-                <UsageHint
-                  title="3. Rapikan lead bila perlu"
-                  description="Kalau follow-up mengubah status bisnis lead, rapikan stage, notes, atau deal di halaman Lead Management."
-                />
-              </div>
-            </section>
-
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="Follow-up Overdue" value={String(worklist.overdue_count)} />
               <MetricCard label="Hot Lead Alert" value={String(worklist.hot_lead_count)} />
@@ -577,21 +527,6 @@ export default function FollowUpPage() {
         )}
       </div>
     </WorkspaceShell>
-  );
-}
-
-function UsageHint({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-    </div>
   );
 }
 
