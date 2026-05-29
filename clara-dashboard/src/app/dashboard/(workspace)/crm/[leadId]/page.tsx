@@ -34,6 +34,7 @@ const STAGE_OPTIONS = [
 ];
 
 const TEMPERATURE_OPTIONS = ["cold", "warm", "hot", "unknown"];
+const ACCOUNT_CATEGORY_OPTIONS = ["mini", "reguler", "unknown"];
 const DEAL_STATUS_OPTIONS = ["open", "won", "lost"];
 const DISCIPLINE_ACTIVITY_OPTIONS = [
   "follow_up_call",
@@ -105,6 +106,19 @@ function formatDisciplineStatus(value: string): string {
       return "Missing today log";
     case "stale_log":
       return "Stale log";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function formatAccountCategory(value: string): string {
+  switch (value) {
+    case "mini":
+      return "Mini";
+    case "reguler":
+      return "Reguler";
+    case "unknown":
+      return "Belum ditentukan";
     default:
       return value.replaceAll("_", " ");
   }
@@ -244,6 +258,7 @@ export default function LeadDetailPage() {
   const [notesInput, setNotesInput] = useState("");
   const [stageInput, setStageInput] = useState("new_lead");
   const [temperatureInput, setTemperatureInput] = useState("unknown");
+  const [accountCategoryInput, setAccountCategoryInput] = useState("unknown");
   const [followUpInput, setFollowUpInput] = useState("");
   const [assignedUserInput, setAssignedUserInput] = useState("");
 
@@ -311,6 +326,7 @@ export default function LeadDetailPage() {
       setNotesInput(leadDetail.notes ?? "");
       setStageInput(leadDetail.current_stage);
       setTemperatureInput(leadDetail.lead_temperature);
+      setAccountCategoryInput(leadDetail.account_category);
       setFollowUpInput(toDateTimeLocalValue(leadDetail.next_follow_up_at));
       setAssignedUserInput(leadDetail.assigned_user_id ?? "");
       setDealStatusInput(
@@ -370,6 +386,7 @@ export default function LeadDetailPage() {
       setNotesInput(refreshedLead.notes ?? "");
       setStageInput(refreshedLead.current_stage);
       setTemperatureInput(refreshedLead.lead_temperature);
+      setAccountCategoryInput(refreshedLead.account_category);
       setFollowUpInput(toDateTimeLocalValue(refreshedLead.next_follow_up_at));
       setAssignedUserInput(refreshedLead.assigned_user_id ?? "");
       setDealStatusInput(updatedDeal.status);
@@ -439,6 +456,7 @@ export default function LeadDetailPage() {
       const payload: LeadUpdateRequest = {
         summary: summaryInput || null,
         notes: notesInput || null,
+        account_category: accountCategoryInput,
         current_stage: stageInput,
         lead_temperature: temperatureInput,
         next_follow_up_at: fromDateTimeLocalValue(followUpInput),
@@ -458,6 +476,7 @@ export default function LeadDetailPage() {
       setNotesInput(updatedLead.notes ?? "");
       setStageInput(updatedLead.current_stage);
       setTemperatureInput(updatedLead.lead_temperature);
+      setAccountCategoryInput(updatedLead.account_category);
       setFollowUpInput(toDateTimeLocalValue(updatedLead.next_follow_up_at));
       setAssignedUserInput(updatedLead.assigned_user_id ?? "");
       setDealStatusInput(
@@ -672,6 +691,9 @@ export default function LeadDetailPage() {
             <section className="space-y-6">
               <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                    Kategori akun: {formatAccountCategory(lead.account_category)}
+                  </span>
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
                       lead.lead_temperature
@@ -688,15 +710,13 @@ export default function LeadDetailPage() {
                 </div>
 
                 <dl className="mt-5 grid gap-4 md:grid-cols-3">
+                  <Metric label="Kategori akun" value={formatAccountCategory(lead.account_category)} />
                   <Metric label="Last contact" value={formatDateTime(lead.last_contact_at)} />
                   <Metric
                     label="Next follow-up"
                     value={formatDateTime(lead.next_follow_up_at)}
                   />
-                  <Metric
-                    label="Conversation count"
-                    value={String(lead.conversation_count)}
-                  />
+                  <Metric label="Conversation count" value={String(lead.conversation_count)} />
                 </dl>
               </div>
 
@@ -750,6 +770,20 @@ export default function LeadDetailPage() {
                 </div>
 
                 <div className="mt-6 grid gap-5 md:grid-cols-2">
+                  <Field label="Kategori akun">
+                    <select
+                      value={accountCategoryInput}
+                      onChange={(event) => setAccountCategoryInput(event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                    >
+                      {ACCOUNT_CATEGORY_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {formatAccountCategory(option)}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
                   <Field label="Stage">
                     <select
                       value={stageInput}

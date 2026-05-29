@@ -557,6 +557,11 @@ def build_chat_review_item(
         sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
         source_channel=normalize_source_channel(conversation.source),
         source_label=build_source_label(conversation.source),
+        account_category=(
+            conversation.lead.account_category
+            if conversation.lead is not None
+            else "unknown"
+        ),
         current_stage=conversation.current_stage,
         lead_temperature=conversation.lead_temperature,
         risk_level=risk_level,
@@ -660,6 +665,11 @@ def get_sales_inbox(
                 source=conversation.source,
                 source_channel=normalize_source_channel(conversation.source),
                 source_label=build_source_label(conversation.source),
+                account_category=(
+                    conversation.lead.account_category
+                    if conversation.lead is not None
+                    else "unknown"
+                ),
                 status=conversation.status,
                 started_at=conversation.started_at,
                 last_message_at=conversation.last_message_at,
@@ -758,6 +768,11 @@ def get_sales_conversation_detail(
         source=conversation.source,
         source_channel=normalize_source_channel(conversation.source),
         source_label=build_source_label(conversation.source),
+        account_category=(
+            conversation.lead.account_category
+            if conversation.lead is not None
+            else "unknown"
+        ),
         status=conversation.status,
         started_at=conversation.started_at,
         last_message_at=conversation.last_message_at,

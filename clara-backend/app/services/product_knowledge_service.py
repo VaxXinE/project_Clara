@@ -10,6 +10,7 @@ from app.schemas.product_knowledge_schema import (
     ProductKnowledgeUpdateRequest,
 )
 from app.services.access_control_service import AccessDeniedError, ensure_user_has_organization
+from app.services.business_segmentation_service import normalize_account_category
 from app.services.role_service import is_owner_like
 
 
@@ -198,6 +199,7 @@ def delete_product_knowledge(
 def get_active_product_knowledge_for_organization(
     db: Session,
     organization_id: UUID | None,
+    account_category: str | None = None,
     limit: int = 20,
 ) -> list[ProductKnowledge]:
     statement = (
@@ -210,6 +212,30 @@ def get_active_product_knowledge_for_organization(
         )
         .where(ProductKnowledge.is_active.is_(True))
         .order_by(desc(ProductKnowledge.updated_at))
-        .limit(limit)
     )
-    return list(db.scalars(statement).all())
+    entries = list(db.scalars(statement).all())
+    normalized_category = normalize_account_category(account_category)
+
+    if normalized_category == "mini":
+        entries = [
+            entry
+            for entry in entries
+            if entry.source_type != "markdown_import_regular"
+            and entry.source_type != "markdown_import"
+        ]
+    elif normalized_category == "reguler":
+        entries = [
+            entry
+            for entry in entries
+            if entry.source_type != "markdown_import_mini"
+            and entry.source_type != "markdown_import"
+        ]
+    else:
+        entries = [
+            entry
+            for entry in entries
+            if not entry.source_type.startswith("markdown_import_")
+            or entry.source_type == "markdown_import_regular"
+        ]
+
+    return entries[:limit]

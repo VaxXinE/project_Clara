@@ -12,11 +12,23 @@ from app.models.conversation import Conversation
 from app.models.customer_profile import CustomerProfile
 from app.models.lead import Lead
 from app.models.user import User
+from app.schemas.ai_extraction_schema import CustomerProfileAutofill
 from app.services.access_control_service import get_accessible_sales_user_ids
+from app.services.business_segmentation_service import normalize_account_category
+from app.services.lead_activity_service import create_lead_activity_event
 from app.services.role_service import is_superadmin_like
 from app.services.source_intelligence_service import build_source_label, normalize_source_channel
 
 ALLOWED_CUSTOMER_PROFILE_STATUSES = {"active", "inactive"}
+ALLOWED_ACCOUNT_CATEGORIES = {"mini", "reguler", "unknown"}
+AI_AUTOFILL_CONFIDENCE_THRESHOLD = 0.86
+GENERIC_PROFILE_NAMES = {
+    "unknown customer",
+    "customer",
+    "calon customer",
+    "lead",
+    "prospect",
+}
 
 
 def ensure_aware_utc(value: datetime | None) -> datetime | None:
@@ -42,6 +54,58 @@ def normalize_optional_text(value: str | None) -> str | None:
         return None
     normalized = value.strip()
     return normalized or None
+
+
+def normalize_ai_phone(value: str | None) -> str | None:
+    normalized = normalize_optional_text(value)
+    if normalized is None:
+        return None
+
+    compact = re.sub(r"(?!^\+)[^\d]", "", normalized)
+    if normalized.startswith("+"):
+        compact = f"+{compact}"
+
+    digit_count = len(re.sub(r"\D", "", compact))
+    if digit_count < 8 or digit_count > 15:
+        return None
+    return compact
+
+
+def normalize_ai_email(value: str | None) -> str | None:
+    normalized = normalize_optional_text(value)
+    if normalized is None:
+        return None
+
+    lowered = normalized.lower()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", lowered):
+        return None
+    return lowered
+
+
+def normalize_ai_address(value: str | None) -> str | None:
+    normalized = normalize_optional_text(value)
+    if normalized is None or len(normalized) < 8:
+        return None
+    return normalized
+
+
+def normalize_ai_display_name(value: str | None) -> str | None:
+    normalized = normalize_optional_text(value)
+    if normalized is None:
+        return None
+
+    lowered = normalized.lower()
+    if lowered in GENERIC_PROFILE_NAMES:
+        return None
+
+    if len(normalized) < 2:
+        return None
+    return normalized
+
+
+def is_placeholder_profile_name(value: str | None) -> bool:
+    normalized = (value or "").strip().lower()
+    return normalized in GENERIC_PROFILE_NAMES or normalized.startswith("unknown")
 
 
 def compute_identity_metadata(
@@ -228,6 +292,7 @@ def build_customer_profile_summary(
             "display_name": lead.display_name,
             "source_channel": normalize_source_channel(lead.source),
             "source_label": build_source_label(lead.source),
+            "account_category": lead.account_category,
             "current_stage": lead.current_stage,
             "lead_temperature": lead.lead_temperature,
             "last_contact_at": lead.last_contact_at,
@@ -491,6 +556,7 @@ def update_customer_profile_for_user(
     email: str | None,
     address: str | None,
     status_value: str,
+    account_category: str | None,
     current_user: User,
 ) -> dict:
     profile = get_customer_profile_model_for_user(
@@ -509,11 +575,18 @@ def update_customer_profile_for_user(
     normalized_email = normalize_optional_text(email)
     normalized_address = normalize_optional_text(address)
     normalized_status = status_value.strip().lower()
+    normalized_account_category = normalize_account_category(account_category)
 
     if normalized_status not in ALLOWED_CUSTOMER_PROFILE_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Status customer profile tidak valid.",
+        )
+
+    if normalized_account_category not in ALLOWED_ACCOUNT_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Kategori akun customer profile tidak valid.",
         )
 
     canonical_key = normalize_customer_identity_name(normalized_name)
@@ -531,6 +604,37 @@ def update_customer_profile_for_user(
     profile.identity_confidence = max(profile.identity_confidence, identity_confidence)
     profile.match_strategy = "manual_profile_update"
 
+    accessible_user_ids = get_accessible_sales_user_ids(
+        db=db,
+        current_user=current_user,
+    )
+    visible_leads = (
+        list(profile.leads)
+        if accessible_user_ids is None
+        else [
+            lead
+            for lead in profile.leads
+            if lead.assigned_user_id in accessible_user_ids
+        ]
+    )
+    for lead in visible_leads:
+        if lead.account_category == normalized_account_category:
+            continue
+
+        previous_category = lead.account_category
+        lead.account_category = normalized_account_category
+        db.add(lead)
+        create_lead_activity_event(
+            db=db,
+            lead=lead,
+            event_type="account_category_changed",
+            title="Kategori akun diperbarui dari profil customer",
+            description="Kategori akun diselaraskan manual dari halaman customer profile.",
+            actor_user_id=current_user.id,
+            from_value=previous_category,
+            to_value=normalized_account_category,
+        )
+
     db.add(profile)
     db.commit()
     db.refresh(profile)
@@ -540,6 +644,64 @@ def update_customer_profile_for_user(
         customer_profile_id=profile.id,
         current_user=current_user,
     )
+
+
+def apply_ai_autofill_to_customer_profile(
+    db: Session,
+    *,
+    lead: Lead,
+    autofill: CustomerProfileAutofill,
+) -> CustomerProfile | None:
+    if autofill.confidence_score < AI_AUTOFILL_CONFIDENCE_THRESHOLD:
+        return None
+
+    profile = lead.customer_profile
+    if profile is None:
+        profile = ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
+
+    updated_fields: list[str] = []
+
+    suggested_name = normalize_ai_display_name(autofill.display_name)
+    if suggested_name and is_placeholder_profile_name(profile.display_name):
+        profile.display_name = suggested_name
+        profile.canonical_key = normalize_customer_identity_name(suggested_name)
+        updated_fields.append("nama")
+
+    suggested_phone = normalize_ai_phone(autofill.phone)
+    if suggested_phone and not profile.phone:
+        profile.phone = suggested_phone
+        updated_fields.append("telepon")
+
+    suggested_email = normalize_ai_email(autofill.email)
+    if suggested_email and not profile.email:
+        profile.email = suggested_email
+        updated_fields.append("email")
+
+    suggested_address = normalize_ai_address(autofill.address)
+    if suggested_address and not profile.address:
+        profile.address = suggested_address
+        updated_fields.append("alamat")
+
+    if not updated_fields:
+        return profile
+
+    profile.match_strategy = "ai_auto_fill"
+    profile.identity_confidence = max(profile.identity_confidence, autofill.confidence_score)
+    db.add(profile)
+    create_lead_activity_event(
+        db=db,
+        lead=lead,
+        event_type="customer_profile_autofilled",
+        title="Profil customer dilengkapi otomatis oleh Clara",
+        description=(
+            f"Field yang diisi: {', '.join(updated_fields)}. "
+            f"Dasar pengisian: {autofill.evidence}"
+        ),
+        actor_user_id=lead.assigned_user_id,
+        to_value=", ".join(updated_fields),
+    )
+    db.flush()
+    return profile
 
 
 def merge_customer_profiles(

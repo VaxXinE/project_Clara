@@ -69,6 +69,30 @@ function formatKnowledgeProposalStatus(value: string): string {
   return formatStatusLabel(value);
 }
 
+function formatAccountCategory(value: string): string {
+  switch (value) {
+    case "mini":
+      return "Mini";
+    case "reguler":
+      return "Reguler";
+    case "unknown":
+      return "Belum ditentukan";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function getAccountCategoryBadgeClass(value: string): string {
+  switch (value) {
+    case "mini":
+      return "bg-emerald-100 text-emerald-700";
+    case "reguler":
+      return "bg-amber-100 text-amber-700";
+    default:
+      return "bg-slate-200 text-slate-700";
+  }
+}
+
 function buildConversationActionPlan(detail: SalesConversationDetail) {
   const extraction = detail.latest_ai_extraction;
   const suggestion = detail.latest_reply_suggestion;
@@ -633,6 +657,14 @@ function ConversationDetailHeader({
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
+                detail.account_category,
+              )}`}
+            >
+              Kategori akun: {formatAccountCategory(detail.account_category)}
+            </span>
+
             {extraction ? (
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(

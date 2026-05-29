@@ -50,6 +50,30 @@ type QueueBucketKey =
   | "high_risk"
   | "archived";
 
+function formatAccountCategory(value: string): string {
+  switch (value) {
+    case "mini":
+      return "Mini";
+    case "reguler":
+      return "Reguler";
+    case "unknown":
+      return "Belum ditentukan";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function getAccountCategoryBadgeClass(value: string): string {
+  switch (value) {
+    case "mini":
+      return "bg-emerald-100 text-emerald-700";
+    case "reguler":
+      return "bg-amber-100 text-amber-700";
+    default:
+      return "bg-slate-200 text-slate-700";
+  }
+}
+
 function buildInboxPath(sourceChannelFilter: string, archiveScope: string): string {
   const params = new URLSearchParams();
 
@@ -657,6 +681,14 @@ export default function SalesInboxPage() {
 
                                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                                     {section.config.label}
+                                  </span>
+
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
+                                      item.account_category,
+                                    )}`}
+                                  >
+                                    {formatAccountCategory(item.account_category)}
                                   </span>
 
                                   {extraction && (
