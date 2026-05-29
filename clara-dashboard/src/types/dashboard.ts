@@ -319,12 +319,33 @@ export type CustomerMergeCandidateItem = {
   last_contact_at: string | null;
 };
 
+export type CustomerProfileListItem = {
+  id: string;
+  assigned_user_id: string | null;
+  assigned_user_name: string | null;
+  display_name: string;
+  phone: string | null;
+  email: string | null;
+  status: string;
+  lead_count: number;
+  active_lead_count: number;
+  conversation_count: number;
+  hot_lead_count: number;
+  source_labels: string[];
+  last_contact_at: string | null;
+  identity_confidence: number;
+};
+
 export type CustomerProfileSummaryItem = {
   id: string;
   organization_id: string | null;
   assigned_user_id: string | null;
   assigned_user_name: string | null;
   display_name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  status: string;
   canonical_key: string;
   identity_confidence: number;
   match_strategy: string;
@@ -339,6 +360,14 @@ export type CustomerProfileSummaryItem = {
   updated_at: string;
   merge_candidates: CustomerMergeCandidateItem[];
   related_leads: CustomerRelatedLeadItem[];
+};
+
+export type CustomerProfileUpdateRequest = {
+  display_name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  status: string;
 };
 
 export type CustomerProfileMergeRequest = {

@@ -16,6 +16,8 @@ from app.services.access_control_service import get_accessible_sales_user_ids
 from app.services.role_service import is_superadmin_like
 from app.services.source_intelligence_service import build_source_label, normalize_source_channel
 
+ALLOWED_CUSTOMER_PROFILE_STATUSES = {"active", "inactive"}
+
 
 def ensure_aware_utc(value: datetime | None) -> datetime | None:
     if value is None:
@@ -33,6 +35,13 @@ def normalize_customer_identity_name(name: str | None) -> str:
     normalized = re.sub(r"\b(customer|cust|buyer|lead|prospect|client|calon)\b", " ", normalized)
     normalized = " ".join(part for part in normalized.split() if part)
     return normalized or "unknown-customer"
+
+
+def normalize_optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 def compute_identity_metadata(
@@ -165,6 +174,7 @@ def ensure_customer_profile_for_lead(
             organization_id=lead.organization_id,
             assigned_user_id=lead.assigned_user_id,
             display_name=display_name,
+            status="active",
             canonical_key=canonical_key,
             identity_confidence=identity_confidence,
             match_strategy=match_strategy,
@@ -243,6 +253,10 @@ def build_customer_profile_summary(
         "assigned_user_id": profile.assigned_user_id,
         "assigned_user_name": profile.assigned_user.name if profile.assigned_user else None,
         "display_name": profile.display_name,
+        "phone": profile.phone,
+        "email": profile.email,
+        "address": profile.address,
+        "status": profile.status,
         "canonical_key": profile.canonical_key,
         "identity_confidence": profile.identity_confidence,
         "match_strategy": profile.match_strategy,
@@ -257,6 +271,36 @@ def build_customer_profile_summary(
         "updated_at": profile.updated_at,
         "merge_candidates": merge_candidates or [],
         "related_leads": related_leads,
+    }
+
+
+def build_customer_profile_list_item(
+    profile: CustomerProfile,
+    *,
+    visible_leads: list[Lead] | None = None,
+) -> dict:
+    leads = visible_leads if visible_leads is not None else list(profile.leads)
+    conversation_count = sum(len(lead.conversations) for lead in leads)
+    active_lead_count = sum(
+        1 for lead in leads if lead.current_stage not in {"won", "lost", "archived"}
+    )
+    hot_lead_count = sum(1 for lead in leads if lead.lead_temperature == "hot")
+
+    return {
+        "id": profile.id,
+        "assigned_user_id": profile.assigned_user_id,
+        "assigned_user_name": profile.assigned_user.name if profile.assigned_user else None,
+        "display_name": profile.display_name,
+        "phone": profile.phone,
+        "email": profile.email,
+        "status": profile.status,
+        "lead_count": len(leads),
+        "active_lead_count": active_lead_count,
+        "conversation_count": conversation_count,
+        "hot_lead_count": hot_lead_count,
+        "source_labels": sorted({build_source_label(lead.source) for lead in leads}),
+        "last_contact_at": profile.last_contact_at,
+        "identity_confidence": profile.identity_confidence,
     }
 
 
@@ -360,6 +404,144 @@ def get_customer_profile_for_user(
     )
 
 
+def list_customer_profiles_for_user(
+    db: Session,
+    *,
+    current_user: User,
+    query: str | None = None,
+    status_value: str | None = None,
+) -> list[dict]:
+    profiles = db.scalars(
+        select(CustomerProfile)
+        .where(CustomerProfile.merged_into_profile_id.is_(None))
+        .options(
+            selectinload(CustomerProfile.assigned_user),
+            selectinload(CustomerProfile.leads).selectinload(Lead.conversations),
+        )
+    ).all()
+
+    if not is_superadmin_like(current_user.role):
+        profiles = [
+            profile
+            for profile in profiles
+            if current_user.organization_id is not None
+            and profile.organization_id == current_user.organization_id
+        ]
+
+    accessible_user_ids = get_accessible_sales_user_ids(db=db, current_user=current_user)
+
+    normalized_query = query.strip().lower() if query and query.strip() else None
+    normalized_status = status_value.strip().lower() if status_value and status_value.strip() else None
+
+    items: list[dict] = []
+    for profile in profiles:
+        visible_leads = (
+            list(profile.leads)
+            if accessible_user_ids is None
+            else [
+                lead
+                for lead in profile.leads
+                if lead.assigned_user_id in accessible_user_ids
+            ]
+        )
+        if not visible_leads:
+            continue
+
+        if normalized_status and profile.status != normalized_status:
+            continue
+
+        if normalized_query:
+            haystacks = [
+                profile.display_name,
+                profile.phone,
+                profile.email,
+                profile.assigned_user.name if profile.assigned_user else None,
+                profile.canonical_key,
+            ]
+            if not any(
+                normalized_query in value.lower()
+                for value in haystacks
+                if isinstance(value, str) and value.strip()
+            ):
+                continue
+
+        items.append(
+            build_customer_profile_list_item(
+                profile,
+                visible_leads=visible_leads,
+            )
+        )
+
+    return sorted(
+        items,
+        key=lambda item: (
+            item["last_contact_at"] or datetime.min.replace(tzinfo=timezone.utc),
+            item["display_name"].lower(),
+        ),
+        reverse=True,
+    )
+
+
+def update_customer_profile_for_user(
+    db: Session,
+    *,
+    customer_profile_id: UUID,
+    display_name: str,
+    phone: str | None,
+    email: str | None,
+    address: str | None,
+    status_value: str,
+    current_user: User,
+) -> dict:
+    profile = get_customer_profile_model_for_user(
+        db=db,
+        customer_profile_id=customer_profile_id,
+        current_user=current_user,
+    )
+    if profile.merged_into_profile_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Customer profile sudah digabung ke profil lain.",
+        )
+
+    normalized_name = display_name.strip()
+    normalized_phone = normalize_optional_text(phone)
+    normalized_email = normalize_optional_text(email)
+    normalized_address = normalize_optional_text(address)
+    normalized_status = status_value.strip().lower()
+
+    if normalized_status not in ALLOWED_CUSTOMER_PROFILE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Status customer profile tidak valid.",
+        )
+
+    canonical_key = normalize_customer_identity_name(normalized_name)
+    identity_confidence, _ = compute_identity_metadata(
+        display_name=normalized_name,
+        canonical_key=canonical_key,
+    )
+
+    profile.display_name = normalized_name
+    profile.phone = normalized_phone
+    profile.email = normalized_email
+    profile.address = normalized_address
+    profile.status = normalized_status
+    profile.canonical_key = canonical_key
+    profile.identity_confidence = max(profile.identity_confidence, identity_confidence)
+    profile.match_strategy = "manual_profile_update"
+
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+
+    return get_customer_profile_for_user(
+        db=db,
+        customer_profile_id=profile.id,
+        current_user=current_user,
+    )
+
+
 def merge_customer_profiles(
     db: Session,
     *,
@@ -399,6 +581,14 @@ def merge_customer_profiles(
     if len(source_profile.display_name.strip()) > len(target_profile.display_name.strip()):
         target_profile.display_name = source_profile.display_name
         target_profile.canonical_key = source_profile.canonical_key
+    if not target_profile.phone and source_profile.phone:
+        target_profile.phone = source_profile.phone
+    if not target_profile.email and source_profile.email:
+        target_profile.email = source_profile.email
+    if not target_profile.address and source_profile.address:
+        target_profile.address = source_profile.address
+    if target_profile.status != "active" and source_profile.status == "active":
+        target_profile.status = "active"
 
     target_profile.identity_confidence = max(
         target_profile.identity_confidence,

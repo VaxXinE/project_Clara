@@ -10,6 +10,12 @@ Clara adalah monorepo untuk **sales operations platform** yang menghubungkan:
 
 Clara dirancang untuk dipakai di workflow sales nyata, bukan cuma sebagai parser chat atau CRM sederhana.
 
+## Dokumen pengguna
+
+Untuk user akhir, panduan penggunaan lengkap ada di:
+
+- [docs/CLARA_USER_MANUAL.md](docs/CLARA_USER_MANUAL.md)
+
 ## Modul repo
 
 - `clara-backend`
