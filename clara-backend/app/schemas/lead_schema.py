@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LeadDealItem(BaseModel):
@@ -130,12 +130,33 @@ class CustomerMergeCandidateItem(BaseModel):
     last_contact_at: datetime | None
 
 
+class CustomerProfileListItem(BaseModel):
+    id: UUID
+    assigned_user_id: UUID | None
+    assigned_user_name: str | None
+    display_name: str
+    phone: str | None
+    email: str | None
+    status: str
+    lead_count: int
+    active_lead_count: int
+    conversation_count: int
+    hot_lead_count: int
+    source_labels: list[str]
+    last_contact_at: datetime | None
+    identity_confidence: float
+
+
 class CustomerProfileSummaryItem(BaseModel):
     id: UUID
     organization_id: UUID | None
     assigned_user_id: UUID | None
     assigned_user_name: str | None
     display_name: str
+    phone: str | None
+    email: str | None
+    address: str | None
+    status: str
     canonical_key: str
     identity_confidence: float
     match_strategy: str
@@ -150,6 +171,14 @@ class CustomerProfileSummaryItem(BaseModel):
     updated_at: datetime
     merge_candidates: list[CustomerMergeCandidateItem] = []
     related_leads: list[CustomerRelatedLeadItem]
+
+
+class CustomerProfileUpdateRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=255)
+    phone: str | None = Field(default=None, max_length=50)
+    email: str | None = Field(default=None, max_length=255)
+    address: str | None = Field(default=None, max_length=2000)
+    status: str = Field(default="active", max_length=20)
 
 
 class CustomerProfileMergeRequest(BaseModel):

@@ -81,6 +81,12 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       description: "Status, owner, dan timeline lead",
     },
     {
+      href: "/customers",
+      label: "Customer List",
+      icon: faBuildingShield,
+      description: "Daftar customer dan profil terpadu",
+    },
+    {
       href: "/notifications",
       label: "Alert Center",
       icon: faTriangleExclamation,
