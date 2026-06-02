@@ -99,14 +99,18 @@ export default function SalesConversationDetailPage() {
     useState("general");
   const [knowledgeProposalContentInput, setKnowledgeProposalContentInput] =
     useState("");
-  const [knowledgeProposalSourceTypeInput, setKnowledgeProposalSourceTypeInput] =
-    useState("coaching_case");
+  const [
+    knowledgeProposalSourceTypeInput,
+    setKnowledgeProposalSourceTypeInput,
+  ] = useState("coaching_case");
   const [knowledgeProposalRationaleInput, setKnowledgeProposalRationaleInput] =
     useState("");
   const [knowledgeProposalStatusInput, setKnowledgeProposalStatusInput] =
     useState("draft");
-  const [knowledgeProposalDecisionNoteInput, setKnowledgeProposalDecisionNoteInput] =
-    useState("");
+  const [
+    knowledgeProposalDecisionNoteInput,
+    setKnowledgeProposalDecisionNoteInput,
+  ] = useState("");
   const [knowledgeProposalErrorMessage, setKnowledgeProposalErrorMessage] =
     useState("");
   const [knowledgeProposalSuccessMessage, setKnowledgeProposalSuccessMessage] =
@@ -179,15 +183,18 @@ export default function SalesConversationDetailPage() {
 
     const knowledgeProposal = detail.knowledge_update_proposal;
     setKnowledgeProposalTitleInput(
-      knowledgeProposal?.title ??
-        `${detail.title} · update knowledge`,
+      knowledgeProposal?.title ?? `${detail.title} · update knowledge`,
     );
     setKnowledgeProposalCategoryInput(knowledgeProposal?.category ?? "general");
     setKnowledgeProposalContentInput(
       knowledgeProposal?.proposed_content ??
         [
-          reviewCase?.review_summary ? `Ringkasan kasus: ${reviewCase.review_summary}` : "",
-          reviewCase?.coaching_focus ? `Fokus coaching: ${reviewCase.coaching_focus}` : "",
+          reviewCase?.review_summary
+            ? `Ringkasan kasus: ${reviewCase.review_summary}`
+            : "",
+          reviewCase?.coaching_focus
+            ? `Fokus coaching: ${reviewCase.coaching_focus}`
+            : "",
           reviewCase?.recommended_action
             ? `Aksi yang direkomendasikan: ${reviewCase.recommended_action}`
             : "",
@@ -322,7 +329,9 @@ export default function SalesConversationDetailPage() {
     }
   }
 
-  async function handleSaveKnowledgeProposal(event: FormEvent<HTMLFormElement>) {
+  async function handleSaveKnowledgeProposal(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
     if (!detail) {
       return;
@@ -374,7 +383,9 @@ export default function SalesConversationDetailPage() {
     }
   }
 
-  async function handleReviewKnowledgeProposal(status: "approved" | "rejected") {
+  async function handleReviewKnowledgeProposal(
+    status: "approved" | "rejected",
+  ) {
     if (!detail?.knowledge_update_proposal) {
       return;
     }
@@ -386,8 +397,7 @@ export default function SalesConversationDetailPage() {
     try {
       const payload: KnowledgeUpdateProposalReviewRequest = {
         status,
-        review_decision_note:
-          knowledgeProposalDecisionNoteInput.trim() || null,
+        review_decision_note: knowledgeProposalDecisionNoteInput.trim() || null,
       };
 
       const proposal = await apiFetch<KnowledgeUpdateProposalItem>(
@@ -507,7 +517,9 @@ export default function SalesConversationDetailPage() {
               knowledgeProposalTitleInput={knowledgeProposalTitleInput}
               knowledgeProposalCategoryInput={knowledgeProposalCategoryInput}
               knowledgeProposalContentInput={knowledgeProposalContentInput}
-              knowledgeProposalSourceTypeInput={knowledgeProposalSourceTypeInput}
+              knowledgeProposalSourceTypeInput={
+                knowledgeProposalSourceTypeInput
+              }
               knowledgeProposalRationaleInput={knowledgeProposalRationaleInput}
               knowledgeProposalStatusInput={knowledgeProposalStatusInput}
               knowledgeProposalDecisionNoteInput={
@@ -528,7 +540,9 @@ export default function SalesConversationDetailPage() {
               onKnowledgeProposalCategoryChange={
                 setKnowledgeProposalCategoryInput
               }
-              onKnowledgeProposalContentChange={setKnowledgeProposalContentInput}
+              onKnowledgeProposalContentChange={
+                setKnowledgeProposalContentInput
+              }
               onKnowledgeProposalSourceTypeChange={
                 setKnowledgeProposalSourceTypeInput
               }
@@ -729,9 +743,7 @@ function ConversationDetailContent({
   onSaveReviewCase: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onAddReviewNote: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSaveKnowledgeProposal: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  onReviewKnowledgeProposal: (
-    status: "approved" | "rejected",
-  ) => Promise<void>;
+  onReviewKnowledgeProposal: (status: "approved" | "rejected") => Promise<void>;
   onUpdated: () => Promise<void>;
 }) {
   const extraction = detail.latest_ai_extraction;
@@ -756,56 +768,73 @@ function ConversationDetailContent({
             Timeline percakapan
           </h2>
           <p className="mt-2 text-sm text-[#d6bb84]">
-            Fokus ke pesan terbaru dulu. Expand penuh hanya saat butuh membaca konteks lama.
+            Fokus ke pesan terbaru dulu. Expand penuh hanya saat butuh membaca
+            konteks lama.
           </p>
         </div>
 
         <div className="rounded-full border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(24,17,12,0.96)_100%)] px-4 py-2 text-sm text-[#d6bb84]">
-          Menampilkan {visibleMessages.length} dari {detail.messages.length} pesan
+          Menampilkan {visibleMessages.length} dari {detail.messages.length}{" "}
+          pesan
         </div>
       </div>
 
-      <div className="mt-5 space-y-3">
-        {!showAllMessages && detail.messages.length > visibleMessages.length ? (
-          <div className="rounded-[22px] border border-dashed border-[#f0cb73]/24 bg-[rgba(32,23,14,0.92)] p-4 text-sm text-[#d6bb84]">
-            {detail.messages.length - visibleMessages.length} pesan lama disembunyikan dulu supaya halaman tetap ringkas.
-          </div>
-        ) : null}
-
-        {visibleMessages.map((message) => {
-          const isSales = message.sender_type === "sales";
-
-          return (
-            <div
-              key={message.id}
-              className={`flex ${isSales ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={`max-w-[90%] sm:max-w-[82%] rounded-[24px] border p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)] ${
-                  isSales
-                    ? "border-[#d3a74b]/18 bg-[linear-gradient(135deg,rgba(63,42,18,0.96)_0%,rgba(25,18,11,0.98)_100%)] text-[#fff0c9]"
-                    : "border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(248,223,162,0.98)_0%,rgba(217,176,92,0.98)_55%,rgba(168,116,34,0.98)_100%)] text-[#1b130b]"
-                }`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-xs font-semibold">
-                    {message.sender_name}
-                  </p>
-                  <p
-                    className={`text-xs ${
-                      isSales ? "text-[#d6bb84]" : "text-[#5c3a12]"
-                    }`}
-                  >
-                    {formatDateTime(message.message_timestamp)}
-                  </p>
-                </div>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-7">
-                  {message.message_text}
-                </p>
-              </div>
+      <div
+        className="clara-scrollbar mt-5 max-h-[70vh] overflow-y-auto rounded-[28px] border border-[#f0cb73]/12 p-4 pr-2 shadow-[inset_0_1px_0_rgba(255,240,201,0.03)] sm:p-5 sm:pr-3"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(18, 13, 9, 0.84), rgba(18, 13, 9, 0.84)), url('/assets/eb24786e5579a01bdd4bb103695b8286.jpg')",
+          backgroundPosition: "center",
+          backgroundRepeat: "repeat",
+          backgroundSize: "280px auto",
+        }}
+      >
+        <div className="space-y-3">
+          {!showAllMessages &&
+          detail.messages.length > visibleMessages.length ? (
+            <div className="rounded-[22px] border border-dashed border-[#f0cb73]/24 bg-[rgba(32,23,14,0.92)] p-4 text-sm text-[#d6bb84]">
+              {detail.messages.length - visibleMessages.length} pesan lama
+              disembunyikan dulu supaya halaman tetap ringkas.
             </div>
-          );
-        })}
+          ) : null}
+
+          {visibleMessages.map((message) => {
+            const isSales = message.sender_type === "sales";
+
+            return (
+              <div
+                key={message.id}
+                className={`flex px-1 ${isSales ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[90%] sm:max-w-[78%] rounded-[24px] border px-4 py-3 shadow-[0_14px_32px_rgba(0,0,0,0.18)] ${
+                    isSales
+                      ? "rounded-tr-[10px] border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(250,220,134,0.98)_0%,rgba(227,186,92,0.98)_55%,rgba(194,138,43,0.98)_100%)] text-[#2c1907]"
+                      : "rounded-tl-[10px] border-[#5a3a17]/72 bg-[linear-gradient(180deg,rgba(55,35,21,0.98)_0%,rgba(36,23,14,0.98)_100%)] text-[#fff0c9]"
+                  }`}
+                >
+                  {!isSales ? (
+                    <p className="mb-1 text-xs font-semibold text-[#ff7792]">
+                      {message.sender_name}
+                    </p>
+                  ) : null}
+                  <p className="whitespace-pre-wrap text-[15px] leading-7">
+                    {message.message_text}
+                  </p>
+                  <div className="mt-2 flex justify-end">
+                    <p
+                      className={`text-[11px] font-medium ${
+                        isSales ? "text-[#6f4311]" : "text-[#d4b06d]"
+                      }`}
+                    >
+                      {formatDateTime(message.message_timestamp)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {detail.messages.length > 12 ? (
@@ -824,7 +853,7 @@ function ConversationDetailContent({
 
   return (
     <section className="space-y-6">
-      <section>
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)] xl:items-start">
         <section className="clara-card rounded-[30px] p-5">
           <div>
             <p className="clara-kicker">Workspace Panel</p>
@@ -883,7 +912,9 @@ function ConversationDetailContent({
                         value={formatStatusLabel(extraction.sentiment)}
                       />
                       <div className="clara-card-soft rounded-[22px] p-4">
-                        <p className="clara-kicker text-[11px]">Main objections</p>
+                        <p className="clara-kicker text-[11px]">
+                          Main objections
+                        </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {extraction.main_objections.length > 0 ? (
                             extraction.main_objections.map((objection) => (
@@ -895,7 +926,9 @@ function ConversationDetailContent({
                               </span>
                             ))
                           ) : (
-                            <p className="text-slate-600">Tidak ada objection.</p>
+                            <p className="text-slate-600">
+                              Tidak ada objection.
+                            </p>
                           )}
                         </div>
                       </div>
@@ -932,8 +965,8 @@ function ConversationDetailContent({
                       Belum ada reply suggestion
                     </h2>
                     <p className="mt-2 text-sm text-slate-600">
-                      Generate reply suggestion dulu, lalu review approval status
-                      sebelum memutuskan kirim balasan.
+                      Generate reply suggestion dulu, lalu review approval
+                      status sebelum memutuskan kirim balasan.
                     </p>
                   </div>
                 )}
@@ -949,8 +982,9 @@ function ConversationDetailContent({
                       Review case manusia untuk manager dan head
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Gunakan section ini untuk memberi label coaching, menunjuk reviewer,
-                      dan menyimpan manager note yang persisten per conversation.
+                      Gunakan section ini untuk memberi label coaching, menunjuk
+                      reviewer, dan menyimpan manager note yang persisten per
+                      conversation.
                     </p>
                   </div>
                   {reviewCase ? (
@@ -990,7 +1024,9 @@ function ConversationDetailContent({
                         <span>Status review</span>
                         <select
                           value={reviewStatusInput}
-                          onChange={(event) => onReviewStatusChange(event.target.value)}
+                          onChange={(event) =>
+                            onReviewStatusChange(event.target.value)
+                          }
                           className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
                         >
                           {CHAT_REVIEW_STATUS_OPTIONS.map((option) => (
@@ -1005,7 +1041,9 @@ function ConversationDetailContent({
                         <span>Label coaching</span>
                         <select
                           value={reviewLabelInput}
-                          onChange={(event) => onReviewLabelChange(event.target.value)}
+                          onChange={(event) =>
+                            onReviewLabelChange(event.target.value)
+                          }
                           className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
                         >
                           {CHAT_REVIEW_LABEL_OPTIONS.map((option) => (
@@ -1020,7 +1058,9 @@ function ConversationDetailContent({
                         <span>Reviewer</span>
                         <select
                           value={reviewerUserInput}
-                          onChange={(event) => onReviewerUserChange(event.target.value)}
+                          onChange={(event) =>
+                            onReviewerUserChange(event.target.value)
+                          }
                           className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
                         >
                           <option value="">Belum ditunjuk</option>
@@ -1037,7 +1077,9 @@ function ConversationDetailContent({
                       <span>Ringkasan review</span>
                       <textarea
                         value={reviewSummaryInput}
-                        onChange={(event) => onReviewSummaryChange(event.target.value)}
+                        onChange={(event) =>
+                          onReviewSummaryChange(event.target.value)
+                        }
                         rows={3}
                         className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
                         placeholder="Tulis konteks singkat percakapan dan alasan kenapa case ini perlu coaching."
@@ -1048,7 +1090,9 @@ function ConversationDetailContent({
                       <span>Fokus coaching</span>
                       <textarea
                         value={coachingFocusInput}
-                        onChange={(event) => onCoachingFocusChange(event.target.value)}
+                        onChange={(event) =>
+                          onCoachingFocusChange(event.target.value)
+                        }
                         rows={3}
                         className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
                         placeholder="Contoh: handling objection legalitas, tone closing, atau cara mengarahkan next step."
@@ -1085,7 +1129,9 @@ function ConversationDetailContent({
                           disabled={isSavingReviewCase}
                           className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                          {isSavingReviewCase ? "Menyimpan review..." : "Simpan Review Case"}
+                          {isSavingReviewCase
+                            ? "Menyimpan review..."
+                            : "Simpan Review Case"}
                         </button>
                       </div>
                     </div>
@@ -1128,7 +1174,9 @@ function ConversationDetailContent({
                       <form onSubmit={onAddReviewNote} className="space-y-3">
                         <textarea
                           value={reviewNoteInput}
-                          onChange={(event) => onReviewNoteChange(event.target.value)}
+                          onChange={(event) =>
+                            onReviewNoteChange(event.target.value)
+                          }
                           rows={3}
                           className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
                           placeholder="Tulis catatan coaching, instruksi rework, atau alasan eskalasi."
@@ -1139,7 +1187,9 @@ function ConversationDetailContent({
                             disabled={isAddingReviewNote || !reviewCase}
                             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
                           >
-                            {isAddingReviewNote ? "Menyimpan note..." : "Tambah Manager Note"}
+                            {isAddingReviewNote
+                              ? "Menyimpan note..."
+                              : "Tambah Manager Note"}
                           </button>
                         </div>
                       </form>
@@ -1186,8 +1236,9 @@ function ConversationDetailContent({
                       Usulan knowledge dari kasus lapangan
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Setelah coaching case jelas, naikkan insight penting jadi proposal knowledge
-                      supaya bisa direview dan dipublish ke knowledge base resmi.
+                      Setelah coaching case jelas, naikkan insight penting jadi
+                      proposal knowledge supaya bisa direview dan dipublish ke
+                      knowledge base resmi.
                     </p>
                   </div>
                   {knowledgeProposal ? (
@@ -1203,8 +1254,9 @@ function ConversationDetailContent({
 
                 {!reviewCase ? (
                   <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                    Buat dan simpan coaching review dulu. Proposal knowledge Tahap 4 sengaja
-                    diikat ke review case supaya audit trail-nya jelas.
+                    Buat dan simpan coaching review dulu. Proposal knowledge
+                    Tahap 4 sengaja diikat ke review case supaya audit trail-nya
+                    jelas.
                   </div>
                 ) : (
                   <>
@@ -1221,14 +1273,19 @@ function ConversationDetailContent({
                     ) : null}
 
                     {canManage ? (
-                      <form onSubmit={onSaveKnowledgeProposal} className="mt-5 space-y-4">
+                      <form
+                        onSubmit={onSaveKnowledgeProposal}
+                        className="mt-5 space-y-4"
+                      >
                         <div className="grid gap-4 md:grid-cols-2">
                           <label className="space-y-2 text-sm font-medium text-slate-700">
                             <span>Judul proposal</span>
                             <input
                               value={knowledgeProposalTitleInput}
                               onChange={(event) =>
-                                onKnowledgeProposalTitleChange(event.target.value)
+                                onKnowledgeProposalTitleChange(
+                                  event.target.value,
+                                )
                               }
                               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
                               placeholder="Contoh: Playbook handling objection legalitas"
@@ -1239,7 +1296,9 @@ function ConversationDetailContent({
                             <input
                               value={knowledgeProposalCategoryInput}
                               onChange={(event) =>
-                                onKnowledgeProposalCategoryChange(event.target.value)
+                                onKnowledgeProposalCategoryChange(
+                                  event.target.value,
+                                )
                               }
                               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
                               placeholder="legalitas / objection / trust"
@@ -1253,7 +1312,9 @@ function ConversationDetailContent({
                             <input
                               value={knowledgeProposalSourceTypeInput}
                               onChange={(event) =>
-                                onKnowledgeProposalSourceTypeChange(event.target.value)
+                                onKnowledgeProposalSourceTypeChange(
+                                  event.target.value,
+                                )
                               }
                               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
                               placeholder="coaching_case"
@@ -1264,15 +1325,19 @@ function ConversationDetailContent({
                             <select
                               value={knowledgeProposalStatusInput}
                               onChange={(event) =>
-                                onKnowledgeProposalStatusChange(event.target.value)
+                                onKnowledgeProposalStatusChange(
+                                  event.target.value,
+                                )
                               }
                               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
                             >
-                              {KNOWLEDGE_PROPOSAL_STATUS_OPTIONS.map((option) => (
-                                <option key={option} value={option}>
-                                  {formatKnowledgeProposalStatus(option)}
-                                </option>
-                              ))}
+                              {KNOWLEDGE_PROPOSAL_STATUS_OPTIONS.map(
+                                (option) => (
+                                  <option key={option} value={option}>
+                                    {formatKnowledgeProposalStatus(option)}
+                                  </option>
+                                ),
+                              )}
                             </select>
                           </label>
                         </div>
@@ -1282,7 +1347,9 @@ function ConversationDetailContent({
                           <textarea
                             value={knowledgeProposalRationaleInput}
                             onChange={(event) =>
-                              onKnowledgeProposalRationaleChange(event.target.value)
+                              onKnowledgeProposalRationaleChange(
+                                event.target.value,
+                              )
                             }
                             rows={3}
                             className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
@@ -1295,7 +1362,9 @@ function ConversationDetailContent({
                           <textarea
                             value={knowledgeProposalContentInput}
                             onChange={(event) =>
-                              onKnowledgeProposalContentChange(event.target.value)
+                              onKnowledgeProposalContentChange(
+                                event.target.value,
+                              )
                             }
                             rows={8}
                             className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
@@ -1309,9 +1378,12 @@ function ConversationDetailContent({
                             disabled={
                               isSavingKnowledgeProposal ||
                               knowledgeProposalTitleInput.trim().length === 0 ||
-                              knowledgeProposalCategoryInput.trim().length === 0 ||
-                              knowledgeProposalContentInput.trim().length === 0 ||
-                              knowledgeProposalSourceTypeInput.trim().length === 0
+                              knowledgeProposalCategoryInput.trim().length ===
+                                0 ||
+                              knowledgeProposalContentInput.trim().length ===
+                                0 ||
+                              knowledgeProposalSourceTypeInput.trim().length ===
+                                0
                             }
                             className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                           >
@@ -1340,7 +1412,8 @@ function ConversationDetailContent({
                         <InfoBlock
                           label="Published knowledge"
                           value={
-                            knowledgeProposal.published_product_knowledge_title ?? "-"
+                            knowledgeProposal.published_product_knowledge_title ??
+                            "-"
                           }
                         />
                       </div>
@@ -1353,7 +1426,9 @@ function ConversationDetailContent({
                           <textarea
                             value={knowledgeProposalDecisionNoteInput}
                             onChange={(event) =>
-                              onKnowledgeProposalDecisionNoteChange(event.target.value)
+                              onKnowledgeProposalDecisionNoteChange(
+                                event.target.value,
+                              )
                             }
                             rows={3}
                             className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
@@ -1364,15 +1439,21 @@ function ConversationDetailContent({
                           <button
                             type="button"
                             disabled={isReviewingKnowledgeProposal}
-                            onClick={() => void onReviewKnowledgeProposal("rejected")}
+                            onClick={() =>
+                              void onReviewKnowledgeProposal("rejected")
+                            }
                             className="inline-flex rounded-full border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70"
                           >
-                            {isReviewingKnowledgeProposal ? "Memproses..." : "Reject"}
+                            {isReviewingKnowledgeProposal
+                              ? "Memproses..."
+                              : "Reject"}
                           </button>
                           <button
                             type="button"
                             disabled={isReviewingKnowledgeProposal}
-                            onClick={() => void onReviewKnowledgeProposal("approved")}
+                            onClick={() =>
+                              void onReviewKnowledgeProposal("approved")
+                            }
                             className="inline-flex rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
                           >
                             {isReviewingKnowledgeProposal
@@ -1424,9 +1505,9 @@ function ConversationDetailContent({
             ) : null}
           </div>
         </section>
-      </section>
 
-      {chatTimeline}
+        <div className="xl:sticky xl:top-28">{chatTimeline}</div>
+      </section>
     </section>
   );
 }
@@ -1486,4 +1567,3 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

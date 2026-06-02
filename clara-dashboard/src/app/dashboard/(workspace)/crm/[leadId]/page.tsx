@@ -700,16 +700,16 @@ export default function LeadDetailPage() {
                 </dl>
               </div>
 
-              <section className="rounded-[28px] border border-amber-200 bg-amber-50/60 p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(39,29,18,0.96)_0%,rgba(24,18,12,0.96)_46%,rgba(63,46,18,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-3xl">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-800">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#c9782b]">
                       Apa yang harus dilakukan di lead ini
                     </p>
-                    <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+                    <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#fff0c9]">
                       Rapikan next step sebelum pindah ke lead lain
                     </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                    <p className="mt-2 text-sm leading-7 text-[#d6bb84]">
                       Halaman ini bukan cuma untuk membaca data. Target akhirnya adalah lead punya
                       owner yang jelas, follow-up yang hidup, discipline log terbaru, dan bila perlu
                       task atau deal metrics yang sudah sinkron.
@@ -1531,12 +1531,12 @@ function LeadActionCard({
   detail: string;
 }) {
   return (
-    <article className="rounded-[22px] border border-amber-200 bg-white/90 p-4">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm font-medium leading-6 text-slate-800">
+    <article className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4 shadow-[0_12px_28px_rgba(0,0,0,0.16)]">
+      <h3 className="text-sm font-semibold text-[#f0cb73]">{title}</h3>
+      <p className="mt-2 text-sm font-medium leading-6 text-[#fff0c9]">
         {action}
       </p>
-      <p className="mt-2 text-sm leading-6 text-slate-700">{detail}</p>
+      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{detail}</p>
     </article>
   );
 }

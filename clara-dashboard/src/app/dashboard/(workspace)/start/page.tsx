@@ -37,7 +37,7 @@ export default function StartHerePage() {
       currentUser={currentUser}
       eyebrow="Onboarding flow"
       title="Workflow Guide"
-      description="Panduan ringkas ini dipakai kalau user masih bingung harus mulai dari halaman mana. Dashboard utama tetap jadi home, tapi halaman ini merangkum alur kerja Clara dengan istilah yang konsisten."
+      description="Panduan ini merangkum alur kerja per role: CS menjawab nasabah dengan bantuan AI, Admin mereview kualitas jawaban CS, dan Head mengecek follow-up tiap sales."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
@@ -49,7 +49,7 @@ export default function StartHerePage() {
               normalizedRole === "head"
                 ? "/dashboard/notifications"
                 : cannotUseQueue
-                  ? "/dashboard/approvals"
+                  ? "/dashboard/manager-insights"
                   : "/dashboard/follow-up";
             const label =
               normalizedRole === "head"
@@ -57,7 +57,7 @@ export default function StartHerePage() {
                 : currentUser &&
                     isManagerLike(currentUser.role) &&
                     !canAccessQueueAndActionCenter(currentUser.role)
-                  ? "Buka Chat Review Center"
+                  ? "Lihat Progress Prospect"
                   : "Buka Action Center";
 
             return (

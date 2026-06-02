@@ -31,6 +31,8 @@ class LeadTaskItem(BaseModel):
     assigned_user_name: str | None
     completed_by_user_id: UUID | None
     completed_by_user_name: str | None
+    workflow_scope: str
+    requested_by_role: str | None
     task_type: str
     status: str
     title: str

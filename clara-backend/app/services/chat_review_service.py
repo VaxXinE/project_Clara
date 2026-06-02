@@ -100,12 +100,17 @@ def build_chat_review_case_item(review_case: ChatReviewCase) -> ChatReviewCaseIt
         reviewer_user_name=(
             review_case.reviewer_user.name if review_case.reviewer_user else None
         ),
+        workflow_scope=review_case.workflow_scope,
+        feedback_status=review_case.feedback_status,
         status=review_case.status,
         review_label=review_case.review_label,
         review_summary=review_case.review_summary,
         coaching_focus=review_case.coaching_focus,
         recommended_action=review_case.recommended_action,
         reviewed_at=review_case.reviewed_at,
+        feedback_sent_at=review_case.feedback_sent_at,
+        feedback_acknowledged_at=review_case.feedback_acknowledged_at,
+        feedback_resolved_at=review_case.feedback_resolved_at,
         created_at=review_case.created_at,
         updated_at=review_case.updated_at,
         notes=[build_chat_review_note_item(note) for note in review_case.notes],
@@ -256,6 +261,22 @@ def _normalize_required_text(value: str, *, field_name: str) -> str:
     return normalized
 
 
+def _resolve_workflow_scope(current_user: User) -> str:
+    if is_head_like(current_user.role):
+        return "head_follow_up"
+    return "admin_quality_check"
+
+
+def _resolve_feedback_status(review_status: str) -> str:
+    if review_status == "draft":
+        return "draft"
+    if review_status == "coaching_done":
+        return "resolved"
+    if review_status == "escalated":
+        return "escalated"
+    return "sent_to_cs"
+
+
 def get_reviewable_conversation_or_raise(
     db: Session,
     *,
@@ -364,9 +385,21 @@ def upsert_chat_review_case(
     review_case.review_summary = _normalize_optional_text(payload.review_summary)
     review_case.coaching_focus = _normalize_optional_text(payload.coaching_focus)
     review_case.recommended_action = _normalize_optional_text(payload.recommended_action)
+    review_case.workflow_scope = _resolve_workflow_scope(current_user)
+    review_case.feedback_status = _resolve_feedback_status(review_case.status)
     review_case.reviewed_at = (
         now if review_case.status in {"coaching_done", "escalated"} else None
     )
+    review_case.feedback_sent_at = (
+        now
+        if review_case.feedback_status in {"sent_to_cs", "resolved", "escalated"}
+        else None
+    )
+    review_case.feedback_resolved_at = (
+        now if review_case.feedback_status == "resolved" else None
+    )
+    if review_case.feedback_status != "acknowledged_by_cs":
+        review_case.feedback_acknowledged_at = None
     review_case.lead_id = conversation.lead_id
     review_case.organization_id = conversation.organization_id
 
@@ -425,7 +458,9 @@ def add_chat_review_note(
 
     if review_case.status == "draft":
         review_case.status = "in_review"
+        review_case.feedback_status = "sent_to_cs"
         review_case.reviewed_at = None
+        review_case.feedback_sent_at = datetime.now(timezone.utc)
         db.add(review_case)
 
     db.commit()

@@ -186,14 +186,74 @@ def lead_has_closed_outcome(lead: Lead) -> bool:
     return False
 
 
-def build_ops_notification_item(notification: OpsNotification) -> OpsNotificationItem:
+def _extract_notification_lead_id(notification: OpsNotification) -> UUID | None:
+    parts = (notification.source_key or "").split(":")
+    if notification.source_type == "sales_worklist" and len(parts) >= 2:
+        try:
+            return UUID(parts[1])
+        except (TypeError, ValueError):
+            return None
+
+    if notification.source_type == "deal_metrics_sync" and len(parts) >= 2:
+        try:
+            return UUID(parts[1])
+        except (TypeError, ValueError):
+            return None
+
+    if notification.target_href and notification.target_href.startswith("/dashboard/crm/"):
+        try:
+            return UUID(notification.target_href.rsplit("/", 1)[-1])
+        except (TypeError, ValueError):
+            return None
+
+    return None
+
+
+def _resolve_notification_workflow_scope(source_type: str) -> str:
+    if source_type == "sales_worklist":
+        return "head_follow_up"
+    if source_type == "approval_queue":
+        return "admin_review"
+    if source_type == "deal_metrics_sync":
+        return "deal_sync"
+    return "ops_oversight"
+
+
+def _resolve_notification_owner_role(source_type: str) -> str:
+    if source_type in {"sales_worklist", "approval_queue", "deal_metrics_sync"}:
+        return "sales"
+    return "head"
+
+
+def _resolve_notification_target_role(source_type: str) -> str:
+    if source_type == "approval_queue":
+        return "manager"
+    if source_type == "sales_worklist":
+        return "head"
+    if source_type == "deal_metrics_sync":
+        return "sales"
+    return "superadmin"
+
+
+def build_ops_notification_item(
+    notification: OpsNotification,
+    lead_lookup: dict[UUID, Lead] | None = None,
+) -> OpsNotificationItem:
     now = datetime.now(timezone.utc)
+    lead_id = _extract_notification_lead_id(notification)
+    lead = lead_lookup.get(lead_id) if lead_lookup and lead_id else None
     return OpsNotificationItem(
         id=notification.id,
         organization_id=notification.organization_id,
         user_id=notification.user_id,
         source_type=notification.source_type,
         source_key=notification.source_key,
+        workflow_scope=notification.workflow_scope,
+        owner_role=notification.owner_role,
+        target_role=notification.target_role,
+        lead_id=lead_id,
+        lead_name=lead.display_name if lead is not None else None,
+        sales_owner_name=lead.assigned_user.name if lead is not None and lead.assigned_user else None,
         severity=notification.severity,
         title=notification.title,
         body=notification.body,
@@ -2007,6 +2067,9 @@ def sync_ops_notifications(
                 user_id=None if is_superadmin_like(current_user.role) else current_user.id,
                 source_type=str(item["source_type"]),
                 source_key=str(item["source_key"]),
+                workflow_scope=_resolve_notification_workflow_scope(str(item["source_type"])),
+                owner_role=_resolve_notification_owner_role(str(item["source_type"])),
+                target_role=_resolve_notification_target_role(str(item["source_type"])),
                 severity=str(item["severity"]),
                 title=str(item["title"]),
                 body=str(item["body"]),
@@ -2018,6 +2081,15 @@ def sync_ops_notifications(
                 escalation_level="none",
             )
         else:
+            notification.workflow_scope = _resolve_notification_workflow_scope(
+                str(item["source_type"])
+            )
+            notification.owner_role = _resolve_notification_owner_role(
+                str(item["source_type"])
+            )
+            notification.target_role = _resolve_notification_target_role(
+                str(item["source_type"])
+            )
             notification.severity = str(item["severity"])
             notification.title = str(item["title"])
             notification.body = str(item["body"])
@@ -2066,6 +2138,23 @@ def list_ops_notifications(
     current_user: User,
 ) -> OpsNotificationResponse:
     notifications = sync_ops_notifications(db=db, current_user=current_user)
+    lead_ids = {
+        lead_id
+        for notification in notifications
+        for lead_id in [_extract_notification_lead_id(notification)]
+        if lead_id is not None
+    }
+    lead_lookup: dict[UUID, Lead] = {}
+    if lead_ids:
+        lead_statement = (
+            select(Lead)
+            .where(Lead.id.in_(lead_ids))
+            .options(selectinload(Lead.assigned_user))
+        )
+        lead_lookup = {
+            lead.id: lead
+            for lead in db.scalars(lead_statement).all()
+        }
 
     return OpsNotificationResponse(
         generated_at=datetime.now(timezone.utc),
@@ -2075,7 +2164,7 @@ def list_ops_notifications(
         ),
         resolved_count=sum(1 for item in notifications if item.status == "resolved"),
         escalated_count=sum(1 for item in notifications if item.escalation_level != "none"),
-        items=[build_ops_notification_item(item) for item in notifications],
+        items=[build_ops_notification_item(item, lead_lookup) for item in notifications],
     )
 
 

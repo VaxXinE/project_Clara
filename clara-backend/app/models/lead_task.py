@@ -32,6 +32,16 @@ class LeadTask(Base):
         nullable=True,
         index=True,
     )
+    workflow_scope: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="cs_follow_up",
+        index=True,
+    )
+    requested_by_role: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+    )
 
     task_type: Mapped[str] = mapped_column(
         String(50),

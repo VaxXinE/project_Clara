@@ -40,8 +40,7 @@ import type {
   OpsNotificationResponse,
 } from "@/types/dashboard";
 
-const SITE_TITLE = "SGB Sales Command Center";
-const SITE_SUBTITLE = "SCC Workspace";
+const SITE_TITLE = "SCC Workspace";
 
 type WorkspaceShellProps = {
   currentUser?: CurrentUser | null;
@@ -90,7 +89,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       href: "/notifications",
       label: "Alert Center",
       icon: faTriangleExclamation,
-      description: "Alert operasional yang perlu ditindak",
+      description: "Follow-up sales yang perlu dicek head",
     },
   ];
 
@@ -102,7 +101,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
         href: "/sales",
         label: "Queue",
         icon: faComments,
-        description: "Kerja percakapan customer",
+        description: "CS menangani pertanyaan nasabah",
       },
       {
         href: "/follow-up",
@@ -143,7 +142,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       href: "/approvals",
       label: "Chat Review Center",
       icon: faWandSparkles,
-      description: "Triase chat, draft, dan escalation",
+      description: "Admin cek jawaban dan feedback ke CS",
     });
     insightItems.push({
       href: "/manager-insights",
@@ -362,10 +361,8 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_12px_24px_rgba(0,0,0,0.22)] xl:h-10 xl:w-10 xl:rounded-xl xl:shadow-none">
                   <FontAwesomeIcon icon={faArrowTrendUp} className="h-4 w-4" />
                 </div>
+
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73] xl:hidden">
-                    {SITE_SUBTITLE}
-                  </p>
                   <p className="truncate text-sm font-semibold text-[#fff0c9] xl:text-base">
                     {SITE_TITLE}
                   </p>
@@ -442,16 +439,6 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
                 >
                   <FontAwesomeIcon icon={faBars} className="h-4 w-4" />
                 </button>
-
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    SCC Workspace
-                  </p>
-                  <p className="truncate text-sm font-semibold text-[#fff0c9]">
-                    {resolvedCurrentUser?.name ??
-                      getWorkspaceTitle(resolvedCurrentUser)}
-                  </p>
-                </div>
               </div>
 
               <div className="flex items-center gap-2">

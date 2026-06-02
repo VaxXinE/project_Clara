@@ -30,6 +30,22 @@ class OpsNotification(Base):
 
     source_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     source_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    workflow_scope: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="ops_oversight",
+        index=True,
+    )
+    owner_role: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="sales",
+    )
+    target_role: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="sales",
+    )
     severity: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)

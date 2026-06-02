@@ -18,6 +18,11 @@ import type {
   OpsNotificationResponse,
 } from "@/types/dashboard";
 
+type NotificationGroup = {
+  ownerName: string;
+  items: OpsNotificationItem[];
+};
+
 function getSeverityClass(severity: string) {
   if (severity === "high") {
     return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
@@ -198,18 +203,34 @@ export default function NotificationsPage() {
     }
   }
 
-  const filteredNotifications = useMemo(() => {
+  const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
+  const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
+  const isManagerMonitorView =
+    isManagerLike(currentUser?.role) && !canAccessQueue;
+  const isHeadMonitorView = normalizedRole === "head";
+  const isOversightAlertView = isManagerMonitorView || isHeadMonitorView;
+
+  const roleScopedNotifications = useMemo(() => {
     const items = notifications?.items ?? [];
+
+    if (!isOversightAlertView) {
+      return items;
+    }
+
+    return items.filter((item) => item.workflow_scope === "head_follow_up");
+  }, [isOversightAlertView, notifications?.items]);
+
+  const filteredNotifications = useMemo(() => {
+    const items = roleScopedNotifications;
 
     return items.filter((item) => {
       const matchesStatus =
         statusFilter === "all" || item.status === statusFilter;
       const matchesSeverity =
         severityFilter === "all" || item.severity === severityFilter;
-
       return matchesStatus && matchesSeverity;
     });
-  }, [notifications?.items, severityFilter, statusFilter]);
+  }, [roleScopedNotifications, severityFilter, statusFilter]);
 
   const totalNotificationPages = Math.max(
     1,
@@ -221,14 +242,38 @@ export default function NotificationsPage() {
     return filteredNotifications.slice(startIndex, startIndex + pageSize);
   }, [filteredNotifications, notificationPage]);
 
-  const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
-  const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
-  const isManagerMonitorView =
-    isManagerLike(currentUser?.role) && !canAccessQueue;
-  const isHeadMonitorView = normalizedRole === "head";
-  const isOversightAlertView = isManagerMonitorView || isHeadMonitorView;
-  const hasAnyNotifications = (notifications?.items.length ?? 0) > 0;
-  const hasActiveNotifications = (notifications?.active_count ?? 0) > 0;
+  const groupedNotifications = useMemo<NotificationGroup[]>(() => {
+    const groups = new Map<string, OpsNotificationItem[]>();
+
+    for (const item of paginatedNotifications) {
+      const ownerName = item.sales_owner_name?.trim() || "Belum ada owner";
+      const existing = groups.get(ownerName);
+      if (existing) {
+        existing.push(item);
+      } else {
+        groups.set(ownerName, [item]);
+      }
+    }
+
+    return Array.from(groups.entries()).map(([ownerName, items]) => ({
+      ownerName,
+      items,
+    }));
+  }, [paginatedNotifications]);
+
+  const scopedCounts = useMemo(
+    () => ({
+      active: roleScopedNotifications.filter((item) => item.status === "active").length,
+      acknowledged: roleScopedNotifications.filter((item) => item.status === "acknowledged")
+        .length,
+      resolved: roleScopedNotifications.filter((item) => item.status === "resolved").length,
+      escalated: roleScopedNotifications.filter((item) => item.escalation_level !== "none")
+        .length,
+    }),
+    [roleScopedNotifications],
+  );
+
+  const hasAnyNotifications = roleScopedNotifications.length > 0;
   const isActiveStatusView = statusFilter === "active";
   const showActiveEmptyState =
     hasAnyNotifications && isActiveStatusView && filteredNotifications.length === 0;
@@ -246,9 +291,13 @@ export default function NotificationsPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Operational orchestration"
+      eyebrow={isOversightAlertView ? "Follow-up oversight" : "Operational orchestration"}
       title="Alert Center"
-      description="Tempat untuk melihat sinyal operasional yang harus segera ditindak: follow-up overdue, chat review kritis, dan alert KPI yang relevan dengan role Anda."
+      description={
+        isOversightAlertView
+          ? "Halaman ini dipakai head atau manager untuk mengecek follow-up sales yang mulai overdue, hot lead yang belum ditindak, dan titik follow-up yang perlu ditekan ke tim."
+          : "Tempat untuk melihat sinyal operasional yang harus segera ditindak: follow-up overdue, chat review kritis, dan alert KPI yang relevan dengan role Anda."
+      }
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
@@ -297,12 +346,18 @@ export default function NotificationsPage() {
                 {!showActiveEmptyState ? (
                   <>
                     <section className="grid gap-4 md:grid-cols-3">
-                      <MetricCard label="Active" value={String(notifications.active_count)} />
                       <MetricCard
-                        label="Acknowledged"
-                        value={String(notifications.acknowledged_count)}
+                        label={isOversightAlertView ? "Perlu Follow-up" : "Active"}
+                        value={String(scopedCounts.active)}
                       />
-                      <MetricCard label="Resolved" value={String(notifications.resolved_count)} />
+                      <MetricCard
+                        label={isOversightAlertView ? "Sudah Dicek" : "Acknowledged"}
+                        value={String(scopedCounts.acknowledged)}
+                      />
+                      <MetricCard
+                        label={isOversightAlertView ? "Selesai" : "Resolved"}
+                        value={String(scopedCounts.resolved)}
+                      />
                     </section>
 
                     <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
@@ -311,7 +366,7 @@ export default function NotificationsPage() {
                       >
                         <MetricCard
                           label="Escalated"
-                          value={String(notifications.escalated_count)}
+                          value={String(scopedCounts.escalated)}
                         />
                         <MetricCard
                           label="Generated"
@@ -342,14 +397,21 @@ export default function NotificationsPage() {
                         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                           Tidak Ada Alert Aktif
                         </p>
-                        <h3 className="mt-2 text-lg font-semibold text-slate-950">
-                          Tidak ada sinyal operasional yang perlu ditangani sekarang
+                        <h3 className="mt-2 text-lg font-semibold text-[#fff0c9]">
+                          {isOversightAlertView
+                            ? "Tidak ada follow-up sales yang perlu ditekan sekarang"
+                            : "Tidak ada sinyal operasional yang perlu ditangani sekarang"}
                         </h3>
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-[#e3c990]">
-                          Fokus halaman ini adalah alert aktif. Karena sekarang kosong, lanjutkan kerja dari{" "}
-                          {canAccessQueue ? "Action Center, Queue, atau Lead Management" : "Manager Insights, KPI, atau Chat Review Center"}.
-                          {notifications.resolved_count > 0
-                            ? ` Ada ${notifications.resolved_count} alert resolved yang bisa dibuka kalau kamu butuh melihat histori.`
+                          {isOversightAlertView
+                            ? "Kalau area ini kosong, berarti belum ada sales yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead management, manager insights, atau histori alert follow-up yang sudah selesai."
+                            : `Fokus halaman ini adalah alert aktif. Karena sekarang kosong, lanjutkan kerja dari ${
+                                canAccessQueue
+                                  ? "Action Center, Queue, atau Lead Management"
+                                  : "Manager Insights, KPI, atau Chat Review Center"
+                              }.`}
+                          {scopedCounts.resolved > 0
+                            ? ` Ada ${scopedCounts.resolved} alert resolved yang bisa dibuka kalau kamu butuh melihat histori.`
                             : ""}
                         </p>
                       </div>
@@ -374,10 +436,13 @@ export default function NotificationsPage() {
                       </div>
                     </div>
                     <div className="mt-5 grid gap-4 md:grid-cols-3">
-                      <MetricCard label="Active" value={String(notifications.active_count)} />
                       <MetricCard
-                        label="Resolved"
-                        value={String(notifications.resolved_count)}
+                        label={isOversightAlertView ? "Perlu Follow-up" : "Active"}
+                        value={String(scopedCounts.active)}
+                      />
+                      <MetricCard
+                        label={isOversightAlertView ? "Selesai" : "Resolved"}
+                        value={String(scopedCounts.resolved)}
                       />
                       <MetricCard
                         label="Generated"
@@ -433,117 +498,237 @@ export default function NotificationsPage() {
                     <div className="clara-empty-state border-dashed p-8 text-center text-sm text-[#d6bb84]">
                       Tidak ada alert yang cocok dengan filter saat ini. Coba ubah status atau severity untuk melihat histori alert lain.
                     </div>
+                  ) : isOversightAlertView ? (
+                    groupedNotifications.map((group) => (
+                      <section
+                        key={group.ownerName}
+                        className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(27,20,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0cb73]/12 pb-4">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
+                              Sales Owner
+                            </p>
+                            <h2 className="mt-2 text-lg font-semibold text-[#fff0c9]">
+                              {group.ownerName}
+                            </h2>
+                          </div>
+                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
+                            {group.items.length} follow-up
+                          </span>
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                          {group.items.map((item) => (
+                            <article
+                              key={item.id}
+                              className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                            >
+                              <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <h3 className="text-base font-semibold text-[#fff0c9]">
+                                      {item.lead_name ?? item.title}
+                                    </h3>
+                                    <span
+                                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getSeverityClass(
+                                        item.severity
+                                      )}`}
+                                    >
+                                      {item.severity.toUpperCase()}
+                                    </span>
+                                    <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                                      {formatStatusLabel(item.status)}
+                                    </span>
+                                    <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                                      Age: {formatStatusLabel(item.age_bucket)}
+                                    </span>
+                                  </div>
+                                  <p className="mt-3 text-sm leading-7 text-[#fff0c9]">
+                                    {item.title}
+                                  </p>
+                                  <p className="mt-2 text-sm leading-7 text-[#d6bb84]">
+                                    {item.body}
+                                  </p>
+                                  <p className="mt-3 text-xs text-[#b89a62]">
+                                    Dibuat: {formatDateTime(item.created_at)} | Update:{" "}
+                                    {formatDateTime(item.updated_at)}
+                                  </p>
+                                  {item.resolution_note ? (
+                                    <p className="mt-3 rounded-xl border border-[#f0cb73]/16 bg-[#1d150d] p-3 text-sm text-[#f0cb73]">
+                                      Resolution note: {item.resolution_note}
+                                    </p>
+                                  ) : null}
+                                </div>
+
+                                <div className="flex w-full flex-col gap-2 xl:w-64 xl:flex-none">
+                                  {resolveNotificationTargetHref(item.target_href, currentUser?.role) ? (
+                                    <Link
+                                      href={
+                                        resolveNotificationTargetHref(
+                                          item.target_href,
+                                          currentUser?.role,
+                                        ) as string
+                                      }
+                                      className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
+                                    >
+                                      Buka Follow-up
+                                    </Link>
+                                  ) : null}
+                                  {item.status === "active" ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={updatingId === item.id}
+                                        onClick={() => {
+                                          void handleAcknowledge(item);
+                                        }}
+                                        className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                      >
+                                        {updatingId === item.id ? "Memproses..." : "Sudah Dicek"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={updatingId === item.id}
+                                        onClick={() => {
+                                          void handleResolve(item);
+                                        }}
+                                        className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-70"
+                                      >
+                                        Tandai Selesai
+                                      </button>
+                                    </>
+                                  ) : null}
+                                  {item.status === "resolved" ? (
+                                    <button
+                                      type="button"
+                                      disabled={updatingId === item.id}
+                                      onClick={() => {
+                                        void handleReopen(item);
+                                      }}
+                                      className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                    >
+                                      Reopen
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    ))
                   ) : (
                     paginatedNotifications.map((item) => (
                       <article
                         key={item.id}
                         className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
                       >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-lg font-semibold text-slate-950">
-                            {item.title}
-                          </h2>
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getSeverityClass(
-                              item.severity
-                            )}`}
-                          >
-                            {item.severity.toUpperCase()}
-                          </span>
-                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                            {formatStatusLabel(item.status)}
-                          </span>
-                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                            Delivery: {formatStatusLabel(item.delivery_status)}
-                          </span>
-                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                            Escalation: {formatStatusLabel(item.escalation_level)}
-                          </span>
-                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                            Age: {formatStatusLabel(item.age_bucket)}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm leading-7 text-[#d6bb84]">
-                          {item.body}
-                        </p>
-                        <p className="mt-3 text-xs text-[#b89a62]">
-                          Dibuat: {formatDateTime(item.created_at)} • Update:{" "}
-                          {formatDateTime(item.updated_at)}
-                        </p>
-                        {item.resolution_note ? (
-                          <p className="mt-3 rounded-xl border border-[#f0cb73]/16 bg-[#1d150d] p-3 text-sm text-[#f0cb73]">
-                            Resolution note: {item.resolution_note}
-                          </p>
-                        ) : null}
-                      </div>
+                        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h2 className="text-lg font-semibold text-[#fff0c9]">
+                                {item.title}
+                              </h2>
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getSeverityClass(
+                                  item.severity
+                                )}`}
+                              >
+                                {item.severity.toUpperCase()}
+                              </span>
+                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                                {formatStatusLabel(item.status)}
+                              </span>
+                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                                Delivery: {formatStatusLabel(item.delivery_status)}
+                              </span>
+                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                                Escalation: {formatStatusLabel(item.escalation_level)}
+                              </span>
+                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                                Age: {formatStatusLabel(item.age_bucket)}
+                              </span>
+                            </div>
+                            <p className="mt-3 text-sm leading-7 text-[#d6bb84]">
+                              {item.body}
+                            </p>
+                            <p className="mt-3 text-xs text-[#b89a62]">
+                              Dibuat: {formatDateTime(item.created_at)} | Update:{" "}
+                              {formatDateTime(item.updated_at)}
+                            </p>
+                            {item.resolution_note ? (
+                              <p className="mt-3 rounded-xl border border-[#f0cb73]/16 bg-[#1d150d] p-3 text-sm text-[#f0cb73]">
+                                Resolution note: {item.resolution_note}
+                              </p>
+                            ) : null}
+                          </div>
 
-                      <div className="flex w-full flex-col gap-2 md:w-64">
-                        {resolveNotificationTargetHref(item.target_href, currentUser?.role) ? (
-                          <Link
-                            href={
-                              resolveNotificationTargetHref(
-                                item.target_href,
-                                currentUser?.role,
-                              ) as string
-                            }
-                            className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
-                          >
-                            Buka Tindakan
-                          </Link>
-                        ) : null}
-                        {item.status === "active" ? (
-                          <>
-                            <button
-                              type="button"
-                              disabled={updatingId === item.id}
-                              onClick={() => {
-                                void handleAcknowledge(item);
-                              }}
-                              className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                              {updatingId === item.id ? "Memproses..." : "Acknowledge"}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={updatingId === item.id}
-                              onClick={() => {
-                                void handleResolve(item);
-                              }}
-                              className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                              Resolve
-                            </button>
-                            {["head", "superadmin"].includes(currentUser?.role ?? "") ? (
+                          <div className="flex w-full flex-col gap-2 xl:w-64 xl:flex-none">
+                            {resolveNotificationTargetHref(item.target_href, currentUser?.role) ? (
+                              <Link
+                                href={
+                                  resolveNotificationTargetHref(
+                                    item.target_href,
+                                    currentUser?.role,
+                                  ) as string
+                                }
+                                className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
+                              >
+                                Buka Tindakan
+                              </Link>
+                            ) : null}
+                            {item.status === "active" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={updatingId === item.id}
+                                  onClick={() => {
+                                    void handleAcknowledge(item);
+                                  }}
+                                  className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                >
+                                  {updatingId === item.id ? "Memproses..." : "Acknowledge"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={updatingId === item.id}
+                                  onClick={() => {
+                                    void handleResolve(item);
+                                  }}
+                                  className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-70"
+                                >
+                                  Resolve
+                                </button>
+                                {["head", "superadmin"].includes(currentUser?.role ?? "") ? (
+                                  <button
+                                    type="button"
+                                    disabled={updatingId === item.id}
+                                    onClick={() => {
+                                      void handleEscalate(item);
+                                    }}
+                                    className="inline-flex justify-center rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-4 py-2.5 text-sm font-semibold text-[#f0cb73] disabled:cursor-not-allowed disabled:opacity-70"
+                                  >
+                                    Escalate
+                                  </button>
+                                ) : null}
+                              </>
+                            ) : null}
+                            {item.status === "resolved" ? (
                               <button
                                 type="button"
                                 disabled={updatingId === item.id}
                                 onClick={() => {
-                                  void handleEscalate(item);
+                                  void handleReopen(item);
                                 }}
-                                className="inline-flex justify-center rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-4 py-2.5 text-sm font-semibold text-[#f0cb73] disabled:cursor-not-allowed disabled:opacity-70"
+                                className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
                               >
-                                Escalate
+                                Reopen
                               </button>
                             ) : null}
-                          </>
-                        ) : null}
-                        {item.status === "resolved" ? (
-                          <button
-                            type="button"
-                            disabled={updatingId === item.id}
-                            onClick={() => {
-                              void handleReopen(item);
-                            }}
-                            className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            Reopen
-                          </button>
-                        ) : null}
-                      </div>
-                      </div>
-                    </article>
+                          </div>
+                        </div>
+                      </article>
                     ))
                   )}
                 </section>
@@ -587,7 +772,7 @@ export default function NotificationsPage() {
                 </p>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-[#e3c990]">
                   {isHeadMonitorView
-                    ? "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role head, langkah berikutnya biasanya memantau kesehatan lintas team, coaching queue, dan pipeline lead yang masih tertahan."
+                    ? "Saat Alert Center kosong, itu artinya follow-up tim sales sedang relatif aman. Untuk role head, langkah berikutnya biasanya memantau lead management, manager insights, dan pipeline lead yang masih tertahan."
                     : "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role manager, langkah berikutnya biasanya memantau disiplin tim, coaching review, atau status lead yang masih tertahan."}
                 </p>
                 <div className="mt-5 flex flex-wrap gap-3">
@@ -646,3 +831,4 @@ function MetricCard({ label, value }: { label: string; value: string }) {
     </article>
   );
 }
+

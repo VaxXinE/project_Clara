@@ -38,20 +38,32 @@ const LOGIN_MESSAGE =
 const AUTH_REFRESH_INTERVAL_MS = 2000
 
 const panelCss = `
+  html,
+  body {
+    background: #070503;
+    margin: 0;
+    min-height: 100%;
+    padding: 0;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
   .clara-panel {
-    --clara-ink: #13212d;
-    --clara-muted: #617383;
-    --clara-line: rgba(19, 33, 45, 0.1);
-    --clara-surface: rgba(255, 253, 248, 0.94);
-    --clara-surface-2: rgba(255, 255, 255, 0.82);
-    --clara-accent: #0f766e;
-    --clara-accent-strong: #164e63;
-    --clara-warm: #d97706;
-    --clara-danger: #b42318;
+    --clara-ink: #f7e7b7;
+    --clara-muted: #c9aa68;
+    --clara-line: rgba(240, 203, 115, 0.14);
+    --clara-surface: rgba(23, 17, 11, 0.94);
+    --clara-surface-2: rgba(33, 24, 16, 0.9);
+    --clara-accent: #f0cb73;
+    --clara-accent-strong: #c29032;
+    --clara-warm: #e1b24a;
+    --clara-danger: #e17c54;
     background:
-      radial-gradient(circle at top left, rgba(255,255,255,0.9), rgba(255,255,255,0) 28%),
-      radial-gradient(circle at 100% 0%, rgba(14,165,233,0.12), rgba(14,165,233,0) 32%),
-      linear-gradient(180deg, #f6f1e8 0%, #eef3f7 42%, #f7fbf8 100%);
+      radial-gradient(circle at top left, rgba(240,203,115,0.16), rgba(240,203,115,0) 28%),
+      radial-gradient(circle at 100% 0%, rgba(194,144,50,0.14), rgba(194,144,50,0) 32%),
+      linear-gradient(180deg, #120d08 0%, #0b0805 42%, #070503 100%);
     color: var(--clara-ink);
     font-family: "Aptos", "Segoe UI Variable Display", "Trebuchet MS", "Segoe UI", sans-serif;
     min-height: 100vh;
@@ -80,14 +92,14 @@ const panelCss = `
 
   .clara-hero {
     background:
-      radial-gradient(circle at top right, rgba(249, 183, 77, 0.24), rgba(249, 183, 77, 0) 28%),
-      linear-gradient(155deg, #11222d 0%, #133b46 48%, #175f66 100%);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+      radial-gradient(circle at top right, rgba(240, 203, 115, 0.28), rgba(240, 203, 115, 0) 30%),
+      linear-gradient(155deg, #171008 0%, #24180e 48%, #3a260f 100%);
+    border: 1px solid rgba(240, 203, 115, 0.14);
     border-radius: 22px;
     box-shadow:
-      0 24px 54px rgba(17, 34, 45, 0.24),
-      inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    color: #f8fbfc;
+      0 24px 54px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 240, 201, 0.08);
+    color: #fff0c9;
     overflow: hidden;
     padding: 14px;
     position: relative;
@@ -95,11 +107,11 @@ const panelCss = `
 
   .clara-hero::after {
     background:
-      linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0)),
+      linear-gradient(90deg, rgba(255,240,201,0.08), rgba(240,203,115,0)),
       repeating-linear-gradient(
         135deg,
-        rgba(255,255,255,0.03),
-        rgba(255,255,255,0.03) 10px,
+        rgba(240,203,115,0.04),
+        rgba(240,203,115,0.04) 10px,
         rgba(255,255,255,0) 10px,
         rgba(255,255,255,0) 20px
       );
@@ -128,7 +140,7 @@ const panelCss = `
   }
 
   .clara-hero__eyebrow {
-    color: rgba(243, 248, 250, 0.74);
+    color: rgba(240, 203, 115, 0.88);
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.14em;
@@ -145,7 +157,7 @@ const panelCss = `
   }
 
   .clara-hero__copy {
-    color: rgba(243, 248, 250, 0.82);
+    color: rgba(247, 231, 183, 0.84);
     font-size: 12px;
     line-height: 1.5;
     margin: 8px 0 0;
@@ -153,8 +165,8 @@ const panelCss = `
   }
 
   .clara-identity {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(12, 9, 6, 0.44);
+    border: 1px solid rgba(240, 203, 115, 0.14);
     border-radius: 16px;
     min-width: 0;
     max-width: 100%;
@@ -163,7 +175,7 @@ const panelCss = `
   }
 
   .clara-identity__label {
-    color: rgba(243, 248, 250, 0.68);
+    color: rgba(240, 203, 115, 0.72);
     font-size: 11px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -178,7 +190,7 @@ const panelCss = `
   }
 
   .clara-identity__meta {
-    color: rgba(243, 248, 250, 0.74);
+    color: rgba(247, 231, 183, 0.7);
     font-size: 11px;
     line-height: 1.45;
     margin-top: 6px;
@@ -186,12 +198,12 @@ const panelCss = `
   }
 
   .clara-pane {
-    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(252,250,245,0.88));
-    border: 1px solid rgba(255, 255, 255, 0.82);
+    background: linear-gradient(180deg, rgba(28,20,13,0.96), rgba(16,12,9,0.96));
+    border: 1px solid rgba(240, 203, 115, 0.14);
     border-radius: 22px;
     box-shadow:
-      0 20px 42px rgba(27, 43, 55, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.84);
+      0 20px 42px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 240, 201, 0.06);
     display: grid;
     gap: 12px;
     min-width: 0;
@@ -200,11 +212,11 @@ const panelCss = `
 
   .clara-pane--reply {
     background:
-      linear-gradient(180deg, rgba(247,252,255,0.94), rgba(253,249,244,0.92));
+      linear-gradient(180deg, rgba(35,25,16,0.96), rgba(18,13,10,0.98));
   }
 
   .clara-pane__eyebrow {
-    color: #617383;
+    color: #c9aa68;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.12em;
@@ -242,27 +254,27 @@ const panelCss = `
   }
 
   .clara-chip--dark {
-    background: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    color: #f8fbfc;
+    background: rgba(240, 203, 115, 0.12);
+    border: 1px solid rgba(240, 203, 115, 0.16);
+    color: #fff0c9;
   }
 
   .clara-chip--soft {
-    background: rgba(19, 33, 45, 0.05);
-    border: 1px solid rgba(19, 33, 45, 0.08);
-    color: #274052;
+    background: rgba(255, 240, 201, 0.06);
+    border: 1px solid rgba(240, 203, 115, 0.12);
+    color: #e5c98b;
   }
 
   .clara-chip--good {
-    background: rgba(15, 118, 110, 0.1);
-    border: 1px solid rgba(15, 118, 110, 0.18);
-    color: #0f5f58;
+    background: rgba(240, 203, 115, 0.14);
+    border: 1px solid rgba(240, 203, 115, 0.18);
+    color: #f0cb73;
   }
 
   .clara-chip--warn {
-    background: rgba(217, 119, 6, 0.1);
-    border: 1px solid rgba(217, 119, 6, 0.18);
-    color: #9a5d08;
+    background: rgba(194, 144, 50, 0.14);
+    border: 1px solid rgba(240, 203, 115, 0.18);
+    color: #f3d694;
   }
 
   .clara-button {
@@ -297,27 +309,27 @@ const panelCss = `
   }
 
   .clara-button--primary {
-    background: linear-gradient(135deg, #124a53 0%, #1d5c86 100%);
+    background: linear-gradient(135deg, #f6d98c 0%, #c29032 100%);
     box-shadow:
-      0 18px 30px rgba(18, 74, 83, 0.18),
-      inset 0 1px 0 rgba(255, 255, 255, 0.18);
-    color: #ffffff;
+      0 18px 30px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 248, 224, 0.18);
+    color: #140f08;
   }
 
   .clara-button--ghost {
-    background: rgba(19, 33, 45, 0.06);
-    border: 1px solid rgba(19, 33, 45, 0.08);
-    color: #1f3e52;
+    background: rgba(255, 240, 201, 0.05);
+    border: 1px solid rgba(240, 203, 115, 0.14);
+    color: #f0cb73;
   }
 
   .clara-button--insert {
-    background: linear-gradient(135deg, #18364a 0%, #0f766e 100%);
-    color: #ffffff;
+    background: linear-gradient(135deg, #2b1c0f 0%, #8b6321 100%);
+    color: #fff0c9;
   }
 
   .clara-button--send {
-    background: linear-gradient(135deg, #0f766e 0%, #1d5c86 100%);
-    color: #ffffff;
+    background: linear-gradient(135deg, #f0cb73 0%, #b67d27 100%);
+    color: #140f08;
   }
 
   .clara-note {
@@ -328,20 +340,20 @@ const panelCss = `
   }
 
   .clara-note--warn {
-    background: rgba(255, 248, 235, 0.96);
-    border: 1px solid rgba(233, 176, 78, 0.35);
-    color: #8a5a0a;
+    background: rgba(55, 38, 18, 0.96);
+    border: 1px solid rgba(240, 203, 115, 0.22);
+    color: #f3d694;
   }
 
   .clara-note--success {
-    background: rgba(237, 250, 246, 0.98);
-    border: 1px solid rgba(84, 176, 144, 0.26);
-    color: #12584f;
+    background: rgba(41, 30, 17, 0.98);
+    border: 1px solid rgba(240, 203, 115, 0.18);
+    color: #f0cb73;
   }
 
   .clara-note--error {
-    background: rgba(254, 242, 240, 0.98);
-    border: 1px solid rgba(229, 137, 121, 0.26);
+    background: rgba(66, 33, 21, 0.98);
+    border: 1px solid rgba(225, 124, 84, 0.28);
     color: var(--clara-danger);
   }
 
@@ -352,16 +364,16 @@ const panelCss = `
   }
 
   .clara-chat-shell {
-    background: #e7ded5;
-    border: 1px solid rgba(19, 33, 45, 0.08);
+    background: #130d08;
+    border: 1px solid rgba(240, 203, 115, 0.12);
     border-radius: 20px;
     overflow: hidden;
   }
 
   .clara-chat-appbar {
     align-items: center;
-    background: #f0f2f5;
-    border-bottom: 1px solid rgba(19, 33, 45, 0.08);
+    background: #1b130b;
+    border-bottom: 1px solid rgba(240, 203, 115, 0.12);
     display: grid;
     gap: 12px;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -370,9 +382,9 @@ const panelCss = `
 
   .clara-chat-avatar {
     align-items: center;
-    background: linear-gradient(135deg, #1f6f78, #2f8c97);
+    background: linear-gradient(135deg, #f6d98c, #c29032);
     border-radius: 50%;
-    color: #ffffff;
+    color: #140f08;
     display: inline-flex;
     font-size: 14px;
     font-weight: 800;
@@ -382,7 +394,7 @@ const panelCss = `
   }
 
   .clara-chat-appbar__title {
-    color: #101f2c;
+    color: #fff0c9;
     font-size: 14px;
     font-weight: 700;
     line-height: 1.25;
@@ -390,7 +402,7 @@ const panelCss = `
   }
 
   .clara-chat-appbar__meta {
-    color: #667781;
+    color: #c9aa68;
     font-size: 11px;
     line-height: 1.35;
     margin-top: 2px;
@@ -398,21 +410,21 @@ const panelCss = `
   }
 
   .clara-chat-latest {
-    background: rgba(255, 255, 255, 0.7);
-    border-bottom: 1px solid rgba(19, 33, 45, 0.06);
-    color: #526673;
+    background: rgba(255, 240, 201, 0.06);
+    border-bottom: 1px solid rgba(240, 203, 115, 0.08);
+    color: #d6bb84;
     font-size: 11px;
     line-height: 1.45;
     padding: 8px 12px;
   }
 
   .clara-chat-latest strong {
-    color: #1d3342;
+    color: #fff0c9;
   }
 
   .clara-thread {
     background:
-      linear-gradient(rgba(239, 234, 226, 0.8), rgba(239, 234, 226, 0.8)),
+      linear-gradient(rgba(10, 7, 5, 0.82), rgba(10, 7, 5, 0.82)),
       url("${chatWallpaper}") center / cover no-repeat;
     display: flex;
     flex-direction: column;
@@ -429,14 +441,14 @@ const panelCss = `
   }
 
   .clara-thread::-webkit-scrollbar-thumb {
-    background: rgba(97, 115, 131, 0.28);
+    background: rgba(240, 203, 115, 0.28);
     border-radius: 999px;
   }
 
   .clara-thread-message {
-    background: #ffffff;
+    background: #24180f;
     border-radius: 10px;
-    box-shadow: 0 1px 0 rgba(17, 27, 33, 0.08), 0 1px 3px rgba(17, 27, 33, 0.12);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.2);
     max-width: 82%;
     min-width: 96px;
     padding: 7px 9px 5px;
@@ -451,15 +463,15 @@ const panelCss = `
   }
 
   .clara-thread-message--in::before {
-    border-right: 10px solid #ffffff;
-    border-top: 10px solid #ffffff;
+    border-right: 10px solid #24180f;
+    border-top: 10px solid #24180f;
     left: -5px;
     transform: skewX(-24deg);
   }
 
   .clara-thread-message--out::before {
-    border-left: 10px solid #d9fdd3;
-    border-top: 10px solid #d9fdd3;
+    border-left: 10px solid #f0cb73;
+    border-top: 10px solid #f0cb73;
     right: -5px;
     transform: skewX(24deg);
   }
@@ -470,11 +482,11 @@ const panelCss = `
 
   .clara-thread-message--out {
     align-self: flex-end;
-    background: #d9fdd3;
+    background: #f0cb73;
   }
 
   .clara-thread-message__author {
-    color: #1f6f78;
+    color: #f0cb73;
     font-size: 11px;
     font-weight: 800;
     line-height: 1.3;
@@ -483,7 +495,7 @@ const panelCss = `
   }
 
   .clara-thread-message__text {
-    color: #111b21;
+    color: #f7e7b7;
     font-size: 12px;
     line-height: 1.45;
     overflow-wrap: anywhere;
@@ -492,7 +504,7 @@ const panelCss = `
   }
 
   .clara-thread-message__footer {
-    color: #667781;
+    color: #c9aa68;
     display: flex;
     font-size: 10px;
     justify-content: flex-end;
@@ -500,33 +512,45 @@ const panelCss = `
     margin-top: 4px;
   }
 
+  .clara-thread-message--out .clara-thread-message__author {
+    color: rgba(20, 15, 8, 0.68);
+  }
+
+  .clara-thread-message--out .clara-thread-message__text {
+    color: #140f08;
+  }
+
+  .clara-thread-message--out .clara-thread-message__footer {
+    color: rgba(20, 15, 8, 0.72);
+  }
+
   .clara-empty {
-    background: rgba(255,255,255,0.6);
-    border: 1px dashed rgba(19, 33, 45, 0.14);
+    background: rgba(255,240,201,0.06);
+    border: 1px dashed rgba(240, 203, 115, 0.18);
     border-radius: 16px;
-    color: #677a89;
+    color: #d6bb84;
     font-size: 13px;
     line-height: 1.6;
     padding: 14px;
   }
 
   .clara-empty__title {
-    color: #294356;
+    color: #fff0c9;
     font-size: 13px;
     font-weight: 800;
     margin-bottom: 6px;
   }
 
   .clara-empty__meta {
-    color: #677a89;
+    color: #c9aa68;
     font-size: 12px;
     line-height: 1.6;
   }
 
   .clara-brief {
     background:
-      linear-gradient(180deg, rgba(247,252,255,0.96), rgba(255,249,241,0.96));
-    border: 1px solid rgba(19, 33, 45, 0.06);
+      linear-gradient(180deg, rgba(34,24,16,0.96), rgba(19,13,10,0.96));
+    border: 1px solid rgba(240, 203, 115, 0.12);
     border-radius: 18px;
     display: grid;
     gap: 10px;
@@ -538,7 +562,7 @@ const panelCss = `
     font-weight: 800;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #516879;
+    color: #c9aa68;
   }
 
   .clara-brief__grid {
@@ -547,7 +571,7 @@ const panelCss = `
   }
 
   .clara-brief__text {
-    color: #304756;
+    color: #e5c98b;
     font-size: 12px;
     line-height: 1.65;
     overflow-wrap: anywhere;
@@ -560,12 +584,12 @@ const panelCss = `
   }
 
   .clara-draft {
-    background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(245,250,253,0.88));
-    border: 1px solid rgba(19, 33, 45, 0.06);
+    background: linear-gradient(180deg, rgba(34,24,16,0.96), rgba(18,13,10,0.94));
+    border: 1px solid rgba(240, 203, 115, 0.12);
     border-radius: 18px;
     box-shadow:
-      0 14px 28px rgba(23, 40, 53, 0.08),
-      inset 0 1px 0 rgba(255,255,255,0.84);
+      0 14px 28px rgba(0, 0, 0, 0.18),
+      inset 0 1px 0 rgba(255,240,201,0.06);
     display: grid;
     gap: 10px;
     min-width: 0;
@@ -573,7 +597,7 @@ const panelCss = `
   }
 
   .clara-draft__number {
-    color: #b16b05;
+    color: #f0cb73;
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -595,7 +619,7 @@ const panelCss = `
   }
 
   .clara-draft__text {
-    color: #203745;
+    color: #f7e7b7;
     font-size: 12px;
     line-height: 1.58;
     overflow-wrap: anywhere;
@@ -610,13 +634,13 @@ const panelCss = `
 
   .clara-input {
     appearance: none;
-    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,251,255,0.94));
-    border: 1px solid rgba(183, 206, 226, 0.9);
+    background: linear-gradient(180deg, rgba(20,14,10,0.98), rgba(15,10,7,0.94));
+    border: 1px solid rgba(240, 203, 115, 0.16);
     border-radius: 16px;
     box-shadow:
-      inset 0 1px 2px rgba(16, 30, 42, 0.04),
-      0 10px 24px rgba(67, 91, 112, 0.06);
-    color: #173245;
+      inset 0 1px 2px rgba(0, 0, 0, 0.18),
+      0 10px 24px rgba(0, 0, 0, 0.14);
+    color: #f7e7b7;
     font-family: "Aptos", "Segoe UI Variable Display", "Trebuchet MS", "Segoe UI", sans-serif;
     font-size: 13px;
     line-height: 1.65;
@@ -631,12 +655,16 @@ const panelCss = `
     width: 100%;
   }
 
+  .clara-input::placeholder {
+    color: rgba(201, 170, 104, 0.72);
+  }
+
   .clara-input:focus {
-    background: #ffffff;
-    border-color: rgba(22, 116, 115, 0.68);
+    background: #1b130b;
+    border-color: rgba(240, 203, 115, 0.42);
     box-shadow:
-      0 0 0 4px rgba(15, 118, 110, 0.12),
-      0 14px 26px rgba(44, 83, 112, 0.08);
+      0 0 0 4px rgba(240, 203, 115, 0.12),
+      0 14px 26px rgba(0, 0, 0, 0.18);
   }
 
   .clara-input--textarea {
@@ -646,9 +674,9 @@ const panelCss = `
   }
 
   .clara-draft__reason {
-    background: rgba(19, 33, 45, 0.04);
+    background: rgba(255, 240, 201, 0.06);
     border-radius: 14px;
-    color: #506575;
+    color: #d6bb84;
     font-size: 12px;
     line-height: 1.6;
     padding: 10px 11px;
@@ -691,8 +719,8 @@ const panelCss = `
 
 const panelStyle = {
   background:
-    "radial-gradient(circle at 10% 10%, rgba(255,255,255,0.95), rgba(255,255,255,0) 24%), radial-gradient(circle at 88% 14%, rgba(112,199,255,0.28), rgba(112,199,255,0) 26%), radial-gradient(circle at 18% 78%, rgba(79,255,195,0.16), rgba(79,255,195,0) 24%), linear-gradient(160deg, #eef6ff 0%, #edf5ff 38%, #f4fbf7 100%)",
-  color: "#14212f",
+    "radial-gradient(circle at 10% 10%, rgba(240,203,115,0.18), rgba(240,203,115,0) 24%), radial-gradient(circle at 88% 14%, rgba(194,144,50,0.16), rgba(194,144,50,0) 26%), radial-gradient(circle at 18% 78%, rgba(240,203,115,0.1), rgba(240,203,115,0) 24%), linear-gradient(160deg, #120d08 0%, #0b0805 38%, #070503 100%)",
+  color: "#f7e7b7",
   fontFamily:
     "'Aptos', 'Segoe UI Variable Display', 'Trebuchet MS', 'Segoe UI', sans-serif",
   minHeight: "100vh",
@@ -703,12 +731,12 @@ const panelStyle = {
 
 const primaryButtonStyle = {
   background:
-    "linear-gradient(135deg, rgba(13,115,104,0.98) 0%, rgba(25,87,148,0.95) 100%)",
-  border: "1px solid rgba(255, 255, 255, 0.26)",
+    "linear-gradient(135deg, rgba(246,217,140,0.98) 0%, rgba(194,144,50,0.96) 100%)",
+  border: "1px solid rgba(255, 240, 201, 0.18)",
   borderRadius: 18,
   boxShadow:
-    "0 18px 36px rgba(36, 96, 128, 0.2), inset 0 1px 0 rgba(255,255,255,0.24)",
-  color: "#ffffff",
+    "0 18px 36px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255,248,224,0.22)",
+  color: "#140f08",
   cursor: "pointer",
   fontSize: 14,
   fontWeight: 800,
@@ -720,12 +748,12 @@ const primaryButtonStyle = {
 
 const secondaryButtonStyle = {
   background:
-    "linear-gradient(180deg, rgba(255,255,255,0.88), rgba(243,248,252,0.78))",
-  border: "1px solid rgba(219, 231, 243, 0.92)",
+    "linear-gradient(180deg, rgba(33,24,16,0.9), rgba(19,13,10,0.82))",
+  border: "1px solid rgba(240, 203, 115, 0.16)",
   borderRadius: 18,
   boxShadow:
-    "0 12px 28px rgba(51, 77, 107, 0.08), inset 0 1px 0 rgba(255,255,255,0.82)",
-  color: "#15344d",
+    "0 12px 28px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255,240,201,0.06)",
+  color: "#f0cb73",
   cursor: "pointer",
   fontSize: 14,
   fontWeight: 700,
@@ -735,10 +763,10 @@ const secondaryButtonStyle = {
 } as const
 
 const actionButtonStyle = {
-  background: "rgba(255,255,255,0.78)",
-  border: "1px solid rgba(214,226,239,0.96)",
+  background: "rgba(255,240,201,0.06)",
+  border: "1px solid rgba(240,203,115,0.16)",
   borderRadius: 14,
-  color: "#1c3954",
+  color: "#f0cb73",
   cursor: "pointer",
   fontSize: 12,
   fontWeight: 700,
@@ -748,21 +776,21 @@ const actionButtonStyle = {
 
 const softCardStyle = {
   background:
-    "linear-gradient(180deg, rgba(255,255,255,0.84), rgba(250,252,255,0.62))",
+    "linear-gradient(180deg, rgba(31,22,15,0.88), rgba(18,13,10,0.7))",
   backdropFilter: "blur(18px) saturate(155%)",
-  border: "1px solid rgba(255, 255, 255, 0.76)",
+  border: "1px solid rgba(240, 203, 115, 0.14)",
   borderRadius: 24,
   boxShadow:
-    "0 18px 40px rgba(64, 87, 109, 0.12), inset 0 1px 0 rgba(255,255,255,0.86)",
+    "0 18px 40px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255,240,201,0.06)",
   padding: 16
 } as const
 
 const chipStyle = {
   alignItems: "center",
-  background: "rgba(255,255,255,0.72)",
-  border: "1px solid rgba(224,235,244,0.94)",
+  background: "rgba(255,240,201,0.08)",
+  border: "1px solid rgba(240,203,115,0.16)",
   borderRadius: 999,
-  color: "#35546d",
+  color: "#f3d694",
   display: "inline-flex",
   fontSize: 11,
   fontWeight: 700,

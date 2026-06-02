@@ -652,14 +652,14 @@ export default function CrmPage() {
                 </p>
               </div>
 
-              <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+              <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
                 {paginatedVisibleLeads.length === 0 ? (
                   <div className="clara-empty-state p-6 text-sm text-[#d6bb84]">
                     Tidak ada lead yang cocok dengan filter saat ini.
                   </div>
                 ) : (
                   <>
-                    <div className="space-y-3 xl:max-h-[780px] xl:overflow-y-auto xl:pr-2">
+                    <div className="clara-scrollbar space-y-3 xl:max-h-[780px] xl:overflow-y-auto xl:pr-2">
                       {renderBucketSection({
                         title: "Perlu tindakan",
                         description:
@@ -728,7 +728,7 @@ export default function CrmPage() {
                       ) : null}
                     </div>
 
-                    <aside className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-5 xl:sticky xl:top-6 xl:self-start">
+                    <aside className="clara-scrollbar rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-5 xl:sticky xl:top-6 xl:max-h-[780px] xl:self-start xl:overflow-y-auto">
                       {selectedLead ? (
                         <>
                           <div className="border-b border-[#f0cb73]/12 pb-4">

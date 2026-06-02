@@ -37,6 +37,18 @@ class ChatReviewCase(Base):
         nullable=True,
         index=True,
     )
+    workflow_scope: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="admin_quality_check",
+        index=True,
+    )
+    feedback_status: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="draft",
+        index=True,
+    )
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
     review_label: Mapped[str] = mapped_column(
         String(50),
@@ -47,6 +59,18 @@ class ChatReviewCase(Base):
     coaching_focus: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommended_action: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    feedback_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    feedback_acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    feedback_resolved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

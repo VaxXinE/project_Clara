@@ -3,43 +3,50 @@
 import Link from "next/link";
 
 import {
-  canAccessQueueAndActionCenter,
   isAdminLike,
   isManagerLike,
   isOwnerLike,
 } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
+type RoleFeatureSet = {
+  roleKey: "sales" | "manager" | "head";
+  label: string;
+  title: string;
+  summary: string;
+  items: readonly string[];
+};
+
 const SALES_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Tangkap Lead Cepat",
+    title: "Terima Pertanyaan Nasabah",
     description:
-      "Mulai dari Lead Capture. Upload file TXT atau paste chat langsung supaya lead dan conversation cepat masuk ke sistem.",
-    href: "/dashboard/upload",
-    cta: "Buka Lead Capture",
-  },
-  {
-    step: "2",
-    title: "Kerjakan Queue",
-    description:
-      "Setelah data masuk, buka Queue untuk review percakapan, jalankan AI analysis, lalu siapkan balasan atau next action.",
+      "Mulai dari Queue untuk membaca chat yang masuk dari nasabah dan buka detail conversation yang sedang aktif.",
     href: "/dashboard/sales",
     cta: "Buka Queue",
   },
   {
-    step: "3",
-    title: "Rapikan Lead",
+    step: "2",
+    title: "Gunakan AI untuk Membantu Jawaban",
     description:
-      "Masuk ke Lead Management untuk atur stage, owner, follow-up date, dan timeline lead yang sedang dikerjakan.",
+      "Di dalam conversation detail, jalankan AI analysis lalu pilih atau edit draft balasan sebelum dikirim ke nasabah.",
+    href: "/dashboard/sales",
+    cta: "Buka Conversation",
+  },
+  {
+    step: "3",
+    title: "Kirim Jawaban dan Pantau Prospect",
+    description:
+      "Setelah jawaban dikirim, cek progress prospect dan lihat apakah ada follow-up yang perlu dikerjakan lagi.",
     href: "/dashboard/crm",
     cta: "Buka Lead Management",
   },
   {
     step: "4",
-    title: "Pantau Tindakan Harian",
+    title: "Lakukan Follow-up Bila Dibutuhkan",
     description:
-      "Gunakan Action Center dan Chat Review Center untuk tahu item mana yang overdue, panas, atau butuh review manusia.",
+      "Gunakan Action Center untuk mengecek follow-up overdue, hot lead, dan notifikasi tindak lanjut yang harus dibersihkan hari ini.",
     href: "/dashboard/follow-up",
     cta: "Buka Action Center",
   },
@@ -48,70 +55,70 @@ const SALES_WORKFLOW_STEPS = [
 const HEAD_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Cek Action Center",
+    title: "Analisis Follow-up Tiap Sales",
     description:
-      "Mulai dari Action Center untuk melihat overdue follow-up, hot lead belum disentuh, dan prioritas kerja tim hari ini.",
-    href: "/dashboard/follow-up",
-    cta: "Buka Action Center",
+      "Mulai dari Alert Center untuk melihat follow-up tiap sales yang overdue, hot lead yang belum disentuh, dan sales mana yang mulai bocor.",
+    href: "/dashboard/notifications",
+    cta: "Buka Alert Center",
   },
   {
     step: "2",
-    title: "Chat Review dan Eskalasi",
+    title: "Identifikasi Prospect yang Kurang atau Berisiko",
     description:
-      "Pastikan bottleneck tim terlihat dari chat review center dan worklist sebelum Anda masuk ke insight yang lebih luas.",
-    href: "/dashboard/approvals",
-    cta: "Buka Chat Review",
-  },
-  {
-    step: "3",
-    title: "Rapikan Lead Tim",
-    description:
-      "Masuk ke lead management untuk memastikan lead aktif, hot lead, dan stage penting tidak tertinggal atau salah arah.",
+      "Setelah terlihat owner-nya, buka lead atau conversation yang paling riskan untuk membaca konteks dan prioritas intervensinya.",
     href: "/dashboard/crm",
     cta: "Buka Lead Management",
   },
   {
-    step: "4",
-    title: "Ambil Keputusan dari Dashboard",
+    step: "3",
+    title: "Follow-up ke CS",
     description:
-      "Kalau operasional sudah cukup jelas, gunakan Ops Dashboard dan Chat Insight untuk membaca performa tim dan arah intervensi berikutnya.",
-    href: "/dashboard/kpi",
-    cta: "Buka Ops Dashboard",
+      "Gunakan Chat Review Center atau conversation review untuk memberi tekanan, coaching, atau keputusan pada item yang macet di level CS.",
+    href: "/dashboard/approvals",
+    cta: "Buka Chat Review Center",
+  },
+  {
+    step: "4",
+    title: "Berikan Arahan dan Next Action",
+    description:
+      "Akhiri dengan arahan yang jelas: lead mana yang harus dikejar, follow-up mana yang harus dibersihkan, dan next action apa yang harus dipegang CS.",
+    href: "/dashboard/notifications",
+    cta: "Kembali ke Alert Center",
   },
 ] as const;
 
 const MANAGER_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Buka Chat Review Center",
+    title: "Lihat Progress Prospect CS",
     description:
-      "Mulai dari review center untuk melihat chat yang macet, butuh coaching, atau menunggu approval manusia.",
-    href: "/dashboard/approvals",
-    cta: "Buka Chat Review Center",
-  },
-  {
-    step: "2",
-    title: "Baca Manager Insights",
-    description:
-      "Pantau discipline by team, coaching priority, dan boundary alert supaya manager tahu tim mana yang mulai bocor.",
+      "Mulai dari Manager Insights untuk melihat kesehatan tim dan prospect CS yang sedang aktif atau mulai melambat.",
     href: "/dashboard/manager-insights",
     cta: "Buka Manager Insights",
   },
   {
-    step: "3",
-    title: "Rapikan Lead Penting",
+    step: "2",
+    title: "Lihat Jawaban yang Sudah Dikirim CS",
     description:
-      "Turun ke Lead Management untuk memastikan lead aktif, hot lead, dan stage penting tidak tertinggal atau salah arah.",
-    href: "/dashboard/crm",
-    cta: "Buka Lead Management",
+      "Masuk ke Chat Review Center untuk membaca jawaban, draft, dan percakapan yang sudah dikirim atau masih butuh dilihat ulang.",
+    href: "/dashboard/approvals",
+    cta: "Buka Chat Review Center",
+  },
+  {
+    step: "3",
+    title: "Analisis Kualitas Jawaban CS",
+    description:
+      "Fokuskan review pada akurasi, kelengkapan, tone, dan kepatuhan jawaban sebelum memutuskan apakah perlu diperbaiki.",
+    href: "/dashboard/approvals",
+    cta: "Review Jawaban CS",
   },
   {
     step: "4",
-    title: "Tindak Alert Bila Perlu",
+    title: "Kirim Feedback ke CS",
     description:
-      "Kalau sudah cukup jelas, cek Alert Center untuk sinyal operasional yang perlu keputusan atau koordinasi lebih lanjut.",
-    href: "/dashboard/notifications",
-    cta: "Buka Alert Center",
+      "Kalau jawaban belum sesuai standar, kirim feedback atau coaching note ke CS supaya follow-up berikutnya lebih rapi.",
+    href: "/dashboard/approvals",
+    cta: "Kirim Feedback",
   },
 ] as const;
 
@@ -150,69 +157,141 @@ const SUPERADMIN_WORKFLOW_STEPS = [
   },
 ] as const;
 
-function buildRoleTasks(role?: string) {
-  const common = [
-    {
-      title: "Saya mau input chat baru",
-      description: "Masuk ke Lead Capture untuk upload file atau paste chat manual.",
-      href: "/dashboard/upload",
-    },
-    {
-      title: "Saya mau lihat lead yang harus dikejar",
-      description: "Masuk ke Lead Management untuk membaca lead yang butuh tindakan, overdue, atau perlu sinkronisasi.",
-      href: "/dashboard/crm",
-    },
-  ];
+const ROLE_FEATURE_SETS: readonly RoleFeatureSet[] = [
+  {
+    roleKey: "sales",
+    label: "CS",
+    title: "Menjawab nasabah dan menjaga follow-up tetap hidup",
+    summary:
+      "Role ini fokus ke eksekusi chat harian, bantuan AI, progress prospect, dan follow-up ke nasabah.",
+    items: [
+      "Menjawab pertanyaan nasabah dengan bantuan AI.",
+      "Membuka conversation, memilih draft, lalu mengirim jawaban.",
+      "Melihat progress prospect dan lead yang sedang aktif.",
+      "Menerima notifikasi follow-up bila ada customer yang harus disentuh lagi.",
+    ],
+  },
+  {
+    roleKey: "manager",
+    label: "Admin",
+    title: "Mengecek kualitas jawaban CS sebelum dibiarkan jalan sendiri",
+    summary:
+      "Role ini dipakai reviewer untuk membaca progress prospect CS, menilai kualitas jawaban, lalu mengirim feedback.",
+    items: [
+      "Melihat progress prospect CS yang aktif atau mulai melambat.",
+      "Membaca daftar jawaban CS yang sudah dikirim ke nasabah.",
+      "Menganalisis akurasi, tone, kelengkapan, dan kepatuhan jawaban.",
+      "Mengirim feedback atau coaching note ke CS untuk perbaikan.",
+    ],
+  },
+  {
+    roleKey: "head",
+    label: "Head",
+    title: "Membaca follow-up tim dan menekan area yang mulai bocor",
+    summary:
+      "Role ini dipakai untuk oversight follow-up sales, identifikasi prospect berisiko, lalu memberi arahan next action.",
+    items: [
+      "Menganalisis follow-up tiap sales dari alert dan worklist tim.",
+      "Mengidentifikasi prospect CS yang kurang, lambat, atau berisiko.",
+      "Follow-up ke CS bila eksekusi mulai macet atau arahnya salah.",
+      "Memberi arahan, prioritas, dan next action yang harus dipegang tim.",
+    ],
+  },
+] as const;
 
-  if (isManagerLike(role) && !isAdminLike(role)) {
+function getRoleFeatureHighlight(role?: string): RoleFeatureSet["roleKey"] {
+  if (isOwnerLike(role) || isAdminLike(role)) {
+    return "head";
+  }
+  if (isManagerLike(role)) {
+    return "manager";
+  }
+  return "sales";
+}
+
+function buildRoleTasks(role?: string) {
+  if (isOwnerLike(role)) {
     return [
-      ...common,
       {
-        title: "Saya mau review percakapan tim",
-        description: "Masuk ke Chat Review Center untuk coaching case, approval, dan bottleneck percakapan tim.",
-        href: "/dashboard/approvals",
+        title: "Saya mau baca health operasional",
+        description: "Masuk ke Ops Dashboard untuk melihat KPI, tekanan lapangan, dan anomali lintas tim.",
+        href: "/dashboard/kpi",
       },
       {
-        title: "Saya mau lihat disiplin tim",
-        description: "Buka Manager Insights untuk membaca stale lead, coaching priority, dan boundary alert.",
-        href: "/dashboard/manager-insights",
+        title: "Saya mau lihat pola objection lapangan",
+        description: "Buka Chat Insight untuk membaca pola keberatan customer dan sinyal yang perlu diterjemahkan jadi intervensi.",
+        href: "/dashboard/marketing",
+      },
+      {
+        title: "Saya mau verifikasi eksekusi di level lead",
+        description: "Turun ke Lead Management atau Action Center saat perlu melihat konteks operasional yang spesifik.",
+        href: "/dashboard/crm",
       },
     ];
-  }
-
-  if (canAccessQueueAndActionCenter(role)) {
-    common.splice(1, 0, {
-      title: "Saya mau balas customer",
-      description: "Masuk ke Queue, buka detail conversation, lalu jalankan AI analysis dan draft reply.",
-      href: "/dashboard/sales",
-    });
-  }
-
-  if (canAccessQueueAndActionCenter(role)) {
-    common.push({
-      title: "Saya mau lihat prioritas harian",
-      description: "Masuk ke Action Center untuk melihat overdue follow-up, hot lead, dan task harian yang harus dibersihkan dulu.",
-      href: "/dashboard/follow-up",
-    });
   }
 
   if (isAdminLike(role)) {
     return [
-      ...common,
       {
-        title: "Saya mau lihat kesehatan tim",
-        description: "Buka ops dashboard untuk memantau KPI operasional, alert, dan tekanan harian tim.",
-        href: "/dashboard/kpi",
+        title: "Saya mau cek follow-up per sales",
+        description: "Masuk ke Alert Center untuk melihat follow-up siapa yang mulai overdue, macet, atau belum disentuh.",
+        href: "/dashboard/notifications",
       },
       {
-        title: "Saya mau lihat pola objection",
-        description: "Buka chat insight untuk membaca objection trend dan sinyal percakapan yang perlu ditindak.",
-        href: "/dashboard/marketing",
+        title: "Saya mau lihat lead yang paling riskan",
+        description: "Buka Lead Management untuk membaca prospect yang bocor, panas, atau butuh intervensi lebih dulu.",
+        href: "/dashboard/crm",
+      },
+      {
+        title: "Saya mau follow-up ke CS",
+        description: "Masuk ke Chat Review Center untuk memberi arahan, tekanan, atau keputusan pada percakapan yang macet.",
+        href: "/dashboard/approvals",
       },
     ];
   }
 
-  return common;
+  if (isManagerLike(role)) {
+      return [
+      {
+        title: "Saya mau lihat progress prospect CS",
+        description: "Buka Manager Insights untuk membaca progress prospect, discipline tim, dan sinyal yang mulai bocor.",
+        href: "/dashboard/manager-insights",
+      },
+      {
+        title: "Saya mau cek jawaban CS",
+        description: "Masuk ke Chat Review Center untuk membaca jawaban CS, approval, dan bottleneck percakapan tim.",
+        href: "/dashboard/approvals",
+      },
+      {
+        title: "Saya mau kirim feedback ke CS",
+        description: "Buka conversation review untuk menulis coaching note, rework, atau keputusan review yang jelas.",
+        href: "/dashboard/approvals",
+      },
+    ];
+  }
+
+  return [
+    {
+      title: "Saya mau input chat baru",
+      description: "Masuk ke Lead Capture untuk upload file atau paste chat manual sebelum diproses jadi conversation kerja.",
+      href: "/dashboard/upload",
+    },
+    {
+      title: "Saya mau balas customer",
+      description: "Masuk ke Queue, buka detail conversation, lalu jalankan AI analysis dan draft reply.",
+      href: "/dashboard/sales",
+    },
+    {
+      title: "Saya mau lihat progress prospect",
+      description: "Masuk ke Lead Management untuk membaca lead aktif, status panasnya, dan konteks follow-up berikutnya.",
+      href: "/dashboard/crm",
+    },
+    {
+      title: "Saya mau lihat prioritas follow-up",
+      description: "Masuk ke Action Center untuk melihat overdue follow-up, hot lead, dan task harian yang harus dibereskan dulu.",
+      href: "/dashboard/follow-up",
+    },
+  ];
 }
 
 function buildWorkflowSteps(role?: string) {
@@ -245,9 +324,9 @@ function buildRoleStartCopy(role?: string) {
   if (isAdminLike(role)) {
     return {
       eyebrow: "Head flow",
-      title: "Mulai dari alert, review bottleneck, lalu rapikan lead dan kontrol akses",
+      title: "Mulai dari follow-up tiap sales, lalu turun ke lead yang paling riskan",
       description:
-        "Sebagai head, workspace ini paling efektif saat Anda memakai Alert Center, Chat Review Center, KPI Dashboard, dan Lead Management untuk melihat titik macet tim tanpa masuk ke Queue atau Action Center harian.",
+        "Sebagai head, alur utamanya adalah membaca follow-up tiap sales dari Alert Center, identifikasi prospect yang kurang atau berisiko, lalu follow-up ke CS dengan arahan next action yang jelas.",
       primaryHref: "/dashboard/notifications",
       primaryLabel: "Buka Alert Center",
       secondaryHref: "/dashboard/approvals",
@@ -257,26 +336,26 @@ function buildRoleStartCopy(role?: string) {
 
   if (isManagerLike(role)) {
     return {
-      eyebrow: "Manager flow",
-      title: "Mulai dari review center, lalu turun ke insight tim dan lead",
+      eyebrow: "Admin flow",
+      title: "Mulai dari progress prospect CS, lalu cek kualitas jawaban",
       description:
-        "Sebagai manager, fokus utama sekarang ada di Chat Review Center, Manager Insights, dan Lead Management. Queue dan Action Center tidak dipakai lagi di role ini.",
-      primaryHref: "/dashboard/approvals",
-      primaryLabel: "Buka Chat Review Center",
+        "Sebagai admin reviewer, alurnya adalah melihat progress prospect CS, membaca jawaban yang sudah dikirim, lalu memberi feedback kalau kualitas jawaban belum sesuai.",
+      primaryHref: "/dashboard/manager-insights",
+      primaryLabel: "Buka Manager Insights",
       secondaryHref: "/dashboard/manager-insights",
-      secondaryLabel: "Buka Manager Insights",
+      secondaryLabel: "Lihat Progress Prospect",
     };
   }
 
   return {
-    eyebrow: "Sales flow",
-    title: "Mulai dari queue, lalu ubah jadi lead dan tindakan harian",
+    eyebrow: "CS flow",
+    title: "Mulai dari chat masuk, jawab dengan bantuan AI, lalu lanjut follow-up",
     description:
-      "Sebagai sales, alur kerja paling masuk akal tetap dimulai dari Lead Capture atau Queue: review percakapan, analisis, lalu lanjutkan ke Action Center dan Lead Management.",
-    primaryHref: "/dashboard/upload",
-    primaryLabel: "Mulai Lead Capture",
+      "Sebagai CS, alur kerja utamanya adalah menerima pertanyaan nasabah, memakai AI untuk membantu membuat jawaban, lalu memantau progress prospect dan follow-up berikutnya.",
+    primaryHref: "/dashboard/sales",
+    primaryLabel: "Buka Queue",
     secondaryHref: "/dashboard/sales",
-    secondaryLabel: "Lihat Queue",
+    secondaryLabel: "Buka Conversation",
   };
 }
 
@@ -290,6 +369,7 @@ export function RoleBasedStartGuide({
   const roleTasks = buildRoleTasks(currentUser?.role);
   const workflowSteps = buildWorkflowSteps(currentUser?.role);
   const roleStartCopy = buildRoleStartCopy(currentUser?.role);
+  const highlightedRole = getRoleFeatureHighlight(currentUser?.role);
 
   return (
     <section className="space-y-6">
@@ -355,7 +435,72 @@ export function RoleBasedStartGuide({
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Saya Mau...
+              Fitur Setiap Role
+            </p>
+            <div className="mt-5 grid gap-4 lg:grid-cols-3">
+              {ROLE_FEATURE_SETS.map((featureSet) => {
+                const isHighlighted = featureSet.roleKey === highlightedRole;
+
+                return (
+                  <article
+                    key={featureSet.roleKey}
+                    className={`rounded-[24px] border p-5 transition ${
+                      isHighlighted
+                        ? "border-slate-900 bg-slate-950 text-white shadow-[0_16px_32px_rgba(15,23,42,0.16)]"
+                        : "border-slate-200 bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span
+                        className={`text-xs font-semibold uppercase tracking-[0.18em] ${
+                          isHighlighted ? "text-slate-300" : "text-slate-500"
+                        }`}
+                      >
+                        {featureSet.label}
+                      </span>
+                      {isHighlighted ? (
+                        <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+                          Role aktif
+                        </span>
+                      ) : null}
+                    </div>
+                    <h3
+                      className={`mt-4 text-base font-semibold ${
+                        isHighlighted ? "text-white" : "text-slate-950"
+                      }`}
+                    >
+                      {featureSet.title}
+                    </h3>
+                    <p
+                      className={`mt-2 text-sm leading-6 ${
+                        isHighlighted ? "text-slate-300" : "text-slate-600"
+                      }`}
+                    >
+                      {featureSet.summary}
+                    </p>
+                    <div className="mt-4 space-y-2">
+                      {featureSet.items.map((item) => (
+                        <p
+                          key={item}
+                          className={`rounded-2xl border px-3.5 py-3 text-sm leading-6 ${
+                            isHighlighted
+                              ? "border-white/10 bg-white/5 text-slate-100"
+                              : "border-slate-200 bg-white text-slate-700"
+                          }`}
+                        >
+                          {item}
+                        </p>
+                      ))}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </article>
+
+          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              Shortcut Sesuai Role
             </p>
             <div className="mt-5 space-y-4">
               {roleTasks.map((task) => (
@@ -373,13 +518,10 @@ export function RoleBasedStartGuide({
                 </Link>
               ))}
             </div>
-          </article>
-
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Cara Baca Menu
-            </p>
-            <div className="mt-5 space-y-3 text-sm leading-7 text-slate-600">
+            <div className="mt-6 space-y-3 border-t border-slate-200 pt-6 text-sm leading-7 text-slate-600">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Cara Baca Menu
+              </p>
               <p>
                 <span className="font-semibold text-slate-950">Queue</span>:
                 tempat eksekusi prioritas harian, bukan arsip semua percakapan.

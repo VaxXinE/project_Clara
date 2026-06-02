@@ -579,7 +579,7 @@ export default function SalesInboxPage() {
                       </p>
                     </div>
 
-                    <div className="mt-5 space-y-4">
+                    <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {section.items.map((item) => {
                         const extraction = item.latest_ai_extraction;
                         const canAnalyze = extraction === null;
@@ -594,13 +594,15 @@ export default function SalesInboxPage() {
                             key={item.conversation_id}
                             className="clara-card rounded-[30px] p-5"
                           >
-                            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                              <div className="min-w-0 flex-1">
+                            <div className="flex h-full flex-col gap-4">
+                              <div className="min-w-0 space-y-4">
                                 <div className="flex flex-wrap items-center gap-2.5">
-                                  <h3 className="truncate text-lg font-semibold text-slate-950">
+                                  <h3 className="line-clamp-2 min-h-[3.5rem] text-lg font-semibold leading-7 text-slate-950">
                                     {item.title}
                                   </h3>
+                                </div>
 
+                                <div className="flex flex-wrap gap-2">
                                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                                     {section.config.label}
                                   </span>
@@ -638,111 +640,92 @@ export default function SalesInboxPage() {
                                   )}
                                 </div>
 
-                                <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
+                                <p className="min-h-[6rem] text-sm leading-6 text-slate-600 line-clamp-4">
                                   {item.latest_message
                                     ? item.latest_message.message_text
                                     : "Belum ada pesan."}
                                 </p>
 
-                                <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
-                                  {shouldShowOwnership && item.sales_owner_name ? (
-                                    <>
+                                <div className="grid gap-2 text-xs text-slate-500">
+                                  <div className="flex flex-wrap gap-x-2 gap-y-1">
+                                    {shouldShowOwnership ? (
                                       <span>
                                         Owner:{" "}
                                         <span className="font-semibold text-slate-700">
-                                          {item.sales_owner_name}
+                                          {item.sales_owner_name ?? "Belum ada owner"}
                                         </span>
                                       </span>
-                                      <span>&bull;</span>
-                                    </>
-                                  ) : null}
-                                  <span>
-                                    Pesan terakhir: {formatDateTime(item.last_message_at)}
-                                  </span>
-                                  <span>&bull;</span>
-                                  <span>Priority: {item.priority_score}</span>
-                                  <span>&bull;</span>
-                                  <span>{formatStatusLabel(item.ui_status)}</span>
-                                  {archiveScope === "all" && (
-                                    <>
-                                      <span>&bull;</span>
+                                    ) : null}
+                                    <span>Pesan terakhir: {formatDateTime(item.last_message_at)}</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-x-2 gap-y-1">
+                                    <span>Priority: {item.priority_score}</span>
+                                    <span>Status: {formatStatusLabel(item.ui_status)}</span>
+                                    {archiveScope === "all" ? (
                                       <span>{item.is_archived ? "Arsip" : "Aktif"}</span>
-                                    </>
-                                  )}
-                                </div>
-
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  {canAnalyze ? (
-                                    <button
-                                      type="button"
-                                      disabled={isActing}
-                                      onClick={() => {
-                                        void handleAnalyze(item.conversation_id);
-                                      }}
-                                      className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
-                                    >
-                                      {isActing ? "Analyzing..." : "Analyze"}
-                                    </button>
-                                  ) : null}
-
-                                  {canGenerateDraft ? (
-                                    <button
-                                      type="button"
-                                      disabled={isActing}
-                                      onClick={() => {
-                                        void handleGenerateDraft(item.conversation_id);
-                                      }}
-                                      className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
-                                    >
-                                      {isActing ? "Generating..." : "Generate Draft"}
-                                    </button>
-                                  ) : null}
-
-                                  <Link
-                                    href={`/dashboard/sales/conversations/${item.conversation_id}`}
-                                    className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
-                                  >
-                                    Buka Chat
-                                  </Link>
+                                    ) : null}
+                                  </div>
                                 </div>
                               </div>
 
-                              <div className="clara-card-soft w-full rounded-[24px] p-4 md:w-80">
+                              <div className="clara-card-soft rounded-[24px] p-4">
                                 <p className="clara-kicker text-[11px]">
                                   Langkah berikutnya
                                 </p>
-                                <p className="mt-3 text-sm leading-6 text-slate-700">
+                                <p className="mt-2 min-h-[5.5rem] text-sm leading-6 text-slate-700 line-clamp-4">
                                   {extraction?.next_best_action ??
                                     "Belum dianalisis. Jalankan AI analysis dulu."}
                                 </p>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                    {formatStatusLabel(item.ui_status)}
+                                  </span>
+                                  {shouldShowOwnership && item.sales_owner_name ? (
+                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                      {item.sales_owner_name}
+                                    </span>
+                                  ) : null}
+                                  {archiveScope === "all" ? (
+                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                      {item.is_archived ? "Arsip" : "Aktif"}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
 
-                                <p className="clara-kicker mt-5 text-[11px]">
-                                  Status balasan
-                                </p>
-                                <p className="mt-2 text-sm font-medium text-slate-800">
-                                  {formatStatusLabel(item.ui_status)}
-                                </p>
-
-                                {shouldShowOwnership ? (
-                                  <>
-                                    <p className="clara-kicker mt-5 text-[11px]">
-                                      Kepemilikan
-                                    </p>
-                                    <p className="mt-2 text-sm font-medium text-slate-800">
-                                      {item.sales_owner_name ?? "Belum ada owner"}
-                                    </p>
-                                    <p className="mt-1 text-xs text-slate-500">
-                                      Visible untuk {getRoleDisplayLabel(currentUser?.role)}
-                                    </p>
-                                  </>
+                              <div className="mt-auto flex flex-wrap gap-2 pt-1">
+                                {canAnalyze ? (
+                                  <button
+                                    type="button"
+                                    disabled={isActing}
+                                    onClick={() => {
+                                      void handleAnalyze(item.conversation_id);
+                                    }}
+                                    className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
+                                  >
+                                    {isActing ? "Analyzing..." : "Analyze"}
+                                  </button>
                                 ) : null}
 
-                                <p className="clara-kicker mt-5 text-[11px]">
-                                  Status arsip
-                                </p>
-                                <p className="mt-2 text-sm font-medium text-slate-800">
-                                  {item.is_archived ? "Archived otomatis" : "Aktif"}
-                                </p>
+                                {canGenerateDraft ? (
+                                  <button
+                                    type="button"
+                                    disabled={isActing}
+                                    onClick={() => {
+                                      void handleGenerateDraft(item.conversation_id);
+                                    }}
+                                    className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
+                                  >
+                                    {isActing ? "Generating..." : "Generate Draft"}
+                                  </button>
+                                ) : null}
+
+                                <Link
+                                  href={`/dashboard/sales/conversations/${item.conversation_id}`}
+                                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
+                                >
+                                  Buka Chat
+                                </Link>
                               </div>
                             </div>
                           </article>

@@ -63,12 +63,17 @@ class ChatReviewCaseItem(BaseModel):
     submitted_by_user_name: str | None
     reviewer_user_id: UUID | None
     reviewer_user_name: str | None
+    workflow_scope: str
+    feedback_status: str
     status: str
     review_label: str
     review_summary: str | None
     coaching_focus: str | None
     recommended_action: str | None
     reviewed_at: datetime | None
+    feedback_sent_at: datetime | None
+    feedback_acknowledged_at: datetime | None
+    feedback_resolved_at: datetime | None
     created_at: datetime
     updated_at: datetime
     notes: list[ChatReviewNoteItem]
@@ -357,6 +362,12 @@ class OpsNotificationItem(BaseModel):
     user_id: UUID | None
     source_type: str
     source_key: str
+    workflow_scope: str
+    owner_role: str
+    target_role: str
+    lead_id: UUID | None = None
+    lead_name: str | None = None
+    sales_owner_name: str | None = None
     severity: str
     title: str
     body: str
