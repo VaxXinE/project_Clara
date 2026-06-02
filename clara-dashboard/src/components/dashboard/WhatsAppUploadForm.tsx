@@ -100,6 +100,12 @@ export function WhatsAppUploadForm() {
     setErrorMessage("");
     setDetectionMessage("");
 
+    const normalizedConversationTitle = conversationTitle.trim();
+    if (normalizedConversationTitle.length < 2) {
+      setErrorMessage("Nama customer wajib diisi untuk judul conversation.");
+      return;
+    }
+
     const channelConfig = channelOptions.find(
       (item) => item.key === selectedChannel,
     );
@@ -125,6 +131,7 @@ export function WhatsAppUploadForm() {
 
         const formData = new FormData();
         formData.append("file", selectedFile);
+        formData.append("title", normalizedConversationTitle);
         result = await apiFetch<UploadConversationResponse>(
           channelConfig?.file_endpoint ?? "/upload/whatsapp-txt",
           {
@@ -145,7 +152,7 @@ export function WhatsAppUploadForm() {
             method: "POST",
             body: {
               raw_text: pastedText,
-              title: conversationTitle.trim() || null,
+              title: normalizedConversationTitle,
             },
           },
         );
@@ -241,6 +248,28 @@ export function WhatsAppUploadForm() {
       </div>
 
       <div>
+        <label
+          htmlFor="conversationTitle"
+          className="text-sm font-semibold text-slate-900"
+        >
+          Nama Customer / Judul Conversation
+        </label>
+        <input
+          id="conversationTitle"
+          type="text"
+          value={conversationTitle}
+          onChange={(event) => {
+            setConversationTitle(event.target.value);
+          }}
+          placeholder="Contoh: Rina Pratama"
+          className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+        />
+        <p className="mt-2 text-xs text-slate-500">
+          Wajib diisi dengan nama customer. Nilai ini akan dipakai sebagai judul conversation dan nama awal customer di Clara.
+        </p>
+      </div>
+
+      <div>
         <label htmlFor="whatsappFile" className="clara-label">
           Input Mode
         </label>
@@ -289,24 +318,6 @@ export function WhatsAppUploadForm() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="conversationTitle"
-              className="text-sm font-semibold text-slate-900"
-            >
-              Judul Conversation (opsional)
-            </label>
-            <input
-              id="conversationTitle"
-              type="text"
-              value={conversationTitle}
-              onChange={(event) => {
-                setConversationTitle(event.target.value);
-              }}
-              placeholder="Contoh: Chat Leoni Telegram"
-              className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
-            />
-          </div>
           <div>
             <label
               htmlFor="pastedText"
@@ -369,6 +380,7 @@ export function WhatsAppUploadForm() {
         disabled={
           isUploading ||
           channelOptions.length === 0 ||
+          conversationTitle.trim().length < 2 ||
           (inputMode === "file"
             ? !selectedFile
             : pastedText.trim().length === 0)

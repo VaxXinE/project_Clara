@@ -68,6 +68,8 @@ def customer_profile_load_only_columns(db: Session) -> list:
         "email": CustomerProfile.email,
         "address": CustomerProfile.address,
         "status": CustomerProfile.status,
+        "temperature": CustomerProfile.temperature,
+        "temperature_source": CustomerProfile.temperature_source,
         "identity_confidence": CustomerProfile.identity_confidence,
         "match_strategy": CustomerProfile.match_strategy,
         "merge_notes": CustomerProfile.merge_notes,
@@ -107,6 +109,16 @@ def _get_profile_status(profile: CustomerProfile) -> str:
     return value if isinstance(value, str) and value.strip() else "active"
 
 
+def _get_profile_temperature(profile: CustomerProfile) -> str:
+    value = _get_loaded_profile_value(profile, "temperature")
+    return normalize_customer_temperature(value if isinstance(value, str) else None)
+
+
+def _get_profile_temperature_source(profile: CustomerProfile) -> str:
+    value = _get_loaded_profile_value(profile, "temperature_source")
+    return value if isinstance(value, str) and value.strip() else "auto"
+
+
 def _get_profile_identity_confidence(profile: CustomerProfile) -> float:
     value = _get_loaded_profile_value(profile, "identity_confidence")
     return float(value) if isinstance(value, (int, float)) else 0.92
@@ -138,6 +150,7 @@ def _require_customer_profile_contact_fields(db: Session) -> None:
 
 
 ALLOWED_ACCOUNT_CATEGORIES = {"mini", "reguler", "unknown"}
+ALLOWED_CUSTOMER_TEMPERATURES = {"hot", "warm", "cold", "unknown"}
 AI_AUTOFILL_CONFIDENCE_THRESHOLD = 0.86
 GENERIC_PROFILE_NAMES = {
     "unknown customer",
@@ -223,6 +236,40 @@ def normalize_ai_display_name(value: str | None) -> str | None:
 def is_placeholder_profile_name(value: str | None) -> bool:
     normalized = (value or "").strip().lower()
     return normalized in GENERIC_PROFILE_NAMES or normalized.startswith("unknown")
+
+
+def normalize_customer_temperature(value: str | None) -> str:
+    normalized = (value or "").strip().lower()
+    return normalized if normalized in ALLOWED_CUSTOMER_TEMPERATURES else "unknown"
+
+
+def derive_customer_temperature_from_leads(leads: list[Lead]) -> str:
+    temperatures = {normalize_customer_temperature(lead.lead_temperature) for lead in leads}
+    if "hot" in temperatures:
+        return "hot"
+    if "warm" in temperatures:
+        return "warm"
+    if "cold" in temperatures:
+        return "cold"
+    return "unknown"
+
+
+def sync_customer_profile_temperature(
+    db: Session,
+    *,
+    profile: CustomerProfile,
+    source: str = "auto",
+) -> CustomerProfile:
+    if profile.temperature_source == "manual":
+        return profile
+
+    next_temperature = derive_customer_temperature_from_leads(list(profile.leads))
+    if profile.temperature != next_temperature or profile.temperature_source != source:
+        profile.temperature = next_temperature
+        profile.temperature_source = source
+        db.add(profile)
+        db.flush()
+    return profile
 
 
 def compute_identity_metadata(
@@ -358,6 +405,8 @@ def ensure_customer_profile_for_lead(
             assigned_user_id=lead.assigned_user_id,
             display_name=display_name,
             status="active",
+            temperature=normalize_customer_temperature(lead.lead_temperature),
+            temperature_source="auto",
             canonical_key=canonical_key,
             identity_confidence=identity_confidence,
             match_strategy=match_strategy,
@@ -384,6 +433,7 @@ def ensure_customer_profile_for_lead(
     lead.customer_profile_id = existing_profile.id
     db.add(lead)
     db.flush()
+    sync_customer_profile_temperature(db=db, profile=existing_profile)
     return existing_profile
 
 
@@ -441,6 +491,8 @@ def build_customer_profile_summary(
         "email": _get_profile_email(profile),
         "address": _get_profile_address(profile),
         "status": _get_profile_status(profile),
+        "temperature": _get_profile_temperature(profile),
+        "temperature_source": _get_profile_temperature_source(profile),
         "canonical_key": profile.canonical_key,
         "identity_confidence": _get_profile_identity_confidence(profile),
         "match_strategy": _get_profile_match_strategy(profile),
@@ -679,6 +731,7 @@ def update_customer_profile_for_user(
     address: str | None,
     status_value: str,
     account_category: str | None,
+    temperature: str | None,
     current_user: User,
 ) -> dict:
     _require_customer_profile_contact_fields(db)
@@ -700,6 +753,7 @@ def update_customer_profile_for_user(
     normalized_address = normalize_optional_text(address)
     normalized_status = status_value.strip().lower()
     normalized_account_category = normalize_account_category(account_category)
+    normalized_temperature = normalize_customer_temperature(temperature)
 
     if normalized_status not in ALLOWED_CUSTOMER_PROFILE_STATUSES:
         raise HTTPException(
@@ -713,6 +767,12 @@ def update_customer_profile_for_user(
             detail="Kategori akun customer profile tidak valid.",
         )
 
+    if normalized_temperature not in ALLOWED_CUSTOMER_TEMPERATURES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Temperature customer profile tidak valid.",
+        )
+
     canonical_key = normalize_customer_identity_name(normalized_name)
     identity_confidence, _ = compute_identity_metadata(
         display_name=normalized_name,
@@ -724,6 +784,8 @@ def update_customer_profile_for_user(
     profile.email = normalized_email
     profile.address = normalized_address
     profile.status = normalized_status
+    profile.temperature = normalized_temperature
+    profile.temperature_source = "manual"
     profile.canonical_key = canonical_key
     profile.identity_confidence = max(profile.identity_confidence, identity_confidence)
     profile.match_strategy = "manual_profile_update"
@@ -877,6 +939,15 @@ def merge_customer_profiles(
         target_profile.address = source_profile.address
     if target_profile.status != "active" and source_profile.status == "active":
         target_profile.status = "active"
+    if target_profile.temperature_source != "manual":
+        if source_profile.temperature_source == "manual":
+            target_profile.temperature = source_profile.temperature
+            target_profile.temperature_source = "manual"
+        else:
+            target_profile.temperature = derive_customer_temperature_from_leads(
+                [*target_profile.leads, *source_leads]
+            )
+            target_profile.temperature_source = "auto"
 
     target_profile.identity_confidence = max(
         target_profile.identity_confidence,
@@ -904,6 +975,18 @@ def merge_customer_profiles(
         customer_profile_id=target_profile.id,
         current_user=current_user,
     )
+    if refreshed_target_profile.temperature_source != "manual":
+        sync_customer_profile_temperature(
+            db=db,
+            profile=refreshed_target_profile,
+        )
+        db.commit()
+        db.expire_all()
+        refreshed_target_profile = get_customer_profile_model_for_user(
+            db=db,
+            customer_profile_id=target_profile.id,
+            current_user=current_user,
+        )
 
     accessible_user_ids = get_accessible_sales_user_ids(
         db=db,

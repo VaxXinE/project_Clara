@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -30,7 +30,7 @@ MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 
 class UploadRawChatRequest(BaseModel):
     raw_text: str
-    title: str | None = None
+    title: str
 
 
 def detect_channel_candidates(raw_text: str) -> list[ChannelDetectCandidate]:
@@ -80,6 +80,16 @@ def ensure_text_size_limit(raw_text: str) -> None:
         )
 
 
+def normalize_conversation_title_or_raise(raw_title: str | None) -> str:
+    normalized_title = (raw_title or "").strip()
+    if len(normalized_title) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Judul conversation wajib diisi dengan nama customer.",
+        )
+    return normalized_title
+
+
 def create_conversation_from_messages(
     *,
     db: Session,
@@ -125,7 +135,7 @@ def create_conversation_from_messages(
     ensure_conversation_lead(
         db=db,
         conversation=conversation,
-        preferred_name=customer_messages[0].sender_name if customer_messages else None,
+        preferred_name=title,
     )
     db.commit()
     db.refresh(conversation)
@@ -164,11 +174,13 @@ def detect_upload_channel(
 @router.post("/whatsapp-txt", status_code=status.HTTP_201_CREATED)
 async def upload_whatsapp_txt(
     request: Request,
+    title: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
+    normalized_title = normalize_conversation_title_or_raise(title)
 
     if not file.filename or not file.filename.endswith(".txt"):
         raise HTTPException(
@@ -200,12 +212,10 @@ async def upload_whatsapp_txt(
             detail=str(exc),
         ) from exc
 
-    title = f"WhatsApp Chat {parsed_messages[0].message_timestamp.date().isoformat()}"
-
     conversation = create_conversation_from_messages(
         db=db,
         current_user=current_user,
-        title=title,
+        title=normalized_title,
         source="whatsapp_txt",
         raw_filename=file.filename,
         raw_text=raw_text,
@@ -234,11 +244,13 @@ async def upload_whatsapp_txt(
 @router.post("/telegram-txt", status_code=status.HTTP_201_CREATED)
 async def upload_telegram_txt(
     request: Request,
+    title: str = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
+    normalized_title = normalize_conversation_title_or_raise(title)
 
     if not file.filename or not file.filename.endswith(".txt"):
         raise HTTPException(
@@ -270,12 +282,10 @@ async def upload_telegram_txt(
             detail=str(exc),
         ) from exc
 
-    title = f"Telegram Chat {parsed_messages[0].message_timestamp.date().isoformat()}"
-
     conversation = create_conversation_from_messages(
         db=db,
         current_user=current_user,
-        title=title,
+        title=normalized_title,
         source="telegram_txt",
         raw_filename=file.filename,
         raw_text=raw_text,
@@ -311,6 +321,7 @@ async def upload_whatsapp_raw_text(
     validate_upload_access(current_user)
 
     raw_text = payload.raw_text.strip()
+    normalized_title = normalize_conversation_title_or_raise(payload.title)
     if not raw_text:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -327,11 +338,10 @@ async def upload_whatsapp_raw_text(
             detail=str(exc),
         ) from exc
 
-    default_title = f"WhatsApp Chat {parsed_messages[0].message_timestamp.date().isoformat()}"
     conversation = create_conversation_from_messages(
         db=db,
         current_user=current_user,
-        title=payload.title.strip() if payload.title and payload.title.strip() else default_title,
+        title=normalized_title,
         source="whatsapp_txt",
         raw_filename=None,
         raw_text=raw_text,
@@ -364,6 +374,7 @@ async def upload_telegram_raw_text(
     validate_upload_access(current_user)
 
     raw_text = payload.raw_text.strip()
+    normalized_title = normalize_conversation_title_or_raise(payload.title)
     if not raw_text:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -380,11 +391,10 @@ async def upload_telegram_raw_text(
             detail=str(exc),
         ) from exc
 
-    default_title = f"Telegram Chat {parsed_messages[0].message_timestamp.date().isoformat()}"
     conversation = create_conversation_from_messages(
         db=db,
         current_user=current_user,
-        title=payload.title.strip() if payload.title and payload.title.strip() else default_title,
+        title=normalized_title,
         source="telegram_txt",
         raw_filename=None,
         raw_text=raw_text,

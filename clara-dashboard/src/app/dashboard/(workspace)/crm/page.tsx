@@ -1177,7 +1177,7 @@ function StageQuickSelect({
         aria-haspopup="listbox"
         disabled={disabled}
         onClick={() => setIsOpen((previous) => !previous)}
-        className="flex w-full items-center justify-between rounded-[18px] border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(24,18,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] px-4 py-3 text-left text-sm font-semibold text-[#fff0c9] shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition hover:border-[#f0cb73]/36 disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-between rounded-[18px] border border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(24,18,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] px-4 py-3 text-left text-sm font-semibold text-[#fff8de] shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition hover:border-[#f0cb73]/40 hover:text-[#fffdf5] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span>{STAGE_LABELS[value] ?? value}</span>
         <span
@@ -1191,7 +1191,7 @@ function StageQuickSelect({
       </button>
 
       {isOpen ? (
-        <div className="absolute inset-x-0 z-30 mt-2 rounded-[18px] border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(26,19,14,0.99)_0%,rgba(15,11,8,0.99)_100%)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.42)]">
+        <div className="absolute inset-x-0 z-30 mt-2 rounded-[18px] border border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(28,20,15,0.99)_0%,rgba(17,12,9,0.99)_100%)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.42)]">
           <ul
             role="listbox"
             aria-label="Stage lead"
@@ -1214,13 +1214,13 @@ function StageQuickSelect({
                     }}
                     className={`flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-sm transition ${
                       isSelected
-                        ? "bg-[#f0cb73] text-[#1a120b]"
-                        : "text-[#f6ddb0] hover:bg-[#2b2013] hover:text-[#fff0c9]"
+                        ? "bg-[#f0cb73] text-[#130d07]"
+                        : "text-[#fff2cf] hover:bg-[#3a2917] hover:text-[#fffdf5]"
                     }`}
                   >
                     <span>{STAGE_LABELS[stage]}</span>
                     {isSelected ? (
-                      <span className="text-xs font-bold uppercase tracking-[0.18em]">
+                      <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#2a1c0e]">
                         Aktif
                       </span>
                     ) : null}

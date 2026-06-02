@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -84,10 +91,7 @@ function formatTimelineValue(value: string | null): string {
     return "-";
   }
 
-  if (
-    value.includes("T") &&
-    (value.endsWith("Z") || value.includes("+"))
-  ) {
+  if (value.includes("T") && (value.endsWith("Z") || value.includes("+"))) {
     return formatDateTime(value);
   }
 
@@ -124,9 +128,16 @@ function formatAccountCategory(value: string): string {
   }
 }
 
+function formatStageLabel(value: string): string {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function resolveDealStatusInput(
   currentStage: string,
-  explicitDealStatus: string | null | undefined
+  explicitDealStatus: string | null | undefined,
 ): string {
   if (explicitDealStatus && explicitDealStatus !== "open") {
     return explicitDealStatus;
@@ -141,7 +152,7 @@ function resolveDealStatusInput(
 
 function leadNeedsDealMetricsSync(
   currentStage: string,
-  explicitDealStatus: string | null | undefined
+  explicitDealStatus: string | null | undefined,
 ): boolean {
   if (currentStage !== "won" && currentStage !== "lost") {
     return false;
@@ -168,7 +179,8 @@ function buildLeadActionPlan(lead: LeadDetail) {
   if (isLeadOverdue(lead.next_follow_up_at)) {
     items.push({
       condition: "Jika next follow-up sudah overdue",
-      action: "Review conversation terakhir lalu ubah field Next follow-up ke jadwal baru yang pasti akan dikerjakan.",
+      action:
+        "Review conversation terakhir lalu ubah field Next follow-up ke jadwal baru yang pasti akan dikerjakan.",
       detail:
         "Kalau customer sudah tidak responsif, tetap catat hasil terakhir di discipline log. Jangan biarkan lead aktif tanpa tanggal follow-up yang hidup.",
     });
@@ -177,7 +189,8 @@ function buildLeadActionPlan(lead: LeadDetail) {
   if (lead.discipline_summary.compliance_status === "stale_log") {
     items.push({
       condition: "Jika compliance = stale log",
-      action: "Isi Daily Discipline Log baru hari ini dengan aktivitas terbaru yang benar-benar dilakukan.",
+      action:
+        "Isi Daily Discipline Log baru hari ini dengan aktivitas terbaru yang benar-benar dilakukan.",
       detail:
         "Minimal isi result status, objection utama, mood customer, dan next follow-up. Ini dipakai untuk menghidupkan kembali ritme kerja lead ini.",
     });
@@ -186,7 +199,8 @@ function buildLeadActionPlan(lead: LeadDetail) {
   if (lead.discipline_summary.compliance_status === "missing_today_log") {
     items.push({
       condition: "Jika compliance = missing today log",
-      action: "Catat satu aktivitas kerja hari ini walaupun hasilnya masih waiting customer atau no response.",
+      action:
+        "Catat satu aktivitas kerja hari ini walaupun hasilnya masih waiting customer atau no response.",
       detail:
         "Status ini bukan berarti gagal, tapi artinya belum ada bukti aksi hari ini. User harus meninggalkan jejak kerja yang jelas.",
     });
@@ -195,7 +209,8 @@ function buildLeadActionPlan(lead: LeadDetail) {
   if (leadNeedsDealMetricsSync(lead.current_stage, lead.deal?.status ?? null)) {
     items.push({
       condition: "Jika deal metrics belum sinkron",
-      action: "Scroll ke Deal Metrics, sesuaikan deal status dengan kondisi lead saat ini, lalu klik Simpan Deal Metrics.",
+      action:
+        "Scroll ke Deal Metrics, sesuaikan deal status dengan kondisi lead saat ini, lalu klik Simpan Deal Metrics.",
       detail:
         "Ini wajib terutama saat stage sudah `won` atau `lost`. Kalau tidak disinkronkan, dashboard KPI akan membaca data yang salah.",
     });
@@ -204,16 +219,22 @@ function buildLeadActionPlan(lead: LeadDetail) {
   if (!lead.summary?.trim() || !lead.assigned_user_name) {
     items.push({
       condition: "Jika summary atau owner belum rapi",
-      action: "Lengkapi Lead Context: isi summary 2-3 kalimat, pastikan owner benar, dan simpan.",
+      action:
+        "Lengkapi Lead Context: isi summary 2-3 kalimat, pastikan owner benar, dan simpan.",
       detail:
         "Targetnya agar siapa pun yang buka lead ini langsung paham posisi customer tanpa harus baca seluruh riwayat dari nol.",
     });
   }
 
-  if (!lead.tasks.some((task) => task.status === "open" || task.status === "snoozed")) {
+  if (
+    !lead.tasks.some(
+      (task) => task.status === "open" || task.status === "snoozed",
+    )
+  ) {
     items.push({
       condition: "Jika masih ada pekerjaan lanjutan tapi belum ada task",
-      action: "Buat Follow-up Task untuk pekerjaan manual seperti telepon ulang, kirim proposal, atau koordinasi internal.",
+      action:
+        "Buat Follow-up Task untuk pekerjaan manual seperti telepon ulang, kirim proposal, atau koordinasi internal.",
       detail:
         "Jangan hanya simpan di kepala atau notes. Task dipakai supaya pekerjaan berikutnya bisa ditracking dan tidak hilang.",
     });
@@ -222,7 +243,8 @@ function buildLeadActionPlan(lead: LeadDetail) {
   if (!items.length) {
     items.push({
       condition: "Jika tidak ada alarm utama",
-      action: "Cukup cek cepat conversation terakhir lalu lanjut ke lead berikutnya.",
+      action:
+        "Cukup cek cepat conversation terakhir lalu lanjut ke lead berikutnya.",
       detail:
         "Artinya lead ini sudah punya konteks, jadwal, dan jejak kerja yang cukup aman untuk sekarang.",
     });
@@ -242,7 +264,8 @@ export default function LeadDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [isCreatingDisciplineLog, setIsCreatingDisciplineLog] = useState(false);
-  const [isPrefillingDisciplineLog, setIsPrefillingDisciplineLog] = useState(false);
+  const [isPrefillingDisciplineLog, setIsPrefillingDisciplineLog] =
+    useState(false);
   const [isSavingDeal, setIsSavingDeal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -266,17 +289,15 @@ export default function LeadDetailPage() {
   const [taskDescriptionInput, setTaskDescriptionInput] = useState("");
   const [taskDueAtInput, setTaskDueAtInput] = useState("");
   const [disciplineLogDateInput, setDisciplineLogDateInput] = useState(
-    getTodayDateInputValue()
+    getTodayDateInputValue(),
   );
-  const [disciplineActivityTypeInput, setDisciplineActivityTypeInput] = useState(
-    DISCIPLINE_ACTIVITY_OPTIONS[0]
-  );
-  const [disciplineResultStatusInput, setDisciplineResultStatusInput] = useState(
-    DISCIPLINE_RESULT_OPTIONS[0]
-  );
+  const [disciplineActivityTypeInput, setDisciplineActivityTypeInput] =
+    useState(DISCIPLINE_ACTIVITY_OPTIONS[0]);
+  const [disciplineResultStatusInput, setDisciplineResultStatusInput] =
+    useState(DISCIPLINE_RESULT_OPTIONS[0]);
   const [disciplineObjectionInput, setDisciplineObjectionInput] = useState("");
   const [disciplineMoodInput, setDisciplineMoodInput] = useState(
-    DISCIPLINE_MOOD_OPTIONS[0]
+    DISCIPLINE_MOOD_OPTIONS[0],
   );
   const [disciplineNotesInput, setDisciplineNotesInput] = useState("");
   const [disciplineFollowUpInput, setDisciplineFollowUpInput] = useState("");
@@ -313,8 +334,7 @@ export default function LeadDetailPage() {
         apiFetch<CurrentUser>("/auth/me"),
         fetchLeadDetail(),
       ]);
-      const canLoadScopedUsers =
-        me.role === "head" || me.role === "superadmin";
+      const canLoadScopedUsers = me.role === "head" || me.role === "superadmin";
       const scopedUsers = canLoadScopedUsers
         ? await apiFetch<CurrentUser[]>("/auth/users")
         : [];
@@ -332,14 +352,16 @@ export default function LeadDetailPage() {
       setDealStatusInput(
         resolveDealStatusInput(
           leadDetail.current_stage,
-          leadDetail.deal?.status ?? null
-        )
+          leadDetail.deal?.status ?? null,
+        ),
       );
       setDealCurrencyInput(leadDetail.deal?.currency ?? "IDR");
       setExpectedValueInput(String(leadDetail.deal?.expected_value ?? 0));
       setDepositAmountInput(String(leadDetail.deal?.deposit_amount ?? 0));
       setExpectedCloseDateInput(leadDetail.deal?.expected_close_date ?? "");
-      setDealClosedAtInput(toDateTimeLocalValue(leadDetail.deal?.closed_at ?? null));
+      setDealClosedAtInput(
+        toDateTimeLocalValue(leadDetail.deal?.closed_at ?? null),
+      );
       setDealNotesInput(leadDetail.deal?.notes ?? "");
       setSuccessMessage("");
       setDisciplineSuccessMessage("");
@@ -347,7 +369,7 @@ export default function LeadDetailPage() {
     } catch (error) {
       setLead(null);
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat detail lead."
+        error instanceof Error ? error.message : "Gagal memuat detail lead.",
       );
     } finally {
       setIsLoading(false);
@@ -375,10 +397,13 @@ export default function LeadDetailPage() {
         notes: dealNotesInput || null,
       };
 
-      const updatedDeal = await apiFetch<LeadDealItem>(`/leads/${lead.id}/deal`, {
-        method: "PUT",
-        body: payload,
-      });
+      const updatedDeal = await apiFetch<LeadDealItem>(
+        `/leads/${lead.id}/deal`,
+        {
+          method: "PUT",
+          body: payload,
+        },
+      );
 
       const refreshedLead = await fetchLeadDetail();
       setLead(refreshedLead);
@@ -399,7 +424,9 @@ export default function LeadDetailPage() {
       setDealSuccessMessage("Deal metrics berhasil diperbarui.");
     } catch (error) {
       setDealErrorMessage(
-        error instanceof Error ? error.message : "Gagal menyimpan deal metrics."
+        error instanceof Error
+          ? error.message
+          : "Gagal menyimpan deal metrics.",
       );
     } finally {
       setIsSavingDeal(false);
@@ -415,10 +442,16 @@ export default function LeadDetailPage() {
   }, [loadLeadDetail]);
 
   const openTasks = useMemo(
-    () => (lead?.tasks ?? []).filter((task) => task.status === "open" || task.status === "snoozed"),
-    [lead]
+    () =>
+      (lead?.tasks ?? []).filter(
+        (task) => task.status === "open" || task.status === "snoozed",
+      ),
+    [lead],
   );
-  const leadActionPlan = useMemo(() => (lead ? buildLeadActionPlan(lead) : []), [lead]);
+  const leadActionPlan = useMemo(
+    () => (lead ? buildLeadActionPlan(lead) : []),
+    [lead],
+  );
   const timelinePageSize = 2;
   const timelineTotalPages = lead
     ? Math.max(1, Math.ceil(lead.timeline.length / timelinePageSize))
@@ -480,12 +513,17 @@ export default function LeadDetailPage() {
       setFollowUpInput(toDateTimeLocalValue(updatedLead.next_follow_up_at));
       setAssignedUserInput(updatedLead.assigned_user_id ?? "");
       setDealStatusInput(
-        resolveDealStatusInput(updatedLead.current_stage, updatedLead.deal?.status ?? null)
+        resolveDealStatusInput(
+          updatedLead.current_stage,
+          updatedLead.deal?.status ?? null,
+        ),
       );
       setSuccessMessage("Lead berhasil diperbarui.");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal menyimpan perubahan lead."
+        error instanceof Error
+          ? error.message
+          : "Gagal menyimpan perubahan lead.",
       );
     } finally {
       setIsSaving(false);
@@ -521,7 +559,7 @@ export default function LeadDetailPage() {
       setTaskDueAtInput("");
     } catch (error) {
       setTaskErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat task."
+        error instanceof Error ? error.message : "Gagal membuat task.",
       );
     } finally {
       setIsCreatingTask(false);
@@ -570,7 +608,7 @@ export default function LeadDetailPage() {
       setDisciplineErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal menyimpan discipline log."
+          : "Gagal menyimpan discipline log.",
       );
     } finally {
       setIsCreatingDisciplineLog(false);
@@ -588,30 +626,31 @@ export default function LeadDetailPage() {
 
     try {
       const suggestion = await apiFetch<LeadDisciplineSuggestionResponse>(
-        `/leads/${lead.id}/discipline-log-suggestion`
+        `/leads/${lead.id}/discipline-log-suggestion`,
       );
       setDisciplineActivityTypeInput(suggestion.activity_type);
       setDisciplineResultStatusInput(suggestion.result_status);
       setDisciplineObjectionInput(suggestion.main_objection ?? "");
       setDisciplineMoodInput(
-        suggestion.customer_mood && DISCIPLINE_MOOD_OPTIONS.includes(suggestion.customer_mood)
+        suggestion.customer_mood &&
+          DISCIPLINE_MOOD_OPTIONS.includes(suggestion.customer_mood)
           ? suggestion.customer_mood
-          : DISCIPLINE_MOOD_OPTIONS[0]
+          : DISCIPLINE_MOOD_OPTIONS[0],
       );
       setDisciplineNotesInput(suggestion.notes);
       setDisciplineFollowUpInput(
-        toDateTimeLocalValue(suggestion.next_follow_up_at)
+        toDateTimeLocalValue(suggestion.next_follow_up_at),
       );
       setDisciplineSuggestionHint(
         `${suggestion.source_summary} Confidence ${Math.round(
-          suggestion.confidence_score * 100
-        )}%.`
+          suggestion.confidence_score * 100,
+        )}%.`,
       );
     } catch (error) {
       setDisciplineErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal mengambil prefill discipline log dari Clara."
+          : "Gagal mengambil prefill discipline log dari Clara.",
       );
     } finally {
       setIsPrefillingDisciplineLog(false);
@@ -627,19 +666,16 @@ export default function LeadDetailPage() {
 
     try {
       const payload: LeadTaskUpdateRequest = { status };
-      await apiFetch<LeadTaskItem>(
-        `/leads/${lead.id}/tasks/${taskId}`,
-        {
-          method: "PATCH",
-            body: payload,
-        }
-      );
+      await apiFetch<LeadTaskItem>(`/leads/${lead.id}/tasks/${taskId}`, {
+        method: "PATCH",
+        body: payload,
+      });
 
       const refreshedLead = await fetchLeadDetail();
       setLead(refreshedLead);
     } catch (error) {
       setTaskErrorMessage(
-        error instanceof Error ? error.message : "Gagal mengubah status task."
+        error instanceof Error ? error.message : "Gagal mengubah status task.",
       );
     }
   }
@@ -692,11 +728,12 @@ export default function LeadDetailPage() {
               <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
-                    Kategori akun: {formatAccountCategory(lead.account_category)}
+                    Kategori akun:{" "}
+                    {formatAccountCategory(lead.account_category)}
                   </span>
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                      lead.lead_temperature
+                      lead.lead_temperature,
                     )}`}
                   >
                     {lead.lead_temperature.toUpperCase()}
@@ -710,44 +747,24 @@ export default function LeadDetailPage() {
                 </div>
 
                 <dl className="mt-5 grid gap-4 md:grid-cols-3">
-                  <Metric label="Kategori akun" value={formatAccountCategory(lead.account_category)} />
-                  <Metric label="Last contact" value={formatDateTime(lead.last_contact_at)} />
+                  <Metric
+                    label="Kategori akun"
+                    value={formatAccountCategory(lead.account_category)}
+                  />
+                  <Metric
+                    label="Last contact"
+                    value={formatDateTime(lead.last_contact_at)}
+                  />
                   <Metric
                     label="Next follow-up"
                     value={formatDateTime(lead.next_follow_up_at)}
                   />
-                  <Metric label="Conversation count" value={String(lead.conversation_count)} />
+                  <Metric
+                    label="Conversation count"
+                    value={String(lead.conversation_count)}
+                  />
                 </dl>
               </div>
-
-              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(39,29,18,0.96)_0%,rgba(24,18,12,0.96)_46%,rgba(63,46,18,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="max-w-3xl">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#c9782b]">
-                      Apa yang harus dilakukan di lead ini
-                    </p>
-                    <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#fff0c9]">
-                      Rapikan next step sebelum pindah ke lead lain
-                    </h2>
-                    <p className="mt-2 text-sm leading-7 text-[#d6bb84]">
-                      Halaman ini bukan cuma untuk membaca data. Target akhirnya adalah lead punya
-                      owner yang jelas, follow-up yang hidup, discipline log terbaru, dan bila perlu
-                      task atau deal metrics yang sudah sinkron.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-3 md:grid-cols-2">
-                  {leadActionPlan.map((item) => (
-                    <LeadActionCard
-                      key={item.condition}
-                      title={item.condition}
-                      action={item.action}
-                      detail={item.detail}
-                    />
-                  ))}
-                </div>
-              </section>
 
               <form
                 onSubmit={(event) => void handleSaveLead(event)}
@@ -771,45 +788,30 @@ export default function LeadDetailPage() {
 
                 <div className="mt-6 grid gap-5 md:grid-cols-2">
                   <Field label="Kategori akun">
-                    <select
+                    <DetailSelect
                       value={accountCategoryInput}
-                      onChange={(event) => setAccountCategoryInput(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
-                    >
-                      {ACCOUNT_CATEGORY_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {formatAccountCategory(option)}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setAccountCategoryInput}
+                      options={ACCOUNT_CATEGORY_OPTIONS}
+                      getOptionLabel={formatAccountCategory}
+                    />
                   </Field>
 
                   <Field label="Stage">
-                    <select
+                    <DetailSelect
                       value={stageInput}
-                      onChange={(event) => setStageInput(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
-                    >
-                      {STAGE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option.replaceAll("_", " ")}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setStageInput}
+                      options={STAGE_OPTIONS}
+                      getOptionLabel={formatStageLabel}
+                    />
                   </Field>
 
                   <Field label="Lead temperature">
-                    <select
+                    <DetailSelect
                       value={temperatureInput}
-                      onChange={(event) => setTemperatureInput(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
-                    >
-                      {TEMPERATURE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option.toUpperCase()}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setTemperatureInput}
+                      options={TEMPERATURE_OPTIONS}
+                      getOptionLabel={(option) => option.toUpperCase()}
+                    />
                   </Field>
 
                   <Field label="Next follow-up">
@@ -824,7 +826,9 @@ export default function LeadDetailPage() {
                   <Field label="Assigned user">
                     <select
                       value={assignedUserInput}
-                      onChange={(event) => setAssignedUserInput(event.target.value)}
+                      onChange={(event) =>
+                        setAssignedUserInput(event.target.value)
+                      }
                       disabled={!canReassignLead}
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400 disabled:bg-slate-100"
                     >
@@ -876,7 +880,9 @@ export default function LeadDetailPage() {
                       Daily Discipline Log
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Catat hasil aktivitas harian sales langsung dari halaman lead supaya manager bisa membaca ritme kerja, objection, dan follow-up tanpa menebak.
+                      Catat hasil aktivitas harian sales langsung dari halaman
+                      lead supaya manager bisa membaca ritme kerja, objection,
+                      dan follow-up tanpa menebak.
                     </p>
                   </div>
                   {disciplineSuccessMessage ? (
@@ -895,7 +901,9 @@ export default function LeadDetailPage() {
                 <div className="mt-5 grid gap-4 md:grid-cols-4">
                   <Metric
                     label="Compliance"
-                    value={formatDisciplineStatus(lead.discipline_summary.compliance_status)}
+                    value={formatDisciplineStatus(
+                      lead.discipline_summary.compliance_status,
+                    )}
                   />
                   <Metric
                     label="Latest log"
@@ -926,7 +934,9 @@ export default function LeadDetailPage() {
                       <input
                         type="date"
                         value={disciplineLogDateInput}
-                        onChange={(event) => setDisciplineLogDateInput(event.target.value)}
+                        onChange={(event) =>
+                          setDisciplineLogDateInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -966,7 +976,9 @@ export default function LeadDetailPage() {
                     <Field label="Customer mood">
                       <select
                         value={disciplineMoodInput}
-                        onChange={(event) => setDisciplineMoodInput(event.target.value)}
+                        onChange={(event) =>
+                          setDisciplineMoodInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       >
                         {DISCIPLINE_MOOD_OPTIONS.map((option) => (
@@ -1005,7 +1017,9 @@ export default function LeadDetailPage() {
                   <Field label="Notes">
                     <textarea
                       value={disciplineNotesInput}
-                      onChange={(event) => setDisciplineNotesInput(event.target.value)}
+                      onChange={(event) =>
+                        setDisciplineNotesInput(event.target.value)
+                      }
                       rows={4}
                       placeholder="Tulis hasil follow-up hari ini, sinyal customer, dan langkah berikutnya."
                       className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
@@ -1059,7 +1073,8 @@ export default function LeadDetailPage() {
                             </p>
                           </div>
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-                            {log.customer_mood?.replaceAll("_", " ") ?? "no mood"}
+                            {log.customer_mood?.replaceAll("_", " ") ??
+                              "no mood"}
                           </span>
                         </div>
 
@@ -1093,7 +1108,9 @@ export default function LeadDetailPage() {
                     Unified Customer Identity
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Clara sekarang mengikat banyak lead lintas channel ke satu profil customer agar konteks tidak pecah antara WhatsApp dan Telegram.
+                    Clara sekarang mengikat banyak lead lintas channel ke satu
+                    profil customer agar konteks tidak pecah antara WhatsApp dan
+                    Telegram.
                   </p>
                 </div>
 
@@ -1106,7 +1123,9 @@ export default function LeadDetailPage() {
                             {lead.customer_profile.display_name}
                           </h3>
                           <p className="mt-1 text-sm text-slate-500">
-                            PIC customer: {lead.customer_profile.assigned_user_name ?? "Belum ada"}
+                            PIC customer:{" "}
+                            {lead.customer_profile.assigned_user_name ??
+                              "Belum ada"}
                           </p>
                         </div>
                         <Link
@@ -1124,11 +1143,15 @@ export default function LeadDetailPage() {
                         />
                         <Metric
                           label="Total Conversations"
-                          value={String(lead.customer_profile.conversation_count)}
+                          value={String(
+                            lead.customer_profile.conversation_count,
+                          )}
                         />
                         <Metric
                           label="Last contact"
-                          value={formatDateTime(lead.customer_profile.last_contact_at)}
+                          value={formatDateTime(
+                            lead.customer_profile.last_contact_at,
+                          )}
                         />
                       </div>
 
@@ -1145,54 +1168,61 @@ export default function LeadDetailPage() {
                     </div>
 
                     <div className="space-y-3">
-                      {lead.customer_profile.related_leads.map((relatedLead) => (
-                        <article
-                          key={relatedLead.id}
-                          className="rounded-[24px] border border-slate-200 bg-white p-4"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-sm font-semibold text-slate-950">
-                              {relatedLead.display_name}
-                            </h3>
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getLeadBadgeClass(
-                                relatedLead.lead_temperature
-                              )}`}
-                            >
-                              {relatedLead.lead_temperature.toUpperCase()}
-                            </span>
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                              {relatedLead.source_label}
-                            </span>
-                          </div>
-                          <div className="mt-3 grid gap-3 md:grid-cols-2">
-                            <Metric
-                              label="Stage"
-                              value={relatedLead.current_stage.replaceAll("_", " ")}
-                            />
-                            <Metric
-                              label="Last contact"
-                              value={formatDateTime(relatedLead.last_contact_at)}
-                            />
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <Link
-                              href={`/dashboard/crm/${relatedLead.id}`}
-                              className="inline-flex rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
-                            >
-                              Buka Lead
-                            </Link>
-                            {relatedLead.latest_conversation_id ? (
-                              <Link
-                                href={`/dashboard/sales/conversations/${relatedLead.latest_conversation_id}`}
-                                className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                      {lead.customer_profile.related_leads.map(
+                        (relatedLead) => (
+                          <article
+                            key={relatedLead.id}
+                            className="rounded-[24px] border border-slate-200 bg-white p-4"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-sm font-semibold text-slate-950">
+                                {relatedLead.display_name}
+                              </h3>
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getLeadBadgeClass(
+                                  relatedLead.lead_temperature,
+                                )}`}
                               >
-                                Buka Conversation
+                                {relatedLead.lead_temperature.toUpperCase()}
+                              </span>
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                {relatedLead.source_label}
+                              </span>
+                            </div>
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                              <Metric
+                                label="Stage"
+                                value={relatedLead.current_stage.replaceAll(
+                                  "_",
+                                  " ",
+                                )}
+                              />
+                              <Metric
+                                label="Last contact"
+                                value={formatDateTime(
+                                  relatedLead.last_contact_at,
+                                )}
+                              />
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Link
+                                href={`/dashboard/crm/${relatedLead.id}`}
+                                className="inline-flex rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                              >
+                                Buka Lead
                               </Link>
-                            ) : null}
-                          </div>
-                        </article>
-                      ))}
+                              {relatedLead.latest_conversation_id ? (
+                                <Link
+                                  href={`/dashboard/sales/conversations/${relatedLead.latest_conversation_id}`}
+                                  className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                                >
+                                  Buka Conversation
+                                </Link>
+                              ) : null}
+                            </div>
+                          </article>
+                        ),
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1209,7 +1239,8 @@ export default function LeadDetailPage() {
                       Deal Metrics
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Isi angka bisnis lead ini supaya KPI owner tidak cuma berhenti di pipeline health.
+                      Isi angka bisnis lead ini supaya KPI owner tidak cuma
+                      berhenti di pipeline health.
                     </p>
                   </div>
                   {dealSuccessMessage && (
@@ -1233,9 +1264,10 @@ export default function LeadDetailPage() {
                     </span>{" "}
                     tetapi deal status di KPI masih{" "}
                     <span className="font-semibold uppercase">
-                      {(lead.deal?.status ?? "belum diisi")}
+                      {lead.deal?.status ?? "belum diisi"}
                     </span>
-                    . Klik <span className="font-semibold">Simpan Deal Metrics</span>{" "}
+                    . Klik{" "}
+                    <span className="font-semibold">Simpan Deal Metrics</span>{" "}
                     supaya KPI dan nilai deal ikut sinkron.
                   </div>
                 )}
@@ -1248,7 +1280,9 @@ export default function LeadDetailPage() {
                     <Field label="Deal status">
                       <select
                         value={dealStatusInput}
-                        onChange={(event) => setDealStatusInput(event.target.value)}
+                        onChange={(event) =>
+                          setDealStatusInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       >
                         {DEAL_STATUS_OPTIONS.map((option) => (
@@ -1262,7 +1296,9 @@ export default function LeadDetailPage() {
                     <Field label="Currency">
                       <input
                         value={dealCurrencyInput}
-                        onChange={(event) => setDealCurrencyInput(event.target.value.toUpperCase())}
+                        onChange={(event) =>
+                          setDealCurrencyInput(event.target.value.toUpperCase())
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -1273,7 +1309,9 @@ export default function LeadDetailPage() {
                         min="0"
                         step="1000"
                         value={expectedValueInput}
-                        onChange={(event) => setExpectedValueInput(event.target.value)}
+                        onChange={(event) =>
+                          setExpectedValueInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -1284,7 +1322,9 @@ export default function LeadDetailPage() {
                         min="0"
                         step="1000"
                         value={depositAmountInput}
-                        onChange={(event) => setDepositAmountInput(event.target.value)}
+                        onChange={(event) =>
+                          setDepositAmountInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -1293,7 +1333,9 @@ export default function LeadDetailPage() {
                       <input
                         type="date"
                         value={expectedCloseDateInput}
-                        onChange={(event) => setExpectedCloseDateInput(event.target.value)}
+                        onChange={(event) =>
+                          setExpectedCloseDateInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -1302,7 +1344,9 @@ export default function LeadDetailPage() {
                       <input
                         type="datetime-local"
                         value={dealClosedAtInput}
-                        onChange={(event) => setDealClosedAtInput(event.target.value)}
+                        onChange={(event) =>
+                          setDealClosedAtInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -1311,7 +1355,9 @@ export default function LeadDetailPage() {
                   <Field label="Deal notes">
                     <textarea
                       value={dealNotesInput}
-                      onChange={(event) => setDealNotesInput(event.target.value)}
+                      onChange={(event) =>
+                        setDealNotesInput(event.target.value)
+                      }
                       rows={3}
                       className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
                     />
@@ -1319,9 +1365,18 @@ export default function LeadDetailPage() {
 
                   <div className="rounded-[24px] bg-slate-50 p-4">
                     <div className="grid gap-3 md:grid-cols-3">
-                      <Metric label="Expected value" value={`${dealCurrencyInput} ${Number(expectedValueInput || 0).toLocaleString("id-ID")}`} />
-                      <Metric label="Deposit" value={`${dealCurrencyInput} ${Number(depositAmountInput || 0).toLocaleString("id-ID")}`} />
-                      <Metric label="Deal status" value={dealStatusInput.toUpperCase()} />
+                      <Metric
+                        label="Expected value"
+                        value={`${dealCurrencyInput} ${Number(expectedValueInput || 0).toLocaleString("id-ID")}`}
+                      />
+                      <Metric
+                        label="Deposit"
+                        value={`${dealCurrencyInput} ${Number(depositAmountInput || 0).toLocaleString("id-ID")}`}
+                      />
+                      <Metric
+                        label="Deal status"
+                        value={dealStatusInput.toUpperCase()}
+                      />
                     </div>
                   </div>
 
@@ -1331,7 +1386,9 @@ export default function LeadDetailPage() {
                       disabled={isSavingDeal}
                       className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                      {isSavingDeal ? "Menyimpan deal..." : "Simpan Deal Metrics"}
+                      {isSavingDeal
+                        ? "Menyimpan deal..."
+                        : "Simpan Deal Metrics"}
                     </button>
                   </div>
                 </form>
@@ -1343,7 +1400,8 @@ export default function LeadDetailPage() {
                     Follow-up Tasks
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Task disimpan permanen, jadi worklist sales sekarang tidak hanya derived dari conversation.
+                    Task disimpan permanen, jadi worklist sales sekarang tidak
+                    hanya derived dari conversation.
                   </p>
                 </div>
 
@@ -1376,7 +1434,10 @@ export default function LeadDetailPage() {
                           <select
                             value={task.status}
                             onChange={(event) =>
-                              void handleTaskStatusChange(task.id, event.target.value)
+                              void handleTaskStatusChange(
+                                task.id,
+                                event.target.value,
+                              )
                             }
                             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-400"
                           >
@@ -1403,7 +1464,9 @@ export default function LeadDetailPage() {
                   <Field label="Task title">
                     <input
                       value={taskTitleInput}
-                      onChange={(event) => setTaskTitleInput(event.target.value)}
+                      onChange={(event) =>
+                        setTaskTitleInput(event.target.value)
+                      }
                       placeholder="Contoh: Follow up soal legalitas"
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                     />
@@ -1412,7 +1475,9 @@ export default function LeadDetailPage() {
                   <Field label="Task description">
                     <textarea
                       value={taskDescriptionInput}
-                      onChange={(event) => setTaskDescriptionInput(event.target.value)}
+                      onChange={(event) =>
+                        setTaskDescriptionInput(event.target.value)
+                      }
                       rows={3}
                       placeholder="Tulis konteks singkat supaya sales berikutnya tidak kehilangan arah."
                       className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
@@ -1423,7 +1488,9 @@ export default function LeadDetailPage() {
                     <input
                       type="datetime-local"
                       value={taskDueAtInput}
-                      onChange={(event) => setTaskDueAtInput(event.target.value)}
+                      onChange={(event) =>
+                        setTaskDueAtInput(event.target.value)
+                      }
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                     />
                   </Field>
@@ -1444,7 +1511,9 @@ export default function LeadDetailPage() {
                     Activity Timeline
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Semua perubahan penting di lead ini dicatat supaya perpindahan stage, follow-up, task, dan deal bisa diaudit dengan enak.
+                    Semua perubahan penting di lead ini dicatat supaya
+                    perpindahan stage, follow-up, task, dan deal bisa diaudit
+                    dengan enak.
                   </p>
                 </div>
 
@@ -1467,7 +1536,8 @@ export default function LeadDetailPage() {
                                   {event.title}
                                 </h3>
                                 <p className="mt-1 text-xs text-slate-500">
-                                  {event.actor_user_name ?? "System"} · {formatDateTime(event.created_at)}
+                                  {event.actor_user_name ?? "System"} ·{" "}
+                                  {formatDateTime(event.created_at)}
                                 </p>
                               </div>
                               <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -1500,12 +1570,18 @@ export default function LeadDetailPage() {
                       {lead.timeline.length > timelinePageSize ? (
                         <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
                           <p className="text-sm text-slate-600">
-                            Halaman {timelinePage} dari {timelineTotalPages} · menampilkan {visibleTimeline.length} dari {lead.timeline.length} aktivitas.
+                            Halaman {timelinePage} dari {timelineTotalPages} ·
+                            menampilkan {visibleTimeline.length} dari{" "}
+                            {lead.timeline.length} aktivitas.
                           </p>
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => setTimelinePage((current) => Math.max(1, current - 1))}
+                              onClick={() =>
+                                setTimelinePage((current) =>
+                                  Math.max(1, current - 1),
+                                )
+                              }
                               disabled={timelinePage === 1}
                               className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                             >
@@ -1538,13 +1614,7 @@ export default function LeadDetailPage() {
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
       <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -1552,6 +1622,132 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function DetailSelect({
+  value,
+  onChange,
+  options,
+  getOptionLabel,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly string[];
+  getOptionLabel: (value: string) => string;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (disabled) {
+      setIsOpen(false);
+    }
+  }, [disabled]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        disabled={disabled}
+        onClick={() => setIsOpen((previous) => !previous)}
+        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 outline-none transition hover:border-slate-300 focus-visible:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+      >
+        <span>{getOptionLabel(value)}</span>
+        <span
+          aria-hidden="true"
+          className={`text-slate-500 transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        >
+          <svg
+            viewBox="0 0 12 12"
+            className="h-3 w-3"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M2.25 4.5L6 8.25L9.75 4.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute inset-x-0 z-10 mt-2 rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.99)_0%,rgba(17,12,9,0.99)_100%)] p-2 shadow-[0_18px_36px_rgba(0,0,0,0.28)]">
+          <ul
+            role="listbox"
+            aria-label="Select option"
+            className="clara-scrollbar max-h-72 space-y-1 overflow-y-auto pr-1"
+          >
+            {options.map((option) => {
+              const isSelected = option === value;
+
+              return (
+                <li key={option}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      setIsOpen(false);
+                      if (option !== value) {
+                        onChange(option);
+                      }
+                    }}
+                    className={`flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm transition ${
+                      isSelected
+                        ? "bg-[#f0cb73] text-[#1a120b]"
+                        : "text-[#fff0c9] hover:bg-[#2b2013] hover:text-[#fff8de]"
+                    }`}
+                  >
+                    <span className="capitalize">{getOptionLabel(option)}</span>
+                    {isSelected ? (
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5a3e16]">
+                        Aktif
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

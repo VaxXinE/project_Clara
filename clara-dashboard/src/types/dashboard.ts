@@ -356,6 +356,8 @@ export type CustomerProfileSummaryItem = {
   email: string | null;
   address: string | null;
   status: string;
+  temperature: string;
+  temperature_source: string;
   canonical_key: string;
   identity_confidence: number;
   match_strategy: string;
@@ -379,6 +381,7 @@ export type CustomerProfileUpdateRequest = {
   address?: string | null;
   status: string;
   account_category?: string | null;
+  temperature?: string | null;
 };
 
 export type CustomerProfileMergeRequest = {

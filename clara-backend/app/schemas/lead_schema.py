@@ -160,6 +160,8 @@ class CustomerProfileSummaryItem(BaseModel):
     email: str | None
     address: str | None
     status: str
+    temperature: str
+    temperature_source: str
     canonical_key: str
     identity_confidence: float
     match_strategy: str
@@ -183,6 +185,7 @@ class CustomerProfileUpdateRequest(BaseModel):
     address: str | None = Field(default=None, max_length=2000)
     status: str = Field(default="active", max_length=20)
     account_category: str | None = Field(default=None, max_length=20)
+    temperature: str | None = Field(default=None, max_length=20)
 
 
 class CustomerProfileMergeRequest(BaseModel):
