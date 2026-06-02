@@ -7,7 +7,7 @@ import { Fragment, useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
-import { canAccessManagerInsights } from "@/lib/roles";
+import { canAccessManagerInsights, isHeadRole } from "@/lib/roles";
 import type {
   CurrentUser,
   ManagerInsightsResponse,
@@ -21,22 +21,30 @@ function getCoachingPriorityAction(item: {
   review_status: string;
   risk_level: string | null;
   review_label: string;
-}) {
+}, isHeadView: boolean) {
   if (item.review_status === "in_review") {
     return {
-      title: "Manager harus review kasus ini sekarang",
+      title: isHeadView
+        ? "Head perlu follow-up kasus ini sekarang"
+        : "Manager harus review kasus ini sekarang",
       description:
-        "Baca conversation, pastikan masalah utamanya jelas, lalu isi coaching note atau putuskan apakah case ini perlu `needs_rework`, `coaching_done`, atau `escalated`.",
-      primaryLabel: "Buka Chat Review Center",
+        isHeadView
+          ? "Baca conversation, lihat hambatan utamanya, lalu beri arahan yang tegas ke sales agar next action tidak menggantung."
+          : "Baca conversation, pastikan masalah utamanya jelas, lalu isi coaching note atau putuskan apakah case ini perlu `needs_rework`, `coaching_done`, atau `escalated`.",
+      primaryLabel: isHeadView ? "Buka Follow-up Center" : "Buka Chat Review Center",
       primaryHref: "/dashboard/approvals",
     };
   }
 
   if (item.review_status === "needs_rework") {
     return {
-      title: "Manager harus beri arahan revisi yang tegas",
+      title: isHeadView
+        ? "Head perlu beri arahan revisi yang tegas"
+        : "Manager harus beri arahan revisi yang tegas",
       description:
-        "Kasus ini belum selesai. Buka review center, tulis revisi yang harus dilakukan sales, dan pastikan next action tidak ambigu.",
+        isHeadView
+          ? "Kasus ini belum selesai. Buka follow-up center, tulis arahan revisi ke sales, dan pastikan owner berikutnya jelas."
+          : "Kasus ini belum selesai. Buka review center, tulis revisi yang harus dilakukan sales, dan pastikan next action tidak ambigu.",
       primaryLabel: "Lanjutkan Review",
       primaryHref: "/dashboard/approvals",
     };
@@ -44,31 +52,45 @@ function getCoachingPriorityAction(item: {
 
   if (item.review_status === "escalated") {
     return {
-      title: "Kasus ini perlu keputusan level lebih tinggi",
+      title: isHeadView
+        ? "Kasus ini perlu keputusan Head"
+        : "Kasus ini perlu keputusan level lebih tinggi",
       description:
-        "Cek alasan eskalasinya, validasi risiko atau klaim sensitifnya, lalu tentukan apakah perlu dinaikkan lagi atau dikembalikan dengan arahan yang jelas.",
-      primaryLabel: "Buka Chat Review Center",
+        isHeadView
+          ? "Cek alasan eskalasinya, validasi risiko atau klaim sensitifnya, lalu putuskan arahan yang harus dibawa sales."
+          : "Cek alasan eskalasinya, validasi risiko atau klaim sensitifnya, lalu tentukan apakah perlu dinaikkan lagi atau dikembalikan dengan arahan yang jelas.",
+      primaryLabel: isHeadView ? "Buka Follow-up Center" : "Buka Chat Review Center",
       primaryHref: "/dashboard/approvals",
     };
   }
 
   if (item.risk_level === "high") {
     return {
-      title: "Kasus ini berisiko tinggi",
+      title: isHeadView
+        ? "Lead ini berisiko tinggi"
+        : "Kasus ini berisiko tinggi",
       description:
-        "Jangan cukup baca summary. Manager perlu buka conversation dan pastikan tidak ada jawaban yang berpotensi mis-selling atau klaim sensitif.",
+        isHeadView
+          ? "Jangan cukup baca summary. Head perlu buka conversation dan memastikan sales tidak jalan tanpa arahan di lead sensitif ini."
+          : "Jangan cukup baca summary. Manager perlu buka conversation dan pastikan tidak ada jawaban yang berpotensi mis-selling atau klaim sensitif.",
       primaryLabel: "Buka Conversation",
       primaryHref: null,
     };
   }
 
   return {
-    title: "Manager perlu pastikan arah coaching-nya jelas",
+    title: isHeadView
+      ? "Head perlu pastikan arah follow-up-nya jelas"
+      : "Manager perlu pastikan arah coaching-nya jelas",
     description:
       item.review_label === "unik"
-        ? "Kasus ini unik, jadi manager perlu memastikan insight utamanya terdokumentasi dan tidak hilang setelah dibaca."
-        : "Buka case ini dan pastikan keputusan review-nya jelas, bukan cuma dibaca lalu ditinggalkan.",
-    primaryLabel: "Buka Chat Review Center",
+        ? isHeadView
+          ? "Kasus ini unik, jadi head perlu memastikan arahan utamanya terdokumentasi dan tidak hilang setelah dibaca."
+          : "Kasus ini unik, jadi manager perlu memastikan insight utamanya terdokumentasi dan tidak hilang setelah dibaca."
+        : isHeadView
+          ? "Buka case ini dan pastikan sales mendapat arahan yang jelas, bukan cuma dibaca lalu dibiarkan."
+          : "Buka case ini dan pastikan keputusan review-nya jelas, bukan cuma dibaca lalu ditinggalkan.",
+    primaryLabel: isHeadView ? "Buka Follow-up Center" : "Buka Chat Review Center",
     primaryHref: "/dashboard/approvals",
   };
 }
@@ -80,6 +102,7 @@ export function ManagerInsightsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [expandedTeamIds, setExpandedTeamIds] = useState<string[]>([]);
+  const isHeadView = isHeadRole(currentUser?.role);
 
   useEffect(() => {
     async function loadPage() {
@@ -125,9 +148,13 @@ export function ManagerInsightsPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Manager command center"
-      title="Manager Insights"
-      description="Halaman ini dipakai untuk membaca disiplin tim, bottleneck follow-up, coaching case aktif, dan sinyal objection yang perlu diintervensi lebih dulu."
+      eyebrow={isHeadView ? "Head command center" : "Manager command center"}
+      title={isHeadView ? "Head Insights" : "Manager Insights"}
+      description={
+        isHeadView
+          ? "Halaman ini dipakai head untuk membaca performa prospect tim, mencari lead yang berisiko, lalu menentukan follow-up dan arahan ke sales."
+          : "Halaman ini dipakai manager untuk membaca disiplin tim, bottleneck follow-up, coaching case aktif, dan sinyal objection yang perlu diintervensi lebih dulu."
+      }
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
@@ -138,11 +165,19 @@ export function ManagerInsightsPage() {
             </div>
           ) : null}
           <Link
-            href="/dashboard/approvals"
+            href={isHeadView ? "/dashboard/crm" : "/dashboard/approvals"}
             className="clara-button clara-button-primary"
           >
-            Buka Chat Review Center
+            {isHeadView ? "Buka Lead Management" : "Buka Chat Review Center"}
           </Link>
+          {isHeadView ? (
+            <Link
+              href="/dashboard/approvals"
+              className="clara-button clara-button-ghost"
+            >
+              Buka Follow-up Center
+            </Link>
+          ) : null}
         </div>
       }
     >
@@ -163,27 +198,50 @@ export function ManagerInsightsPage() {
               <MetricCard
                 label="Scope Teams"
                 value={String(insights.scope_team_count)}
-                hint="Jumlah team yang saat ini masuk boundary manager Anda."
+                hint={
+                  isHeadView
+                    ? "Jumlah team yang saat ini masuk area pantau Head."
+                    : "Jumlah team yang saat ini masuk boundary manager Anda."
+                }
               />
               <MetricCard
                 label="Total Leads"
                 value={String(insights.total_leads)}
-                hint="Lead aktif yang perlu dijaga ritmenya di scope Anda."
+                hint={
+                  isHeadView
+                    ? "Prospect aktif yang perlu dijaga ritme dan arahnya."
+                    : "Lead aktif yang perlu dijaga ritmenya di scope Anda."
+                }
               />
               <MetricCard
                 label="Stale Lead Ratio"
                 value={formatPercent(insights.stale_lead_ratio)}
-                hint="Semakin tinggi, semakin banyak lead yang log harian atau ritmenya mulai longgar."
+                hint={
+                  isHeadView
+                    ? "Semakin tinggi, semakin banyak prospect yang ritmenya mulai longgar dan perlu tekanan."
+                    : "Semakin tinggi, semakin banyak lead yang log harian atau ritmenya mulai longgar."
+                }
               />
               <MetricCard
                 label="Follow-up Compliance"
                 value={formatPercent(insights.follow_up_compliance_rate)}
-                hint="Persentase lead yang follow-up schedule-nya belum overdue."
+                hint={
+                  isHeadView
+                    ? "Persentase prospect yang follow-up schedule-nya masih sehat."
+                    : "Persentase lead yang follow-up schedule-nya belum overdue."
+                }
               />
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-              <Panel title="Boundary Alerts" description="Alert cepat per team atau unit untuk memutuskan intervensi paling mendesak.">
+              <Panel
+                title={isHeadView ? "Prospect Berisiko" : "Boundary Alerts"}
+                description={
+                  isHeadView
+                    ? "Daftar cepat team atau unit yang perlu intervensi Head lebih dulu."
+                    : "Alert cepat per team atau unit untuk memutuskan intervensi paling mendesak."
+                }
+              >
                 <div className="space-y-3">
                   {insights.boundary_alerts.length === 0 ? (
                     <EmptyText text="Belum ada alert boundary yang cukup kuat." />
@@ -232,13 +290,24 @@ export function ManagerInsightsPage() {
                 </div>
               </Panel>
 
-              <Panel title="Coaching Priority" description="Case review yang paling perlu dibaca manager sekarang, diurutkan berdasarkan risiko dan umur chat.">
+              <Panel
+                title={isHeadView ? "Follow-up ke Sales" : "Coaching Priority"}
+                description={
+                  isHeadView
+                    ? "Case yang paling perlu dibaca Head sekarang sebelum memberi arahan ke Sales."
+                    : "Case review yang paling perlu dibaca manager sekarang, diurutkan berdasarkan risiko dan umur chat."
+                }
+              >
                 <div className="space-y-3">
                   {insights.coaching_priority.length === 0 ? (
                     <EmptyText text="Belum ada coaching case aktif di scope ini." />
                   ) : (
                     insights.coaching_priority.map((item) => (
-                      <CoachingPriorityCard key={item.review_case_id} item={item} />
+                      <CoachingPriorityCard
+                        key={item.review_case_id}
+                        item={item}
+                        isHeadView={isHeadView}
+                      />
                     ))
                   )}
                 </div>
@@ -246,7 +315,14 @@ export function ManagerInsightsPage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-              <Panel title="Discipline by Team" description="Baca team mana yang mulai longgar, bukan sekadar melihat angka global.">
+              <Panel
+                title={isHeadView ? "Snapshot Per Team" : "Discipline by Team"}
+                description={
+                  isHeadView
+                    ? "Lihat team mana yang mulai longgar, berisiko, atau butuh intervensi cepat."
+                    : "Baca team mana yang mulai longgar, bukan sekadar melihat angka global."
+                }
+              >
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-left text-sm">
                     <thead>
@@ -365,7 +441,14 @@ export function ManagerInsightsPage() {
                 </div>
               </Panel>
 
-              <Panel title="Objection Trends" description="Top objection untuk membantu manager membaca pola hambatan yang berulang.">
+              <Panel
+                title={isHeadView ? "Pola Objection Tim" : "Objection Trends"}
+                description={
+                  isHeadView
+                    ? "Top objection untuk membantu Head membaca peluang, risiko, dan pola hambatan berulang."
+                    : "Top objection untuk membantu manager membaca pola hambatan yang berulang."
+                }
+              >
                 <div className="space-y-3">
                   {insights.objection_trends.length === 0 ? (
                     <EmptyText text="Belum ada objection trend yang cukup kuat di scope ini." />
@@ -398,10 +481,12 @@ export function ManagerInsightsPage() {
 
 function CoachingPriorityCard({
   item,
+  isHeadView,
 }: {
   item: ManagerInsightsResponse["coaching_priority"][number];
+  isHeadView: boolean;
 }) {
-  const action = getCoachingPriorityAction(item);
+  const action = getCoachingPriorityAction(item, isHeadView);
 
   return (
     <article className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">

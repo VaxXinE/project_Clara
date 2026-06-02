@@ -167,38 +167,43 @@ export default function ChatReviewCenterPage() {
 
   const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
   const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
+  const isHeadView = normalizedRole === "head";
   const fallbackHref = canAccessQueue
     ? "/dashboard/sales"
-    : normalizedRole === "head"
+    : isHeadView
       ? "/dashboard/notifications"
       : "/dashboard/manager-insights";
   const fallbackLabel = canAccessQueue
     ? "Kembali ke Queue"
-    : normalizedRole === "head"
+    : isHeadView
       ? "Buka Alert Center"
       : "Buka Manager Insights";
   const emptyStateTitle = canAccessQueue
     ? "Tidak ada chat yang macet saat ini"
-    : normalizedRole === "head"
+    : isHeadView
       ? "Tidak ada chat lintas tim yang perlu review saat ini"
       : "Tidak ada chat tim yang perlu review saat ini";
   const emptyStateDescription = canAccessQueue
     ? "Chat Review Center hanya menampilkan chat yang butuh analisis ulang, draft baru, approval, escalation, atau sudah stale. Kalau kosong, lanjutkan eksekusi lewat Queue atau Action Center."
-    : normalizedRole === "head"
+    : isHeadView
       ? "Chat Review Center hanya menampilkan chat yang butuh analisis ulang, draft baru, approval, escalation, atau sudah stale. Kalau kosong, berarti tidak ada bottleneck review lintas tim saat ini. Lanjutkan pantau Alert Center, KPI, atau Lead Management."
       : "Chat Review Center hanya menampilkan chat yang butuh analisis ulang, draft baru, approval, escalation, atau sudah stale. Kalau kosong, berarti tidak ada bottleneck di tim saat ini. Lanjutkan pantau Manager Insights atau buka Lead Management.";
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Review workflow"
-      title="Chat Review Center"
-      description="Satu layar untuk membaca chat yang perlu analisis ulang, butuh draft baru, menunggu approval, atau harus dinaikkan ke reviewer manusia."
+      eyebrow={isHeadView ? "Head follow-up" : "Review workflow"}
+      title={isHeadView ? "Follow-up ke Sales" : "Chat Review Center"}
+      description={
+        isHeadView
+          ? "Satu layar untuk membaca conversation yang berisiko, menilai bottleneck follow-up, lalu memberi arahan yang jelas ke Sales."
+          : "Satu layar untuk membaca chat yang perlu analisis ulang, butuh draft baru, menunggu approval, atau harus dinaikkan ke reviewer manusia."
+      }
       backHref={fallbackHref}
       backLabel={
         canAccessQueue
           ? "Kembali ke Queue"
-          : normalizedRole === "head"
+          : isHeadView
             ? "Kembali ke Alert Center"
             : "Kembali ke Manager Insights"
       }
@@ -207,16 +212,16 @@ export default function ChatReviewCenterPage() {
           href={
             canAccessQueue
               ? "/dashboard/follow-up"
-              : normalizedRole === "head"
-                ? "/dashboard/notifications"
+              : isHeadView
+                ? "/dashboard/crm"
                 : "/dashboard/manager-insights"
           }
           className="clara-button clara-button-primary"
         >
           {canAccessQueue
             ? "Buka Action Center"
-            : normalizedRole === "head"
-              ? "Buka Alert Center"
+            : isHeadView
+              ? "Buka Lead Management"
               : "Buka Manager Insights"}
         </Link>
       }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -175,7 +175,8 @@ function getLeadActionItems(lead: LeadListItem) {
   if (isOverdueLead(lead)) {
     items.push({
       condition: "Jika statusnya Follow-up overdue",
-      action: "Buka lead detail, cek chat terakhir, lalu isi next follow-up baru pada hari/jam yang realistis.",
+      action:
+        "Buka lead detail, cek chat terakhir, lalu isi next follow-up baru pada hari/jam yang realistis.",
       detail:
         "Jangan pindah ke lead lain sebelum lead ini punya jadwal follow-up baru. Kalau ternyata lead sudah tidak aktif, update stage atau catat alasannya di notes/log.",
     });
@@ -184,7 +185,8 @@ function getLeadActionItems(lead: LeadListItem) {
   if (lead.discipline_compliance_status === "stale_log") {
     items.push({
       condition: "Jika statusnya Discipline stale",
-      action: "Isi discipline log baru hari ini berdasarkan aktivitas terakhir yang benar-benar terjadi.",
+      action:
+        "Isi discipline log baru hari ini berdasarkan aktivitas terakhir yang benar-benar terjadi.",
       detail:
         "Minimal isi activity type, result status, objection utama, customer mood, dan next follow-up. Tujuannya menghidupkan lagi jejak kerja lead ini.",
     });
@@ -193,7 +195,8 @@ function getLeadActionItems(lead: LeadListItem) {
   if (lead.discipline_compliance_status === "missing_today_log") {
     items.push({
       condition: "Jika statusnya Need discipline",
-      action: "Catat aktivitas hari ini walaupun hasilnya belum closing, misalnya follow-up chat, no response, atau waiting customer.",
+      action:
+        "Catat aktivitas hari ini walaupun hasilnya belum closing, misalnya follow-up chat, no response, atau waiting customer.",
       detail:
         "Status ini artinya belum ada bukti kerja hari ini. Isi log supaya lead tidak terlihat diam dan manager tahu langkah yang sudah dilakukan.",
     });
@@ -202,16 +205,21 @@ function getLeadActionItems(lead: LeadListItem) {
   if (lead.needs_deal_sync) {
     items.push({
       condition: "Jika statusnya Need sync",
-      action: "Masuk ke section Deal Metrics lalu samakan deal status dengan kondisi lead sekarang, kemudian simpan.",
+      action:
+        "Masuk ke section Deal Metrics lalu samakan deal status dengan kondisi lead sekarang, kemudian simpan.",
       detail:
         "Biasanya ini muncul saat stage sudah `won` atau `lost` tapi deal status KPI belum ikut berubah. Jangan biarkan karena angka KPI bisa salah.",
     });
   }
 
-  if (lead.current_stage === "new_lead" || lead.current_stage === "qualification") {
+  if (
+    lead.current_stage === "new_lead" ||
+    lead.current_stage === "qualification"
+  ) {
     items.push({
       condition: "Jika stage masih New Lead atau Qualification",
-      action: "Lengkapi summary singkat, tetapkan owner, lalu set next follow-up pertama.",
+      action:
+        "Lengkapi summary singkat, tetapkan owner, lalu set next follow-up pertama.",
       detail:
         "Targetnya sederhana: lead jangan mentah. Orang lain harus bisa buka lead ini dan langsung paham siapa customer-nya dan next step-nya apa.",
     });
@@ -220,7 +228,8 @@ function getLeadActionItems(lead: LeadListItem) {
   if (lead.current_stage === "objection" || lead.current_stage === "closing") {
     items.push({
       condition: "Jika stage sudah Objection atau Closing",
-      action: "Buka conversation terakhir dulu sebelum update stage atau kirim follow-up baru.",
+      action:
+        "Buka conversation terakhir dulu sebelum update stage atau kirim follow-up baru.",
       detail:
         "Di fase ini jangan kerja berdasarkan asumsi. Pastikan objection, risiko, dan posisi customer terakhir benar-benar terbaca sebelum ambil tindakan.",
     });
@@ -229,7 +238,8 @@ function getLeadActionItems(lead: LeadListItem) {
   if (!items.length) {
     items.push({
       condition: "Jika tidak ada badge masalah",
-      action: "Cek cepat apakah stage, owner, dan next follow-up masih relevan lalu lanjut ke lead berikutnya.",
+      action:
+        "Cek cepat apakah stage, owner, dan next follow-up masih relevan lalu lanjut ke lead berikutnya.",
       detail:
         "Artinya lead ini relatif aman untuk sekarang dan tidak butuh intervensi langsung.",
     });
@@ -274,7 +284,9 @@ export default function CrmPage() {
       setErrorMessage("");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat Lead Management.",
+        error instanceof Error
+          ? error.message
+          : "Gagal memuat Lead Management.",
       );
     } finally {
       setIsLoading(false);
@@ -318,8 +330,10 @@ export default function CrmPage() {
       }
 
       if (sortBy === "next_follow_up") {
-        const leftTime = toDate(left.next_follow_up_at)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-        const rightTime = toDate(right.next_follow_up_at)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const leftTime =
+          toDate(left.next_follow_up_at)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+        const rightTime =
+          toDate(right.next_follow_up_at)?.getTime() ?? Number.MAX_SAFE_INTEGER;
         return leftTime - rightTime;
       }
 
@@ -334,10 +348,15 @@ export default function CrmPage() {
   }, [leads, quickFilter, searchQuery, sortBy]);
 
   const visibleLeads = useMemo(() => {
-    return filteredLeads.filter((lead) => matchesBucketFilter(lead, bucketFilter));
+    return filteredLeads.filter((lead) =>
+      matchesBucketFilter(lead, bucketFilter),
+    );
   }, [filteredLeads, bucketFilter]);
 
-  const totalLeadPages = Math.max(1, Math.ceil(visibleLeads.length / LEADS_PAGE_SIZE));
+  const totalLeadPages = Math.max(
+    1,
+    Math.ceil(visibleLeads.length / LEADS_PAGE_SIZE),
+  );
   const paginatedVisibleLeads = useMemo(() => {
     const startIndex = (leadPage - 1) * LEADS_PAGE_SIZE;
     return visibleLeads.slice(startIndex, startIndex + LEADS_PAGE_SIZE);
@@ -345,19 +364,31 @@ export default function CrmPage() {
 
   const bucketedLeads = useMemo(() => {
     return {
-      action: paginatedVisibleLeads.filter((lead) => getLeadBucket(lead) === "action"),
-      waiting: paginatedVisibleLeads.filter((lead) => getLeadBucket(lead) === "waiting"),
-      won: paginatedVisibleLeads.filter((lead) => getLeadBucket(lead) === "won"),
-      archived: paginatedVisibleLeads.filter((lead) => getLeadBucket(lead) === "archived"),
+      action: paginatedVisibleLeads.filter(
+        (lead) => getLeadBucket(lead) === "action",
+      ),
+      waiting: paginatedVisibleLeads.filter(
+        (lead) => getLeadBucket(lead) === "waiting",
+      ),
+      won: paginatedVisibleLeads.filter(
+        (lead) => getLeadBucket(lead) === "won",
+      ),
+      archived: paginatedVisibleLeads.filter(
+        (lead) => getLeadBucket(lead) === "archived",
+      ),
     };
   }, [paginatedVisibleLeads]);
 
   const bucketSummary = useMemo(() => {
     return {
-      action: filteredLeads.filter((lead) => getLeadBucket(lead) === "action").length,
-      waiting: filteredLeads.filter((lead) => getLeadBucket(lead) === "waiting").length,
+      action: filteredLeads.filter((lead) => getLeadBucket(lead) === "action")
+        .length,
+      waiting: filteredLeads.filter((lead) => getLeadBucket(lead) === "waiting")
+        .length,
       won: filteredLeads.filter((lead) => getLeadBucket(lead) === "won").length,
-      archived: filteredLeads.filter((lead) => getLeadBucket(lead) === "archived").length,
+      archived: filteredLeads.filter(
+        (lead) => getLeadBucket(lead) === "archived",
+      ).length,
     };
   }, [filteredLeads]);
 
@@ -378,7 +409,10 @@ export default function CrmPage() {
     }
 
     setSelectedLeadId((previous) => {
-      if (previous && paginatedVisibleLeads.some((lead) => lead.id === previous)) {
+      if (
+        previous &&
+        paginatedVisibleLeads.some((lead) => lead.id === previous)
+      ) {
         return previous;
       }
       return paginatedVisibleLeads[0]?.id ?? null;
@@ -432,15 +466,24 @@ export default function CrmPage() {
       actions={
         <>
           {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
-            <Link href="/dashboard/sales" className="clara-button clara-button-ghost">
+            <Link
+              href="/dashboard/sales"
+              className="clara-button clara-button-ghost"
+            >
               Queue
             </Link>
           ) : (
-            <Link href="/dashboard/approvals" className="clara-button clara-button-ghost">
+            <Link
+              href="/dashboard/approvals"
+              className="clara-button clara-button-ghost"
+            >
               Chat Review Center
             </Link>
           )}
-          <Link href="/dashboard/upload" className="clara-button clara-button-primary">
+          <Link
+            href="/dashboard/upload"
+            className="clara-button clara-button-primary"
+          >
             Lead Capture
           </Link>
         </>
@@ -462,12 +505,36 @@ export default function CrmPage() {
         {!isLoading && !errorMessage && (
           <>
             <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
-              <BoardMetric label="Total Leads" value={String(summary.total)} hint="Semua lead yang masuk scope Anda." />
-              <BoardMetric label="Perlu tindakan" value={String(summary.needsAction)} hint="Lead yang sebaiknya dicek hari ini." />
-              <BoardMetric label="Overdue" value={String(summary.overdue)} hint="Follow-up yang sudah lewat jadwal." />
-              <BoardMetric label="Need sync" value={String(summary.needsSync)} hint="Stage dan deal metrics belum selaras." />
-              <BoardMetric label="Hot" value={String(summary.hot)} hint="Lead dengan urgensi tinggi." />
-              <BoardMetric label="Won" value={String(summary.won)} hint="Lead yang sudah closing berhasil." />
+              <BoardMetric
+                label="Total Leads"
+                value={String(summary.total)}
+                hint="Semua lead yang masuk scope Anda."
+              />
+              <BoardMetric
+                label="Perlu tindakan"
+                value={String(summary.needsAction)}
+                hint="Lead yang sebaiknya dicek hari ini."
+              />
+              <BoardMetric
+                label="Overdue"
+                value={String(summary.overdue)}
+                hint="Follow-up yang sudah lewat jadwal."
+              />
+              <BoardMetric
+                label="Need sync"
+                value={String(summary.needsSync)}
+                hint="Stage dan deal metrics belum selaras."
+              />
+              <BoardMetric
+                label="Hot"
+                value={String(summary.hot)}
+                hint="Lead dengan urgensi tinggi."
+              />
+              <BoardMetric
+                label="Won"
+                value={String(summary.won)}
+                hint="Lead yang sudah closing berhasil."
+              />
             </section>
 
             <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
@@ -481,14 +548,25 @@ export default function CrmPage() {
                       Atur lead yang mau discan dari satu toolbar
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-[#e3c990]">
-                      Gunakan search, sort, channel, quick filter, dan bucket view supaya list lead tetap bersih walau volume hariannya tinggi.
+                      Gunakan search, sort, channel, quick filter, dan bucket
+                      view supaya list lead tetap bersih walau volume hariannya
+                      tinggi.
                     </p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <LeadMetaPill label="Perlu tindakan" value={String(summary.needsAction)} />
-                    <LeadMetaPill label="Overdue" value={String(summary.overdue)} />
-                    <LeadMetaPill label="Need sync" value={String(summary.needsSync)} />
+                    <LeadMetaPill
+                      label="Perlu tindakan"
+                      value={String(summary.needsAction)}
+                    />
+                    <LeadMetaPill
+                      label="Overdue"
+                      value={String(summary.overdue)}
+                    />
+                    <LeadMetaPill
+                      label="Need sync"
+                      value={String(summary.needsSync)}
+                    />
                   </div>
                 </div>
 
@@ -522,7 +600,9 @@ export default function CrmPage() {
                     <span>Channel</span>
                     <select
                       value={sourceChannelFilter}
-                      onChange={(event) => setSourceChannelFilter(event.target.value)}
+                      onChange={(event) =>
+                        setSourceChannelFilter(event.target.value)
+                      }
                       className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
                     >
                       {SOURCE_CHANNEL_OPTIONS.map((option) => (
@@ -570,7 +650,9 @@ export default function CrmPage() {
                         const count =
                           option.value === "all"
                             ? filteredLeads.length
-                            : bucketSummary[option.value as keyof typeof bucketSummary];
+                            : bucketSummary[
+                                option.value as keyof typeof bucketSummary
+                              ];
                         return (
                           <button
                             key={option.value}
@@ -583,7 +665,9 @@ export default function CrmPage() {
                             }`}
                           >
                             {option.label}{" "}
-                            <span className="ml-1 text-xs opacity-80">{count}</span>
+                            <span className="ml-1 text-xs opacity-80">
+                              {count}
+                            </span>
                           </button>
                         );
                       })}
@@ -597,43 +681,16 @@ export default function CrmPage() {
                   Hasil
                 </span>
                 <span>
-                  Menampilkan <span className="font-semibold text-[#fff0c9]">{paginatedVisibleLeads.length}</span> dari{" "}
-                  <span className="font-semibold text-[#fff0c9]">{visibleLeads.length}</span> lead pada halaman ini.
+                  Menampilkan{" "}
+                  <span className="font-semibold text-[#fff0c9]">
+                    {paginatedVisibleLeads.length}
+                  </span>{" "}
+                  dari{" "}
+                  <span className="font-semibold text-[#fff0c9]">
+                    {visibleLeads.length}
+                  </span>{" "}
+                  lead pada halaman ini.
                 </span>
-              </div>
-            </section>
-
-            <section className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="max-w-3xl">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    Cara Kerja Halaman Ini
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    Jangan baca semua lead. Selesaikan yang paling butuh aksi.
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-[#e3c990]">
-                    Kalau Anda bingung harus mulai dari mana, pakai urutan ini:
-                    pilih bucket <span className="font-semibold">Perlu tindakan</span>,
-                    buka lead yang punya badge <span className="font-semibold">Overdue</span>,
-                    <span className="font-semibold">Need discipline</span>, atau
-                    <span className="font-semibold">Need sync</span>, lalu selesaikan konteks, follow-up, dan log hariannya.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3 lg:w-[460px] lg:grid-cols-1">
-                  <BoardGuideCard
-                    title="1. Pilih lead merah dulu"
-                    description="Prioritaskan overdue, stale discipline, atau closing hot lead."
-                  />
-                  <BoardGuideCard
-                    title="2. Putuskan aksi minimum"
-                    description="Set follow-up, isi discipline log, update stage, atau sinkronkan deal."
-                  />
-                  <BoardGuideCard
-                    title="3. Baru pindah lead berikutnya"
-                    description="Jangan lompat sebelum lead aktif punya next step yang jelas."
-                  />
-                </div>
               </div>
             </section>
 
@@ -648,7 +705,8 @@ export default function CrmPage() {
                   </h3>
                 </div>
                 <p className="text-sm text-[#c8ad75]">
-                  {paginatedVisibleLeads.length} / {visibleLeads.length} lead tampil di halaman ini
+                  {paginatedVisibleLeads.length} / {visibleLeads.length} lead
+                  tampil di halaman ini
                 </p>
               </div>
 
@@ -708,7 +766,11 @@ export default function CrmPage() {
                             <button
                               type="button"
                               disabled={leadPage === 1}
-                              onClick={() => setLeadPage((current) => Math.max(1, current - 1))}
+                              onClick={() =>
+                                setLeadPage((current) =>
+                                  Math.max(1, current - 1),
+                                )
+                              }
                               className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Sebelumnya
@@ -717,7 +779,9 @@ export default function CrmPage() {
                               type="button"
                               disabled={leadPage === totalLeadPages}
                               onClick={() =>
-                                setLeadPage((current) => Math.min(totalLeadPages, current + 1))
+                                setLeadPage((current) =>
+                                  Math.min(totalLeadPages, current + 1),
+                                )
                               }
                               className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-60"
                             >
@@ -773,14 +837,16 @@ export default function CrmPage() {
                                     Follow-up overdue
                                   </span>
                                 )}
-                                {selectedLead.discipline_compliance_status !== "logged_today" ? (
-                                   <span className="rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
+                                {selectedLead.discipline_compliance_status !==
+                                "logged_today" ? (
+                                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
                                     {DISCIPLINE_LABELS[
                                       selectedLead.discipline_compliance_status
-                                    ] ?? selectedLead.discipline_compliance_status}
+                                    ] ??
+                                      selectedLead.discipline_compliance_status}
                                   </span>
                                 ) : (
-                                   <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
+                                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
                                     Discipline ok
                                   </span>
                                 )}
@@ -790,7 +856,10 @@ export default function CrmPage() {
                             <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
                               <PreviewStat
                                 label="Owner"
-                                value={selectedLead.assigned_user_name ?? "Belum ada owner"}
+                                value={
+                                  selectedLead.assigned_user_name ??
+                                  "Belum ada owner"
+                                }
                               />
                               <PreviewStat
                                 label="Customer profile"
@@ -801,15 +870,21 @@ export default function CrmPage() {
                               />
                               <PreviewStat
                                 label="Last contact"
-                                value={formatDateTime(selectedLead.last_contact_at)}
+                                value={formatDateTime(
+                                  selectedLead.last_contact_at,
+                                )}
                               />
                               <PreviewStat
                                 label="Next follow-up"
-                                value={formatDateTime(selectedLead.next_follow_up_at)}
+                                value={formatDateTime(
+                                  selectedLead.next_follow_up_at,
+                                )}
                               />
                               <PreviewStat
                                 label="Deal status"
-                                value={selectedLead.deal_status ?? "Belum diisi"}
+                                value={
+                                  selectedLead.deal_status ?? "Belum diisi"
+                                }
                               />
                               <PreviewStat
                                 label="Source"
@@ -822,14 +897,16 @@ export default function CrmPage() {
                                 Apa yang harus dilakukan
                               </p>
                               <div className="mt-3 space-y-3">
-                                {getLeadActionItems(selectedLead).map((item) => (
-                                  <ActionGuideCard
-                                    key={item.condition}
-                                    title={item.condition}
-                                    action={item.action}
-                                    detail={item.detail}
-                                  />
-                                ))}
+                                {getLeadActionItems(selectedLead).map(
+                                  (item) => (
+                                    <ActionGuideCard
+                                      key={item.condition}
+                                      title={item.condition}
+                                      action={item.action}
+                                      detail={item.detail}
+                                    />
+                                  ),
+                                )}
                               </div>
                             </section>
 
@@ -837,23 +914,13 @@ export default function CrmPage() {
                               <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
                                 Update stage cepat
                               </label>
-                              <select
+                              <StageQuickSelect
                                 value={selectedLead.current_stage}
-                                onChange={(event) => {
-                                  void handleStageChange(
-                                    selectedLead.id,
-                                    event.target.value,
-                                  );
-                                }}
                                 disabled={updatingLeadId === selectedLead.id}
-                                className="clara-select mt-2"
-                              >
-                                {STAGE_ORDER.map((stage) => (
-                                  <option key={stage} value={stage}>
-                                    {STAGE_LABELS[stage]}
-                                  </option>
-                                ))}
-                              </select>
+                                onChange={(stage) => {
+                                  void handleStageChange(selectedLead.id, stage);
+                                }}
+                              />
 
                               <div className="mt-4 flex flex-wrap gap-2">
                                 <Link
@@ -876,7 +943,8 @@ export default function CrmPage() {
                         </>
                       ) : (
                         <div className="clara-empty-state p-6 text-sm text-[#d6bb84]">
-                          Pilih satu lead dari panel kiri untuk melihat preview cepatnya.
+                          Pilih satu lead dari panel kiri untuk melihat preview
+                          cepatnya.
                         </div>
                       )}
                     </aside>
@@ -1021,7 +1089,9 @@ function LeadListRow({
             </p>
             <p className="rounded-full border border-[#f0cb73]/14 bg-[#1d150d] px-3 py-1.5">
               Priority:{" "}
-              <span className="font-semibold text-[#f0cb73]">{priorityScore}</span>
+              <span className="font-semibold text-[#f0cb73]">
+                {priorityScore}
+              </span>
             </p>
           </div>
         </div>
@@ -1045,13 +1115,7 @@ function LeadMetaPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PreviewStat({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function PreviewStat({ label, value }: { label: string; value: string }) {
   return (
     <article className="rounded-[18px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
@@ -1059,6 +1123,115 @@ function PreviewStat({
       </p>
       <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
     </article>
+  );
+}
+
+function StageQuickSelect({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (stage: string) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (disabled) {
+      setIsOpen(false);
+    }
+  }, [disabled]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative mt-2">
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        disabled={disabled}
+        onClick={() => setIsOpen((previous) => !previous)}
+        className="flex w-full items-center justify-between rounded-[18px] border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(24,18,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] px-4 py-3 text-left text-sm font-semibold text-[#fff0c9] shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition hover:border-[#f0cb73]/36 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span>{STAGE_LABELS[value] ?? value}</span>
+        <span
+          aria-hidden="true"
+          className={`text-[#f0cb73] transition-transform ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        >
+          ▾
+        </span>
+      </button>
+
+      {isOpen ? (
+        <div className="absolute inset-x-0 z-30 mt-2 rounded-[18px] border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(26,19,14,0.99)_0%,rgba(15,11,8,0.99)_100%)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.42)]">
+          <ul
+            role="listbox"
+            aria-label="Stage lead"
+            className="max-h-72 space-y-1 overflow-y-auto pr-1 clara-scrollbar"
+          >
+            {STAGE_ORDER.map((stage) => {
+              const isSelected = stage === value;
+
+              return (
+                <li key={stage}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      setIsOpen(false);
+                      if (stage !== value) {
+                        onChange(stage);
+                      }
+                    }}
+                    className={`flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-sm transition ${
+                      isSelected
+                        ? "bg-[#f0cb73] text-[#1a120b]"
+                        : "text-[#f6ddb0] hover:bg-[#2b2013] hover:text-[#fff0c9]"
+                    }`}
+                  >
+                    <span>{STAGE_LABELS[stage]}</span>
+                    {isSelected ? (
+                      <span className="text-xs font-bold uppercase tracking-[0.18em]">
+                        Aktif
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1073,7 +1246,9 @@ function BoardMetric({
 }) {
   return (
     <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#140f08]">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#140f08]">
+        {label}
+      </p>
       <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
         {value}
       </p>

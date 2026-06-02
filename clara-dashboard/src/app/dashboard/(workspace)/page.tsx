@@ -42,23 +42,19 @@ const EMPTY_METRICS: OverviewMetrics = {
 const roleCopy: Record<string, { title: string; summary: string }> = {
   superadmin: {
     title: "Superadmin Command Center",
-    summary:
-      "Ringkasan kesehatan operasional, insight, dan pipeline lintas organization dari satu tempat.",
+    summary: "Ringkasan operasional dan insight.",
   },
   head: {
     title: "Head Control Room",
-    summary:
-      "Ringkasan ritme kerja tim, pressure operasional, dan arah prioritas harian.",
+    summary: "Ringkasan follow-up dan prioritas tim.",
   },
   manager: {
     title: "Manager Action Room",
-    summary:
-      "Ringkasan discipline tim, review pressure, dan status lead yang perlu perhatian.",
+    summary: "Ringkasan review dan progres Sales.",
   },
   sales: {
     title: "Sales Workspace",
-    summary:
-      "Ringkasan conversation aktif, coverage AI, dan aktivitas terbaru yang perlu ditindak.",
+    summary: "Ringkasan chat aktif dan follow-up.",
   },
 };
 
@@ -152,10 +148,7 @@ export default function DashboardHomePage() {
       currentUser={currentUser}
       eyebrow="Workspace overview"
       title={currentUser ? `Halo, ${currentUser.name}.` : "SCC Workspace"}
-      description={
-        roleLabel?.summary ??
-        "Ringkasan data operasional harian yang lebih ringkas dan lebih mudah dipindai."
-      }
+      description={roleLabel?.summary ?? "Ringkasan kerja hari ini."}
     >
       <div className="space-y-6">
         {errorMessage && (
@@ -168,28 +161,28 @@ export default function DashboardHomePage() {
           <MetricCard
             label="Percakapan Aktif"
             value={isLoading ? "..." : String(metrics.inboxCount)}
-            hint="Jumlah percakapan aktif yang sedang hidup di workspace."
+            hint="Chat aktif saat ini."
             icon={faComments}
             accent="from-[#f7dfa2] to-[#be8d2f]"
           />
           <MetricCard
             label="Sudah Dianalisis"
             value={isLoading ? "..." : String(metrics.analyzedCount)}
-            hint="Conversation yang sudah punya pembacaan AI."
+            hint="Chat yang sudah dibaca AI."
             icon={faWandSparkles}
             accent="from-[#f3d48a] to-[#9f7121]"
           />
           <MetricCard
             label="Cakupan Insight"
             value={isLoading ? "..." : String(metrics.insightConversationCount)}
-            hint="Percakapan yang ikut membentuk insight saat ini."
+            hint="Chat yang masuk insight."
             icon={faChartLine}
             accent="from-[#f1cf7a] to-[#7f5a1a]"
           />
           <MetricCard
             label="Risiko Tinggi"
             value={isLoading ? "..." : String(metrics.highRiskCount)}
-            hint="Percakapan sensitif yang perlu perhatian lebih cepat."
+            hint="Chat yang perlu perhatian."
             icon={faTriangleExclamation}
             accent="from-[#f6dc9d] to-[#b67d27]"
           />
@@ -203,7 +196,7 @@ export default function DashboardHomePage() {
                 title={roleLabel?.title ?? "Workspace"}
                 description={
                   roleLabel?.summary ??
-                  "Pusat kerja harian untuk membaca data percakapan, insight, dan pipeline."
+                  "Pusat kerja sesuai role."
                 }
               />
               <MiniInsightCard
@@ -215,8 +208,8 @@ export default function DashboardHomePage() {
                 }
                 description={
                   pendingAiCount > 0
-                    ? `${pendingAiCount} conversation masih menunggu analisis AI.`
-                    : "Seluruh conversation aktif sudah terbaca AI."
+                    ? `${pendingAiCount} chat menunggu analisis AI.`
+                    : "Semua chat aktif sudah dibaca AI."
                 }
                 icon={faBullseye}
               />

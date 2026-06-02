@@ -524,7 +524,6 @@ export default function CustomerProfilePage() {
                 </button>
               </div>
             </section>
-            ) : null}
 
             <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -613,7 +612,6 @@ export default function CustomerProfilePage() {
                 )}
               </div>
             </section>
-            ) : null}
 
             <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -682,7 +680,6 @@ export default function CustomerProfilePage() {
                 ))}
               </div>
             </section>
-            ) : null}
           </>
         ) : null}
       </div>
@@ -757,8 +754,10 @@ function PanelChip({
 function CompactInfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-      <p className="text-sm font-semibold text-[#fff0c9]">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
+        {label}
+      </p>
+      <p className="mt-3 text-base font-semibold text-[#fff0c9]">{value}</p>
     </div>
   );
 }

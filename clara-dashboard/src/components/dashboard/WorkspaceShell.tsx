@@ -30,9 +30,7 @@ import { apiFetch } from "@/lib/api";
 import {
   canAccessQueueAndActionCenter,
   getRoleDisplayLabel,
-  isAdminLike,
-  isManagerLike,
-  isOwnerLike,
+  isHeadRole,
   normalizeWorkspaceRole,
 } from "@/lib/roles";
 import type {
@@ -67,30 +65,30 @@ type NavGroup = {
 };
 
 function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
+  const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
+  const isSalesRole = normalizedRole === "sales";
+  const isManagerScopedRole = normalizedRole === "manager";
+  const isHeadScopedRole = normalizedRole === "head";
+  const isSuperadminScopedRole = normalizedRole === "superadmin";
+
   const workspaceItems: NavItem[] = [
     {
       href: "/workspace",
       label: "Beranda",
       icon: faGaugeHigh,
-      description: "Pusat ringkasan tim",
+      description: "Ringkasan kerja",
     },
     {
       href: "/crm",
       label: "Lead Management",
       icon: faBriefcase,
-      description: "Status, owner, dan timeline lead",
+      description: "Status dan progres lead",
     },
     {
       href: "/customers",
       label: "Customer List",
       icon: faBuildingShield,
-      description: "Daftar customer dan profil terpadu",
-    },
-    {
-      href: "/notifications",
-      label: "Alert Center",
-      icon: faTriangleExclamation,
-      description: "Follow-up sales yang perlu dicek head",
+      description: "Data customer",
     },
   ];
 
@@ -102,13 +100,13 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
         href: "/sales",
         label: "Queue",
         icon: faComments,
-        description: "CS menangani pertanyaan nasabah",
+        description: "Chat masuk Sales",
       },
       {
         href: "/follow-up",
         label: "Action Center",
         icon: faCalendarCheck,
-        description: "Prioritas follow-up harian",
+        description: "Prioritas follow-up",
       },
     );
   }
@@ -116,56 +114,70 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   const insightItems: NavItem[] = [];
   const adminItems: NavItem[] = [];
 
-  if (
-    currentUser &&
-    !isManagerLike(currentUser.role) &&
-    !isAdminLike(currentUser.role)
-  ) {
+  if (currentUser && isSalesRole) {
     workspaceItems.push({
       href: "/upload",
       label: "Lead Capture",
       icon: faCloudArrowUp,
-      description: "Masukkan chat atau lead baru",
+      description: "Input chat baru",
     });
   }
 
-  if (currentUser && isAdminLike(currentUser.role)) {
+  if (currentUser && (isHeadScopedRole || isSuperadminScopedRole)) {
+    workspaceItems.push({
+      href: "/notifications",
+      label: "Alert Center",
+      icon: faTriangleExclamation,
+      description: isHeadScopedRole
+        ? "Alert follow-up tim"
+        : "Alert operasional",
+    });
+  }
+
+  if (currentUser && isSuperadminScopedRole) {
     workspaceItems.push({
       href: "/channels",
       label: "Channels",
       icon: faBars,
-      description: "Lihat sumber channel dan ingestion",
+      description: "Sumber channel",
     });
   }
 
-  if (currentUser && isManagerLike(currentUser.role)) {
+  if (
+    currentUser &&
+    (isManagerScopedRole || isHeadScopedRole || isSuperadminScopedRole)
+  ) {
     workspaceItems.push({
       href: "/approvals",
-      label: "Chat Review Center",
+      label: isHeadScopedRole ? "Follow-up Center" : "Chat Review Center",
       icon: faWandSparkles,
-      description: "Admin cek jawaban dan feedback ke CS",
+      description: isHeadScopedRole
+        ? "Arahan dan follow-up Sales"
+        : "Review jawaban Sales",
     });
     insightItems.push({
       href: "/manager-insights",
-      label: "Manager Insights",
+      label: isHeadScopedRole ? "Head Insights" : "Manager Insights",
       icon: faChartLine,
-      description: "Discipline, coaching, dan alert tim",
+      description: isHeadScopedRole
+        ? "Analisis prospect tim"
+        : "Progres prospect Sales",
     });
   }
 
-  if (currentUser && isAdminLike(currentUser.role)) {
+  if (currentUser && isSuperadminScopedRole) {
     insightItems.push(
       {
         href: "/knowledge",
         label: "Knowledge Base",
         icon: faBookOpen,
-        description: "Landasan jawaban resmi",
+        description: "Jawaban resmi",
       },
       {
         href: "/kpi",
         label: "Ops Dashboard",
         icon: faChartColumn,
-        description: "Performa tim dan organisasi",
+        description: "Kinerja operasional",
       },
     );
 
@@ -173,7 +185,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       href: "/admin/access",
       label: "Access Control",
       icon: faUsersGear,
-      description: "Kelola role dan boundary akses",
+      description: "Role dan akses",
     });
   }
 
@@ -254,6 +266,8 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
   const [globalNotifications, setGlobalNotifications] = useState<
     OpsNotificationItem[]
   >([]);
+  const normalizedRole = normalizeWorkspaceRole(resolvedCurrentUser?.role);
+  const isHeadScopedRole = isHeadRole(resolvedCurrentUser?.role);
 
   useEffect(() => {
     if (!currentUser) {
@@ -385,7 +399,11 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
             {navGroups.map((group) => (
               <div key={group.title}>
                 <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
-                  {group.title === "Insights" ? "Oversight" : group.title}
+                  {group.title === "Insights" && isHeadScopedRole
+                    ? "Head Oversight"
+                    : group.title === "Insights"
+                      ? "Oversight"
+                      : group.title}
                 </p>
                 <nav className="mt-3 space-y-2.5">
                   {group.items.map((item) => {
@@ -539,7 +557,9 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
                             href={notification.target_href}
                             className="inline-flex items-center rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
                           >
-                            Buka data yang belum sinkron
+                            {normalizedRole === "head"
+                              ? "Buka follow-up tim"
+                              : "Buka data yang belum sinkron"}
                           </Link>
                         ) : null}
                         <Link

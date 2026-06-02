@@ -105,7 +105,7 @@ from app.services.source_intelligence_service import (
     normalize_source_channel,
     normalize_source_key,
 )
-from app.services.role_service import is_head_like, is_superadmin_like
+from app.services.role_service import is_head_like, is_sales_like, is_superadmin_like
 
 
 def build_ai_summary(
@@ -211,7 +211,7 @@ def _extract_notification_lead_id(notification: OpsNotification) -> UUID | None:
 
 def _resolve_notification_workflow_scope(source_type: str) -> str:
     if source_type == "sales_worklist":
-        return "head_follow_up"
+        return "cs_follow_up"
     if source_type == "approval_queue":
         return "admin_review"
     if source_type == "deal_metrics_sync":
@@ -229,7 +229,7 @@ def _resolve_notification_target_role(source_type: str) -> str:
     if source_type == "approval_queue":
         return "manager"
     if source_type == "sales_worklist":
-        return "head"
+        return "sales"
     if source_type == "deal_metrics_sync":
         return "sales"
     return "superadmin"
@@ -1947,7 +1947,12 @@ def sync_ops_notifications(
     current_user: User,
 ) -> list[OpsNotification]:
     now = datetime.now(timezone.utc)
-    worklist = get_sales_worklist(db=db, current_user=current_user)
+    is_sales_notification_owner = is_sales_like(current_user.role)
+    worklist = (
+        get_sales_worklist(db=db, current_user=current_user)
+        if is_sales_notification_owner
+        else None
+    )
     approval_queue = get_sales_approval_queue(db=db, current_user=current_user)
     kpi_alerts = (
         list_kpi_alert_records(db=db, current_user=current_user).items
@@ -1957,35 +1962,36 @@ def sync_ops_notifications(
 
     desired_notifications: list[dict[str, str | None]] = []
 
-    for item in worklist.items[:20]:
-        if item.task_type not in {
-            "overdue_follow_up",
-            "hot_lead_needs_reply",
-            "approved_ready_to_send",
-            "needs_analysis",
-        }:
-            continue
+    if worklist is not None:
+        for item in worklist.items[:20]:
+            if item.task_type not in {
+                "overdue_follow_up",
+                "hot_lead_needs_reply",
+                "approved_ready_to_send",
+                "needs_analysis",
+            }:
+                continue
 
-        severity = "medium"
-        if item.task_type in {"overdue_follow_up", "hot_lead_needs_reply"}:
-            severity = "high"
+            severity = "medium"
+            if item.task_type in {"overdue_follow_up", "hot_lead_needs_reply"}:
+                severity = "high"
 
-        target_href = (
-            f"/dashboard/sales/conversations/{item.conversation_id}"
-            if item.conversation_id
-            else f"/dashboard/crm/{item.lead_id}"
-        )
+            target_href = (
+                f"/dashboard/sales/conversations/{item.conversation_id}"
+                if item.conversation_id
+                else f"/dashboard/crm/{item.lead_id}"
+            )
 
-        desired_notifications.append(
-            {
-                "source_type": "sales_worklist",
-                "source_key": f"worklist:{item.lead_id}:{item.task_id or item.task_type}",
-                "severity": severity,
-                "title": item.task_label,
-                "body": item.reason,
-                "target_href": target_href,
-            }
-        )
+            desired_notifications.append(
+                {
+                    "source_type": "sales_worklist",
+                    "source_key": f"worklist:{item.lead_id}:{item.task_id or item.task_type}",
+                    "severity": severity,
+                    "title": item.task_label,
+                    "body": item.reason,
+                    "target_href": target_href,
+                }
+            )
 
     for item in approval_queue.items[:20]:
         severity = "high" if item.risk_level == "high" or item.action_mode == "escalate_to_human" else "medium"
@@ -2000,7 +2006,7 @@ def sync_ops_notifications(
             }
         )
 
-    if current_user.organization_id is not None:
+    if is_sales_notification_owner and current_user.organization_id is not None:
         lead_statement = (
             select(Lead)
             .where(Lead.organization_id == current_user.organization_id)

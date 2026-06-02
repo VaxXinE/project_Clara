@@ -19,6 +19,18 @@ export function isOwnerLike(role?: string | null): boolean {
   return normalized === "superadmin";
 }
 
+export function isSuperadminRole(role?: string | null): boolean {
+  return normalizeWorkspaceRole(role) === "superadmin";
+}
+
+export function isHeadRole(role?: string | null): boolean {
+  return normalizeWorkspaceRole(role) === "head";
+}
+
+export function isManagerRole(role?: string | null): boolean {
+  return normalizeWorkspaceRole(role) === "manager";
+}
+
 export function isAdminLike(role?: string | null): boolean {
   const normalized = normalizeWorkspaceRole(role);
   return normalized === "head" || isOwnerLike(normalized);

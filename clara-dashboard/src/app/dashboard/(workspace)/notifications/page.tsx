@@ -8,7 +8,8 @@ import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import {
   canAccessQueueAndActionCenter,
-  isManagerLike,
+  isHeadRole,
+  isManagerRole,
   normalizeWorkspaceRole,
 } from "@/lib/roles";
 import type {
@@ -51,7 +52,7 @@ function resolveNotificationTargetHref(
     }
   }
 
-  if (isManagerLike(role) && !canAccessQueueAndActionCenter(role)) {
+  if (isManagerRole(role) && !canAccessQueueAndActionCenter(role)) {
     if (href.startsWith("/dashboard/follow-up")) {
       return "/dashboard/manager-insights";
     }
@@ -206,8 +207,8 @@ export default function NotificationsPage() {
   const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
   const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
   const isManagerMonitorView =
-    isManagerLike(currentUser?.role) && !canAccessQueue;
-  const isHeadMonitorView = normalizedRole === "head";
+    isManagerRole(currentUser?.role) && !canAccessQueue;
+  const isHeadMonitorView = isHeadRole(currentUser?.role);
   const isOversightAlertView = isManagerMonitorView || isHeadMonitorView;
 
   const roleScopedNotifications = useMemo(() => {
@@ -291,11 +292,19 @@ export default function NotificationsPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={isOversightAlertView ? "Follow-up oversight" : "Operational orchestration"}
+      eyebrow={
+        isHeadMonitorView
+          ? "Head follow-up"
+          : isOversightAlertView
+            ? "Manager follow-up"
+            : "Operational orchestration"
+      }
       title="Alert Center"
       description={
-        isOversightAlertView
-          ? "Halaman ini dipakai head atau manager untuk mengecek follow-up sales yang mulai overdue, hot lead yang belum ditindak, dan titik follow-up yang perlu ditekan ke tim."
+        isHeadMonitorView
+          ? "Halaman ini dipakai Head untuk memantau follow-up tim, membaca lead yang mulai berisiko, lalu menentukan area mana yang harus segera ditekan ke Sales."
+          : isOversightAlertView
+            ? "Halaman ini dipakai manager untuk mengecek follow-up sales yang mulai overdue, hot lead yang belum ditindak, dan titik follow-up yang perlu ditekan ke tim."
           : "Tempat untuk melihat sinyal operasional yang harus segera ditindak: follow-up overdue, chat review kritis, dan alert KPI yang relevan dengan role Anda."
       }
       backHref="/dashboard"
@@ -311,17 +320,17 @@ export default function NotificationsPage() {
             </Link>
           ) : (
             <Link
-              href="/dashboard/manager-insights"
+              href={isHeadMonitorView ? "/dashboard/crm" : "/dashboard/manager-insights"}
               className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
             >
-              Manager Insights
+              {isHeadMonitorView ? "Lead Management" : "Manager Insights"}
             </Link>
           )}
           <Link
             href="/dashboard/approvals"
             className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
           >
-            Chat Review Center
+            {isHeadMonitorView ? "Follow-up Center" : "Chat Review Center"}
           </Link>
         </>
       }
@@ -404,11 +413,15 @@ export default function NotificationsPage() {
                         </h3>
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-[#e3c990]">
                           {isOversightAlertView
-                            ? "Kalau area ini kosong, berarti belum ada sales yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead management, manager insights, atau histori alert follow-up yang sudah selesai."
+                            ? isHeadMonitorView
+                              ? "Kalau area ini kosong, berarti belum ada sales yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead management, Head Insights, atau histori alert follow-up yang sudah selesai."
+                              : "Kalau area ini kosong, berarti belum ada sales yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead management, manager insights, atau histori alert follow-up yang sudah selesai."
                             : `Fokus halaman ini adalah alert aktif. Karena sekarang kosong, lanjutkan kerja dari ${
                                 canAccessQueue
                                   ? "Action Center, Queue, atau Lead Management"
-                                  : "Manager Insights, KPI, atau Chat Review Center"
+                                  : isHeadMonitorView
+                                    ? "Head Insights, Lead Management, atau Follow-up Center"
+                                    : "Manager Insights atau Chat Review Center"
                               }.`}
                           {scopedCounts.resolved > 0
                             ? ` Ada ${scopedCounts.resolved} alert resolved yang bisa dibuka kalau kamu butuh melihat histori.`
@@ -424,13 +437,19 @@ export default function NotificationsPage() {
                           Lihat Histori Alert
                         </button>
                         <Link
-                          href={canAccessQueue ? "/dashboard/follow-up" : isHeadMonitorView ? "/dashboard/kpi" : "/dashboard/manager-insights"}
+                          href={
+                            canAccessQueue
+                              ? "/dashboard/follow-up"
+                              : isHeadMonitorView
+                                ? "/dashboard/manager-insights"
+                                : "/dashboard/manager-insights"
+                          }
                           className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
                         >
                           {canAccessQueue
                             ? "Buka Action Center"
                             : isHeadMonitorView
-                              ? "Buka KPI Dashboard"
+                              ? "Buka Head Insights"
                               : "Buka Manager Insights"}
                         </Link>
                       </div>
@@ -772,16 +791,16 @@ export default function NotificationsPage() {
                 </p>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-[#e3c990]">
                   {isHeadMonitorView
-                    ? "Saat Alert Center kosong, itu artinya follow-up tim sales sedang relatif aman. Untuk role head, langkah berikutnya biasanya memantau lead management, manager insights, dan pipeline lead yang masih tertahan."
+                    ? "Saat Alert Center kosong, itu artinya follow-up tim sales sedang relatif aman. Untuk role head, langkah berikutnya biasanya memantau Head Insights, Lead Management, dan pipeline lead yang masih tertahan."
                     : "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role manager, langkah berikutnya biasanya memantau disiplin tim, coaching review, atau status lead yang masih tertahan."}
                 </p>
                 <div className="mt-5 flex flex-wrap gap-3">
                   {isHeadMonitorView ? (
                     <Link
-                      href="/dashboard/kpi"
+                      href="/dashboard/manager-insights"
                       className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
                     >
-                      Buka KPI Dashboard
+                      Buka Head Insights
                     </Link>
                   ) : (
                     <Link
@@ -795,7 +814,7 @@ export default function NotificationsPage() {
                     href="/dashboard/approvals"
                     className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                   >
-                    Buka Chat Review Center
+                    {isHeadMonitorView ? "Buka Follow-up Center" : "Buka Chat Review Center"}
                   </Link>
                   <Link
                     href="/dashboard/crm"
@@ -804,12 +823,7 @@ export default function NotificationsPage() {
                     Buka Lead Management
                   </Link>
                   {isHeadMonitorView ? (
-                    <Link
-                      href="/dashboard/manager-insights"
-                      className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
-                    >
-                      Buka Manager Insights
-                    </Link>
+                    null
                   ) : null}
                 </div>
               </section>

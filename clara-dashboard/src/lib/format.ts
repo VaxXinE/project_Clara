@@ -71,7 +71,7 @@ export function getLeadBadgeClass(leadTemperature?: string): string {
     case "cold":
       return "bg-slate-100 text-slate-700";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-orange-100 text-orange-700";
   }
 }
 
@@ -84,6 +84,6 @@ export function getRiskBadgeClass(riskLevel?: string): string {
     case "low":
       return "bg-green-100 text-green-700";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-orange-100 text-orange-700";
   }
 }
