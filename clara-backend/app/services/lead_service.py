@@ -34,6 +34,7 @@ from app.services.customer_profile_service import (
     customer_profile_load_only_columns,
     build_customer_profile_summary,
     ensure_customer_profile_for_lead,
+    sync_customer_profile_temperature,
 )
 from app.services.lead_discipline_service import (
     build_lead_discipline_summary,
@@ -257,11 +258,12 @@ def sync_lead_from_conversation(
     db.add(lead)
     db.flush()
     if customer_profile_contact_fields_supported(db):
-        ensure_customer_profile_for_lead(
+        profile = ensure_customer_profile_for_lead(
             db=db,
             lead=lead,
             preferred_name=lead.display_name,
         )
+        sync_customer_profile_temperature(db=db, profile=profile)
     if next_follow_up_at is not None:
         upsert_follow_up_task_for_lead(db=db, lead=lead)
     return lead
