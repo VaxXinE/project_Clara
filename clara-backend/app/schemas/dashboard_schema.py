@@ -113,6 +113,7 @@ class SalesInboxItem(BaseModel):
     source: str
     source_channel: str
     source_label: str
+    account_category: str
     status: str
     started_at: datetime | None
     last_message_at: datetime | None
@@ -136,6 +137,7 @@ class SalesConversationDetail(BaseModel):
     source: str
     source_channel: str
     source_label: str
+    account_category: str
     status: str
     started_at: datetime | None
     last_message_at: datetime | None
@@ -220,6 +222,7 @@ class ChatReviewQueueItem(BaseModel):
     sales_owner_name: str | None
     source_channel: str
     source_label: str
+    account_category: str
     current_stage: str
     lead_temperature: str
     risk_level: str | None

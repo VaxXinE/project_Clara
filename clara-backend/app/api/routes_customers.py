@@ -72,6 +72,7 @@ def update_customer_profile(
         email=payload.email,
         address=payload.address,
         status_value=payload.status,
+        account_category=payload.account_category,
         current_user=current_user,
     )
     create_audit_log(
@@ -83,6 +84,7 @@ def update_customer_profile(
         request=request,
         metadata={
             "status": payload.status,
+            "account_category": payload.account_category,
             "has_phone": bool(payload.phone),
             "has_email": bool(payload.email),
             "has_address": bool(payload.address),

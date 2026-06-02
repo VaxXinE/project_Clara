@@ -69,6 +69,88 @@ function formatKnowledgeProposalStatus(value: string): string {
   return formatStatusLabel(value);
 }
 
+function formatAccountCategory(value: string): string {
+  switch (value) {
+    case "mini":
+      return "Mini";
+    case "reguler":
+      return "Reguler";
+    case "unknown":
+      return "Belum ditentukan";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function getAccountCategoryBadgeClass(value: string): string {
+  switch (value) {
+    case "mini":
+      return "bg-emerald-100 text-emerald-700";
+    case "reguler":
+      return "bg-amber-100 text-amber-700";
+    default:
+      return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
+  }
+}
+
+function buildConversationActionPlan(detail: SalesConversationDetail) {
+  const extraction = detail.latest_ai_extraction;
+  const suggestion = detail.latest_reply_suggestion;
+  const sentCount = detail.sent_messages.length;
+  const items: Array<{
+    condition: string;
+    action: string;
+    detail: string;
+  }> = [];
+
+  items.push({
+    condition: "Jika baru buka conversation",
+    action: "Baca 5-10 chat terakhir dulu sebelum klik tombol apa pun.",
+    detail:
+      "Tujuannya supaya user tidak balas berdasarkan summary lama. Konteks terbaru customer tetap sumber keputusan utama.",
+  });
+
+  if (!extraction) {
+    items.push({
+      condition: "Jika AI analysis belum ada",
+      action: "Jalankan AI analysis dulu.",
+      detail:
+        "Tanpa ini user belum punya ringkasan stage, risk, objection, dan next best action. Jangan lompat langsung bikin balasan.",
+    });
+  } else if (!suggestion) {
+    items.push({
+      condition: "Jika AI analysis sudah ada tapi draft belum ada",
+      action: "Generate reply suggestion lalu review hasilnya.",
+      detail:
+        "Tujuannya bukan asal cepat, tapi supaya user mulai dari draft yang sudah mempertimbangkan objection dan risk yang terdeteksi.",
+    });
+  } else if (sentCount === 0) {
+    items.push({
+      condition: "Jika draft sudah ada tapi belum ada pesan terkirim",
+      action: "Review draft, lalu kirim atau ajukan approval sesuai level risikonya.",
+      detail:
+        "Pastikan jawaban relevan dengan pertanyaan terakhir customer dan tidak mengandung klaim sensitif yang belum diverifikasi.",
+    });
+  } else {
+    items.push({
+      condition: "Jika chat sudah ditindaklanjuti",
+      action: "Tutup loop ke CRM dengan update lead detail.",
+      detail:
+        "Setelah balasan terkirim, user harus cek apakah stage, follow-up berikutnya, discipline log, atau task lanjutan perlu diperbarui.",
+    });
+  }
+
+  if (extraction?.risk_level === "high") {
+    items.push({
+      condition: "Jika risk level = high",
+      action: "Jangan kirim balasan langsung tanpa review manusia atau approval.",
+      detail:
+        "Baca reasoning AI dengan teliti. Kalau ada potensi mis-selling, janji berlebihan, atau klaim sensitif, eskalasikan dulu.",
+    });
+  }
+
+  return items.slice(0, 4);
+}
 export default function SalesConversationDetailPage() {
   const params = useParams<{ conversationId: string }>();
   const conversationId = params.conversationId;
@@ -588,6 +670,14 @@ function ConversationDetailHeader({
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
+                detail.account_category,
+              )}`}
+            >
+              Kategori akun: {formatAccountCategory(detail.account_category)}
+            </span>
+
             {extraction ? (
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(

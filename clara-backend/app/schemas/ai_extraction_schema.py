@@ -17,6 +17,21 @@ class RecommendedReplyStrategy(BaseModel):
     avoid_topics: list[str] = Field(default_factory=list)
 
 
+class AccountCategoryPrediction(BaseModel):
+    value: Literal["mini", "reguler", "unknown"]
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    evidence: str = Field(min_length=1, max_length=500)
+
+
+class CustomerProfileAutofill(BaseModel):
+    display_name: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=50)
+    email: str | None = Field(default=None, max_length=255)
+    address: str | None = Field(default=None, max_length=1000)
+    confidence_score: float = Field(ge=0.0, le=1.0)
+    evidence: str = Field(min_length=1, max_length=500)
+
+
 class AIExtractionCreate(BaseModel):
     lead_temperature: Literal["cold", "warm", "hot"]
     pipeline_stage: Literal[
@@ -42,6 +57,8 @@ class AIExtractionCreate(BaseModel):
     next_best_action: str = Field(min_length=1, max_length=1000)
     content_insight: str = Field(min_length=1, max_length=1000)
     internal_notes: str = Field(min_length=1, max_length=1000)
+    account_category_prediction: AccountCategoryPrediction
+    customer_profile_autofill: CustomerProfileAutofill
 
     confidence_score: float = Field(ge=0.0, le=1.0)
 

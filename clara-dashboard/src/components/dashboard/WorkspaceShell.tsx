@@ -33,6 +33,7 @@ import {
   isAdminLike,
   isManagerLike,
   isOwnerLike,
+  normalizeWorkspaceRole,
 } from "@/lib/roles";
 import type {
   CurrentUser,
@@ -211,8 +212,14 @@ function getAccountProfileHref() {
 
 function getGlobalAlertNotifications(
   notifications: OpsNotificationItem[],
+  currentUser?: CurrentUser | null,
 ): OpsNotificationItem[] {
-  const activeItems = notifications.filter((item) => item.status === "active");
+  const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
+  const activeItems = notifications.filter(
+    (item) =>
+      item.status === "active" &&
+      (!normalizedRole || item.target_role === normalizedRole),
+  );
   const prioritizedItems = activeItems.sort((left, right) => {
     const leftIsDealSync = left.source_type === "deal_metrics_sync" ? 1 : 0;
     const rightIsDealSync = right.source_type === "deal_metrics_sync" ? 1 : 0;
@@ -291,7 +298,10 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
           return;
         }
         setGlobalNotifications(
-          getGlobalAlertNotifications(response.items).slice(0, 2),
+          getGlobalAlertNotifications(response.items, resolvedCurrentUser).slice(
+            0,
+            2,
+          ),
         );
       } catch {
         if (!isCancelled) {

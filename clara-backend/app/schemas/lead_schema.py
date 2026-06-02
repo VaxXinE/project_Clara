@@ -112,6 +112,7 @@ class CustomerRelatedLeadItem(BaseModel):
     display_name: str
     source_channel: str
     source_label: str
+    account_category: str
     current_stage: str
     lead_temperature: str
     last_contact_at: datetime | None
@@ -181,6 +182,7 @@ class CustomerProfileUpdateRequest(BaseModel):
     email: str | None = Field(default=None, max_length=255)
     address: str | None = Field(default=None, max_length=2000)
     status: str = Field(default="active", max_length=20)
+    account_category: str | None = Field(default=None, max_length=20)
 
 
 class CustomerProfileMergeRequest(BaseModel):

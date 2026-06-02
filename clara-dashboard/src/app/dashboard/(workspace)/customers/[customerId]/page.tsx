@@ -30,8 +30,11 @@ export default function CustomerProfilePage() {
     email: "",
     address: "",
     status: "active",
+    account_category: "unknown",
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [activePanel, setActivePanel] = useState<"leads" | "profile" | "merge">("leads");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -48,6 +51,7 @@ export default function CustomerProfilePage() {
           email: data.email ?? "",
           address: data.address ?? "",
           status: data.status,
+          account_category: deriveEditableAccountCategory(data.related_leads),
         });
       } catch (error) {
         setErrorMessage(
@@ -107,6 +111,7 @@ export default function CustomerProfilePage() {
         email: profileForm.email.trim() || null,
         address: profileForm.address.trim() || null,
         status: profileForm.status,
+        account_category: profileForm.account_category,
       };
       const updated = await apiFetch<CustomerProfileSummaryItem>(`/customers/${profile.id}`, {
         method: "PATCH",
@@ -119,6 +124,7 @@ export default function CustomerProfilePage() {
         email: updated.email ?? "",
         address: updated.address ?? "",
         status: updated.status,
+        account_category: deriveEditableAccountCategory(updated.related_leads),
       });
     } catch (error) {
       setErrorMessage(
@@ -148,6 +154,7 @@ export default function CustomerProfilePage() {
       : profile?.source_labels.length
         ? `${profile.source_labels.length} channel`
         : "Belum ada channel";
+  const accountCategorySummary = buildAccountCategorySummary(relatedLeads);
   const identityConfidenceLabel = profile
     ? describeIdentityConfidence(profile.identity_confidence)
     : "";
@@ -164,6 +171,8 @@ export default function CustomerProfilePage() {
     hotLeadCount,
     profile,
   });
+  const canMergeProfiles = ["head", "superadmin"].includes(currentUser?.role ?? "");
+  const mergeCandidateCount = profile?.merge_candidates.length ?? 0;
 
   return (
     <WorkspaceShell
@@ -231,6 +240,38 @@ export default function CustomerProfilePage() {
               </div>
             </section>
 
+            <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+                    Mulai Dari Sini
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    Buka lead terkait dulu kalau tujuan Anda adalah kerja operasional. Buka profil customer kalau ingin rapikan identitas. Buka merge hanya kalau data customer terasa pecah.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <PanelChip
+                    active={activePanel === "leads"}
+                    label={`Lead terkait (${profile.related_leads.length})`}
+                    onClick={() => setActivePanel("leads")}
+                  />
+                  <PanelChip
+                    active={activePanel === "profile"}
+                    label="Profil customer"
+                    onClick={() => setActivePanel("profile")}
+                  />
+                  {canMergeProfiles ? (
+                    <PanelChip
+                      active={activePanel === "merge"}
+                      label={`Merge candidates (${mergeCandidateCount})`}
+                      onClick={() => setActivePanel("merge")}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
             <section className="grid gap-4 md:grid-cols-4">
               <Metric label="Lead Count" value={String(profile.lead_count)} />
               <Metric label="Conversation Count" value={String(profile.conversation_count)} />
@@ -254,29 +295,18 @@ export default function CustomerProfilePage() {
               <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
                 <h2 className="text-xl font-semibold text-[#fff0c9]">Profil Customer</h2>
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <InfoCard
-                    label="Nama yang dipakai Clara"
-                    value={profile.display_name}
-                    description="Nama ini dipakai Clara untuk mengelompokkan lead yang kemungkinan berasal dari customer yang sama."
-                  />
-                  <InfoCard
+                  <CompactInfoRow label="Nama customer" value={profile.display_name} />
+                  <CompactInfoRow
                     label="Status profil"
                     value={profile.merged_into_profile_id ? "Sudah digabung" : "Masih aktif"}
-                    description={
-                      profile.merged_into_profile_id
-                        ? "Profil ini sudah pernah digabung ke profil customer lain."
-                        : "Profil ini masih menjadi profil utama yang aktif dipakai."
-                    }
                   />
-                  <InfoCard
-                    label="Cara Clara mengenali customer ini"
-                    value={profile.match_strategy}
-                    description="Ini menjelaskan cara Clara menyatukan identitas customer, misalnya dari kemiripan nama atau normalisasi nama."
-                  />
-                  <InfoCard
+                  <CompactInfoRow label="Telepon" value={profile.phone ?? "Belum diisi"} />
+                  <CompactInfoRow label="Email" value={profile.email ?? "Belum diisi"} />
+                  <CompactInfoRow label="Status customer" value={formatCustomerStatus(profile.status)} />
+                  <CompactInfoRow label="Kategori akun" value={accountCategorySummary} />
+                  <CompactInfoRow
                     label="Kekuatan identitas"
-                    value={identityConfidenceLabel}
-                    description="Semakin tinggi nilainya, semakin kecil kemungkinan customer ini salah gabung dengan orang lain."
+                    value={`${Math.round(profile.identity_confidence * 100)}% • ${identityConfidenceLabel}`}
                   />
                 </div>
 
@@ -357,6 +387,12 @@ export default function CustomerProfilePage() {
                   <p className="mt-2 text-sm leading-7 text-[#d6bb84]">
                     Bagian ini dipakai untuk mengisi identitas customer yang lebih rapi seperti yang biasanya ada di sistem CRM klasik. Isi seperlunya, tapi pastikan nama, telepon, dan statusnya tidak ngawur karena data ini bisa dipakai tim lain juga.
                   </p>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    Kategori akun dibaca otomatis dari lead terkait customer ini. Kalau customer punya lebih dari satu lead, kategorinya bisa terlihat campuran di ringkasan profil.
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    Kalau Anda yakin kategori akun customer ini memang harus mini atau reguler, Anda bisa set manual di form ini untuk menyelaraskan lead terkait.
+                  </p>
                 </div>
                 <div className="rounded-[22px] border border-[#f0cb73]/18 bg-[#2a1e12] px-4 py-3 text-sm text-[#e6c887] lg:max-w-sm">
                   Jangan isi data palsu. Kalau Anda belum yakin nomor, email, atau alamatnya benar, lebih baik kosongkan dulu daripada membuat tim salah membaca customer.
@@ -423,6 +459,23 @@ export default function CustomerProfilePage() {
                     <option value="inactive">Tidak aktif</option>
                   </select>
                 </label>
+                <label className="space-y-2 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">Kategori Akun</span>
+                  <select
+                    value={profileForm.account_category}
+                    onChange={(event) => {
+                      setProfileForm((prev) => ({
+                        ...prev,
+                        account_category: event.target.value,
+                      }));
+                    }}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                  >
+                    <option value="unknown">Belum ditentukan</option>
+                    <option value="mini">Mini</option>
+                    <option value="reguler">Reguler</option>
+                  </select>
+                </label>
               </div>
 
               <label className="mt-4 block space-y-2 text-sm text-[#d6bb84]">
@@ -461,7 +514,9 @@ export default function CustomerProfilePage() {
                       email: profile.email ?? "",
                       address: profile.address ?? "",
                       status: profile.status,
+                      account_category: deriveEditableAccountCategory(profile.related_leads),
                     });
+                    setIsEditingProfile(false);
                   }}
                   className="inline-flex rounded-full border border-[#f0cb73]/18 bg-[#22190f] px-5 py-3 text-sm font-semibold text-[#f0cb73]"
                 >
@@ -469,6 +524,7 @@ export default function CustomerProfilePage() {
                 </button>
               </div>
             </section>
+            ) : null}
 
             <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -557,6 +613,7 @@ export default function CustomerProfilePage() {
                 )}
               </div>
             </section>
+            ) : null}
 
             <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -625,6 +682,7 @@ export default function CustomerProfilePage() {
                 ))}
               </div>
             </section>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -664,6 +722,39 @@ function InfoCard({
 }
 
 function ActionHint({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+      <p className="text-sm font-semibold text-[#fff0c9]">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
+    </div>
+  );
+}
+
+function PanelChip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+        active
+          ? "bg-slate-950 text-white"
+          : "border border-slate-300 bg-white text-slate-700"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function CompactInfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
       <p className="text-sm font-semibold text-[#fff0c9]">{title}</p>
@@ -727,6 +818,30 @@ function formatTemperatureLabel(value: string) {
   return labels[value] ?? value.toUpperCase();
 }
 
+function formatAccountCategory(value: string) {
+  const labels: Record<string, string> = {
+    mini: "Mini",
+    reguler: "Reguler",
+    unknown: "Belum ditentukan",
+  };
+
+  return labels[value] ?? value.replaceAll("_", " ");
+}
+
+function getAccountCategoryBadgeClass(value: string) {
+  if (value === "mini") {
+    return "bg-emerald-100 text-emerald-700";
+  }
+  if (value === "reguler") {
+    return "bg-amber-100 text-amber-700";
+  }
+  return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
+}
+
+function formatCustomerStatus(value: string) {
+  return value === "inactive" ? "Tidak aktif" : "Aktif";
+}
+
 function describeIdentityConfidence(value: number) {
   if (value >= 0.9) {
     return "sangat yakin";
@@ -735,6 +850,46 @@ function describeIdentityConfidence(value: number) {
     return "cukup yakin";
   }
   return "perlu dicek lagi";
+}
+
+function buildAccountCategorySummary(
+  relatedLeads: CustomerProfileSummaryItem["related_leads"]
+) {
+  const normalizedCategories = Array.from(
+    new Set(relatedLeads.map((lead) => lead.account_category))
+  );
+
+  if (normalizedCategories.length === 0) {
+    return "Belum terbaca";
+  }
+
+  const knownCategories = normalizedCategories.filter(
+    (category) => category !== "unknown"
+  );
+
+  if (knownCategories.length === 0) {
+    return "Belum ditentukan";
+  }
+
+  if (knownCategories.length === 1) {
+    return formatAccountCategory(knownCategories[0]);
+  }
+
+  return knownCategories.map(formatAccountCategory).join(" + ");
+}
+
+function deriveEditableAccountCategory(
+  relatedLeads: CustomerProfileSummaryItem["related_leads"]
+) {
+  const normalizedCategories = Array.from(
+    new Set(relatedLeads.map((lead) => lead.account_category))
+  ).filter((category) => category !== "unknown");
+
+  if (normalizedCategories.length === 1) {
+    return normalizedCategories[0];
+  }
+
+  return "unknown";
 }
 
 function buildCustomerOverview({

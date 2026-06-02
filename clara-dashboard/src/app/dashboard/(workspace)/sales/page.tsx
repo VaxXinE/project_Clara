@@ -42,6 +42,8 @@ const QUEUE_BUCKET_OPTIONS = [
   { value: "archived", label: "Archived" },
 ] as const;
 
+const QUEUE_SECTION_PAGE_SIZE = 8;
+
 type QueueBucketKey =
   | "reply_now"
   | "needs_analysis"
@@ -49,6 +51,30 @@ type QueueBucketKey =
   | "pending_review"
   | "high_risk"
   | "archived";
+
+function formatAccountCategory(value: string): string {
+  switch (value) {
+    case "mini":
+      return "Mini";
+    case "reguler":
+      return "Reguler";
+    case "unknown":
+      return "Belum ditentukan";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function getAccountCategoryBadgeClass(value: string): string {
+  switch (value) {
+    case "mini":
+      return "bg-emerald-100 text-emerald-700";
+    case "reguler":
+      return "bg-amber-100 text-amber-700";
+    default:
+      return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
+  }
+}
 
 function buildInboxPath(sourceChannelFilter: string, archiveScope: string): string {
   const params = new URLSearchParams();
@@ -138,6 +164,9 @@ export default function SalesInboxPage() {
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
   const [archiveScope, setArchiveScope] = useState("active");
   const [queueBucketFilter, setQueueBucketFilter] = useState("all");
+  const [queueSectionPages, setQueueSectionPages] = useState<
+    Partial<Record<QueueBucketKey, number>>
+  >({});
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [actionConversationId, setActionConversationId] = useState<string | null>(null);
@@ -232,6 +261,45 @@ export default function SalesInboxPage() {
       }))
       .filter((section) => section.items.length > 0);
   }, [archiveScope, filteredInboxItems]);
+
+  useEffect(() => {
+    setQueueSectionPages((current) => {
+      const next: Partial<Record<QueueBucketKey, number>> = {};
+      let hasChanges = false;
+
+      for (const section of queueSections) {
+        const totalPages = Math.max(
+          1,
+          Math.ceil(section.items.length / QUEUE_SECTION_PAGE_SIZE),
+        );
+        const currentPage = current[section.bucket] ?? 1;
+        const normalizedPage = Math.min(Math.max(currentPage, 1), totalPages);
+        next[section.bucket] = normalizedPage;
+
+        if (normalizedPage !== currentPage) {
+          hasChanges = true;
+        }
+      }
+
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(next);
+      if (!hasChanges && currentKeys.length === nextKeys.length) {
+        return current;
+      }
+
+      return next;
+    });
+  }, [queueSections]);
+
+  function handleQueueSectionPageChange(
+    bucket: QueueBucketKey,
+    nextPage: number,
+  ) {
+    setQueueSectionPages((current) => ({
+      ...current,
+      [bucket]: nextPage,
+    }));
+  }
 
   async function handleLogout() {
     try {
@@ -563,9 +631,23 @@ export default function SalesInboxPage() {
                   )}
                 </div>
               ) : (
-                queueSections.map((section) => (
-                  <section key={section.bucket} className="clara-card rounded-[28px] p-5">
-                    <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                queueSections.map((section) => {
+                  const currentPage = queueSectionPages[section.bucket] ?? 1;
+                  const totalPages = Math.max(
+                    1,
+                    Math.ceil(section.items.length / QUEUE_SECTION_PAGE_SIZE),
+                  );
+                  const paginatedItems = section.items.slice(
+                    (currentPage - 1) * QUEUE_SECTION_PAGE_SIZE,
+                    currentPage * QUEUE_SECTION_PAGE_SIZE,
+                  );
+
+                  return (
+                    <section
+                      key={section.bucket}
+                      className="clara-card rounded-[28px] p-5"
+                    >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                       <div>
                         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                           {section.config.label}
@@ -579,8 +661,55 @@ export default function SalesInboxPage() {
                       </p>
                     </div>
 
+                    {totalPages > 1 ? (
+                      <div className="mt-4 flex flex-col gap-3 rounded-[22px] border border-[#f0cb73]/14 bg-[#1d150d] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-[#d6bb82]">
+                          Menampilkan{" "}
+                          <span className="font-semibold text-[#fff0c9]">
+                            {paginatedItems.length}
+                          </span>{" "}
+                          dari{" "}
+                          <span className="font-semibold text-[#fff0c9]">
+                            {section.items.length}
+                          </span>{" "}
+                          conversation
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={currentPage === 1}
+                            onClick={() =>
+                              handleQueueSectionPageChange(
+                                section.bucket,
+                                currentPage - 1,
+                              )
+                            }
+                            className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/8 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f0cb73] hover:bg-[#f0cb73]/12 disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            Sebelumnya
+                          </button>
+                          <span className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#d6bb82]">
+                            Halaman {currentPage} / {totalPages}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={currentPage === totalPages}
+                            onClick={() =>
+                              handleQueueSectionPageChange(
+                                section.bucket,
+                                currentPage + 1,
+                              )
+                            }
+                            className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/8 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f0cb73] hover:bg-[#f0cb73]/12 disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            Berikutnya
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+
                     <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {section.items.map((item) => {
+                      {paginatedItems.map((item) => {
                         const extraction = item.latest_ai_extraction;
                         const canAnalyze = extraction === null;
                         const canGenerateDraft =
@@ -605,6 +734,14 @@ export default function SalesInboxPage() {
                                 <div className="flex flex-wrap gap-2">
                                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                                     {section.config.label}
+                                  </span>
+
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
+                                      item.account_category,
+                                    )}`}
+                                  >
+                                    {formatAccountCategory(item.account_category)}
                                   </span>
 
                                   {extraction && (
@@ -732,8 +869,9 @@ export default function SalesInboxPage() {
                         );
                       })}
                     </div>
-                  </section>
-                ))
+                    </section>
+                  );
+                })
               )}
             </section>
           </>

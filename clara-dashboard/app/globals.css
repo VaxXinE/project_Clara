@@ -382,11 +382,13 @@ textarea:focus-visible {
 .theme-black-gold .bg-white,
 .theme-black-gold .bg-slate-50,
 .theme-black-gold .bg-slate-100,
+.theme-black-gold .bg-\[linear-gradient\(180deg\,\#ffffff_0\%\,\#f8fafc_100\%\)\],
 .theme-black-gold .bg-\[linear-gradient\(180deg\,\#ffffff_0\%\,\#f8fbff_100\%\)\],
 .theme-black-gold .bg-\[linear-gradient\(135deg\,\#f8fafc_0\%\,\#ffffff_45\%\,\#eff6ff_100\%\)\] {
   background: linear-gradient(180deg, rgba(28, 22, 16, 0.96) 0%, rgba(16, 12, 9, 0.96) 100%) !important;
 }
 
+.theme-black-gold .bg-white\/90,
 .theme-black-gold .bg-white\/70,
 .theme-black-gold .bg-white\/80 {
   background: rgba(28, 22, 16, 0.8) !important;

@@ -21,6 +21,30 @@ import type {
   CurrentUser,
 } from "@/types/dashboard";
 
+function formatAccountCategory(value: string): string {
+  switch (value) {
+    case "mini":
+      return "Mini";
+    case "reguler":
+      return "Reguler";
+    case "unknown":
+      return "Belum ditentukan";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function getAccountCategoryBadgeClass(value: string): string {
+  switch (value) {
+    case "mini":
+      return "bg-emerald-100 text-emerald-700";
+    case "reguler":
+      return "bg-amber-100 text-amber-700";
+    default:
+      return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
+  }
+}
+
 export default function ChatReviewCenterPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [queue, setQueue] = useState<ChatReviewCenterResponse | null>(null);
@@ -392,6 +416,13 @@ function ReviewCard({
               )}`}
             >
               {item.lead_temperature.toUpperCase()}
+            </span>
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
+                item.account_category,
+              )}`}
+            >
+              {formatAccountCategory(item.account_category)}
             </span>
             {item.risk_level && (
               <span

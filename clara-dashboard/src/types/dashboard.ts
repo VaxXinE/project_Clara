@@ -86,6 +86,7 @@ export type SalesInboxItem = {
   source: string;
   source_channel: string;
   source_label: string;
+  account_category: string;
   status: string;
   started_at: string | null;
   last_message_at: string | null;
@@ -183,6 +184,7 @@ export type SalesConversationDetail = {
   source: string;
   source_channel: string;
   source_label: string;
+  account_category: string;
   status: string;
   started_at: string | null;
   last_message_at: string | null;
@@ -306,6 +308,7 @@ export type CustomerRelatedLeadItem = {
   display_name: string;
   source_channel: string;
   source_label: string;
+  account_category: string;
   current_stage: string;
   lead_temperature: string;
   last_contact_at: string | null;
@@ -375,6 +378,7 @@ export type CustomerProfileUpdateRequest = {
   email?: string | null;
   address?: string | null;
   status: string;
+  account_category?: string | null;
 };
 
 export type CustomerProfileMergeRequest = {
@@ -415,6 +419,7 @@ export type LeadDisciplineSuggestionResponse = {
 };
 
 export type LeadUpdateRequest = {
+  account_category?: string;
   current_stage?: string;
   lead_temperature?: string;
   summary?: string | null;
@@ -624,6 +629,7 @@ export type ChatReviewQueueItem = {
   sales_owner_name: string | null;
   source_channel: string;
   source_label: string;
+  account_category: string;
   current_stage: string;
   lead_temperature: string;
   risk_level: string | null;
