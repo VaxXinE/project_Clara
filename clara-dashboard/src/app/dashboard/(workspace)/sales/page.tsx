@@ -35,6 +35,7 @@ const ARCHIVE_SCOPE_OPTIONS = [
 const QUEUE_BUCKET_OPTIONS = [
   { value: "all", label: "Semua queue" },
   { value: "reply_now", label: "Perlu dibalas" },
+  { value: "waiting_customer", label: "Menunggu customer" },
   { value: "needs_analysis", label: "Perlu analisis" },
   { value: "needs_draft", label: "Perlu draft" },
   { value: "pending_review", label: "Menunggu review" },
@@ -46,6 +47,7 @@ const QUEUE_SECTION_PAGE_SIZE = 8;
 
 type QueueBucketKey =
   | "reply_now"
+  | "waiting_customer"
   | "needs_analysis"
   | "needs_draft"
   | "pending_review"
@@ -116,6 +118,10 @@ function getQueueBucket(item: SalesInboxItem): QueueBucketKey {
     return "needs_draft";
   }
 
+  if (item.ui_status === "reply_sent") {
+    return "waiting_customer";
+  }
+
   return "reply_now";
 }
 
@@ -132,6 +138,12 @@ function getQueueBucketConfig(bucket: QueueBucketKey) {
         label: "Perlu Draft",
         description:
           "Analisis sudah ada, tapi balasan belum dibuat. Generate draft agar user tidak mulai dari nol.",
+      };
+    case "waiting_customer":
+      return {
+        label: "Menunggu Customer",
+        description:
+          "Balasan sales sudah dikirim. Untuk sementara tidak perlu membalas lagi sampai customer merespons atau ada konteks baru.",
       };
     case "pending_review":
       return {
@@ -267,6 +279,7 @@ export default function SalesInboxPage() {
             "needs_draft",
             "pending_review",
             "reply_now",
+            "waiting_customer",
           ];
 
     return orderedBuckets
