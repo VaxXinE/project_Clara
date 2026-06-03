@@ -255,7 +255,16 @@ function getGlobalAlertNotifications(
   );
 }
 
-export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
+export function WorkspaceShell({
+  currentUser,
+  eyebrow,
+  title,
+  description,
+  backHref,
+  backLabel,
+  actions,
+  children,
+}: WorkspaceShellProps) {
   const pathname = usePathname();
   const dashboardUser = useDashboardUser();
   const resolvedCurrentUser = currentUser ?? dashboardUser?.currentUser ?? null;
@@ -526,6 +535,39 @@ export function WorkspaceShell({ currentUser, children }: WorkspaceShellProps) {
           </div>
 
           <div className="space-y-4">
+            <section className="rounded-[28px] border border-[#f0cb73]/16 bg-[linear-gradient(135deg,rgba(255,249,236,0.96)_0%,rgba(255,244,219,0.94)_100%)] p-5 shadow-[0_18px_36px_rgba(34,24,12,0.14)] sm:p-6">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#9b6a1f]">
+                    {eyebrow}
+                  </p>
+                  <h1 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-[#1f160d] sm:text-3xl">
+                    {title}
+                  </h1>
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-[#5f4a31] sm:text-[15px]">
+                    {description}
+                  </p>
+
+                  {backHref && backLabel ? (
+                    <div className="mt-4">
+                      <Link
+                        href={backHref}
+                        className="inline-flex items-center rounded-full border border-[#d8bb7b] bg-white/80 px-4 py-2 text-sm font-semibold text-[#5b3d12] shadow-[0_8px_20px_rgba(34,24,12,0.08)] hover:bg-white"
+                      >
+                        {backLabel}
+                      </Link>
+                    </div>
+                  ) : null}
+                </div>
+
+                {actions ? (
+                  <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:max-w-[520px] lg:flex-none lg:justify-end">
+                    {actions}
+                  </div>
+                ) : null}
+              </div>
+            </section>
+
             {globalNotifications.length > 0 ? (
               <div className="space-y-3">
                 {globalNotifications.map((notification) => (

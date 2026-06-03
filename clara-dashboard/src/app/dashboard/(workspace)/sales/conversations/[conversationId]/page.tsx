@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { ConversationAiActions } from "@/components/dashboard/ConversationAiActions";
@@ -151,8 +151,94 @@ function buildConversationActionPlan(detail: SalesConversationDetail) {
 
   return items.slice(0, 4);
 }
+
+function getLatestConversationMessage(detail: SalesConversationDetail) {
+  return [...detail.messages].sort((left, right) =>
+    left.message_timestamp.localeCompare(right.message_timestamp),
+  )[detail.messages.length - 1] ?? null;
+}
+
+function getLatestSentMessage(detail: SalesConversationDetail) {
+  return [...detail.sent_messages].sort((left, right) =>
+    left.sent_at.localeCompare(right.sent_at),
+  )[detail.sent_messages.length - 1] ?? null;
+}
+
+function isAnalysisStale(detail: SalesConversationDetail): boolean {
+  const extraction = detail.latest_ai_extraction;
+  const latestMessage = getLatestConversationMessage(detail);
+  if (!extraction || !latestMessage || latestMessage.sender_type !== "customer") {
+    return false;
+  }
+  return extraction.created_at < latestMessage.message_timestamp;
+}
+
+function isReplySuggestionStale(detail: SalesConversationDetail): boolean {
+  const suggestion = detail.latest_reply_suggestion;
+  const latestMessage = getLatestConversationMessage(detail);
+  if (!suggestion || !latestMessage || latestMessage.sender_type !== "customer") {
+    return false;
+  }
+  return suggestion.created_at < latestMessage.message_timestamp;
+}
+
+function hasFreshCustomerReply(detail: SalesConversationDetail): boolean {
+  const latestMessage = getLatestConversationMessage(detail);
+  const latestSent = getLatestSentMessage(detail);
+  if (!latestMessage || latestMessage.sender_type !== "customer" || !latestSent) {
+    return false;
+  }
+  return latestMessage.message_timestamp > latestSent.sent_at;
+}
+
+function buildContinuationHref(detail: SalesConversationDetail): string {
+  const params = new URLSearchParams({
+    mode: "continue",
+    title: detail.title,
+    channel: detail.source_channel || "whatsapp",
+    conversationId: detail.conversation_id,
+  });
+  return `/dashboard/upload?${params.toString()}`;
+}
+
+function buildUploadResultBanner(
+  searchParams: { get(name: string): string | null },
+): { tone: "success" | "neutral"; text: string } | null {
+  const uploadStatus = searchParams.get("uploadStatus");
+  if (!uploadStatus) {
+    return null;
+  }
+
+  const appendedCount = Number(searchParams.get("appended") ?? "0");
+  const messageCount = Number(searchParams.get("messageCount") ?? "0");
+
+  if (uploadStatus === "created") {
+    return {
+      tone: "success",
+      text: `Conversation baru dibuat dari ${messageCount} pesan yang baru di-upload.`,
+    };
+  }
+
+  if (uploadStatus === "updated") {
+    return {
+      tone: "success",
+      text: `${appendedCount} pesan baru berhasil ditempelkan ke conversation ini. Cek lagi analisis dan draft lama karena konteks chat sudah berkembang.`,
+    };
+  }
+
+  if (uploadStatus === "unchanged") {
+    return {
+      tone: "neutral",
+      text: "Upload terakhir tidak menambah pesan baru. Clara menganggap isi chat yang Anda kirim sama dengan yang sudah ada di conversation ini.",
+    };
+  }
+
+  return null;
+}
+
 export default function SalesConversationDetailPage() {
   const params = useParams<{ conversationId: string }>();
+  const searchParams = useSearchParams();
   const conversationId = params.conversationId;
 
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -532,22 +618,32 @@ export default function SalesConversationDetailPage() {
           : "Kembali ke inbox"
       }
       actions={
-        <Link
-          href={
-            currentUser && !canAccessQueueAndActionCenter(currentUser.role)
+        <>
+          {detail ? (
+            <Link
+              href={buildContinuationHref(detail)}
+              className="clara-button clara-button-primary"
+            >
+              Tambah Chat Lanjutan
+            </Link>
+          ) : null}
+          <Link
+            href={
+              currentUser && !canAccessQueueAndActionCenter(currentUser.role)
+                ? normalizeWorkspaceRole(currentUser.role) === "head"
+                  ? "/dashboard/notifications"
+                  : "/dashboard/manager-insights"
+                : "/dashboard/follow-up"
+            }
+            className="clara-button clara-button-ghost"
+          >
+            {currentUser && !canAccessQueueAndActionCenter(currentUser.role)
               ? normalizeWorkspaceRole(currentUser.role) === "head"
-                ? "/dashboard/notifications"
-                : "/dashboard/manager-insights"
-              : "/dashboard/follow-up"
-          }
-          className="clara-button clara-button-ghost"
-        >
-          {currentUser && !canAccessQueueAndActionCenter(currentUser.role)
-            ? normalizeWorkspaceRole(currentUser.role) === "head"
-              ? "Buka Alert Center"
-              : "Buka Manager Insights"
-            : "Buka Worklist"}
-        </Link>
+                ? "Buka Alert Center"
+                : "Buka Manager Insights"
+              : "Buka Worklist"}
+          </Link>
+        </>
       }
     >
       <div className="space-y-6">
@@ -578,6 +674,10 @@ export default function SalesConversationDetailPage() {
 
         {detail && !isLoading && !errorMessage && (
           <>
+            <ConversationFreshnessBanner
+              detail={detail}
+              uploadBanner={buildUploadResultBanner(searchParams)}
+            />
             <ConversationDetailHeader detail={detail} />
             <ConversationDetailContent
               currentUser={currentUser}
@@ -649,6 +749,87 @@ export default function SalesConversationDetailPage() {
   );
 }
 
+function ConversationFreshnessBanner({
+  detail,
+  uploadBanner,
+}: {
+  detail: SalesConversationDetail;
+  uploadBanner: { tone: "success" | "neutral"; text: string } | null;
+}) {
+  const analysisStale = isAnalysisStale(detail);
+  const suggestionStale = isReplySuggestionStale(detail);
+  const freshCustomerReply = hasFreshCustomerReply(detail);
+  const continuationHref = buildContinuationHref(detail);
+
+  return (
+    <div className="space-y-3">
+      {uploadBanner ? (
+        <div
+          className={
+            uploadBanner.tone === "success"
+              ? "rounded-[24px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+              : "rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"
+          }
+        >
+          {uploadBanner.text}
+        </div>
+      ) : null}
+
+      {(freshCustomerReply || analysisStale || suggestionStale) ? (
+        <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,#fff8eb_0%,#fff2d8_100%)] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="clara-kicker text-[#9a5a08]">
+                Chat terus berkembang
+              </p>
+              <h2 className="mt-2 text-lg font-bold text-slate-950">
+                Ada konteks baru setelah tindakan terakhir
+              </h2>
+              <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+                {freshCustomerReply ? (
+                  <p>
+                    Customer sudah membalas lagi setelah pesan terakhir yang
+                    ditandai terkirim. Conversation ini aktif lagi dan perlu
+                    dibaca ulang.
+                  </p>
+                ) : null}
+                {analysisStale ? (
+                  <p>
+                    AI analysis lama sudah tertinggal dari chat terbaru. Jalankan
+                    ulang analisis sebelum mengambil keputusan baru.
+                  </p>
+                ) : null}
+                {suggestionStale ? (
+                  <p>
+                    Draft balasan lama sudah tidak sepenuhnya relevan. Generate
+                    ulang reply suggestion setelah memastikan konteks terbaru.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={continuationHref}
+                className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+              >
+                Upload Chat Lanjutan
+              </Link>
+              <button
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              >
+                Baca dari atas lagi
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ConversationDetailHeader({
   detail,
 }: {
@@ -656,6 +837,8 @@ function ConversationDetailHeader({
 }) {
   const extraction = detail.latest_ai_extraction;
   const suggestion = detail.latest_reply_suggestion;
+  const analysisStale = isAnalysisStale(detail);
+  const suggestionStale = isReplySuggestionStale(detail);
 
   return (
     <section className="clara-card rounded-[30px] p-5 sm:p-6">
@@ -711,6 +894,18 @@ function ConversationDetailHeader({
                 Belum ada draft
               </span>
             )}
+
+            {analysisStale ? (
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                Analysis perlu diperbarui
+              </span>
+            ) : null}
+
+            {suggestionStale ? (
+              <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800">
+                Draft lama
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -842,6 +1037,8 @@ function ConversationDetailContent({
   const canReviewProposal = canReviewKnowledgeProposal(currentUser?.role);
   const reviewCase = detail.chat_review_case;
   const knowledgeProposal = detail.knowledge_update_proposal;
+  const analysisStale = isAnalysisStale(detail);
+  const suggestionStale = isReplySuggestionStale(detail);
   const [activePanel, setActivePanel] = useState<
     "ai_reply" | "coaching" | "knowledge" | "sent_logs"
   >("ai_reply");
@@ -982,6 +1179,8 @@ function ConversationDetailContent({
                   conversationId={detail.conversation_id}
                   hasAiExtraction={Boolean(extraction)}
                   hasReplySuggestion={Boolean(suggestion)}
+                  analysisNeedsRefresh={analysisStale}
+                  replyNeedsRefresh={suggestionStale}
                   onUpdated={onUpdated}
                 />
 
@@ -1047,6 +1246,7 @@ function ConversationDetailContent({
                       (sentMessage) =>
                         sentMessage.reply_suggestion_id === suggestion.id,
                     )}
+                    isStale={suggestionStale}
                     onUpdated={onUpdated}
                   />
                 ) : (

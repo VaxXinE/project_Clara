@@ -1024,6 +1024,7 @@ export type MarketingInsightSnapshot = {
 export type UploadConversationResponse = {
   conversation_id: string;
   message_count: number;
+  appended_message_count: number;
   status: string;
 };
 

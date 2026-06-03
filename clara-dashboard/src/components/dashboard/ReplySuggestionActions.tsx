@@ -10,6 +10,7 @@ type Props = {
   suggestedReplies: SuggestedReply[];
   approvalStatus: string;
   hasBeenSent?: boolean;
+  isStale?: boolean;
   onUpdated: () => Promise<void>;
 };
 
@@ -18,6 +19,7 @@ export function ReplySuggestionActions({
   suggestedReplies,
   approvalStatus,
   hasBeenSent = false,
+  isStale = false,
   onUpdated,
 }: Props) {
   const [selectedText, setSelectedText] = useState(
@@ -111,6 +113,12 @@ export function ReplySuggestionActions({
           Untuk MVP ini, status terkirim masih simulasi manual. Nanti bisa
           diganti ke WhatsApp Cloud API.
         </p>
+        {isStale ? (
+          <p className="mt-3 rounded-[18px] border border-amber-200/50 bg-amber-100/10 px-3 py-2 text-sm text-[#fff0c9]">
+            Customer sudah membalas lagi setelah pesan terkirim. Draft lama ini
+            sebaiknya tidak dipakai sebagai patokan balasan berikutnya.
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -165,6 +173,12 @@ export function ReplySuggestionActions({
         <p className="mt-2 text-sm text-slate-600">
           Pilih salah satu draft, edit kalau perlu, lalu approve atau reject.
         </p>
+        {isStale ? (
+          <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Draft ini dibuat sebelum chat terbaru masuk. Baca pesan terakhir
+            customer dulu, lalu pertimbangkan generate ulang sebelum approve.
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-3">
