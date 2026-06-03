@@ -15,8 +15,7 @@ export function normalizeWorkspaceRole(role?: string | null): string {
 }
 
 export function isOwnerLike(role?: string | null): boolean {
-  const normalized = normalizeWorkspaceRole(role);
-  return normalized === "superadmin";
+  return normalizeWorkspaceRole(role) === "superadmin";
 }
 
 export function isSuperadminRole(role?: string | null): boolean {
@@ -33,7 +32,7 @@ export function isManagerRole(role?: string | null): boolean {
 
 export function isAdminLike(role?: string | null): boolean {
   const normalized = normalizeWorkspaceRole(role);
-  return normalized === "head" || isOwnerLike(normalized);
+  return normalized === "head" || normalized === "superadmin";
 }
 
 export function isManagerLike(role?: string | null): boolean {
@@ -41,8 +40,12 @@ export function isManagerLike(role?: string | null): boolean {
   return normalized === "manager" || isAdminLike(normalized);
 }
 
-export function canLeadSalesTeam(role?: string | null): boolean {
+export function canViewSalesTeam(role?: string | null): boolean {
   return normalizeWorkspaceRole(role) === "manager";
+}
+
+export function canLeadSalesTeam(role?: string | null): boolean {
+  return canViewSalesTeam(role);
 }
 
 export function isSalesLike(role?: string | null): boolean {

@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <title>Clara Manager Manual</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 14mm 14mm 16mm 14mm;
+      }
+
+      :root {
+        --ink: #171a29;
+        --muted: #59607b;
+        --gold: #c89538;
+        --gold-soft: #f6d98c;
+        --line: #e8dcc9;
+        --paper: #fffdfa;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        line-height: 1.5;
+        font-size: 11.2px;
+      }
+
+      h1, h2, h3 { margin: 0 0 10px; line-height: 1.2; }
+      h1 { font-size: 26px; }
+      h2 {
+        margin-top: 18px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--line);
+        font-size: 18px;
+      }
+      h3 { margin-top: 14px; font-size: 14px; }
+      p { margin: 0 0 8px; }
+      ul, ol { margin: 0 0 10px 18px; padding: 0; }
+      li { margin-bottom: 3px; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 14px;
+        font-size: 10px;
+      }
+      th, td {
+        border: 1px solid var(--line);
+        padding: 6px 8px;
+        vertical-align: top;
+        text-align: left;
+      }
+      th { background: #f5ecdd; }
+      .cover {
+        min-height: 256mm;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 18mm 16mm;
+        background:
+          linear-gradient(140deg, rgba(16,18,29,.95), rgba(28,31,50,.92)),
+          url("../clara-dashboard/public/assets/background.png") center/cover no-repeat;
+        color: white;
+        border-radius: 18px;
+        overflow: hidden;
+      }
+      .pill {
+        display: inline-block;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(246, 217, 140, 0.12);
+        color: var(--gold-soft);
+        border: 1px solid rgba(246, 217, 140, 0.22);
+        letter-spacing: .14em;
+        font-size: 10px;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+      .cover h1 {
+        margin-top: 16px;
+        font-size: 31px;
+        max-width: 520px;
+      }
+      .cover p {
+        max-width: 560px;
+        color: rgba(255,255,255,.82);
+        font-size: 13px;
+      }
+      .card,
+      .section-box,
+      .image-block,
+      .note {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .card {
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 18px;
+        padding: 14px;
+        margin-top: 12px;
+      }
+      .card h3 {
+        color: var(--gold-soft);
+        margin-bottom: 8px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: .14em;
+      }
+      .section-box {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 16px;
+        padding: 14px;
+        margin: 12px 0 14px;
+      }
+      .image-block {
+        margin: 12px 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 10px;
+        background: white;
+      }
+      .image-block img {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 205mm;
+        object-fit: contain;
+        border-radius: 12px;
+      }
+      .caption {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .note {
+        padding: 12px 14px;
+        border-left: 4px solid var(--gold);
+        background: #fff8eb;
+        border-radius: 10px;
+        margin: 10px 0 16px;
+      }
+      .page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+      .footer {
+        margin-top: 22px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="cover">
+      <div>
+        <span class="pill">Clara Manager Manual</span>
+        <h1>Panduan Khusus Manager Menggunakan Clara</h1>
+        <p>
+          Dokumen ini dibuat khusus untuk manager. Fokusnya adalah membaca bottleneck,
+          memberi coaching yang jelas, memantau kondisi tim, dan memutuskan kapan
+          harus turun ke lead atau customer detail.
+        </p>
+      </div>
+      <div>
+        <div class="card">
+          <h3>Fokus</h3>
+          <p>Chat Review Center, Conversation Detail, Manager Insights, Lead Management, Customer Detail, dan Alert Center.</p>
+        </div>
+        <div class="card">
+          <h3>Versi Dokumen</h3>
+          <p>Disusun berdasarkan workflow manager Clara yang aktif per 3 Juni 2026.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h1>Daftar Isi</h1>
+      <div class="section-box">
+        <ol>
+          <li>Clara dipakai untuk apa oleh manager</li>
+          <li>Halaman yang paling sering dipakai manager</li>
+          <li>Alur kerja harian manager</li>
+          <li>Panduan halaman satu per satu</li>
+          <li>Tindakan berdasarkan kondisi</li>
+          <li>Checklist dan hal yang jangan dilakukan</li>
+          <li>Troubleshooting singkat</li>
+        </ol>
+      </div>
+
+      <h2>1. Clara Dipakai Untuk Apa Oleh Manager</h2>
+      <p>
+        Untuk manager, Clara dipakai untuk melihat chat tim yang macet, membaca
+        kondisi tim, memberi coaching, mengecek lead penting, dan memastikan data
+        customer tidak membingungkan tim.
+      </p>
+
+      <h2>2. Halaman Yang Paling Sering Dipakai Manager</h2>
+      <ol>
+        <li>Chat Review Center</li>
+        <li>Conversation Detail</li>
+        <li>Manager Insights</li>
+        <li>Lead Management</li>
+        <li>Lead Detail</li>
+        <li>Customer List</li>
+        <li>Customer Detail</li>
+        <li>Alert Center</li>
+      </ol>
+
+      <div class="note">
+        Aturan cepat: manager tidak bekerja dari Queue. Manager bekerja dari
+        Chat Review Center dan Manager Insights.
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>3. Alur Kerja Harian Manager</h2>
+      <ol>
+        <li>Buka Chat Review Center.</li>
+        <li>Pilih item yang high risk, stale, atau pending review.</li>
+        <li>Buka Conversation Detail dan pahami hambatannya.</li>
+        <li>Beri coaching note atau keputusan review.</li>
+        <li>Buka Manager Insights.</li>
+        <li>Lihat discipline by team dan coaching priority.</li>
+        <li>Turun ke Lead Management atau Customer Detail bila perlu.</li>
+      </ol>
+
+      <div class="image-block">
+        <img src="assets/manual/screenshots/chat_review_center.png" alt="Chat Review Center Clara" />
+        <div class="caption">
+          Tampilan Chat Review Center Clara asli. Manager memakainya untuk melihat
+          chat tim yang macet, high risk, atau pending review.
+        </div>
+      </div>
+
+      <div class="image-block">
+        <img src="assets/manual/screenshots/manager_insight.png" alt="Manager Insights Clara" />
+        <div class="caption">
+          Tampilan Manager Insights Clara asli. Halaman ini membantu manager melihat
+          tim mana yang mulai longgar dan butuh perhatian.
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>4. Panduan Halaman Satu Per Satu</h2>
+
+      <h3>4.1 Chat Review Center</h3>
+      <p>
+        Ini adalah tempat kerja utama manager.
+      </p>
+      <ul>
+        <li>Prioritaskan item high risk, stale, atau pending review.</li>
+        <li>Jangan baca semua item tanpa urutan.</li>
+        <li>Tujuan halaman ini adalah memutuskan tindakan, bukan sekadar melihat daftar chat.</li>
+      </ul>
+
+      <h3>4.2 Conversation Detail</h3>
+      <p>
+        Dipakai untuk membaca konteks penuh sebelum memberi coaching atau keputusan.
+      </p>
+      <ul>
+        <li>Baca chat terbaru dulu.</li>
+        <li>Lihat hasil AI analysis.</li>
+        <li>Lihat draft balasan.</li>
+        <li>Cek account category.</li>
+        <li>Tentukan apakah sales butuh revisi atau approval.</li>
+      </ul>
+
+      <h3>4.3 Manager Insights</h3>
+      <p>
+        Dipakai untuk membaca kondisi tim secara ringkas.
+      </p>
+      <ul>
+        <li>Lihat discipline by team.</li>
+        <li>Lihat coaching priority.</li>
+        <li>Lihat objection trend dan boundary alert.</li>
+        <li>Klik team bila perlu melihat anggota.</li>
+      </ul>
+
+      <h3>4.4 Lead Management</h3>
+      <p>
+        Dipakai manager untuk memeriksa lead yang memang perlu perhatian:
+        Hot, Overdue, Needs sync, atau Disiplin stale.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/lead_management.png" alt="Lead Management Clara" />
+        <div class="caption">
+          Tampilan Lead Management Clara asli. Manager memakainya untuk membaca
+          lead yang berdampak, bukan untuk scan semua lead tanpa tujuan.
+        </div>
+      </div>
+
+      <h3>4.5 Lead Detail</h3>
+      <p>
+        Dipakai manager untuk melihat apakah satu lead dikerjakan dengan benar.
+      </p>
+      <ul>
+        <li>Cek stage.</li>
+        <li>Cek owner.</li>
+        <li>Cek next follow-up.</li>
+        <li>Cek log disiplin.</li>
+        <li>Cek metrik deal.</li>
+        <li>Cek account category.</li>
+      </ul>
+
+      <h3>4.6 Customer Detail</h3>
+      <p>
+        Dipakai saat manager merasa satu customer terbaca membingungkan atau
+        ada masalah segmentasi akun.
+      </p>
+      <ul>
+        <li>Cek nama, nomor, email, dan alamat.</li>
+        <li>Cek kategori akun.</li>
+        <li>Cek temperature customer.</li>
+        <li>Cek lead terkait.</li>
+      </ul>
+
+      <h3>4.7 Alert Center</h3>
+      <p>
+        Dipakai manager untuk membaca sinyal operasional aktif yang mungkin butuh perhatian.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/alert_center.png" alt="Alert Center Clara" />
+        <div class="caption">
+          Tampilan Alert Center Clara asli. Manager memakainya untuk melihat
+          sinyal operasional yang masih aktif.
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>5. Tindakan Berdasarkan Kondisi</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Kondisi</th>
+            <th>Apa Artinya</th>
+            <th>Tindakan Yang Harus Dilakukan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>High risk chat</td>
+            <td>Balasan berpotensi sensitif atau salah.</td>
+            <td>Buka Conversation Detail, baca konteks penuh, lalu beri arahan atau keputusan.</td>
+          </tr>
+          <tr>
+            <td>Pending review</td>
+            <td>Ada chat yang menunggu keputusan manusia.</td>
+            <td>Buka item tersebut lalu putuskan tindakan.</td>
+          </tr>
+          <tr>
+            <td>Stale</td>
+            <td>Item terlalu lama menunggu.</td>
+            <td>Cari penyebab macetnya lalu beri arahan yang jelas.</td>
+          </tr>
+          <tr>
+            <td>Discipline by Team melemah</td>
+            <td>Ritme kerja tim mulai turun.</td>
+            <td>Buka Manager Insights dan cari apakah masalahnya ada di chat, follow-up, atau log disiplin.</td>
+          </tr>
+          <tr>
+            <td>Customer profile janggal</td>
+            <td>Nama, kategori akun, atau temperature tampak tidak tepat.</td>
+            <td>Buka Customer Detail, cek lead terkait, lalu minta koreksi jika memang perlu.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>6. Checklist Cepat Manager</h2>
+      <ul>
+        <li>Apakah ada chat high risk yang belum disentuh.</li>
+        <li>Apakah ada item pending review yang terlalu lama.</li>
+        <li>Apakah ada team yang mulai longgar.</li>
+        <li>Apakah hot lead milik tim masih dijaga.</li>
+        <li>Apakah coaching sudah spesifik dan bisa ditindaklanjuti.</li>
+        <li>Apakah customer profile penting tidak membingungkan tim.</li>
+      </ul>
+
+      <h2>7. Hal Yang Jangan Dilakukan Manager</h2>
+      <ul>
+        <li>Jangan menilai tim hanya dari satu chat.</li>
+        <li>Jangan memberi coaching yang terlalu umum.</li>
+        <li>Jangan mengabaikan stale atau pending review.</li>
+        <li>Jangan membiarkan lead panas tanpa owner yang jelas.</li>
+        <li>Jangan memperbaiki data customer tanpa membaca konteks lead terkait.</li>
+      </ul>
+
+      <h2>8. Troubleshooting Singkat</h2>
+      <h3>8.1 Kenapa Chat Review Center kosong</h3>
+      <p>Bisa jadi memang tidak ada bottleneck review saat ini atau filter terlalu ketat.</p>
+
+      <h3>8.2 Kenapa Manager Insights terlihat kosong</h3>
+      <p>Bisa jadi scope tim kecil atau sinyal yang terkumpul memang belum banyak.</p>
+
+      <h3>8.3 Kenapa kategori akun belum muncul</h3>
+      <p>Bisa jadi analisis chat belum dijalankan atau Clara belum cukup yakin membaca kategorinya.</p>
+
+      <div class="footer">
+        Clara Manager Manual • Disusun dari workflow manager Clara yang aktif • 3 Juni 2026
+      </div>
+    </section>
+  </body>
+</html>
