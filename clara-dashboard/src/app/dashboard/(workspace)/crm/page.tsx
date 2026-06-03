@@ -30,6 +30,7 @@ const QUICK_FILTER_OPTIONS = [
 ] as const;
 
 const SORT_OPTIONS = [
+  { value: "created_at", label: "Terbaru" },
   { value: "priority", label: "Priority" },
   { value: "last_contact", label: "Last contact" },
   { value: "next_follow_up", label: "Next follow-up" },
@@ -255,7 +256,7 @@ export default function CrmPage() {
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
   const [quickFilter, setQuickFilter] = useState("all");
   const [bucketFilter, setBucketFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("priority");
+  const [sortBy, setSortBy] = useState("created_at");
   const [searchQuery, setSearchQuery] = useState("");
   const [leadPage, setLeadPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
@@ -323,6 +324,12 @@ export default function CrmPage() {
       });
 
     return [...result].sort((left, right) => {
+      if (sortBy === "created_at") {
+        const leftTime = toDate(left.created_at)?.getTime() ?? 0;
+        const rightTime = toDate(right.created_at)?.getTime() ?? 0;
+        return rightTime - leftTime;
+      }
+
       if (sortBy === "last_contact") {
         const leftTime = toDate(left.last_contact_at)?.getTime() ?? 0;
         const rightTime = toDate(right.last_contact_at)?.getTime() ?? 0;

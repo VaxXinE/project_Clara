@@ -461,7 +461,7 @@ def get_leads_for_user(
     )
     if not is_superadmin_like(current_user.role):
         statement = statement.where(Lead.organization_id == current_user.organization_id)
-    statement = statement.order_by(desc(Lead.last_contact_at), desc(Lead.created_at))
+    statement = statement.order_by(desc(Lead.created_at), desc(Lead.updated_at))
 
     statement = apply_sales_user_scope_filter(
         statement,
