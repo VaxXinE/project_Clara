@@ -30,6 +30,7 @@ from app.services.lead_activity_service import (
     list_lead_activity_events,
 )
 from app.services.customer_profile_service import (
+    is_placeholder_profile_name,
     customer_profile_contact_fields_supported,
     customer_profile_load_only_columns,
     build_customer_profile_summary,
@@ -112,18 +113,26 @@ def derive_lead_display_name(
     conversation: Conversation,
     preferred_name: str | None = None,
 ) -> str:
-    if preferred_name and preferred_name.strip():
+    if preferred_name and preferred_name.strip() and not is_placeholder_profile_name(preferred_name):
         return preferred_name.strip()
 
     customer_messages = [
         message
         for message in conversation.messages
-        if message.sender_type == "customer" and message.sender_name.strip()
+        if message.sender_type == "customer"
+        and message.sender_name.strip()
+        and not is_placeholder_profile_name(message.sender_name)
     ]
     if customer_messages:
         return customer_messages[0].sender_name.strip()
 
-    return conversation.title.strip()
+    if conversation.title.strip():
+        return conversation.title.strip()
+
+    if preferred_name and preferred_name.strip():
+        return preferred_name.strip()
+
+    return "Unknown Customer"
 
 
 def ensure_conversation_lead(

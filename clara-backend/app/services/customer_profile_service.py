@@ -423,8 +423,15 @@ def ensure_customer_profile_for_lead(
             or lead_last_contact > profile_last_contact
         ):
             existing_profile.last_contact_at = lead_last_contact
-        if len(display_name.strip()) > len(existing_profile.display_name.strip()):
+        if (
+            is_placeholder_profile_name(existing_profile.display_name)
+            and not is_placeholder_profile_name(display_name)
+        ):
             existing_profile.display_name = display_name
+            existing_profile.canonical_key = canonical_key
+        elif len(display_name.strip()) > len(existing_profile.display_name.strip()):
+            existing_profile.display_name = display_name
+            existing_profile.canonical_key = canonical_key
         existing_profile.identity_confidence = max(existing_profile.identity_confidence, identity_confidence)
         existing_profile.match_strategy = match_strategy
         db.add(existing_profile)

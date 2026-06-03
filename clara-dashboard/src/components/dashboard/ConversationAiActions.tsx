@@ -8,6 +8,8 @@ type Props = {
   conversationId: string;
   hasAiExtraction: boolean;
   hasReplySuggestion: boolean;
+  analysisNeedsRefresh?: boolean;
+  replyNeedsRefresh?: boolean;
   onUpdated: () => Promise<void>;
 };
 
@@ -15,6 +17,8 @@ export function ConversationAiActions({
   conversationId,
   hasAiExtraction,
   hasReplySuggestion,
+  analysisNeedsRefresh = false,
+  replyNeedsRefresh = false,
   onUpdated,
 }: Props) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -69,6 +73,14 @@ export function ConversationAiActions({
         Jalankan analysis dan generate draft balasan langsung dari dashboard.
       </p>
 
+      {analysisNeedsRefresh || replyNeedsRefresh ? (
+        <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          {analysisNeedsRefresh
+            ? "Ada pesan customer baru sejak analisis terakhir. Jalankan ulang AI analysis dulu."
+            : "Draft lama sudah tertinggal dari chat terbaru. Generate ulang reply suggestion setelah baca konteks baru."}
+        </div>
+      ) : null}
+
       <div className="mt-4 flex flex-col gap-3">
         <button
           type="button"
@@ -78,8 +90,10 @@ export function ConversationAiActions({
         >
           {isAnalyzing
             ? "Analyzing..."
-            : hasAiExtraction
-              ? "Run AI Analysis Again"
+            : analysisNeedsRefresh
+              ? "Analyze Ulang karena Ada Chat Baru"
+              : hasAiExtraction
+                ? "Run AI Analysis Again"
               : "Analyze Conversation"}
         </button>
 
@@ -91,8 +105,10 @@ export function ConversationAiActions({
         >
           {isGeneratingReply
             ? "Generating..."
-            : hasReplySuggestion
-              ? "Generate New Reply Suggestion"
+            : replyNeedsRefresh
+              ? "Generate Draft Ulang"
+              : hasReplySuggestion
+                ? "Generate New Reply Suggestion"
               : "Generate Reply Suggestion"}
         </button>
 

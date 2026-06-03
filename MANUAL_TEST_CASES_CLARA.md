@@ -336,6 +336,240 @@ Disarankan mencatat:
 
 ---
 
+## 8A. Test Case Conversation Continuity Manual Upload
+
+Section ini khusus untuk menguji apakah chat hasil upload/paste bisa berkembang
+terus di conversation yang sama, bukan selalu membuat thread baru.
+
+### Data uji dasar
+
+Gunakan customer contoh berikut:
+
+- Nama: `Rina Pratama`
+- Channel utama: `WhatsApp`
+- Nomor: `081288997766`
+- Email: `rina.pratama@gmail.com`
+
+### Chat A - upload pertama
+
+```text
+[03/06/26, 09.10] Customer: Halo kak, saya Rina Pratama.
+[03/06/26, 09.11] Customer: Saya tertarik program mini.
+[03/06/26, 09.12] Sales: Siap kak Rina, saya bantu jelaskan ya.
+```
+
+### Chat B - chat lanjutan dengan customer yang sama
+
+```text
+[03/06/26, 09.10] Customer: Halo kak, saya Rina Pratama.
+[03/06/26, 09.11] Customer: Saya tertarik program mini.
+[03/06/26, 09.12] Sales: Siap kak Rina, saya bantu jelaskan ya.
+[03/06/26, 09.18] Customer: Kalau untuk pemula ini aman nggak kak?
+[03/06/26, 09.19] Customer: Terus legalitasnya gimana?
+```
+
+### Chat C - chat lanjutan dengan nomor dan email eksplisit
+
+```text
+[03/06/26, 09.10] Customer: Halo kak, saya Rina Pratama.
+[03/06/26, 09.10] Customer: Nomor saya 081288997766 ya kak.
+[03/06/26, 09.11] Customer: Email saya rina.pratama@gmail.com
+[03/06/26, 09.12] Sales: Siap kak Rina, saya bantu jelaskan ya.
+[03/06/26, 09.23] Customer: Saya mau tahu step lanjutnya juga.
+```
+
+### Chat D - upload duplikat
+
+Gunakan isi yang sama persis dengan `Chat B`.
+
+### Chat E - customer yang sama tapi judul sedikit berubah
+
+Gunakan isi `Chat C`, tetapi isi `Nama Customer / Judul Conversation` dengan
+`Rina P`.
+
+### Chat F - customer sama tapi channel berbeda
+
+```text
+Customer: Halo kak, saya Rina Pratama.
+Customer: Saya lanjut tanya dari Telegram ya.
+Customer: Email saya rina.pratama@gmail.com
+Sales: Siap kak, saya bantu.
+```
+
+### TC-CONT-001 Upload pertama membuat conversation baru
+
+- Role: `sales`
+- Langkah:
+  1. buka `/dashboard/upload`
+  2. pilih channel `WhatsApp`
+  3. isi judul `Rina Pratama`
+  4. paste `Chat A`
+  5. submit
+- Expected:
+  - redirect ke detail conversation
+  - response upload status = `created`
+  - `message_count = 3`
+  - lead baru terbentuk
+  - belum ada banner stale
+
+### TC-CONT-002 AI analysis dan draft awal berhasil dibuat
+
+- Role: `sales`
+- Langkah:
+  1. dari detail conversation hasil `TC-CONT-001`
+  2. klik `Analyze Conversation`
+  3. klik `Generate Reply Suggestion`
+- Expected:
+  - AI analysis muncul
+  - draft muncul
+  - tidak ada warning `analysis perlu diperbarui`
+  - tidak ada warning `draft lama`
+
+### TC-CONT-003 Chat lanjutan masuk ke conversation yang sama
+
+- Role: `sales`
+- Langkah:
+  1. dari detail conversation, klik `Tambah Chat Lanjutan`
+  2. pastikan judul customer tetap `Rina Pratama`
+  3. paste `Chat B`
+  4. submit
+- Expected:
+  - redirect kembali ke conversation yang sama
+  - response upload status = `updated`
+  - `appended_message_count = 2`
+  - timeline chat bertambah 2 pesan customer baru
+  - status conversation berubah jadi `reopened`
+
+### TC-CONT-004 Analysis dan draft lama ditandai stale
+
+- Role: `sales`
+- Prasyarat:
+  - `TC-CONT-002` dan `TC-CONT-003` sudah lolos
+- Langkah:
+  1. buka lagi detail conversation
+- Expected:
+  - muncul banner bahwa chat berkembang
+  - muncul sinyal `Analysis perlu diperbarui`
+  - muncul sinyal `Draft lama`
+  - panel AI memberi warning bahwa ada pesan customer baru
+  - panel reply memberi warning bahwa draft dibuat sebelum chat terbaru
+
+### TC-CONT-005 Upload duplikat tidak menambah pesan baru
+
+- Role: `sales`
+- Langkah:
+  1. klik `Tambah Chat Lanjutan`
+  2. paste `Chat D` yang isinya sama persis dengan upload sebelumnya
+  3. submit
+- Expected:
+  - response upload status = `unchanged`
+  - `appended_message_count = 0`
+  - tidak ada pesan baru di timeline
+  - muncul info bahwa upload terakhir tidak menambah pesan baru
+
+### TC-CONT-006 Identity phone/email membantu continuity meski judul berubah
+
+- Role: `sales`
+- Langkah:
+  1. buat satu conversation baru dulu dari `Chat C` dengan judul `Rina Pratama`
+  2. lalu upload lagi isi `Chat E` dengan judul `Rina P`
+- Expected:
+  - Clara tetap bisa menemukan conversation/customer yang sama
+  - tidak membuat thread ganda kalau phone/email berhasil dibaca
+  - response upload biasanya `updated`, bukan `created`
+
+### TC-CONT-007 Fallback ke title tetap jalan kalau tidak ada phone/email
+
+- Role: `sales`
+- Langkah:
+  1. buat customer baru tanpa nomor/email di isi chat
+  2. upload ulang chat lanjutan dengan judul yang sama
+- Expected:
+  - Clara tetap menemukan conversation lama lewat title fallback
+  - response upload = `updated`
+
+### TC-CONT-008 Channel berbeda tidak boleh auto-merge thread
+
+- Role: `sales`
+- Langkah:
+  1. setelah punya conversation WhatsApp `Rina Pratama`
+  2. buka upload lagi
+  3. pilih channel `Telegram`
+  4. isi judul `Rina Pratama`
+  5. paste `Chat F`
+- Expected:
+  - Clara membuat conversation baru untuk channel berbeda
+  - response upload = `created`
+  - tidak menempel ke thread WhatsApp
+
+### TC-CONT-009 Lead activity mencatat conversation reopened
+
+- Role: `sales` atau `manager`
+- Prasyarat:
+  - `TC-CONT-003` sudah lolos
+- Langkah:
+  1. buka `Lead Detail` dari conversation terkait
+  2. cek activity timeline
+- Expected:
+  - ada event `Conversation aktif lagi`
+  - kalau status conversation berubah, ada event perubahan status
+
+### TC-CONT-010 Task follow-up atau queue ikut bangun lagi
+
+- Role: `sales`
+- Prasyarat:
+  - conversation sudah pernah ditindaklanjuti
+- Langkah:
+  1. upload chat lanjutan dengan pesan customer baru
+  2. buka `Action Center` atau `Lead Detail`
+- Expected:
+  - lead kembali muncul sebagai item yang perlu dibaca
+  - kalau lead sudah punya `next_follow_up_at`, task follow-up tersinkron ulang
+  - kalau belum punya jadwal, queue task dibuat atau dibuka lagi
+
+### TC-CONT-011 Customer profile temperature tetap sinkron otomatis
+
+- Role: `sales`
+- Langkah:
+  1. biarkan Clara/AI update temperature lead lewat analisis
+  2. upload chat lanjutan yang memicu lead tetap aktif
+  3. buka `Customer Detail`
+- Expected:
+  - profile customer tetap menampilkan temperature hasil sinkron otomatis
+  - tidak berubah jadi manual kecuali memang pernah diubah manual user
+
+### TC-CONT-012 Tombol Tambah Chat Lanjutan membawa context yang benar
+
+- Role: `sales`
+- Langkah:
+  1. buka detail conversation
+  2. klik `Tambah Chat Lanjutan`
+- Expected:
+  - diarahkan ke `/dashboard/upload`
+  - mode `continue` aktif
+  - judul customer sudah terisi
+  - channel sudah terpilih otomatis
+  - ada link kembali ke detail conversation
+
+### Catatan interpretasi hasil
+
+- `created`:
+  conversation benar-benar baru dibuat.
+- `updated`:
+  conversation lama ditemukan dan ada pesan baru yang ditambahkan.
+- `unchanged`:
+  conversation lama ditemukan, tetapi isi upload tidak menambah pesan baru.
+
+### Risiko yang masih dianggap wajar di versi sekarang
+
+- kalau tidak ada phone/email dan judul berubah total, Clara masih bisa gagal
+  mengenali thread yang sama
+- upload manual tetap tidak sekuat jalur webhook realtime
+- false match harus sangat dihindari, jadi matching sekarang memang dibuat
+  konservatif
+
+---
+
 ## 9. Test Case Daily Discipline Log
 
 ### TC-DISC-001 Tambah discipline log manual
@@ -789,4 +1023,3 @@ order by created_at desc;
 - Jangan commit `.env`.
 - Kalau test manual banyak role, pakai browser profile terpisah atau incognito supaya cookie session tidak bentrok.
 - Kalau route dashboard terasa aneh, restart dashboard dev server dan hapus `.next`.
-
