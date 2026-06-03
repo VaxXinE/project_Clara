@@ -535,16 +535,20 @@ export function WorkspaceShell({
           </div>
 
           <div className="space-y-4">
-            <section className="rounded-[28px] border border-[#f0cb73]/16 bg-[linear-gradient(135deg,rgba(255,249,236,0.96)_0%,rgba(255,244,219,0.94)_100%)] p-5 shadow-[0_18px_36px_rgba(34,24,12,0.14)] sm:p-6">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+            <section className="relative overflow-hidden rounded-[28px] border border-[#f0cb73]/16 bg-[linear-gradient(135deg,rgba(29,21,14,0.96)_0%,rgba(18,13,10,0.97)_52%,rgba(12,9,7,0.98)_100%)] p-5 shadow-[0_22px_44px_rgba(0,0,0,0.3)] sm:p-6">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(240,203,115,0.18),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0)_26%,rgba(212,168,82,0.08)_62%,rgba(255,255,255,0.03)_100%)]"
+              />
+              <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#9b6a1f]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
                     {eyebrow}
                   </p>
-                  <h1 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-[#1f160d] sm:text-3xl">
+                  <h1 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-[#fff0c9] sm:text-3xl">
                     {title}
                   </h1>
-                  <p className="mt-3 max-w-3xl text-sm leading-7 text-[#5f4a31] sm:text-[15px]">
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-[#d6bb84] sm:text-[15px]">
                     {description}
                   </p>
 
@@ -552,7 +556,7 @@ export function WorkspaceShell({
                     <div className="mt-4">
                       <Link
                         href={backHref}
-                        className="inline-flex items-center rounded-full border border-[#d8bb7b] bg-white/80 px-4 py-2 text-sm font-semibold text-[#5b3d12] shadow-[0_8px_20px_rgba(34,24,12,0.08)] hover:bg-white"
+                        className="inline-flex items-center rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-4 py-2 text-sm font-semibold text-[#f3d694] shadow-[0_10px_24px_rgba(0,0,0,0.18)] hover:bg-[#f0cb73]/14 hover:text-[#fff0c9]"
                       >
                         {backLabel}
                       </Link>

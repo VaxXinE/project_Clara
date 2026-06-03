@@ -67,9 +67,7 @@ services:
       - |
         set -e
         uv sync --frozen
-        uv run alembic upgrade head
-        uv run python scripts/bootstrap_owner.py
-        uv run python scripts/import_clara_knowledge.py
+        uv run python scripts/setup_local_environment.py
         uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test:

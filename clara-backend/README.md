@@ -50,9 +50,7 @@ docker compose -f infra/docker-compose.yml up -d
 cd clara-backend
 cp .env.example .env
 uv sync
-uv run alembic upgrade head
-uv run python scripts/bootstrap_owner.py
-uv run python scripts/import_clara_knowledge.py
+uv run python scripts/setup_local_environment.py
 uv run uvicorn app.main:app --reload
 ```
 
@@ -87,6 +85,7 @@ CONVERSATION_AUTO_ARCHIVE_DAYS=7
 Script:
 
 - [scripts/bootstrap_owner.py](/Users/newsmaker23/Projects/clara/clara-backend/scripts/bootstrap_owner.py)
+- [scripts/setup_local_environment.py](/Users/newsmaker23/Projects/clara/clara-backend/scripts/setup_local_environment.py)
 
 Fungsi:
 
@@ -98,6 +97,7 @@ Behavior:
 - kalau env `BOOTSTRAP_*` kosong -> script skip aman
 - kalau env diisi tidak lengkap -> script fail dengan pesan jelas
 - kalau superadmin sudah ada -> script skip dan tidak bikin duplikat
+- `setup_local_environment.py` menjalankan migration `heads`, bootstrap superadmin, dan import knowledge dalam satu proses dengan progress/timing yang jelas
 
 ## Import knowledge
 

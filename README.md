@@ -440,9 +440,7 @@ Default credential lokal:
 cd clara-backend
 cp .env.example .env
 uv sync
-uv run alembic upgrade heads
-uv run python scripts/bootstrap_owner.py
-uv run python scripts/import_clara_knowledge.py
+uv run python scripts/setup_local_environment.py
 uv run uvicorn app.main:app --reload
 ```
 
@@ -607,6 +605,7 @@ uv run alembic upgrade heads
 
 Script penting di backend:
 
+- `scripts/setup_local_environment.py`
 - `scripts/bootstrap_owner.py`
 - `scripts/create_owner.py`
 - `scripts/import_clara_knowledge.py`
@@ -615,12 +614,13 @@ Script penting di backend:
 Urutan awal yang disarankan:
 
 ```bash
-uv run python scripts/bootstrap_owner.py
-uv run python scripts/import_clara_knowledge.py
+uv run python scripts/setup_local_environment.py
 ```
 
 Fungsi script:
 
+- `setup_local_environment.py`
+  - menjalankan migration `heads`, bootstrap owner, dan import knowledge dalam satu proses supaya startup lokal tidak membayar overhead `uv run` berulang
 - `bootstrap_owner.py`
   - membuat owner / organization awal untuk local setup
 - `create_owner.py`
@@ -637,8 +637,8 @@ Fungsi script:
 ```bash
 cd clara-backend
 uv sync
+uv run python scripts/setup_local_environment.py
 uv run uvicorn app.main:app --reload
-uv run alembic upgrade heads
 uv run python scripts/import_clara_knowledge.py
 ```
 

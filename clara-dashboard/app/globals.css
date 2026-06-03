@@ -350,6 +350,7 @@ textarea:focus-visible {
   box-shadow: var(--card-shadow-soft);
   backdrop-filter: blur(12px);
   color: var(--foreground);
+  height: 100%;
 }
 
 .clara-divider {

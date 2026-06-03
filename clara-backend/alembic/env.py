@@ -5,25 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.db.session import Base
-
-# Import all models so Alembic can detect metadata changes.
-from app.models.ai_extraction import AIExtraction  # noqa: F401
-from app.models.approval_log import ApprovalLog  # noqa: F401
-from app.models.conversation import Conversation  # noqa: F401
-from app.models.message import Message  # noqa: F401
-from app.models.marketing_insight_snapshot import MarketingInsightSnapshot  # noqa: F401
-from app.models.marketing_execution_item import MarketingExecutionItem  # noqa: F401
-from app.models.reply_suggestion import ReplySuggestion  # noqa: F401
-from app.models.sent_message import SentMessage  # noqa: F401
-from app.models.user import User  # noqa: F401
-from app.models.audit_log import AuditLog  # noqa: F401
-from app.models.organization import Organization  # noqa: F401
-from app.models.product_knowledge import ProductKnowledge  # noqa: F401
-from app.models.lead import Lead  # noqa: F401
-from app.models.lead_activity_event import LeadActivityEvent  # noqa: F401
-from app.models.lead_deal import LeadDeal  # noqa: F401
-from app.models.lead_task import LeadTask  # noqa: F401
-from app.models.lead_task_event import LeadTaskEvent  # noqa: F401
+import app.models  # noqa: F401
 
 config = context.config
 
