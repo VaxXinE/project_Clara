@@ -128,6 +128,8 @@ def login(
             detail=str(exc),
         ) from exc
 
+    session_response = SessionResponse(user=build_user_response(user))
+
     create_audit_log(
         db=db,
         action="auth.login",
@@ -141,7 +143,7 @@ def login(
     access_token = create_access_token(user)
     set_auth_cookies(response=response, access_token=access_token)
 
-    return SessionResponse(user=build_user_response(user))
+    return session_response
 
 
 @router.get("/me", response_model=CurrentUserResponse)

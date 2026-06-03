@@ -81,6 +81,29 @@ def customer_profile_load_only_columns(db: Session) -> list:
     return columns
 
 
+def customer_profile_lead_relationship_load():
+    return selectinload(CustomerProfile.leads).options(
+        load_only(
+            Lead.id,
+            Lead.assigned_user_id,
+            Lead.customer_profile_id,
+            Lead.display_name,
+            Lead.source,
+            Lead.account_category,
+            Lead.current_stage,
+            Lead.lead_temperature,
+            Lead.last_contact_at,
+            Lead.created_at,
+        ),
+        # Customer list/detail only needs ids and timestamps, not raw conversation text.
+        selectinload(Lead.conversations).load_only(
+            Conversation.id,
+            Conversation.created_at,
+            Conversation.last_message_at,
+        ),
+    )
+
+
 def _get_loaded_profile_value(
     profile: CustomerProfile,
     field_name: str,
@@ -552,7 +575,7 @@ def get_customer_profile_model_for_user(
         .options(
             load_only(*customer_profile_load_only_columns(db)),
             selectinload(CustomerProfile.assigned_user),
-            selectinload(CustomerProfile.leads).selectinload(Lead.conversations),
+            customer_profile_lead_relationship_load(),
         )
     ).first()
 
@@ -626,7 +649,7 @@ def get_customer_profile_for_user(
             CustomerProfile.organization_id == profile.organization_id,
         )
         .options(load_only(*customer_profile_load_only_columns(db)))
-        .options(selectinload(CustomerProfile.leads).selectinload(Lead.conversations))
+        .options(customer_profile_lead_relationship_load())
     ).all()
     if accessible_user_ids is not None:
         visible_profiles = [
@@ -655,7 +678,7 @@ def list_customer_profiles_for_user(
         .options(
             load_only(*customer_profile_load_only_columns(db)),
             selectinload(CustomerProfile.assigned_user),
-            selectinload(CustomerProfile.leads).selectinload(Lead.conversations),
+            customer_profile_lead_relationship_load(),
         )
     ).all()
 
@@ -1005,7 +1028,7 @@ def merge_customer_profiles(
         select(CustomerProfile)
         .where(CustomerProfile.organization_id == refreshed_target_profile.organization_id)
         .options(load_only(*customer_profile_load_only_columns(db)))
-        .options(selectinload(CustomerProfile.leads).selectinload(Lead.conversations))
+        .options(customer_profile_lead_relationship_load())
     ).all()
     if accessible_user_ids is not None:
         visible_profiles = [

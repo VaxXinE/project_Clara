@@ -115,7 +115,9 @@ export async function apiFetch<T>(
       if (
         lowerText.includes("failed to proxy") ||
         lowerText.includes("aggregateerror") ||
-        lowerText.includes("ecconnrefused")
+        lowerText.includes("ecconnrefused") ||
+        lowerText.includes("econnreset") ||
+        lowerText.includes("socket hang up")
       ) {
         message = `Clara backend belum bisa dijangkau. Pastikan service backend aktif di ${BACKEND_BASE_URL}.`;
       } else {

@@ -35,7 +35,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_user_by_email(db: Session, email: str) -> User | None:
     normalized_email = email.strip().lower()
-    statement = select(User).where(User.email == normalized_email)
+    statement = (
+        select(User)
+        .options(
+            selectinload(User.organization),
+            selectinload(User.created_by_user),
+            selectinload(User.sales_team).selectinload(SalesTeam.unit),
+        )
+        .where(User.email == normalized_email)
+    )
     return db.scalars(statement).first()
 
 

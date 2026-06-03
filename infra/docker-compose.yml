@@ -33,6 +33,7 @@ services:
       retries: 10
 
   backend:
+    profiles: ["app"]
     build:
       context: ../clara-backend
       dockerfile: Dockerfile
@@ -50,12 +51,12 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://clara_user:clara_password_dev_only@postgres:5432/clara_db
       REDIS_URL: redis://redis:6379/0
-      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://192.168.1.146:3000
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
       WATCHFILES_FORCE_POLLING: "true"
     ports:
-      - "192.168.1.146:8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ../clara-backend:/workspace/clara-backend
       - ../clara_knowledge:/workspace/clara_knowledge:ro
@@ -83,6 +84,7 @@ services:
       retries: 10
 
   dashboard:
+    profiles: ["app"]
     build:
       context: ../clara-dashboard
       dockerfile: Dockerfile
@@ -100,7 +102,7 @@ services:
       CHOKIDAR_USEPOLLING: "1"
       WATCHPACK_POLLING: "true"
     ports:
-      - "192.168.1.146:3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ../clara-dashboard:/app
       - clara_dashboard_node_modules:/app/node_modules

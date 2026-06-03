@@ -76,7 +76,10 @@ function getAccountCategoryBadgeClass(value: string): string {
   }
 }
 
-function buildInboxPath(sourceChannelFilter: string, archiveScope: string): string {
+function buildInboxPath(
+  sourceChannelFilter: string,
+  archiveScope: string,
+): string {
   const params = new URLSearchParams();
 
   if (sourceChannelFilter !== "all") {
@@ -169,7 +172,9 @@ export default function SalesInboxPage() {
   >({});
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [actionConversationId, setActionConversationId] = useState<string | null>(null);
+  const [actionConversationId, setActionConversationId] = useState<
+    string | null
+  >(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   async function loadInbox() {
@@ -216,7 +221,9 @@ export default function SalesInboxPage() {
   const analyzedCount = inboxItems.filter(
     (item) => item.latest_ai_extraction !== null,
   ).length;
-  const sentCount = inboxItems.filter((item) => item.latest_sent_message).length;
+  const sentCount = inboxItems.filter(
+    (item) => item.latest_sent_message,
+  ).length;
   const highRiskCount = inboxItems.filter(
     (item) => item.latest_ai_extraction?.risk_level === "high",
   ).length;
@@ -226,7 +233,10 @@ export default function SalesInboxPage() {
 
   const filteredInboxItems = useMemo(() => {
     return inboxItems.filter((item) => {
-      if (queueBucketFilter !== "all" && getQueueBucket(item) !== queueBucketFilter) {
+      if (
+        queueBucketFilter !== "all" &&
+        getQueueBucket(item) !== queueBucketFilter
+      ) {
         return false;
       }
 
@@ -251,13 +261,21 @@ export default function SalesInboxPage() {
     const orderedBuckets: QueueBucketKey[] =
       archiveScope === "archived"
         ? ["archived"]
-        : ["high_risk", "needs_analysis", "needs_draft", "pending_review", "reply_now"];
+        : [
+            "high_risk",
+            "needs_analysis",
+            "needs_draft",
+            "pending_review",
+            "reply_now",
+          ];
 
     return orderedBuckets
       .map((bucket) => ({
         bucket,
         config: getQueueBucketConfig(bucket),
-        items: filteredInboxItems.filter((item) => getQueueBucket(item) === bucket),
+        items: filteredInboxItems.filter(
+          (item) => getQueueBucket(item) === bucket,
+        ),
       }))
       .filter((section) => section.items.length > 0);
   }, [archiveScope, filteredInboxItems]);
@@ -325,7 +343,9 @@ export default function SalesInboxPage() {
       setInboxItems(data);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal menjalankan AI analysis.",
+        error instanceof Error
+          ? error.message
+          : "Gagal menjalankan AI analysis.",
       );
     } finally {
       setActionConversationId(null);
@@ -398,10 +418,7 @@ export default function SalesInboxPage() {
             </Link>
           )}
           {canAccessAdminOps && (
-            <Link
-              href="/admin/ops"
-              className="clara-button clara-button-ghost"
-            >
+            <Link href="/admin/ops" className="clara-button clara-button-ghost">
               Admin Ops
             </Link>
           )}
@@ -489,12 +506,22 @@ export default function SalesInboxPage() {
                       Atur queue kerja dari satu toolbar
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-[#e3c990]">
-                      Atur scope conversation, channel, pencarian, dan bucket kerja dari satu tempat supaya scanning queue lebih cepat.
+                      Atur scope conversation, channel, pencarian, dan bucket
+                      kerja dari satu tempat supaya scanning queue lebih cepat.
                     </p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <QueueMetaPill label="Scope" value={archiveScope === "active" ? "Aktif" : archiveScope === "archived" ? "Archived" : "Semua"} />
+                    <QueueMetaPill
+                      label="Scope"
+                      value={
+                        archiveScope === "active"
+                          ? "Aktif"
+                          : archiveScope === "archived"
+                            ? "Archived"
+                            : "Semua"
+                      }
+                    />
                     <QueueMetaPill
                       label="Channel"
                       value={
@@ -551,7 +578,9 @@ export default function SalesInboxPage() {
                         <span>Channel</span>
                         <select
                           value={sourceChannelFilter}
-                          onChange={(event) => setSourceChannelFilter(event.target.value)}
+                          onChange={(event) =>
+                            setSourceChannelFilter(event.target.value)
+                          }
                           className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
                         >
                           {SOURCE_CHANNEL_OPTIONS.map((option) => (
@@ -566,7 +595,9 @@ export default function SalesInboxPage() {
                         <span>Bucket kerja</span>
                         <select
                           value={queueBucketFilter}
-                          onChange={(event) => setQueueBucketFilter(event.target.value)}
+                          onChange={(event) =>
+                            setQueueBucketFilter(event.target.value)
+                          }
                           className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
                         >
                           {QUEUE_BUCKET_OPTIONS.map((option) => (
@@ -598,8 +629,15 @@ export default function SalesInboxPage() {
                   Hasil
                 </span>
                 <span>
-                  Menampilkan <span className="font-semibold text-[#fff0c9]">{filteredInboxItems.length}</span> dari{" "}
-                  <span className="font-semibold text-[#fff0c9]">{inboxItems.length}</span> conversation.
+                  Menampilkan{" "}
+                  <span className="font-semibold text-[#fff0c9]">
+                    {filteredInboxItems.length}
+                  </span>{" "}
+                  dari{" "}
+                  <span className="font-semibold text-[#fff0c9]">
+                    {inboxItems.length}
+                  </span>{" "}
+                  conversation.
                 </span>
               </div>
             </section>
@@ -647,228 +685,249 @@ export default function SalesInboxPage() {
                       key={section.bucket}
                       className="clara-card rounded-[28px] p-5"
                     >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                      <div>
-                        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          {section.config.label}
-                        </p>
-                        <h2 className="mt-1 text-2xl font-bold text-slate-950">
-                          {section.items.length} conversation
-                        </h2>
-                      </div>
-                      <p className="max-w-2xl text-sm leading-6 text-slate-500">
-                        {section.config.description}
-                      </p>
-                    </div>
-
-                    {totalPages > 1 ? (
-                      <div className="mt-4 flex flex-col gap-3 rounded-[22px] border border-[#f0cb73]/14 bg-[#1d150d] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm text-[#d6bb82]">
-                          Menampilkan{" "}
-                          <span className="font-semibold text-[#fff0c9]">
-                            {paginatedItems.length}
-                          </span>{" "}
-                          dari{" "}
-                          <span className="font-semibold text-[#fff0c9]">
-                            {section.items.length}
-                          </span>{" "}
-                          conversation
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={currentPage === 1}
-                            onClick={() =>
-                              handleQueueSectionPageChange(
-                                section.bucket,
-                                currentPage - 1,
-                              )
-                            }
-                            className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/8 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f0cb73] hover:bg-[#f0cb73]/12 disabled:cursor-not-allowed disabled:opacity-45"
-                          >
-                            Sebelumnya
-                          </button>
-                          <span className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#d6bb82]">
-                            Halaman {currentPage} / {totalPages}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={currentPage === totalPages}
-                            onClick={() =>
-                              handleQueueSectionPageChange(
-                                section.bucket,
-                                currentPage + 1,
-                              )
-                            }
-                            className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/8 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f0cb73] hover:bg-[#f0cb73]/12 disabled:cursor-not-allowed disabled:opacity-45"
-                          >
-                            Berikutnya
-                          </button>
+                      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            {section.config.label}
+                          </p>
+                          <h2 className="mt-1 text-2xl font-bold text-slate-950">
+                            {section.items.length} conversation
+                          </h2>
                         </div>
+                        <p className="max-w-2xl text-sm leading-6 text-slate-500">
+                          {section.config.description}
+                        </p>
                       </div>
-                    ) : null}
 
-                    <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {paginatedItems.map((item) => {
-                        const extraction = item.latest_ai_extraction;
-                        const canAnalyze = extraction === null;
-                        const canGenerateDraft =
-                          extraction !== null &&
-                          item.latest_reply_suggestion === null &&
-                          item.ui_status !== "reply_sent";
-                        const isActing = actionConversationId === item.conversation_id;
+                      {totalPages > 1 ? (
+                        <div className="mt-4 flex flex-col gap-3 rounded-[22px] border border-[#f0cb73]/14 bg-[#1d150d] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-sm text-[#d6bb82]">
+                            Menampilkan{" "}
+                            <span className="font-semibold text-[#fff0c9]">
+                              {paginatedItems.length}
+                            </span>{" "}
+                            dari{" "}
+                            <span className="font-semibold text-[#fff0c9]">
+                              {section.items.length}
+                            </span>{" "}
+                            conversation
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              disabled={currentPage === 1}
+                              onClick={() =>
+                                handleQueueSectionPageChange(
+                                  section.bucket,
+                                  currentPage - 1,
+                                )
+                              }
+                              className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/8 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f0cb73] hover:bg-[#f0cb73]/12 disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                              Sebelumnya
+                            </button>
+                            <span className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#d6bb82]">
+                              Halaman {currentPage} / {totalPages}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={currentPage === totalPages}
+                              onClick={() =>
+                                handleQueueSectionPageChange(
+                                  section.bucket,
+                                  currentPage + 1,
+                                )
+                              }
+                              className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/8 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f0cb73] hover:bg-[#f0cb73]/12 disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                              Berikutnya
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
 
-                        return (
-                          <article
-                            key={item.conversation_id}
-                            className="clara-card rounded-[30px] p-5"
-                          >
-                            <div className="flex h-full flex-col gap-4">
-                              <div className="min-w-0 space-y-4">
-                                <div className="flex flex-wrap items-center gap-2.5">
-                                  <h3 className="line-clamp-2 min-h-[3.5rem] text-lg font-semibold leading-7 text-slate-950">
-                                    {item.title}
-                                  </h3>
-                                </div>
+                      <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {paginatedItems.map((item) => {
+                          const extraction = item.latest_ai_extraction;
+                          const canAnalyze = extraction === null;
+                          const canGenerateDraft =
+                            extraction !== null &&
+                            item.latest_reply_suggestion === null &&
+                            item.ui_status !== "reply_sent";
+                          const isActing =
+                            actionConversationId === item.conversation_id;
 
-                                <div className="flex flex-wrap gap-2">
-                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                    {section.config.label}
-                                  </span>
+                          return (
+                            <article
+                              key={item.conversation_id}
+                              className="clara-card rounded-[30px] p-5"
+                            >
+                              <div className="flex h-full flex-col gap-4">
+                                <div className="min-w-0 space-y-4">
+                                  <div className="flex flex-wrap items-center gap-2.5">
+                                    <h3 className="line-clamp-2 text-lg font-semibold leading-7 text-slate-950">
+                                      {item.title}
+                                    </h3>
+                                  </div>
 
-                                  <span
-                                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
-                                      item.account_category,
-                                    )}`}
-                                  >
-                                    {formatAccountCategory(item.account_category)}
-                                  </span>
+                                  <div className="flex flex-wrap gap-2">
+                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                      {section.config.label}
+                                    </span>
 
-                                  {extraction && (
                                     <span
-                                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                                        extraction.lead_temperature,
+                                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
+                                        item.account_category,
                                       )}`}
                                     >
-                                      {extraction.lead_temperature.toUpperCase()}
+                                      {formatAccountCategory(
+                                        item.account_category,
+                                      )}
                                     </span>
-                                  )}
 
-                                  {extraction && (
-                                    <span
-                                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
-                                        extraction.risk_level,
-                                      )}`}
-                                    >
-                                      Risk {extraction.risk_level}
-                                    </span>
-                                  )}
+                                    {extraction && (
+                                      <span
+                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
+                                          extraction.lead_temperature,
+                                        )}`}
+                                      >
+                                        {extraction.lead_temperature.toUpperCase()}
+                                      </span>
+                                    )}
 
-                                  {item.ui_status === "reply_sent" && (
-                                    <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
-                                      SENT
-                                    </span>
-                                  )}
+                                    {extraction && (
+                                      <span
+                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
+                                          extraction.risk_level,
+                                        )}`}
+                                      >
+                                        Risk {extraction.risk_level}
+                                      </span>
+                                    )}
 
-                                  {item.is_archived && (
-                                    <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                      ARCHIVED
-                                    </span>
-                                  )}
-                                </div>
+                                    {item.ui_status === "reply_sent" && (
+                                      <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                                        SENT
+                                      </span>
+                                    )}
 
-                                <p className="min-h-[6rem] text-sm leading-6 text-slate-600 line-clamp-4">
-                                  {item.latest_message
-                                    ? item.latest_message.message_text
-                                    : "Belum ada pesan."}
-                                </p>
+                                    {item.is_archived && (
+                                      <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                        ARCHIVED
+                                      </span>
+                                    )}
+                                  </div>
 
-                                <div className="grid gap-2 text-xs text-slate-500">
-                                  <div className="flex flex-wrap gap-x-2 gap-y-1">
-                                    {shouldShowOwnership ? (
-                                      <span>
-                                        Owner:{" "}
-                                        <span className="font-semibold text-slate-700">
-                                          {item.sales_owner_name ?? "Belum ada owner"}
+                                  <p className="min-h-[6rem] text-sm leading-6 text-slate-600 line-clamp-4">
+                                    {item.latest_message
+                                      ? item.latest_message.message_text
+                                      : "Belum ada pesan."}
+                                  </p>
+
+                                  <div className="grid gap-2 text-xs text-slate-500">
+                                    <div className="flex flex-wrap gap-x-2 gap-y-1">
+                                      {shouldShowOwnership ? (
+                                        <span>
+                                          Owner:{" "}
+                                          <span className="font-semibold text-slate-700">
+                                            {item.sales_owner_name ??
+                                              "Belum ada owner"}
+                                          </span>
                                         </span>
+                                      ) : null}
+                                      <span>
+                                        Pesan terakhir:{" "}
+                                        {formatDateTime(item.last_message_at)}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-x-2 gap-y-1">
+                                      <span>
+                                        Priority: {item.priority_score}
+                                      </span>
+                                      <span>
+                                        Status:{" "}
+                                        {formatStatusLabel(item.ui_status)}
+                                      </span>
+                                      {archiveScope === "all" ? (
+                                        <span>
+                                          {item.is_archived ? "Arsip" : "Aktif"}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="clara-card-soft rounded-[24px] p-4">
+                                  <p className="clara-kicker text-[11px]">
+                                    Langkah berikutnya
+                                  </p>
+                                  <p className="mt-2 min-h-[5.5rem] text-sm leading-6 text-slate-700 line-clamp-4">
+                                    {extraction?.next_best_action ??
+                                      "Belum dianalisis. Jalankan AI analysis dulu."}
+                                  </p>
+                                  <div className="mt-4 flex flex-wrap gap-2">
+                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                      {formatStatusLabel(item.ui_status)}
+                                    </span>
+                                    {shouldShowOwnership &&
+                                    item.sales_owner_name ? (
+                                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                        {item.sales_owner_name}
                                       </span>
                                     ) : null}
-                                    <span>Pesan terakhir: {formatDateTime(item.last_message_at)}</span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-x-2 gap-y-1">
-                                    <span>Priority: {item.priority_score}</span>
-                                    <span>Status: {formatStatusLabel(item.ui_status)}</span>
                                     {archiveScope === "all" ? (
-                                      <span>{item.is_archived ? "Arsip" : "Aktif"}</span>
+                                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                        {item.is_archived ? "Arsip" : "Aktif"}
+                                      </span>
                                     ) : null}
                                   </div>
                                 </div>
-                              </div>
 
-                              <div className="clara-card-soft rounded-[24px] p-4">
-                                <p className="clara-kicker text-[11px]">
-                                  Langkah berikutnya
-                                </p>
-                                <p className="mt-2 min-h-[5.5rem] text-sm leading-6 text-slate-700 line-clamp-4">
-                                  {extraction?.next_best_action ??
-                                    "Belum dianalisis. Jalankan AI analysis dulu."}
-                                </p>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                    {formatStatusLabel(item.ui_status)}
-                                  </span>
-                                  {shouldShowOwnership && item.sales_owner_name ? (
-                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                      {item.sales_owner_name}
-                                    </span>
+                                <div className="mt-auto flex flex-wrap gap-2 pt-1">
+                                  {canAnalyze ? (
+                                    <button
+                                      type="button"
+                                      disabled={isActing}
+                                      onClick={() => {
+                                        void handleAnalyze(
+                                          item.conversation_id,
+                                        );
+                                      }}
+                                      className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
+                                    >
+                                      {isActing ? "Analyzing..." : "Analyze"}
+                                    </button>
                                   ) : null}
-                                  {archiveScope === "all" ? (
-                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
-                                      {item.is_archived ? "Arsip" : "Aktif"}
-                                    </span>
+
+                                  {canGenerateDraft ? (
+                                    <button
+                                      type="button"
+                                      disabled={isActing}
+                                      onClick={() => {
+                                        void handleGenerateDraft(
+                                          item.conversation_id,
+                                        );
+                                      }}
+                                      className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
+                                    >
+                                      {isActing
+                                        ? "Generating..."
+                                        : "Generate Draft"}
+                                    </button>
                                   ) : null}
+
+                                  <Link
+                                    href={`/dashboard/sales/conversations/${item.conversation_id}`}
+                                    className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
+                                  >
+                                    Buka Chat
+                                  </Link>
                                 </div>
                               </div>
-
-                              <div className="mt-auto flex flex-wrap gap-2 pt-1">
-                                {canAnalyze ? (
-                                  <button
-                                    type="button"
-                                    disabled={isActing}
-                                    onClick={() => {
-                                      void handleAnalyze(item.conversation_id);
-                                    }}
-                                    className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
-                                  >
-                                    {isActing ? "Analyzing..." : "Analyze"}
-                                  </button>
-                                ) : null}
-
-                                {canGenerateDraft ? (
-                                  <button
-                                    type="button"
-                                    disabled={isActing}
-                                    onClick={() => {
-                                      void handleGenerateDraft(item.conversation_id);
-                                    }}
-                                    className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
-                                  >
-                                    {isActing ? "Generating..." : "Generate Draft"}
-                                  </button>
-                                ) : null}
-
-                                <Link
-                                  href={`/dashboard/sales/conversations/${item.conversation_id}`}
-                                  className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
-                                >
-                                  Buka Chat
-                                </Link>
-                              </div>
-                            </div>
-                          </article>
-                        );
-                      })}
-                    </div>
+                            </article>
+                          );
+                        })}
+                      </div>
                     </section>
                   );
                 })
@@ -914,7 +973,9 @@ function OverviewTile({
     <article
       className={`rounded-[26px] border border-[#f0cb73]/18 bg-gradient-to-br p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)] ${toneClass}`}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#140f08]">{label}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#140f08]">
+        {label}
+      </p>
       <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
         {value}
       </p>

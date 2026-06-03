@@ -1,7 +1,20 @@
 "use client";
 
+import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
+import {
+  faArrowDownWideShort,
+  faBullseye,
+  faFilter,
+  faFire,
+  faLayerGroup,
+  faLink,
+  faRotateLeft,
+  faTrophy,
+  faUsers,
+} from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -44,6 +57,29 @@ const BUCKET_OPTIONS = [
   { value: "won", label: "Won" },
   { value: "archived", label: "Archived" },
 ] as const;
+
+const BUCKET_SECTION_COPY = {
+  action: {
+    title: "Perlu tindakan",
+    description:
+      "Lead yang masih butuh aksi hari ini, overdue, atau butuh sinkronisasi CRM.",
+  },
+  waiting: {
+    title: "Waiting",
+    description:
+      "Lead yang sudah cukup aman untuk sekarang dan tinggal menunggu momen follow-up berikutnya.",
+  },
+  won: {
+    title: "Won",
+    description:
+      "Lead yang sudah closing dan relatif aman, cocok untuk cek kelengkapan KPI atau deal metrics.",
+  },
+  archived: {
+    title: "Archived",
+    description:
+      "Lead yang sudah dingin atau lost, disimpan terpisah supaya list aktif tetap bersih.",
+  },
+} as const;
 
 const STAGE_ORDER = [
   "new_lead",
@@ -140,6 +176,28 @@ function getLeadBucket(lead: LeadListItem) {
   }
   if (needsActionToday(lead)) return "action";
   return "waiting";
+}
+
+function getSourceLabelBadgeClass(sourceLabel: string) {
+  const normalizedSourceLabel = sourceLabel.trim().toLowerCase();
+
+  if (normalizedSourceLabel.includes("telegram extension")) {
+    return "border-blue-500/20 bg-blue-500/10 text-blue-500";
+  }
+
+  if (normalizedSourceLabel.includes("whatsapp extension")) {
+    return "border-green-500/20 bg-green-500/10 text-green-500";
+  }
+
+  if (normalizedSourceLabel.includes("instagram")) {
+    return "border-pink-500/20 bg-pink-500/10 text-pink-500";
+  }
+
+  if (normalizedSourceLabel.includes("facebook")) {
+    return "border-indigo-500/20 bg-indigo-500/10 text-indigo-500";
+  }
+
+  return "border-[#f0cb73]/20 bg-[#f0cb73]/10 text-[#f0cb73]";
 }
 
 function matchesBucketFilter(lead: LeadListItem, bucketFilter: string) {
@@ -253,6 +311,7 @@ export default function CrmPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
   const [quickFilter, setQuickFilter] = useState("all");
   const [bucketFilter, setBucketFilter] = useState("all");
@@ -386,6 +445,31 @@ export default function CrmPage() {
     };
   }, [paginatedVisibleLeads]);
 
+  const renderedBucketSections = useMemo(() => {
+    if (bucketFilter === "all") {
+      return [
+        { ...BUCKET_SECTION_COPY.action, leads: bucketedLeads.action },
+        { ...BUCKET_SECTION_COPY.waiting, leads: bucketedLeads.waiting },
+        { ...BUCKET_SECTION_COPY.won, leads: bucketedLeads.won },
+        { ...BUCKET_SECTION_COPY.archived, leads: bucketedLeads.archived },
+      ];
+    }
+
+    const selectedBucketCopy =
+      BUCKET_SECTION_COPY[bucketFilter as keyof typeof BUCKET_SECTION_COPY];
+
+    if (!selectedBucketCopy) {
+      return [];
+    }
+
+    return [
+      {
+        ...selectedBucketCopy,
+        leads: paginatedVisibleLeads,
+      },
+    ];
+  }, [bucketFilter, bucketedLeads, paginatedVisibleLeads]);
+
   const bucketSummary = useMemo(() => {
     return {
       action: filteredLeads.filter((lead) => getLeadBucket(lead) === "action")
@@ -408,6 +492,21 @@ export default function CrmPage() {
   useEffect(() => {
     setLeadPage(1);
   }, [bucketFilter, quickFilter, searchQuery, sortBy, sourceChannelFilter]);
+
+  useEffect(() => {
+    if (!isFilterModalOpen) {
+      return;
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsFilterModalOpen(false);
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isFilterModalOpen]);
 
   useEffect(() => {
     if (!paginatedVisibleLeads.length) {
@@ -437,8 +536,38 @@ export default function CrmPage() {
     };
   }, [leads]);
 
+  const activeBucketLabel =
+    BUCKET_OPTIONS.find((option) => option.value === bucketFilter)?.label ??
+    "Semua bucket";
+  const activeChannelLabel =
+    SOURCE_CHANNEL_OPTIONS.find(
+      (option) => option.value === sourceChannelFilter,
+    )?.label ?? "Semua Channel";
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+
+    if (searchQuery.trim()) count += 1;
+    if (sourceChannelFilter !== "all") count += 1;
+    if (quickFilter !== "all") count += 1;
+    if (bucketFilter !== "all") count += 1;
+    if (sortBy !== "created_at") count += 1;
+
+    return count;
+  }, [bucketFilter, quickFilter, searchQuery, sortBy, sourceChannelFilter]);
+
   const selectedLead =
     paginatedVisibleLeads.find((lead) => lead.id === selectedLeadId) ?? null;
+  const selectedLeadActions = useMemo(() => {
+    return selectedLead ? getLeadActionItems(selectedLead) : [];
+  }, [selectedLead]);
+
+  function resetFilters() {
+    setSearchQuery("");
+    setSortBy("created_at");
+    setSourceChannelFilter("all");
+    setQuickFilter("all");
+    setBucketFilter("all");
+  }
 
   async function handleStageChange(leadId: string, currentStage: string) {
     setUpdatingLeadId(leadId);
@@ -511,195 +640,266 @@ export default function CrmPage() {
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
               <BoardMetric
-                label="Total Leads"
+                label="Total lead"
                 value={String(summary.total)}
-                hint="Semua lead yang masuk scope Anda."
+                icon={faUsers}
+                accentClass="from-[#f0cb73]/18 to-transparent text-[#f0cb73]"
               />
               <BoardMetric
                 label="Perlu tindakan"
                 value={String(summary.needsAction)}
-                hint="Lead yang sebaiknya dicek hari ini."
+                icon={faBullseye}
+                accentClass="from-[#f59e0b]/18 to-transparent text-[#f5c15d]"
               />
               <BoardMetric
                 label="Overdue"
                 value={String(summary.overdue)}
-                hint="Follow-up yang sudah lewat jadwal."
+                icon={faBullseye}
+                accentClass="from-[#fb923c]/18 to-transparent text-[#f4b164]"
               />
               <BoardMetric
                 label="Need sync"
                 value={String(summary.needsSync)}
-                hint="Stage dan deal metrics belum selaras."
+                icon={faLink}
+                accentClass="from-[#60a5fa]/18 to-transparent text-[#8fc0ff]"
               />
               <BoardMetric
                 label="Hot"
                 value={String(summary.hot)}
-                hint="Lead dengan urgensi tinggi."
+                icon={faFire}
+                accentClass="from-[#ef4444]/18 to-transparent text-[#ff9d7a]"
               />
               <BoardMetric
                 label="Won"
                 value={String(summary.won)}
-                hint="Lead yang sudah closing berhasil."
+                icon={faTrophy}
+                accentClass="from-[#fde68a]/18 to-transparent text-[#ffe8a3]"
               />
             </section>
 
-            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
-              <div className="space-y-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-4 backdrop-blur-sm">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="max-w-2xl">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                      Kontrol Lead
-                    </p>
-                    <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
-                      Atur lead yang mau discan dari satu toolbar
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-[#e3c990]">
-                      Gunakan search, sort, channel, quick filter, dan bucket
-                      view supaya list lead tetap bersih walau volume hariannya
-                      tinggi.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <LeadMetaPill
-                      label="Perlu tindakan"
-                      value={String(summary.needsAction)}
-                    />
-                    <LeadMetaPill
-                      label="Overdue"
-                      value={String(summary.overdue)}
-                    />
-                    <LeadMetaPill
-                      label="Need sync"
-                      value={String(summary.needsSync)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr]">
-                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Cari lead</span>
-                    <input
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      placeholder="Cari nama lead, owner, customer profile, source, atau summary..."
-                      className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
-                    />
-                  </label>
-
-                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Sort</span>
-                    <select
-                      value={sortBy}
-                      onChange={(event) => setSortBy(event.target.value)}
-                      className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+            <section className="rounded-[26px] border border-[#f0cb73]/18 bg-[radial-gradient(circle_at_top_right,rgba(240,203,115,0.14),transparent_34%),linear-gradient(180deg,rgba(28,21,15,0.97)_0%,rgba(16,12,9,0.97)_100%)] p-4 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsFilterModalOpen(true)}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-5 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
                     >
-                      {SORT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Channel</span>
-                    <select
-                      value={sourceChannelFilter}
-                      onChange={(event) =>
-                        setSourceChannelFilter(event.target.value)
-                      }
-                      className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                      <FontAwesomeIcon
+                        icon={faFilter}
+                        className="h-3.5 w-3.5"
+                      />
+                      Filter
+                      {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetFilters}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#3c2c16] bg-[#22190f] px-5 py-2.5 text-sm font-semibold text-[#e1c27c] transition hover:border-[#f0cb73]/28 hover:bg-[#2a1e12]"
                     >
-                      {SOURCE_CHANNEL_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                      Quick Filters
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {QUICK_FILTER_OPTIONS.map((option) => {
-                        const isActive = quickFilter === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setQuickFilter(option.value)}
-                            className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                              isActive
-                                ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-                                : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
-                            }`}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                      Bucket View
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {BUCKET_OPTIONS.map((option) => {
-                        const isActive = bucketFilter === option.value;
-                        const count =
-                          option.value === "all"
-                            ? filteredLeads.length
-                            : bucketSummary[
-                                option.value as keyof typeof bucketSummary
-                              ];
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setBucketFilter(option.value)}
-                            className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                              isActive
-                                ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-                                : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
-                            }`}
-                          >
-                            {option.label}{" "}
-                            <span className="ml-1 text-xs opacity-80">
-                              {count}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                      <FontAwesomeIcon
+                        icon={faRotateLeft}
+                        className="h-3.5 w-3.5"
+                      />
+                      Reset
+                    </button>
                   </div>
                 </div>
-              </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[22px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] px-4 py-3 text-sm text-[#d8bc84] shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
-                <span className="rounded-full bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
-                  Hasil
-                </span>
-                <span>
-                  Menampilkan{" "}
-                  <span className="font-semibold text-[#fff0c9]">
-                    {paginatedVisibleLeads.length}
-                  </span>{" "}
-                  dari{" "}
-                  <span className="font-semibold text-[#fff0c9]">
-                    {visibleLeads.length}
-                  </span>{" "}
-                  lead pada halaman ini.
-                </span>
+                <div className="flex flex-wrap justify-start gap-2 xl:max-w-[520px] xl:justify-end">
+                  <LeadMetaPill
+                    label="Channel"
+                    value={activeChannelLabel}
+                    icon={faLink}
+                  />
+                  <LeadMetaPill
+                    label="Bucket"
+                    value={activeBucketLabel}
+                    icon={faLayerGroup}
+                  />
+                  <LeadMetaPill
+                    label="Sort"
+                    value={
+                      SORT_OPTIONS.find((option) => option.value === sortBy)
+                        ?.label ?? "Terbaru"
+                    }
+                    icon={faArrowDownWideShort}
+                  />
+                </div>
               </div>
             </section>
+
+            {isFilterModalOpen ? (
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(8,6,4,0.72)] p-4 backdrop-blur-sm sm:items-center">
+                <button
+                  type="button"
+                  aria-label="Tutup filter"
+                  onClick={() => setIsFilterModalOpen(false)}
+                  className="absolute inset-0"
+                />
+                <section className="relative z-10 w-full max-w-4xl rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.98)_0%,rgba(22,16,12,0.98)_48%,rgba(53,39,17,0.96)_100%)] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.36)]">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                        Filter
+                      </p>
+                      <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#fff0c9]">
+                        Lead controls
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsFilterModalOpen(false)}
+                      className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+
+                  <div className="mt-5 space-y-4">
+                    <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr]">
+                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                          Cari lead
+                        </span>
+                        <input
+                          value={searchQuery}
+                          onChange={(event) =>
+                            setSearchQuery(event.target.value)
+                          }
+                          placeholder="Cari nama, owner, profile, source, atau summary..."
+                          className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
+                        />
+                      </label>
+
+                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                          Sort
+                        </span>
+                        <select
+                          value={sortBy}
+                          onChange={(event) => setSortBy(event.target.value)}
+                          className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                        >
+                          {SORT_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                          Channel
+                        </span>
+                        <select
+                          value={sourceChannelFilter}
+                          onChange={(event) =>
+                            setSourceChannelFilter(event.target.value)
+                          }
+                          className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                        >
+                          {SOURCE_CHANNEL_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+                      <div className="rounded-[22px] border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(34,25,18,0.82)_0%,rgba(18,13,10,0.88)_100%)] p-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                          Quick Filters
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {QUICK_FILTER_OPTIONS.map((option) => {
+                            const isActive = quickFilter === option.value;
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => setQuickFilter(option.value)}
+                                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                                  isActive
+                                    ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+                                    : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="rounded-[22px] border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(34,25,18,0.82)_0%,rgba(18,13,10,0.88)_100%)] p-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                          Bucket View
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {BUCKET_OPTIONS.map((option) => {
+                            const isActive = bucketFilter === option.value;
+                            const count =
+                              option.value === "all"
+                                ? filteredLeads.length
+                                : bucketSummary[
+                                    option.value as keyof typeof bucketSummary
+                                  ];
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => setBucketFilter(option.value)}
+                                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                                  isActive
+                                    ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+                                    : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
+                                }`}
+                              >
+                                {option.label}
+                                <span className="ml-1 text-xs opacity-80">
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-col gap-3 border-t border-[#f0cb73]/12 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-[#d8bc84]">
+                      {activeFilterCount > 0
+                        ? `${activeFilterCount} filter aktif`
+                        : "Belum ada filter aktif"}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={resetFilters}
+                        className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                      >
+                        Reset
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsFilterModalOpen(false)}
+                        className="rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-5 py-2 text-sm font-semibold text-[#140f08]"
+                      >
+                        Selesai
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            ) : null}
 
             <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-4 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
               <div className="flex items-center justify-between gap-3 border-b border-[#f0cb73]/12 px-2 pb-4">
@@ -724,45 +924,20 @@ export default function CrmPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="clara-scrollbar space-y-3 xl:max-h-[780px] xl:overflow-y-auto xl:pr-2">
-                      {renderBucketSection({
-                        title: "Perlu tindakan",
-                        description:
-                          "Lead yang masih butuh aksi hari ini, overdue, atau butuh sinkronisasi CRM.",
-                        leads:
-                          bucketFilter === "all"
-                            ? bucketedLeads.action
-                            : visibleLeads,
-                        selectedLeadId,
-                        setSelectedLeadId,
-                      })}
-                      {bucketFilter === "all" &&
-                        renderBucketSection({
-                          title: "Waiting",
-                          description:
-                            "Lead yang sudah cukup aman untuk sekarang dan tinggal menunggu momen follow-up berikutnya.",
-                          leads: bucketedLeads.waiting,
-                          selectedLeadId,
-                          setSelectedLeadId,
-                        })}
-                      {bucketFilter === "all" &&
-                        renderBucketSection({
-                          title: "Won",
-                          description:
-                            "Lead yang sudah closing dan relatif aman, cocok untuk cek kelengkapan KPI atau deal metrics.",
-                          leads: bucketedLeads.won,
-                          selectedLeadId,
-                          setSelectedLeadId,
-                        })}
-                      {bucketFilter === "all" &&
-                        renderBucketSection({
-                          title: "Archived",
-                          description:
-                            "Lead yang sudah dingin atau lost, disimpan terpisah supaya list aktif tetap bersih.",
-                          leads: bucketedLeads.archived,
-                          selectedLeadId,
-                          setSelectedLeadId,
-                        })}
+                    <div className="flex min-h-0 flex-col gap-4 xl:max-h-[780px]">
+                      <div className="clara-scrollbar rounded-lg min-h-0 flex-1 space-y-3 xl:overflow-y-auto xl:p-2 bg-[#f0cb73]/16">
+                        {renderedBucketSections.map((section) => (
+                          <Fragment key={section.title}>
+                            {renderBucketSection({
+                              title: section.title,
+                              description: section.description,
+                              leads: section.leads,
+                              selectedLeadId,
+                              setSelectedLeadId,
+                            })}
+                          </Fragment>
+                        ))}
+                      </div>
 
                       {totalLeadPages > 1 ? (
                         <div className="flex items-center justify-between gap-3 rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
@@ -799,7 +974,7 @@ export default function CrmPage() {
                       ) : null}
                     </div>
 
-                    <aside className="clara-scrollbar rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-5 xl:sticky xl:top-6 xl:max-h-[780px] xl:self-start xl:overflow-y-auto">
+                    <div>
                       {selectedLead ? (
                         <>
                           <div className="border-b border-[#f0cb73]/12 pb-4">
@@ -820,6 +995,13 @@ export default function CrmPage() {
                                 )}`}
                               >
                                 {selectedLead.lead_temperature.toUpperCase()}
+                              </span>
+                              <span
+                                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getSourceLabelBadgeClass(
+                                  selectedLead.source_label,
+                                )}`}
+                              >
+                                {selectedLead.source_label}
                               </span>
                             </div>
                             <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
@@ -860,7 +1042,7 @@ export default function CrmPage() {
                               </div>
                             </section>
 
-                            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+                            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-2">
                               <PreviewStat
                                 label="Owner"
                                 value={
@@ -900,24 +1082,6 @@ export default function CrmPage() {
                             </section>
 
                             <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
-                                Apa yang harus dilakukan
-                              </p>
-                              <div className="mt-3 space-y-3">
-                                {getLeadActionItems(selectedLead).map(
-                                  (item) => (
-                                    <ActionGuideCard
-                                      key={item.condition}
-                                      title={item.condition}
-                                      action={item.action}
-                                      detail={item.detail}
-                                    />
-                                  ),
-                                )}
-                              </div>
-                            </section>
-
-                            <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
                               <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
                                 Update stage cepat
                               </label>
@@ -925,7 +1089,10 @@ export default function CrmPage() {
                                 value={selectedLead.current_stage}
                                 disabled={updatingLeadId === selectedLead.id}
                                 onChange={(stage) => {
-                                  void handleStageChange(selectedLead.id, stage);
+                                  void handleStageChange(
+                                    selectedLead.id,
+                                    stage,
+                                  );
                                 }}
                               />
 
@@ -954,7 +1121,7 @@ export default function CrmPage() {
                           cepatnya.
                         </div>
                       )}
-                    </aside>
+                    </div>
                   </>
                 )}
               </div>
@@ -1031,7 +1198,7 @@ function LeadListRow({
           : "border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] hover:border-[#f0cb73]/28"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-semibold text-slate-950">
@@ -1068,6 +1235,13 @@ function LeadListRow({
                   lead.discipline_compliance_status}
               </span>
             )}
+            <div
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getSourceLabelBadgeClass(
+                lead.source_label,
+              )}`}
+            >
+              {lead.source_label}
+            </div>
           </div>
 
           <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#d6bb84]">
@@ -1102,33 +1276,46 @@ function LeadListRow({
             </p>
           </div>
         </div>
-
-        <div className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-          {lead.source_label}
-        </div>
       </div>
     </button>
   );
 }
 
-function LeadMetaPill({ label, value }: { label: string; value: string }) {
+function LeadMetaPill({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon: IconDefinition;
+}) {
   return (
-    <div className="rounded-full border border-[#f0cb73]/18 bg-[#1d150d] px-3.5 py-2 shadow-[0_8px_18px_rgba(0,0,0,0.14)]">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b58d43]">
-        {label}
+    <div className="inline-flex items-center gap-2 rounded-full border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(32,24,17,0.92)_0%,rgba(20,15,11,0.96)_100%)] px-3.5 py-2 shadow-[inset_0_1px_0_rgba(255,232,182,0.04)]">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f0cb73]/10 text-[#d6a74e]">
+        <FontAwesomeIcon icon={icon} className="h-3 w-3" />
       </span>
-      <span className="ml-2 text-sm font-semibold text-[#f0cb73]">{value}</span>
+      <span className="min-w-0">
+        <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9f7a38]">
+          {label}
+        </span>
+        <span className="block truncate text-sm font-semibold text-[#f0cb73]">
+          {value}
+        </span>
+      </span>
     </div>
   );
 }
 
 function PreviewStat({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-[18px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+    <article className="rounded-[18px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-[#fff0c9]">
+        {value}
+      </p>
     </article>
   );
 }
@@ -1245,36 +1432,31 @@ function StageQuickSelect({
 function BoardMetric({
   label,
   value,
-  hint,
+  icon,
+  accentClass,
 }: {
   label: string;
   value: string;
-  hint: string;
+  icon: IconDefinition;
+  accentClass: string;
 }) {
   return (
-    <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#140f08]">
-        {label}
-      </p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
-        {value}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-[#2f210f]">{hint}</p>
-    </article>
-  );
-}
-
-function BoardGuideCard({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <article className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(25,19,14,0.94)_0%,rgba(16,12,9,0.94)_100%)] p-4">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
+    <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] px-5 py-4 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#b9924b]">
+            {label}
+          </p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-[#fff0c9]">
+            {value}
+          </p>
+        </div>
+        <span
+          className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br ${accentClass}`}
+        >
+          <FontAwesomeIcon icon={icon} className="h-4 w-4" />
+        </span>
+      </div>
     </article>
   );
 }
