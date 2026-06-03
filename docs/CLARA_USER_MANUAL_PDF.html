@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <title>Clara User Manual</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 14mm 14mm 16mm 14mm;
+      }
+
+      :root {
+        --ink: #171a29;
+        --muted: #59607b;
+        --gold: #c89538;
+        --gold-soft: #f6d98c;
+        --line: #e8dcc9;
+        --paper: #fffdfa;
+        --panel: #f7f1e7;
+        --navy: #1a1c2c;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        line-height: 1.5;
+        font-size: 11.2px;
+      }
+
+      h1, h2, h3, h4 { margin: 0 0 10px; line-height: 1.2; }
+      h1 { font-size: 26px; }
+      h2 {
+        margin-top: 18px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--line);
+        font-size: 18px;
+      }
+      h3 { margin-top: 14px; font-size: 14px; }
+      h4 { margin-top: 12px; font-size: 12px; }
+      p { margin: 0 0 8px; }
+      ul, ol { margin: 0 0 10px 18px; padding: 0; }
+      li { margin-bottom: 3px; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 14px;
+        font-size: 10px;
+        page-break-inside: auto;
+      }
+      tr { page-break-inside: avoid; break-inside: avoid; }
+      th, td {
+        border: 1px solid var(--line);
+        padding: 6px 8px;
+        vertical-align: top;
+      }
+      th {
+        background: #f5ecdd;
+        text-align: left;
+      }
+      .cover {
+        min-height: 256mm;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 18mm 16mm;
+        background:
+          linear-gradient(140deg, rgba(16,18,29,.95), rgba(28,31,50,.92)),
+          url("../clara-dashboard/public/assets/background.png") center/cover no-repeat;
+        color: white;
+        border-radius: 18px;
+        overflow: hidden;
+        break-inside: avoid;
+      }
+      .cover-pill,
+      .eyebrow {
+        display: inline-block;
+        letter-spacing: .14em;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+      .cover-pill {
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(246, 217, 140, 0.12);
+        color: var(--gold-soft);
+        border: 1px solid rgba(246, 217, 140, 0.22);
+        font-size: 10px;
+      }
+      .cover h1 {
+        margin-top: 16px;
+        font-size: 31px;
+        max-width: 520px;
+      }
+      .cover p {
+        max-width: 560px;
+        color: rgba(255,255,255,.82);
+        font-size: 13px;
+      }
+      .card,
+      .toc,
+      .section-box,
+      .image-block,
+      .note {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .card {
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 18px;
+        padding: 14px;
+        margin-top: 12px;
+      }
+      .card h3 {
+        color: var(--gold-soft);
+        margin-bottom: 8px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: .14em;
+      }
+      .toc, .section-box {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 16px;
+        padding: 14px;
+        margin: 12px 0 14px;
+      }
+      .eyebrow {
+        margin-bottom: 8px;
+        font-size: 10px;
+        color: var(--gold);
+      }
+      .image-block {
+        margin: 12px 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 10px;
+        background: white;
+      }
+      .image-block img {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 205mm;
+        object-fit: contain;
+        border-radius: 12px;
+      }
+      .caption {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .note {
+        padding: 12px 14px;
+        border-left: 4px solid var(--gold);
+        background: #fff8eb;
+        border-radius: 10px;
+        margin: 10px 0 16px;
+      }
+      .page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+      .footer {
+        margin-top: 22px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .screenshot-notes {
+        margin: 8px 0 0 16px;
+        color: var(--ink);
+      }
+    </style>
+  </head>
+  <body>
+    <section class="cover">
+      <div>
+        <span class="cover-pill">Clara Manual Book</span>
+        <h1>Panduan Lengkap Penggunaan Clara</h1>
+        <p>
+          Dokumen ini menjelaskan cara memakai Clara untuk sales, manager, head,
+          dan superadmin. Fokusnya adalah alur kerja nyata, tindakan yang harus
+          dilakukan, serta cara membaca halaman-halaman penting tanpa bingung.
+        </p>
+      </div>
+      <div>
+        <div class="card">
+          <h3>Cakupan</h3>
+          <p>
+            Queue, conversation detail, lead capture, lead management, customer
+            list, customer detail, action center, alert center, review,
+            knowledge, KPI, dan access control.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Versi Dokumen</h3>
+          <p>Disusun berdasarkan struktur Clara aktif per 3 Juni 2026.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h1>Daftar Isi</h1>
+      <div class="toc">
+        <ol>
+          <li>Apa itu Clara</li>
+          <li>Role dan hak akses</li>
+          <li>Mulai dari halaman mana</li>
+          <li>Manual Sales</li>
+          <li>Manual Manager</li>
+          <li>Manual Head dan Superadmin</li>
+          <li>Panduan halaman utama</li>
+          <li>Tindakan berdasarkan kondisi</li>
+          <li>Customer intelligence dan knowledge</li>
+          <li>Troubleshooting</li>
+          <li>Praktik aman</li>
+        </ol>
+      </div>
+
+      <h2>1. Apa Itu Clara</h2>
+      <p>
+        Clara adalah platform sales operations yang menghubungkan chat customer,
+        lead, customer profile, follow-up, review manager, knowledge, dan KPI
+        dalam satu workspace.
+      </p>
+      <p>
+        Tujuan Clara bukan sekadar menyimpan data, tetapi membantu tim menjawab
+        pertanyaan paling penting: <strong>apa yang harus dikerjakan sekarang,
+        pada lead yang mana, untuk customer yang mana, dan dengan jawaban seperti apa</strong>.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/beranda_sales1.png" alt="Beranda Clara" />
+        <div class="caption">
+          Tampilan beranda Clara asli. Dari halaman ini user melihat ringkasan kerja,
+          langkah berikutnya, dan shortcut ke modul utama.
+        </div>
+      </div>
+
+      <h2>2. Role Dan Hak Akses</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Modul / Halaman</th>
+            <th>Sales</th>
+            <th>Manager</th>
+            <th>Head</th>
+            <th>Superadmin</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Beranda</td><td>Ya</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+          <tr><td>Queue</td><td>Ya</td><td>Tidak</td><td>Tidak</td><td>Ya</td></tr>
+          <tr><td>Conversation Detail</td><td>Ya</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+          <tr><td>Lead Management</td><td>Ya</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+          <tr><td>Lead Detail</td><td>Ya</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+          <tr><td>Customer List</td><td>Ya</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+          <tr><td>Customer Detail</td><td>Ya</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+          <tr><td>Action Center</td><td>Ya</td><td>Tidak</td><td>Tidak</td><td>Ya</td></tr>
+          <tr><td>Alert Center</td><td>Ya</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+          <tr><td>Lead Capture</td><td>Ya</td><td>Tidak</td><td>Tidak</td><td>Ya</td></tr>
+          <tr><td>Chat Review Center</td><td>Tidak</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+          <tr><td>Manager Insights</td><td>Tidak</td><td>Ya</td><td>Ya</td><td>Ya</td></tr>
+          <tr><td>Channels / KPI / Marketing / Access Control</td><td>Tidak</td><td>Tidak</td><td>Ya</td><td>Ya</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        Aturan cepat: sales bekerja dari Queue. Manager bekerja dari Chat Review
+        Center. Head bekerja dari Alert Center. Superadmin bekerja dari KPI dan
+        halaman governance, lalu turun ke detail bila perlu.
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>3. Mulai Dari Halaman Mana</h2>
+      <div class="section-box">
+        <ul>
+          <li><strong>Sales</strong>: mulai dari <strong>Queue</strong></li>
+          <li><strong>Manager</strong>: mulai dari <strong>Chat Review Center</strong></li>
+          <li><strong>Head</strong>: mulai dari <strong>Alert Center</strong></li>
+          <li><strong>Superadmin</strong>: mulai dari <strong>Ops Dashboard</strong></li>
+        </ul>
+      </div>
+
+      <h2>4. Bab A. Manual Sales</h2>
+      <p>Bab ini khusus untuk user sales.</p>
+      <h3>4.1 Tujuan kerja sales</h3>
+      <ul>
+        <li>Membaca chat yang masuk.</li>
+        <li>Membalas customer dengan konteks yang benar.</li>
+        <li>Rapikan lead dan next follow-up.</li>
+        <li>Rapikan customer profile jika perlu.</li>
+        <li>Jangan biarkan lead penting terlambat.</li>
+      </ul>
+      <h3>4.2 Halaman utama sales</h3>
+      <ol>
+        <li>Queue</li>
+        <li>Conversation Detail</li>
+        <li>Lead Management</li>
+        <li>Lead Detail</li>
+        <li>Customer List</li>
+        <li>Customer Detail</li>
+        <li>Action Center</li>
+        <li>Lead Capture</li>
+      </ol>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/queue_sales1.png" alt="Queue Clara untuk sales" />
+        <div class="caption">
+          Tampilan Queue Clara asli. Sales biasanya memulai kerja dari halaman ini
+          untuk membaca chat yang paling penting.
+        </div>
+      </div>
+      <h3>4.3 Urutan kerja sales</h3>
+      <ol>
+        <li>Buka Queue.</li>
+        <li>Pilih chat yang paling penting.</li>
+        <li>Buka Conversation Detail.</li>
+        <li>Jalankan AI analysis jika perlu.</li>
+        <li>Cek draft balasan, lalu sesuaikan.</li>
+        <li>Balas customer.</li>
+        <li>Buka Lead Management dan isi next follow-up.</li>
+        <li>Jika data customer kurang rapi, buka Customer Detail.</li>
+        <li>Tutup hari kerja dengan mengecek Action Center.</li>
+      </ol>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/action_center1.png" alt="Action Center Clara" />
+        <div class="caption">
+          Tampilan Action Center Clara asli. Halaman ini dipakai sales untuk
+          membersihkan pekerjaan harian yang paling penting.
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>5. Bab B. Manual Manager</h2>
+      <p>Bab ini khusus untuk manager.</p>
+      <h3>5.1 Fokus manager</h3>
+      <ul>
+        <li>Melihat chat tim yang macet.</li>
+        <li>Melihat disiplin kerja tim.</li>
+        <li>Memberi coaching yang spesifik.</li>
+        <li>Menjaga hot lead tidak terlewat.</li>
+      </ul>
+      <h3>5.2 Halaman utama manager</h3>
+      <ol>
+        <li>Chat Review Center</li>
+        <li>Conversation Detail</li>
+        <li>Manager Insights</li>
+        <li>Lead Management</li>
+        <li>Lead Detail</li>
+        <li>Customer List</li>
+        <li>Customer Detail</li>
+        <li>Alert Center</li>
+      </ol>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/chat_review_center.png" alt="Chat Review Center Clara" />
+        <div class="caption">
+          Tampilan Chat Review Center Clara asli. Manager memakainya untuk melihat
+          chat tim yang macet, high risk, atau pending review.
+        </div>
+      </div>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/manager_insight.png" alt="Manager Insights Clara" />
+        <div class="caption">
+          Tampilan Manager Insights Clara asli. Halaman ini membantu manager melihat
+          tim mana yang mulai longgar dan butuh perhatian.
+        </div>
+      </div>
+
+      <h2>6. Bab C. Manual Head dan Superadmin</h2>
+      <p>Bab ini dipakai head dan bisa juga dibaca superadmin.</p>
+      <h3>6.1 Fokus head</h3>
+      <ul>
+        <li>Melihat masalah operasional dari level atas.</li>
+        <li>Mengecek bottleneck lintas tim.</li>
+        <li>Menjaga kesehatan pipeline.</li>
+        <li>Menjaga governance akses dan kualitas data.</li>
+      </ul>
+      <h3>6.2 Halaman utama head</h3>
+      <ol>
+        <li>Alert Center</li>
+        <li>Chat Review Center</li>
+        <li>Lead Management</li>
+        <li>Customer List</li>
+        <li>Customer Detail</li>
+        <li>Ops Dashboard</li>
+        <li>Manager Insights</li>
+        <li>Access Control</li>
+        <li>Channels</li>
+        <li>Knowledge Base</li>
+      </ol>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/alert_center.png" alt="Alert Center Clara" />
+        <div class="caption">
+          Tampilan Alert Center Clara asli. Head biasanya memulai pengawasan harian
+          dari halaman ini.
+        </div>
+      </div>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/ops_dashboard1.png" alt="Ops Dashboard Clara" />
+        <div class="caption">
+          Tampilan Ops Dashboard Clara asli. Head dan superadmin memakainya untuk
+          membaca kesehatan operasional tim.
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>7. Panduan Halaman Utama</h2>
+
+      <h3>7.1 Queue</h3>
+      <p>
+        Queue adalah tempat kerja utama untuk chat customer. User membaca daftar
+        conversation, melihat preview, risk, channel, dan sekarang juga
+        <strong>account category</strong>.
+      </p>
+      <ul>
+        <li>Kalau AI belum jalan: jalankan AI analysis.</li>
+        <li>Kalau perlu draft: generate draft.</li>
+        <li>Kalau konteks belum jelas: buka Conversation Detail.</li>
+      </ul>
+
+      <h3>7.2 Conversation Detail</h3>
+      <p>
+        Halaman ini dipakai untuk membaca transcript utuh, hasil AI analysis,
+        draft balasan, coaching context, dan konteks lead/customer.
+      </p>
+      <p>
+        Perhatikan juga <strong>account category</strong>, karena kategori ini
+        mempengaruhi knowledge yang dipakai Clara saat menyusun jawaban.
+      </p>
+
+      <h3>7.3 Lead Capture</h3>
+      <p>Dipakai untuk memasukkan chat baru ke Clara.</p>
+      <div class="note">
+        Aturan baru yang wajib dipahami: judul conversation harus diisi dengan
+        <strong>nama customer</strong>. Jangan lagi memakai judul generik.
+      </div>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/lead_capture.png" alt="Lead Capture Clara" />
+        <div class="caption">
+          Tampilan Lead Capture Clara asli. Halaman ini dipakai untuk memasukkan
+          chat baru ke Clara.
+        </div>
+      </div>
+
+      <h3>7.4 Lead Management</h3>
+      <p>
+        Dipakai untuk scan banyak lead secara cepat. Fokus ke bucket seperti
+        Needs tindakan, Overdue, Needs sync, Hot, dan Disiplin stale.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/lead_management.png" alt="Lead Management Clara" />
+        <div class="caption">
+          Tampilan Lead Management Clara asli. Halaman ini dipakai untuk scan
+          banyak lead dan melihat preview lead secara cepat.
+        </div>
+      </div>
+
+      <h3>7.5 Lead Detail</h3>
+      <p>
+        Dipakai untuk melihat satu lead secara lengkap: stage, owner, next
+        follow-up, metrik deal, log disiplin, task, dan timeline aktivitas.
+      </p>
+      <p>
+        Di halaman ini user juga bisa melihat atau mengubah
+        <strong>account category</strong> lead.
+      </p>
+
+      <h3>7.6 Customer List</h3>
+      <p>
+        Dipakai untuk mencari customer yang sudah dikenal Clara dan membuka detail
+        customer dengan cepat.
+      </p>
+
+      <h3>7.7 Customer Detail</h3>
+      <p>
+        Dipakai untuk memahami customer secara utuh: identitas, lead terkait,
+        channel coverage, kategori akun, dan temperature customer.
+      </p>
+      <ul>
+        <li>Lihat profil customer dulu saat halaman dibuka.</li>
+        <li>Cek nama, telepon, email, alamat, status, dan category.</li>
+        <li>Cek temperature customer.</li>
+        <li>Buka lead prioritas bila perlu.</li>
+      </ul>
+      <div class="note">
+        Clara bisa mengisi otomatis nama, telepon, email, alamat, account category,
+        dan temperature berdasarkan analisis chat. Tetapi user tetap boleh
+        memperbaiki manual jika memang yakin datanya kurang tepat.
+      </div>
+
+      <h3>7.8 Action Center</h3>
+      <p>
+        Dipakai sales untuk membersihkan pekerjaan harian paling penting. Fokus
+        utama biasanya Overdue lebih dulu.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/action_center2.png" alt="Action Center Clara lanjutan" />
+        <div class="caption">
+          Tampilan Action Center Clara asli bagian lanjutan. Di sini user membaca
+          item prioritas secara lebih detail sebelum mengambil tindakan.
+        </div>
+      </div>
+
+      <h3>7.9 Chat Review Center</h3>
+      <p>
+        Dipakai manager dan head untuk membaca chat yang macet, high risk, atau
+        butuh keputusan manusia.
+      </p>
+
+      <h3>7.10 Knowledge Base</h3>
+      <p>
+        Dipakai untuk rujukan jawaban resmi pada topik sensitif seperti legalitas,
+        kebijakan, proses, atau harga.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/knowledge_base.png" alt="Knowledge Base Clara" />
+        <div class="caption">
+          Tampilan Knowledge Base Clara asli. Halaman ini menjadi rujukan utama
+          saat user butuh jawaban yang konsisten.
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>8. Tindakan Berdasarkan Kondisi</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Kondisi</th>
+            <th>Apa Artinya</th>
+            <th>Tindakan Yang Harus Dilakukan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Overdue</td>
+            <td>Follow-up sudah lewat dari jadwal.</td>
+            <td>Cek chat terakhir, tentukan langkah berikutnya, lalu isi next follow-up baru.</td>
+          </tr>
+          <tr>
+            <td>Needs sync</td>
+            <td>Stage dan data deal belum selaras.</td>
+            <td>Buka lead detail, cek metrik deal, lalu samakan dengan kondisi lapangan.</td>
+          </tr>
+          <tr>
+            <td>Disiplin stale</td>
+            <td>Log aktivitas sudah terlalu lama tidak diperbarui.</td>
+            <td>Isi log disiplin terbaru hari ini.</td>
+          </tr>
+          <tr>
+            <td>High risk chat</td>
+            <td>Chat berpotensi sensitif atau berisiko salah jawab.</td>
+            <td>Jangan kirim balasan mentah. Review dulu, cek knowledge, dan lihat account category.</td>
+          </tr>
+          <tr>
+            <td>Customer profile janggal</td>
+            <td>Nama, nomor, kategori akun, atau temperature tampak tidak cocok.</td>
+            <td>Buka Customer Detail, cek lead terkait, lalu koreksi manual jika yakin.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>9. Customer Intelligence dan Knowledge</h2>
+      <h3>9.1 Customer Intelligence</h3>
+      <p>
+        Clara sekarang punya `Customer List` dan `Customer Detail` supaya tim tidak
+        membaca satu orang sebagai beberapa customer yang berbeda.
+      </p>
+      <p>
+        Di area ini user bisa melihat:
+      </p>
+      <ul>
+        <li>lead terkait</li>
+        <li>channel coverage</li>
+        <li>account category</li>
+        <li>customer temperature</li>
+        <li>kekuatan identitas</li>
+      </ul>
+
+      <h3>9.2 Knowledge Routing Mini vs Reguler</h3>
+      <p>
+        Clara memakai knowledge yang berbeda tergantung account category:
+      </p>
+      <ul>
+        <li><strong>Mini</strong> memakai knowledge mini</li>
+        <li><strong>Reguler</strong> memakai knowledge regular</li>
+        <li><strong>Belum ditentukan</strong> memakai fallback yang lebih aman</li>
+      </ul>
+      <p>
+        Karena itu, user harus sadar kategori akun yang sedang tampil di chat,
+        lead, atau customer profile.
+      </p>
+
+      <h2>10. Troubleshooting</h2>
+      <h3>10.1 Queue kosong</h3>
+      <ul>
+        <li>Bisa jadi tidak ada chat aktif.</li>
+        <li>Bisa jadi filter terlalu ketat.</li>
+        <li>Bisa jadi role Anda memang tidak berhak memakai Queue.</li>
+      </ul>
+
+      <h3>10.2 Chat Review Center kosong</h3>
+      <p>Ini biasanya bukan error. Artinya tidak ada bottleneck review saat ini.</p>
+
+      <h3>10.3 Alert Center kosong</h3>
+      <p>Artinya tidak ada alert aktif yang harus ditangani sekarang. Lanjutkan ke modul kerja sesuai role.</p>
+
+      <h3>10.4 Kategori akun belum muncul</h3>
+      <p>
+        Biasanya Clara belum cukup yakin membaca kategori akun, atau analisis chat
+        belum dijalankan. Cek lead detail atau customer detail untuk verifikasi.
+      </p>
+
+      <h3>10.5 Temperature customer berbeda dengan lead</h3>
+      <p>
+        Bisa jadi temperature customer pernah diubah manual atau ada sinyal baru
+        dari lead lain. Buka Customer Detail untuk mengecek nilai akhirnya.
+      </p>
+
+      <h2>11. Praktik Aman Saat Menggunakan Clara</h2>
+      <ul>
+        <li>Jangan berbagi akun dengan orang lain.</li>
+        <li>Jangan simpan password atau token di chat biasa.</li>
+        <li>Gunakan knowledge resmi untuk topik sensitif.</li>
+        <li>Jangan mengubah status lead atau alert jika belum paham konteksnya.</li>
+        <li>Jangan menebak-nebak legalitas, kebijakan, atau janji produk.</li>
+        <li>Jangan mengisi data customer palsu.</li>
+      </ul>
+
+      <div class="footer">
+        Clara User Manual • Disusun dari struktur workspace, role access, customer intelligence, dan knowledge routing Clara • 3 Juni 2026
+      </div>
+    </section>
+  </body>
+</html>
