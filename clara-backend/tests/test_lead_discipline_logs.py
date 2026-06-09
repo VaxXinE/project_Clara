@@ -73,7 +73,6 @@ def test_worklist_surfaces_missing_and_stale_discipline_logs(
     seeded_data: dict[str, object],
 ) -> None:
     admin_a = seeded_data["admin_a"]
-    owned_lead = seeded_data["owned_lead"]
     org_a = seeded_data["org_a"]
     marketing_a = seeded_data["marketing_a"]
 

@@ -1,616 +1,278 @@
-# Clara Sales Manual
+# CLARA Sales Manual
 
-Manual ini dibuat khusus untuk user `sales` di Clara.
+Manual ini dibuat khusus untuk akun `sales` di Clara.
 
-Tujuannya:
+Tujuan manual ini:
 
 - membantu sales baru cepat paham cara kerja Clara
 - menjelaskan urutan kerja harian yang aman
-- menjelaskan halaman apa yang harus dibuka
-- menjelaskan apa yang harus dilakukan saat melihat status tertentu
+- menjelaskan fitur apa yang harus dipakai dan kapan
+- memberi test case cepat untuk tiap fitur utama
 
 Kalau harus diingat dalam satu kalimat:
 
-> Tugas sales di Clara adalah membaca chat dengan benar, membalas dengan aman, merapikan lead, lalu memastikan follow-up berikutnya jelas.
+> Tugas sales di Clara adalah membaca chat dengan benar, membalas dengan aman, merapikan lead dan customer, lalu memastikan follow-up berikutnya jelas.
 
 ---
 
-## 1. Clara Dipakai Untuk Apa
+## 1. Akses Sales Saat Ini
 
-Clara adalah tempat kerja harian sales.
+Fitur utama yang bisa diakses `sales`:
 
-Di Clara, pekerjaan berikut disatukan:
+1. `Beranda`
+2. `Lead Capture`
+3. `Queue`
+4. `Conversation Detail`
+5. `Lead Management`
+6. `Lead Detail`
+7. `Customer List`
+8. `Customer Detail`
+9. `Action Center`
 
-- chat customer
-- lead
-- customer profile
-- follow-up
-- bantuan AI untuk membaca chat
+Yang **tidak** bisa diakses `sales`:
 
-Jadi Clara bukan cuma tempat simpan data. Clara dipakai supaya sales cepat tahu:
-
-- chat mana yang harus dibaca dulu
-- balasan apa yang paling aman
-- lead mana yang paling penting
-- customer mana yang datanya belum rapi
-
----
-
-## 2. Halaman Yang Paling Sering Dipakai Sales
-
-Urutan halaman yang paling sering dipakai sales:
-
-1. `Queue`
-2. `Conversation Detail`
-3. `Lead Management`
-4. `Lead Detail`
-5. `Customer List`
-6. `Customer Detail`
-7. `Action Center`
-8. `Lead Capture`
-
-Aturan paling sederhana:
-
-- kalau mau balas chat: buka `Queue`
-- kalau mau baca detail chat: buka `Conversation Detail`
-- kalau mau rapikan lead: buka `Lead Management`
-- kalau mau rapikan customer: buka `Customer Detail`
-- kalau mau lihat pekerjaan hari ini: buka `Action Center`
-- kalau mau masukkan chat baru: buka `Lead Capture`
+- `Manager Insights`
+- `Head Insights`
+- `Marketing Insights`
+- `Ops Dashboard`
+- `Access Control`
+- `Audit Logs`
+- approval final knowledge
 
 ---
 
-## 3. Alur Kerja Harian Sales
-
-### Saat mulai kerja pagi
-
-1. login ke Clara
-2. buka `Queue`
-3. baca chat yang paling baru atau paling penting
-4. lihat apakah AI analysis sudah ada
-5. lihat apakah kategori akun sudah terbaca
-
-### Saat mulai membalas customer
-
-1. buka `Conversation Detail`
-2. baca chat terakhir
-3. lihat siapa yang bicara terakhir
-4. pahami apa yang customer minta
-5. jalankan `AI Analysis` jika belum ada
-6. cek draft balasan
-7. edit draft jika perlu
-8. kirim balasan jika aman
-
-### Setelah selesai membalas
-
-1. buka `Lead Management`
-2. cari lead terkait
-3. cek stage
-4. isi `next follow-up`
-5. kalau ada aktivitas penting, buka `Lead Detail`
-6. isi `Log Disiplin Harian`
-
-### Kalau data customer terasa belum rapi
-
-1. buka `Customer List`
-2. cari nama customer
-3. buka `Customer Detail`
-4. cek nama, telepon, email, alamat
-5. cek `kategori akun`
-6. cek `temperature customer`
-7. koreksi manual bila memang perlu
-
-### Saat menjelang siang atau sore
-
-1. buka `Action Center`
-2. cek item `Overdue`
-3. kerjakan yang paling telat dulu
-4. pastikan tidak ada lead panas yang dibiarkan
-
----
-
-## 4. Urutan Kerja Yang Paling Aman
-
-Kalau Anda bingung harus mulai dari mana, pakai urutan ini:
-
-1. `Queue`
-2. `Conversation Detail`
-3. `Lead Management`
-4. `Lead Detail`
-5. `Customer Detail`
-6. `Action Center`
-
-Jangan dibalik.
-
-Alasannya:
-
-- `Queue` dipakai untuk melihat chat yang masuk
-- `Conversation Detail` dipakai untuk memahami konteks
-- `Lead Management` dipakai untuk memilih lead mana yang perlu dirapikan
-- `Lead Detail` dipakai untuk update data eksekusi
-- `Customer Detail` dipakai untuk merapikan identitas customer
-- `Action Center` dipakai untuk bersih-bersih prioritas harian
-
----
-
-## 5. Panduan Halaman Satu Per Satu
-
-## 5.1 Queue
-
-### Fungsi halaman ini
-
-Queue adalah tempat kerja utama sales untuk membaca chat customer.
-
-### Yang biasanya terlihat
-
-- daftar conversation
-- preview isi chat
-- channel
-- risk level
-- kategori akun
-- tombol `AI Analysis`
-- tombol `Generate Draft`
-- tombol `Buka Chat`
-
-### Cara pakai
+## 2. Urutan Kerja Sales Yang Paling Aman
 
 1. buka `Queue`
-2. pilih chat yang paling penting
-3. baca preview singkat
-4. kalau AI belum jalan, tekan `AI Analysis`
-5. kalau perlu draft, tekan `Generate Draft`
-6. kalau butuh konteks penuh, tekan `Buka Chat`
-
-### Hal yang harus dicari saat membaca satu row chat
-
-- nama customer
-- isi chat terakhir
-- channel
-- risk level
-- kategori akun
-- apakah draft sudah ada
-
-### Jangan lakukan ini di Queue
-
-- membuka semua chat satu per satu tanpa prioritas
-- langsung membalas tanpa membaca konteks
-- mengirim draft AI mentah untuk topik sensitif
+2. pilih conversation
+3. baca `Conversation Detail`
+4. jalankan `AI Analysis` kalau belum ada
+5. generate draft dan kirim balasan
+6. rapikan `Lead Detail`
+7. rapikan `Customer Detail` bila perlu
+8. cek `Action Center`
+9. masukkan chat baru lewat `Lead Capture` kalau ada sumber baru
 
 ---
 
-## 5.2 Conversation Detail
+## 3. Fitur Per Fitur
 
-### Fungsi halaman ini
+## 3.1 Beranda
 
-Halaman ini dipakai untuk membaca percakapan lengkap.
+### Fungsi
 
-### Yang biasanya ada
+Dipakai untuk melihat shortcut pekerjaan hari itu.
 
-- transcript chat
-- hasil AI analysis
-- draft balasan
-- sent logs
-- account category
-- konteks lead
+### Test case cepat
 
-### Urutan membaca halaman ini
-
-1. baca chat terbaru dulu
-2. lihat siapa bicara terakhir
-3. pahami apa yang diminta customer
-4. lihat AI analysis
-5. lihat next action recommendation
-6. lihat draft balasan
-7. edit atau tindak lanjuti
-
-### Catatan penting
-
-- `account category` membantu Clara memilih knowledge `Mini` atau `Reguler`
-- kalau kategori salah, perbaikannya biasanya dilakukan dari `Lead Detail` atau `Customer Detail`
-
-### Untuk kasus sensitif
-
-Kalau customer bertanya soal:
-
-- legalitas
-- kebijakan
-- janji hasil
-- aturan pembayaran
-
-jangan langsung kirim draft mentah. Baca dulu konteksnya dan pastikan jawabannya aman.
+- ID: `SALES-HOME-01`
+- Steps:
+  1. login sebagai `sales`
+  2. buka `/dashboard`
+  3. verifikasi menu `Queue`, `Lead Management`, `Customer List`, `Action Center`, `Lead Capture` muncul
+- Expected:
+  - beranda tampil
+  - menu sales sesuai role
 
 ---
 
-## 5.3 Lead Capture
+## 3.2 Lead Capture
 
-### Fungsi halaman ini
+### Fungsi
 
 Dipakai untuk memasukkan chat baru ke Clara.
 
-### Aturan baru yang wajib dipahami
-
-Judul conversation sekarang **wajib diisi dengan nama customer**.
-
-Jangan isi dengan:
-
-- `chat baru`
-- `customer`
-- `test`
-
-Isi dengan nama customer yang benar.
-
-### Cara pakai
+### Langkah pakai
 
 1. buka `Lead Capture`
-2. isi nama customer sebagai judul conversation
-3. pilih cara input:
-   - upload file TXT
-   - paste chat manual
-4. cek isi chat
-5. submit
-6. cek hasil parsing
+2. isi judul dengan nama customer yang benar
+3. pilih upload TXT atau paste manual
+4. submit
+5. verifikasi conversation dan lead terbentuk
 
-### Yang harus diperiksa setelah submit
+### Test case cepat
 
-- apakah nama customer terbaca benar
-- apakah isi chat lengkap
-- apakah conversation terbentuk
-- apakah lead ikut terbentuk
-- apakah customer profile awal ikut masuk
+- ID: `SALES-CAPTURE-01`
+- Steps:
+  1. buka `Lead Capture`
+  2. upload/paste transcript valid
+  3. submit
+- Expected:
+  - conversation dibuat/diupdate
+  - lead dan customer profile ikut tersambung
 
 ---
 
-## 5.4 Lead Management
+## 3.3 Queue
 
-### Fungsi halaman ini
+### Fungsi
 
-Dipakai untuk membaca banyak lead secara cepat.
+Tempat kerja utama sales untuk membaca chat yang harus ditindaklanjuti.
 
-Tujuannya bukan membaca semua lead satu per satu, tetapi menemukan:
+### Langkah pakai
 
-- lead mana yang perlu tindakan
-- lead mana yang terlambat
-- lead mana yang belum sinkron
-- lead mana yang perlu dibuka detailnya
+1. buka `Queue`
+2. prioritaskan chat penting
+3. cek apakah AI extraction sudah ada
+4. cek apakah draft reply sudah ada
+5. buka chat yang perlu dikerjakan
 
-### Yang biasanya terlihat
+### Test case cepat
 
-- ringkasan total lead
-- search
-- filter
-- bucket lead
-- list lead
-- preview lead
+- ID: `SALES-QUEUE-01`
+- Steps:
+  1. buka `Queue`
+  2. pilih satu row conversation
+  3. klik buka chat
+- Expected:
+  - queue tampil
+  - navigasi ke conversation detail berjalan
 
-### Cara pakai
+---
 
-1. buka `Lead Management`
-2. lihat angka ringkasan di atas
-3. fokus ke:
-   - `Needs tindakan`
-   - `Overdue`
-   - `Needs sync`
-4. pilih bucket yang paling penting
-5. baca lead satu per satu dari bucket itu
-6. buka detail lead jika perlu
+## 3.4 Conversation Detail
 
-### Hal yang harus dilihat di satu kartu lead
+### Fungsi
 
-- nama customer
+Dipakai untuk membaca transcript lengkap dan menyiapkan balasan.
+
+### Langkah pakai
+
+1. baca chat terakhir
+2. pahami siapa yang bicara terakhir
+3. jalankan `AI Analysis` jika belum ada
+4. cek summary, intent, risk, next action
+5. generate draft reply
+6. edit jika perlu
+7. approve/mark sent sesuai flow
+
+### Test case cepat
+
+- ID: `SALES-CONV-01`
+- Steps:
+  1. buka conversation
+  2. jalankan analyze
+  3. generate draft
+  4. mark sent
+- Expected:
+  - AI extraction tersimpan
+  - draft muncul
+  - sent history terupdate
+
+---
+
+## 3.5 Lead Management
+
+### Fungsi
+
+Dipakai untuk melihat daftar lead yang sedang dikerjakan.
+
+### Test case cepat
+
+- ID: `SALES-LEAD-LIST-01`
+- Steps:
+  1. buka `Lead Management`
+  2. filter lead penting
+  3. buka satu lead
+- Expected:
+  - list lead tampil
+  - filter dan buka detail berjalan
+
+---
+
+## 3.6 Lead Detail
+
+### Fungsi
+
+Dipakai untuk merapikan data eksekusi sales setelah chat dibalas.
+
+### Yang harus diisi
+
 - stage
-- badge seperti `Overdue`, `Hot`, atau `Disiplin stale`
-- owner
-- kontak terakhir
 - next follow-up
-- kategori akun
+- summary/notes
+- account category bila perlu
+- deal metrics bila relevan
+
+### Test case cepat
+
+- ID: `SALES-LEAD-DETAIL-01`
+- Steps:
+  1. buka detail lead
+  2. ubah stage
+  3. isi next follow-up
+  4. simpan
+- Expected:
+  - perubahan tersimpan
+  - lead kembali terlihat dengan status terbaru
 
 ---
 
-## 5.5 Lead Detail
+## 3.7 Customer List dan Customer Detail
 
-### Fungsi halaman ini
+### Fungsi
 
-Halaman ini adalah pusat kerja untuk satu lead.
+Dipakai untuk membersihkan data customer yang dipakai lintas lead.
 
-### Bagian yang biasanya ada
+### Test case cepat
 
-- konteks lead
-- log disiplin harian
-- metrik deal
-- tugas follow-up
-- timeline aktivitas
-
-### Urutan membaca
-
-1. lihat action plan di bagian atas
-2. cek follow-up
-3. cek owner
-4. cek metrik deal
-5. cek `account category`
-6. cek task dan timeline
-
-### Hal penting yang harus diisi sales
-
-- stage lead
-- next follow-up
-- log disiplin
-- metrik deal jika memang perlu
-
-### Kapan harus isi log disiplin
-
-- setelah follow-up penting
-- setelah telepon
-- setelah meeting
-- saat customer memberi sinyal baru
+- ID: `SALES-CUSTOMER-01`
+- Steps:
+  1. buka `Customer List`
+  2. cari customer
+  3. buka detail dan update field yang diizinkan
+- Expected:
+  - detail customer tampil
+  - perubahan profil tersimpan
 
 ---
 
-## 5.6 Customer List
+## 3.8 Action Center
 
-### Fungsi halaman ini
+### Fungsi
 
-Dipakai untuk mencari customer yang sudah dikenal Clara.
+Dipakai untuk merapikan pekerjaan follow-up yang belum selesai.
 
-### Kapan harus buka
+### Yang dicari
 
-- saat Anda ingin cari satu customer tertentu
-- saat Anda merasa satu orang terbaca dari banyak lead
-- saat Anda ingin rapikan identitas customer
+- item overdue
+- item yang tertahan
+- lead yang belum punya next action jelas
 
-### Cara pakai
+### Test case cepat
 
-1. buka `Customer List`
-2. cari nama customer
-3. buka detailnya
-
----
-
-## 5.7 Customer Detail
-
-### Fungsi halaman ini
-
-Dipakai untuk memahami satu customer secara utuh.
-
-### Yang biasanya ada
-
-- ringkasan customer
-- profil customer
-- lead terkait
-- data customer
-- channel coverage
-
-### Urutan membaca
-
-1. lihat `Profil customer` dulu
-2. cek nama, telepon, email, alamat, status
-3. cek `kategori akun`
-4. cek `temperature customer`
-5. lihat lead terkait
-6. buka lead prioritas kalau perlu
-
-### Tentang kategori akun
-
-Kategori akun bisa:
-
-- terbaca otomatis oleh Clara
-- diubah manual oleh sales jika memang yakin
-
-Pilihan yang biasanya ada:
-
-- `Belum ditentukan`
-- `Mini`
-- `Reguler`
-
-### Tentang temperature customer
-
-Temperature bisa:
-
-- diisi otomatis berdasarkan hasil analisa Clara
-- diubah manual jika penilaian otomatis kurang tepat
-
-Pilihan yang biasanya ada:
-
-- `Belum ditentukan`
-- `Cold`
-- `Warm`
-- `Hot`
-
-### Tentang AI autofill
-
-Clara bisa membantu mengisi otomatis:
-
-- nama customer
-- nomor telepon
-- email
-- alamat
-- kategori akun
-- temperature
-
-Tetapi:
-
-- user tetap boleh koreksi manual
-- jangan isi data palsu bila masih ragu
+- ID: `SALES-ACTION-01`
+- Steps:
+  1. buka `Action Center`
+  2. pilih item overdue
+  3. buka lead/conversation terkait
+- Expected:
+  - worklist tampil
+  - user bisa lanjut menindaklanjuti item
 
 ---
 
-## 5.8 Action Center
+## 4. Checklist Harian Sales
 
-### Fungsi halaman ini
-
-Dipakai untuk melihat pekerjaan harian yang paling perlu dibersihkan.
-
-### Yang biasanya ada
-
-- overdue
-- due today
-- hot lead
-- item perlu analisis
-- item siap kirim
-
-### Cara pakai
-
-1. buka `Action Center`
-2. fokus ke bucket paling kritis
-3. lihat item mana yang paling telat
-4. kerjakan satu per satu
-5. setelah selesai, pindah ke bucket berikutnya
+1. buka `Queue`
+2. kerjakan chat paling penting
+3. analyze jika belum ada
+4. generate dan kirim balasan
+5. update lead
+6. rapikan customer bila perlu
+7. tutup hari dengan cek `Action Center`
 
 ---
 
-## 6. Apa Yang Harus Dilakukan Kalau Melihat Status Ini
+## 5. Ringkasan Test Case Sales
 
-## 6.1 `Overdue`
-
-Artinya:
-
-- follow-up sudah lewat dari jadwal
-
-Yang harus dilakukan:
-
-1. buka lead
-2. baca chat terakhir
-3. tentukan langkah berikutnya
-4. isi `next follow-up` baru
-
-## 6.2 `Disiplin stale`
-
-Artinya:
-
-- aktivitas sudah lama tidak dicatat
-
-Yang harus dilakukan:
-
-1. buka lead detail
-2. isi log disiplin baru
-3. tulis aktivitas terbaru secara jujur dan jelas
-
-## 6.3 `Needs sync`
-
-Artinya:
-
-- data di lead belum cocok dengan kondisi deal sebenarnya
-
-Yang harus dilakukan:
-
-1. buka lead detail
-2. periksa `Metrik Deal`
-3. samakan status, nilai, atau catatan deal
-
-## 6.4 Chat `high risk`
-
-Artinya:
-
-- balasan berpotensi sensitif atau salah
-
-Yang harus dilakukan:
-
-1. jangan kirim draft mentah
-2. baca konteks penuh
-3. cek kategori akun
-4. pastikan jawabannya aman
-
-## 6.5 Customer profile terasa salah
-
-Artinya:
-
-- nama, nomor, kategori akun, atau temperature bisa terbaca kurang tepat
-
-Yang harus dilakukan:
-
-1. buka `Customer Detail`
-2. cek lead terkait
-3. koreksi manual kalau Anda yakin
-4. jangan isi asal jika masih ragu
-
----
-
-## 7. Checklist Cepat Sales
-
-Sebelum selesai kerja hari itu, cek:
-
-- apakah semua chat penting sudah dibaca
-- apakah follow-up penting sudah punya jadwal
-- apakah lead panas tidak dibiarkan
-- apakah aktivitas penting sudah dicatat
-- apakah data customer penting yang baru muncul sudah cukup rapi
-
----
-
-## 8. Hal Yang Jangan Dilakukan Sales
-
-- jangan kirim draft AI mentah untuk topik sensitif
-- jangan membiarkan `Overdue` tanpa tindakan
-- jangan menutup pekerjaan tanpa mengisi `next follow-up`
-- jangan mengubah data deal kalau belum yakin
-- jangan mengisi data customer palsu hanya supaya form cepat penuh
-- jangan menebak-nebak legalitas atau janji hasil
-
----
-
-## 9. Troubleshooting Singkat
-
-## 9.1 Kenapa Queue kosong
-
-Kemungkinan:
-
-- memang tidak ada conversation aktif
-- filter terlalu ketat
-- chat belum masuk ke sistem
-
-## 9.2 Kenapa kategori akun belum muncul
-
-Kemungkinan:
-
-- Clara belum cukup yakin membaca kategori akun
-- analisis chat belum dijalankan
-
-Yang harus dilakukan:
-
-1. cek apakah AI analysis sudah dijalankan
-2. buka `Lead Detail` atau `Customer Detail`
-3. isi manual jika Anda yakin
-
-## 9.3 Kenapa temperature customer berbeda dengan lead
-
-Kemungkinan:
-
-- temperature customer pernah diubah manual
-- ada sinyal baru dari lead lain
-
-Yang harus dilakukan:
-
-1. buka `Customer Detail`
-2. lihat nilai temperature customer
-3. putuskan apakah perlu disesuaikan manual
-
----
-
-## 10. Ringkasan Super Singkat
-
-Kalau Anda lupa semua isi manual ini, ingat 4 hal:
-
-- mulai kerja dari `Queue`
-- rapikan lead di `Lead Management` dan `Lead Detail`
-- rapikan identitas di `Customer Detail`
-- bersihkan prioritas harian di `Action Center`
-
-Kalau Anda bingung melihat satu item:
-
-- chat -> buka `Conversation Detail`
-- lead -> buka `Lead Detail`
-- customer -> buka `Customer Detail`
-
----
-
-## 11. Penutup
-
-Clara paling mudah dipakai kalau sales tidak mencoba menghafal semua modul sekaligus.
-
-Mulailah dari:
-
-- `Queue`
-- `Conversation Detail`
-- `Lead Management`
-- `Customer Detail`
-
-Kalau empat hal itu sudah dikuasai, workflow sales di Clara akan jauh lebih mudah dipahami.
+| ID | Fitur | Hasil yang diharapkan |
+| --- | --- | --- |
+| `SALES-HOME-01` | Beranda | menu sales tampil |
+| `SALES-CAPTURE-01` | Lead Capture | chat baru masuk ke sistem |
+| `SALES-QUEUE-01` | Queue | list conversation tampil |
+| `SALES-CONV-01` | Conversation Detail | analyze, draft, sent berjalan |
+| `SALES-LEAD-LIST-01` | Lead Management | list/filter lead berjalan |
+| `SALES-LEAD-DETAIL-01` | Lead Detail | update stage/follow-up tersimpan |
+| `SALES-CUSTOMER-01` | Customer Detail | profil customer bisa dibaca dan diupdate |
+| `SALES-ACTION-01` | Action Center | item worklist bisa dibuka dan ditindaklanjuti |

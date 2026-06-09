@@ -65,15 +65,6 @@ export function WhatsAppUploadForm() {
     void loadChannels();
   }, []);
 
-  useEffect(() => {
-    if (isContinueMode) {
-      setConversationTitle((current) => current || initialTitle);
-      if (initialChannel) {
-        setSelectedChannel(initialChannel);
-      }
-    }
-  }, [initialChannel, initialTitle, isContinueMode]);
-
   function validateFile(file: File): string | null {
     if (!file.name.toLowerCase().endsWith(".txt")) {
       return "File harus berformat .txt";

@@ -4,7 +4,6 @@ from uuid import UUID
 from sqlalchemy import Select, desc, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.chat_review_case import ChatReviewCase
 from app.models.conversation import Conversation
 from app.models.knowledge_update_proposal import KnowledgeUpdateProposal
 from app.models.product_knowledge import ProductKnowledge
@@ -20,7 +19,6 @@ from app.services.access_control_service import (
     get_accessible_conversation_or_raise,
 )
 from app.services.role_service import (
-    is_head_like,
     is_manager_like,
     is_superadmin_like,
 )
@@ -263,9 +261,9 @@ def review_knowledge_update_proposal(
     payload: KnowledgeUpdateProposalReviewRequest,
     current_user: User,
 ) -> KnowledgeUpdateProposal:
-    if not is_head_like(current_user.role):
+    if not is_superadmin_like(current_user.role):
         raise AccessDeniedError(
-            "Only head or superadmin can approve or reject knowledge proposals."
+            "Only superadmin can approve or reject knowledge proposals."
         )
 
     proposal = get_knowledge_update_proposal_or_raise(

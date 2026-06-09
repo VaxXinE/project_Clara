@@ -79,9 +79,8 @@ def test_head_can_create_knowledge_update_proposal_from_review_case(
     assert listed[0]["title"] == "Handling objection legalitas"
 
 
-def test_head_can_approve_and_publish_knowledge_update_proposal(
+def test_head_cannot_approve_knowledge_update_proposal(
     client: TestClient,
-    db_session_factory: sessionmaker,
     seeded_data: dict[str, object],
 ) -> None:
     admin_a = seeded_data["admin_a"]
@@ -109,7 +108,48 @@ def test_head_can_approve_and_publish_knowledge_update_proposal(
         f"/product-knowledge/proposals/{proposal_id}/review",
         json={
             "status": "approved",
-            "review_decision_note": "Layak dipublish untuk organization ini.",
+            "review_decision_note": "Head tidak boleh approve langsung lagi.",
+        },
+        headers=csrf_headers(client),
+    )
+    assert review_response.status_code == 403, review_response.text
+
+
+def test_superadmin_can_approve_and_publish_knowledge_update_proposal(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    owner = seeded_data["owner"]
+    owned_conversation = seeded_data["owned_conversation"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+    create_review_case(client, conversation_id=str(owned_conversation.id))
+
+    create_response = client.put(
+        f"/product-knowledge/conversations/{owned_conversation.id}/proposal",
+        json={
+            "title": "Trust issue legalitas",
+            "category": "trust",
+            "proposed_content": "Sales harus menjelaskan legalitas memakai sumber resmi dan menghindari janji hasil.",
+            "source_type": "coaching_case",
+            "rationale": "Diperlukan guardrail jawaban yang seragam.",
+            "status": "pending_approval",
+        },
+        headers=csrf_headers(client),
+    )
+    assert create_response.status_code == 200, create_response.text
+    proposal_id = create_response.json()["id"]
+
+    client.post("/auth/logout", headers=csrf_headers(client))
+    login(client, email=owner.email, password="OwnerPass123!")
+
+    review_response = client.patch(
+        f"/product-knowledge/proposals/{proposal_id}/review",
+        json={
+            "status": "approved",
+            "review_decision_note": "Layak dipublish oleh superadmin untuk organization ini.",
         },
         headers=csrf_headers(client),
     )

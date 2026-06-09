@@ -14,7 +14,6 @@ import {
 } from "@/lib/format";
 import {
   canAccessQueueAndActionCenter,
-  getRoleDisplayLabel,
   isManagerLike,
   normalizeWorkspaceRole,
 } from "@/lib/roles";
@@ -189,38 +188,54 @@ export default function SalesInboxPage() {
   >(null);
   const [errorMessage, setErrorMessage] = useState("");
 
-  async function loadInbox() {
-    setIsLoading(true);
-
-    try {
-      const me = await apiFetch<CurrentUser>("/auth/me");
-      setCurrentUser(me);
-
-      if (!canAccessQueueAndActionCenter(me.role)) {
-        router.replace(
-          normalizeWorkspaceRole(me.role) === "head"
-            ? "/dashboard/approvals"
-            : "/dashboard/manager-insights",
-        );
-        return;
-      }
-
-      const data = await apiFetch<SalesInboxItem[]>(
-        buildInboxPath(sourceChannelFilter, archiveScope),
-      );
-      setInboxItems(data);
-      setErrorMessage("");
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load inbox.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
   useEffect(() => {
-    void loadInbox();
+    let isCancelled = false;
+
+    async function bootstrapInbox() {
+      setIsLoading(true);
+
+      try {
+        const me = await apiFetch<CurrentUser>("/auth/me");
+        if (isCancelled) {
+          return;
+        }
+        setCurrentUser(me);
+
+        if (!canAccessQueueAndActionCenter(me.role)) {
+          router.replace(
+            normalizeWorkspaceRole(me.role) === "head"
+              ? "/dashboard/approvals"
+              : "/dashboard/manager-insights",
+          );
+          return;
+        }
+
+        const data = await apiFetch<SalesInboxItem[]>(
+          buildInboxPath(sourceChannelFilter, archiveScope),
+        );
+        if (isCancelled) {
+          return;
+        }
+        setInboxItems(data);
+        setErrorMessage("");
+      } catch (error) {
+        if (!isCancelled) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Failed to load inbox.",
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void bootstrapInbox();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [archiveScope, router, sourceChannelFilter]);
 
   const canAccessMarketing =
@@ -228,7 +243,7 @@ export default function SalesInboxPage() {
   const canAccessKnowledge =
     currentUser !== null && currentUser.role === "superadmin";
   const canAccessAdminOps =
-    currentUser !== null && ["superadmin", "head"].includes(currentUser.role);
+    currentUser !== null && currentUser.role === "superadmin";
 
   const analyzedCount = inboxItems.filter(
     (item) => item.latest_ai_extraction !== null,
@@ -292,35 +307,6 @@ export default function SalesInboxPage() {
       }))
       .filter((section) => section.items.length > 0);
   }, [archiveScope, filteredInboxItems]);
-
-  useEffect(() => {
-    setQueueSectionPages((current) => {
-      const next: Partial<Record<QueueBucketKey, number>> = {};
-      let hasChanges = false;
-
-      for (const section of queueSections) {
-        const totalPages = Math.max(
-          1,
-          Math.ceil(section.items.length / QUEUE_SECTION_PAGE_SIZE),
-        );
-        const currentPage = current[section.bucket] ?? 1;
-        const normalizedPage = Math.min(Math.max(currentPage, 1), totalPages);
-        next[section.bucket] = normalizedPage;
-
-        if (normalizedPage !== currentPage) {
-          hasChanges = true;
-        }
-      }
-
-      const currentKeys = Object.keys(current);
-      const nextKeys = Object.keys(next);
-      if (!hasChanges && currentKeys.length === nextKeys.length) {
-        return current;
-      }
-
-      return next;
-    });
-  }, [queueSections]);
 
   function handleQueueSectionPageChange(
     bucket: QueueBucketKey,
@@ -683,10 +669,14 @@ export default function SalesInboxPage() {
                 </div>
               ) : (
                 queueSections.map((section) => {
-                  const currentPage = queueSectionPages[section.bucket] ?? 1;
+                  const requestedPage = queueSectionPages[section.bucket] ?? 1;
                   const totalPages = Math.max(
                     1,
                     Math.ceil(section.items.length / QUEUE_SECTION_PAGE_SIZE),
+                  );
+                  const currentPage = Math.min(
+                    Math.max(requestedPage, 1),
+                    totalPages,
                   );
                   const paginatedItems = section.items.slice(
                     (currentPage - 1) * QUEUE_SECTION_PAGE_SIZE,

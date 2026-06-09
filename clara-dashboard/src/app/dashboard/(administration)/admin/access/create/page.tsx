@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
-import { isAdminLike } from "@/lib/roles";
+import { isOwnerLike } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 export default function AdminAccessCreateHubPage() {
@@ -16,7 +16,7 @@ export default function AdminAccessCreateHubPage() {
       try {
         const me = await apiFetch<CurrentUser>("/auth/me");
 
-        if (!isAdminLike(me.role)) {
+        if (!isOwnerLike(me.role)) {
           router.replace("/workspace");
           return;
         }

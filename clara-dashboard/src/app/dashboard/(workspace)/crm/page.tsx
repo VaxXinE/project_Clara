@@ -14,7 +14,14 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -224,89 +231,6 @@ function matchesQuickFilter(lead: LeadListItem, quickFilter: string) {
   }
 }
 
-function getLeadActionItems(lead: LeadListItem) {
-  const items: Array<{
-    condition: string;
-    action: string;
-    detail: string;
-  }> = [];
-
-  if (isOverdueLead(lead)) {
-    items.push({
-      condition: "Jika statusnya Follow-up overdue",
-      action:
-        "Buka lead detail, cek chat terakhir, lalu isi next follow-up baru pada hari/jam yang realistis.",
-      detail:
-        "Jangan pindah ke lead lain sebelum lead ini punya jadwal follow-up baru. Kalau ternyata lead sudah tidak aktif, update stage atau catat alasannya di notes/log.",
-    });
-  }
-
-  if (lead.discipline_compliance_status === "stale_log") {
-    items.push({
-      condition: "Jika statusnya Discipline stale",
-      action:
-        "Isi discipline log baru hari ini berdasarkan aktivitas terakhir yang benar-benar terjadi.",
-      detail:
-        "Minimal isi activity type, result status, objection utama, customer mood, dan next follow-up. Tujuannya menghidupkan lagi jejak kerja lead ini.",
-    });
-  }
-
-  if (lead.discipline_compliance_status === "missing_today_log") {
-    items.push({
-      condition: "Jika statusnya Need discipline",
-      action:
-        "Catat aktivitas hari ini walaupun hasilnya belum closing, misalnya follow-up chat, no response, atau waiting customer.",
-      detail:
-        "Status ini artinya belum ada bukti kerja hari ini. Isi log supaya lead tidak terlihat diam dan manager tahu langkah yang sudah dilakukan.",
-    });
-  }
-
-  if (lead.needs_deal_sync) {
-    items.push({
-      condition: "Jika statusnya Need sync",
-      action:
-        "Masuk ke section Deal Metrics lalu samakan deal status dengan kondisi lead sekarang, kemudian simpan.",
-      detail:
-        "Biasanya ini muncul saat stage sudah `won` atau `lost` tapi deal status KPI belum ikut berubah. Jangan biarkan karena angka KPI bisa salah.",
-    });
-  }
-
-  if (
-    lead.current_stage === "new_lead" ||
-    lead.current_stage === "qualification"
-  ) {
-    items.push({
-      condition: "Jika stage masih New Lead atau Qualification",
-      action:
-        "Lengkapi summary singkat, tetapkan owner, lalu set next follow-up pertama.",
-      detail:
-        "Targetnya sederhana: lead jangan mentah. Orang lain harus bisa buka lead ini dan langsung paham siapa customer-nya dan next step-nya apa.",
-    });
-  }
-
-  if (lead.current_stage === "objection" || lead.current_stage === "closing") {
-    items.push({
-      condition: "Jika stage sudah Objection atau Closing",
-      action:
-        "Buka conversation terakhir dulu sebelum update stage atau kirim follow-up baru.",
-      detail:
-        "Di fase ini jangan kerja berdasarkan asumsi. Pastikan objection, risiko, dan posisi customer terakhir benar-benar terbaca sebelum ambil tindakan.",
-    });
-  }
-
-  if (!items.length) {
-    items.push({
-      condition: "Jika tidak ada badge masalah",
-      action:
-        "Cek cepat apakah stage, owner, dan next follow-up masih relevan lalu lanjut ke lead berikutnya.",
-      detail:
-        "Artinya lead ini relatif aman untuk sekarang dan tidak butuh intervensi langsung.",
-    });
-  }
-
-  return items.slice(0, 3);
-}
-
 export default function CrmPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
@@ -322,7 +246,7 @@ export default function CrmPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
 
-  async function loadCrmBoard() {
+  const loadCrmBoard = useCallback(async () => {
     setIsLoading(true);
     try {
       const leadsPath =
@@ -351,7 +275,7 @@ export default function CrmPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [sourceChannelFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -359,7 +283,7 @@ export default function CrmPage() {
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [sourceChannelFilter]);
+  }, [loadCrmBoard]);
 
   const filteredLeads = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -423,10 +347,11 @@ export default function CrmPage() {
     1,
     Math.ceil(visibleLeads.length / LEADS_PAGE_SIZE),
   );
+  const effectiveLeadPage = Math.min(leadPage, totalLeadPages);
   const paginatedVisibleLeads = useMemo(() => {
-    const startIndex = (leadPage - 1) * LEADS_PAGE_SIZE;
+    const startIndex = (effectiveLeadPage - 1) * LEADS_PAGE_SIZE;
     return visibleLeads.slice(startIndex, startIndex + LEADS_PAGE_SIZE);
-  }, [leadPage, visibleLeads]);
+  }, [effectiveLeadPage, visibleLeads]);
 
   const bucketedLeads = useMemo(() => {
     return {
@@ -484,16 +409,6 @@ export default function CrmPage() {
   }, [filteredLeads]);
 
   useEffect(() => {
-    if (leadPage > totalLeadPages) {
-      setLeadPage(totalLeadPages);
-    }
-  }, [leadPage, totalLeadPages]);
-
-  useEffect(() => {
-    setLeadPage(1);
-  }, [bucketFilter, quickFilter, searchQuery, sortBy, sourceChannelFilter]);
-
-  useEffect(() => {
     if (!isFilterModalOpen) {
       return;
     }
@@ -507,23 +422,6 @@ export default function CrmPage() {
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isFilterModalOpen]);
-
-  useEffect(() => {
-    if (!paginatedVisibleLeads.length) {
-      setSelectedLeadId(null);
-      return;
-    }
-
-    setSelectedLeadId((previous) => {
-      if (
-        previous &&
-        paginatedVisibleLeads.some((lead) => lead.id === previous)
-      ) {
-        return previous;
-      }
-      return paginatedVisibleLeads[0]?.id ?? null;
-    });
-  }, [paginatedVisibleLeads]);
 
   const summary = useMemo(() => {
     return {
@@ -555,11 +453,12 @@ export default function CrmPage() {
     return count;
   }, [bucketFilter, quickFilter, searchQuery, sortBy, sourceChannelFilter]);
 
+  const effectiveSelectedLeadId =
+    selectedLeadId && paginatedVisibleLeads.some((lead) => lead.id === selectedLeadId)
+      ? selectedLeadId
+      : paginatedVisibleLeads[0]?.id ?? null;
   const selectedLead =
-    paginatedVisibleLeads.find((lead) => lead.id === selectedLeadId) ?? null;
-  const selectedLeadActions = useMemo(() => {
-    return selectedLead ? getLeadActionItems(selectedLead) : [];
-  }, [selectedLead]);
+    paginatedVisibleLeads.find((lead) => lead.id === effectiveSelectedLeadId) ?? null;
 
   function resetFilters() {
     setSearchQuery("");
@@ -567,6 +466,7 @@ export default function CrmPage() {
     setSourceChannelFilter("all");
     setQuickFilter("all");
     setBucketFilter("all");
+    setLeadPage(1);
   }
 
   async function handleStageChange(leadId: string, currentStage: string) {
@@ -767,9 +667,10 @@ export default function CrmPage() {
                         </span>
                         <input
                           value={searchQuery}
-                          onChange={(event) =>
-                            setSearchQuery(event.target.value)
-                          }
+                            onChange={(event) => {
+                              setSearchQuery(event.target.value);
+                              setLeadPage(1);
+                            }}
                           placeholder="Cari nama, owner, profile, source, atau summary..."
                           className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
                         />
@@ -781,7 +682,10 @@ export default function CrmPage() {
                         </span>
                         <select
                           value={sortBy}
-                          onChange={(event) => setSortBy(event.target.value)}
+                          onChange={(event) => {
+                            setSortBy(event.target.value);
+                            setLeadPage(1);
+                          }}
                           className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
                         >
                           {SORT_OPTIONS.map((option) => (
@@ -798,9 +702,10 @@ export default function CrmPage() {
                         </span>
                         <select
                           value={sourceChannelFilter}
-                          onChange={(event) =>
-                            setSourceChannelFilter(event.target.value)
-                          }
+                            onChange={(event) => {
+                              setSourceChannelFilter(event.target.value);
+                              setLeadPage(1);
+                            }}
                           className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
                         >
                           {SOURCE_CHANNEL_OPTIONS.map((option) => (
@@ -824,7 +729,10 @@ export default function CrmPage() {
                               <button
                                 key={option.value}
                                 type="button"
-                                onClick={() => setQuickFilter(option.value)}
+                                onClick={() => {
+                                  setQuickFilter(option.value);
+                                  setLeadPage(1);
+                                }}
                                 className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                                   isActive
                                     ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
@@ -855,7 +763,10 @@ export default function CrmPage() {
                               <button
                                 key={option.value}
                                 type="button"
-                                onClick={() => setBucketFilter(option.value)}
+                                onClick={() => {
+                                  setBucketFilter(option.value);
+                                  setLeadPage(1);
+                                }}
                                 className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                                   isActive
                                     ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
@@ -932,7 +843,7 @@ export default function CrmPage() {
                               title: section.title,
                               description: section.description,
                               leads: section.leads,
-                              selectedLeadId,
+                              selectedLeadId: effectiveSelectedLeadId,
                               setSelectedLeadId,
                             })}
                           </Fragment>
@@ -942,12 +853,12 @@ export default function CrmPage() {
                       {totalLeadPages > 1 ? (
                         <div className="flex items-center justify-between gap-3 rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
                           <p className="text-sm text-[#d8bc84]">
-                            Halaman {leadPage} dari {totalLeadPages}
+                            Halaman {effectiveLeadPage} dari {totalLeadPages}
                           </p>
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              disabled={leadPage === 1}
+                              disabled={effectiveLeadPage === 1}
                               onClick={() =>
                                 setLeadPage((current) =>
                                   Math.max(1, current - 1),
@@ -959,7 +870,7 @@ export default function CrmPage() {
                             </button>
                             <button
                               type="button"
-                              disabled={leadPage === totalLeadPages}
+                              disabled={effectiveLeadPage === totalLeadPages}
                               onClick={() =>
                                 setLeadPage((current) =>
                                   Math.min(totalLeadPages, current + 1),
@@ -1331,12 +1242,7 @@ function StageQuickSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (disabled) {
-      setIsOpen(false);
-    }
-  }, [disabled]);
+  const isDropdownOpen = !disabled && isOpen;
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -1367,7 +1273,7 @@ function StageQuickSelect({
     <div ref={containerRef} className="relative mt-2">
       <button
         type="button"
-        aria-expanded={isOpen}
+        aria-expanded={isDropdownOpen}
         aria-haspopup="listbox"
         disabled={disabled}
         onClick={() => setIsOpen((previous) => !previous)}
@@ -1377,14 +1283,14 @@ function StageQuickSelect({
         <span
           aria-hidden="true"
           className={`text-[#f0cb73] transition-transform ${
-            isOpen ? "rotate-180" : ""
+            isDropdownOpen ? "rotate-180" : ""
           }`}
         >
           ▾
         </span>
       </button>
 
-      {isOpen ? (
+      {isDropdownOpen ? (
         <div className="absolute inset-x-0 z-30 mt-2 rounded-[18px] border border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(28,20,15,0.99)_0%,rgba(17,12,9,0.99)_100%)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.42)]">
           <ul
             role="listbox"
@@ -1457,26 +1363,6 @@ function BoardMetric({
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />
         </span>
       </div>
-    </article>
-  );
-}
-
-function ActionGuideCard({
-  title,
-  action,
-  detail,
-}: {
-  title: string;
-  action: string;
-  detail: string;
-}) {
-  return (
-    <article className="rounded-[18px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-      <h4 className="text-sm font-semibold text-slate-950">{title}</h4>
-      <p className="mt-2 text-sm font-medium leading-6 text-[#fff0c9]">
-        {action}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{detail}</p>
     </article>
   );
 }

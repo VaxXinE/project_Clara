@@ -1,572 +1,474 @@
 # CLARA Head Manual
 
-Manual ini dibuat khusus untuk user `head` di Clara.
+Manual ini dibuat khusus untuk akun `head` di Clara.
 
-Tujuannya:
+Tujuan manual ini:
 
-- membantu head cepat paham halaman yang memang dipakai head
-- menjelaskan urutan kerja harian head
-- menjelaskan cara membaca alert, bottleneck lintas tim, KPI, dan governance
-- menjelaskan kapan harus turun ke lead atau customer detail
+- membantu `head` baru memahami fitur yang memang bisa dia akses
+- memberi alur kerja harian yang realistis
+- menjelaskan kapan `head` cukup mengawasi, kapan harus turun ke detail
+- memberi checklist verifikasi cepat untuk tiap fitur
 
 Kalau harus diingat dalam satu kalimat:
 
-> Tugas head di Clara adalah menjaga ritme operasional tim, melihat masalah dari level atas, lalu turun ke detail hanya saat keputusan atau intervensi benar-benar diperlukan.
+> Tugas head di Clara adalah membaca kesehatan operasional tim, mengoreksi arah kerja, lalu mengeskalasi perbaikan strategis tanpa turun mengerjakan semua chat satu per satu.
 
 ---
 
-## 1. Clara Dipakai Untuk Apa Oleh Head
+## 1. Akses Head Saat Ini
 
-Untuk head, Clara dipakai untuk:
+Fitur utama yang bisa diakses `head`:
 
-- melihat alert aktif
-- melihat bottleneck lintas tim
-- memastikan lead penting tidak tertahan
-- mengecek customer intelligence yang berdampak ke banyak lead
-- memantau KPI operasional
-- menjaga governance akses dan kualitas knowledge
+1. `Beranda`
+2. `Lead Management`
+3. `Customer List`
+4. `Alert Center`
+5. `Follow-up Center`
+6. `Head Insights`
+7. `Knowledge Base`
+8. `Marketing Insights`
+9. `Ops Dashboard`
 
-Jadi fokus head adalah:
+Fitur yang **tidak** bisa diakses `head`:
 
-- pengawasan operasional
-- keputusan lintas tim
-- kualitas pipeline
-- governance akses dan knowledge
+- `Access Control`
+- `Audit Logs`
+- `Channels`
+- approval final knowledge
+- create/edit organization, unit, team, user
 
----
+Catatan penting:
 
-## 2. Halaman Yang Paling Sering Dipakai Head
-
-Urutan halaman yang paling sering dipakai head:
-
-1. `Alert Center`
-2. `Chat Review Center`
-3. `Lead Management`
-4. `Lead Detail`
-5. `Customer List`
-6. `Customer Detail`
-7. `Ops Dashboard`
-8. `Manager Insights`
-9. `Access Control`
-10. `Channels`
-11. `Knowledge Base`
-
-Aturan paling sederhana:
-
-- kalau mau lihat masalah hari ini: buka `Alert Center`
-- kalau mau lihat bottleneck chat: buka `Chat Review Center`
-- kalau mau lihat lead yang tertahan: buka `Lead Management`
-- kalau mau lihat kesehatan operasional: buka `Ops Dashboard`
-- kalau mau cek akses dan struktur user: buka `Access Control`
+- `head` masih bisa melihat masalah besar lintas tim, tapi governance akses sekarang hanya `superadmin`
+- `head` boleh mengoreksi proposal knowledge, tetapi approval final dan publish tetap `superadmin`
 
 ---
 
-## 3. Alur Kerja Harian Head
+## 2. Cara Memakai Clara Sebagai Head
 
-### Saat mulai kerja
-
-1. login ke Clara
-2. buka `Alert Center`
-3. baca alert aktif yang paling penting
-4. lihat apakah ada masalah yang butuh keputusan cepat
-
-### Setelah itu
-
-1. buka `Chat Review Center`
-2. lihat chat atau bottleneck yang butuh campur tangan
-3. kalau perlu, buka `Conversation Detail`
-
-### Saat memeriksa pipeline
-
-1. buka `Lead Management`
-2. lihat lead `Hot`, `Overdue`, dan `Needs sync`
-3. buka `Lead Detail` jika perlu melihat konteks penuh
-
-### Saat memeriksa customer dan data kerja tim
-
-1. buka `Customer List`
-2. cari customer yang terasa penting atau bermasalah
-3. buka `Customer Detail`
-4. lihat apakah kategori akun sudah tepat
-5. lihat apakah data identitas masih rapi
-
-### Saat memeriksa kesehatan operasional
-
-1. buka `Ops Dashboard`
-2. lihat KPI tim
-3. lihat apakah ada tekanan operasional
-4. cek apakah bottleneck di alert dan review sejalan dengan KPI
-
-### Saat perlu intervensi sistem
-
-1. buka `Access Control`
-2. cek apakah role dan akses sudah tepat
-3. buka `Channels` jika ingin melihat sumber data
-4. buka `Knowledge Base` jika ingin mengecek landasan jawaban resmi
-
----
-
-## 4. Urutan Kerja Yang Paling Aman
-
-Kalau Anda bingung harus mulai dari mana, pakai urutan ini:
-
-1. `Alert Center`
-2. `Chat Review Center`
-3. `Lead Management`
-4. `Lead Detail`
-5. `Customer Detail`
-6. `Ops Dashboard`
-7. `Access Control`
-8. `Knowledge Base`
-
-Alasannya:
-
-- `Alert Center` dipakai untuk tahu apakah ada masalah aktif
-- `Chat Review Center` dipakai untuk melihat bottleneck manusia
-- `Lead Management` dipakai untuk melihat dampaknya di pipeline
-- `Customer Detail` dipakai jika masalahnya menyentuh identitas atau segmentasi customer
-- `Ops Dashboard` dipakai untuk membaca tekanan operasional dari atas
-- `Access Control` dan `Knowledge Base` dipakai untuk menjaga governance
-
----
-
-## 5. Panduan Halaman Satu Per Satu
-
-## 5.1 Alert Center
-
-### Fungsi halaman ini
-
-Ini adalah titik masuk utama head untuk membaca masalah operasional yang aktif.
-
-### Yang biasanya terlihat
-
-- alert `active`
-- `acknowledged`
-- `resolved`
-- severity
-- sumber alert
-
-### Cara pakai
-
-1. fokus ke alert `active`
-2. baca judul dan severity
-3. pahami apakah masalah ini cukup ditangani tim
-4. tentukan apakah perlu keputusan lebih tinggi
-
-### Jangan lakukan ini
-
-- mengabaikan alert aktif yang berulang
-- menyelesaikan alert tanpa verifikasi
-- hanya membaca angka tanpa turun ke konteks
-
----
-
-## 5.2 Chat Review Center
-
-### Fungsi halaman ini
-
-Dipakai untuk melihat chat yang macet atau butuh perhatian khusus dari level head.
-
-### Yang biasanya masuk ke sini
-
-- high risk
-- stale
-- pending review
-- escalation
-
-### Cara pakai
-
-1. buka `Chat Review Center`
-2. prioritaskan item yang paling berisiko
-3. buka detail chat
-4. tentukan apakah cukup dibimbing, direvisi, atau perlu keputusan lebih tinggi
-
----
-
-## 5.3 Lead Management
-
-### Fungsi halaman ini
-
-Dipakai head untuk melihat apakah pipeline tertahan di area tertentu.
-
-### Fokus utama head
-
-- `Hot`
-- `Overdue`
-- `Needs sync`
-- `Disiplin stale`
-
-### Cara pakai
-
-1. buka `Lead Management`
-2. lihat bucket yang paling bermasalah
-3. pilih lead yang berdampak besar
-4. buka detail jika perlu
-
----
-
-## 5.4 Lead Detail
-
-### Fungsi halaman ini
-
-Dipakai head untuk memahami satu lead secara lengkap saat perlu intervensi.
-
-### Yang harus diperiksa
-
-- stage
-- owner
-- next follow-up
-- log disiplin
-- metrik deal
-- account category
-
-### Tanda lead perlu perhatian head
-
-- lead panas tanpa next step jelas
-- owner tidak jelas
-- metrik deal tidak sinkron
-- banyak perubahan tapi log lemah
-
----
-
-## 5.5 Customer List
-
-### Fungsi halaman ini
-
-Dipakai head untuk mencari customer yang ingin diperiksa dari sudut pandang operasional dan kualitas data.
-
-### Kapan harus buka
-
-- saat satu customer terkait ke banyak lead
-- saat kategori akun terasa salah
-- saat tim terlihat membaca customer yang sama sebagai orang berbeda
-
----
-
-## 5.6 Customer Detail
-
-### Fungsi halaman ini
-
-Dipakai untuk memahami satu customer secara utuh dari sudut pandang pengawasan.
-
-### Yang harus diperiksa
-
-- nama customer
-- telepon
-- email
-- alamat
-- kategori akun
-- temperature customer
-- lead terkait
-
-### Kenapa halaman ini penting untuk head
-
-Karena masalah operasional kadang bukan cuma di chat, tetapi di:
-
-- customer yang pecah ke banyak lead
-- segmentasi akun yang salah
-- temperature yang tidak sesuai konteks
-
-### Tentang kategori akun
-
-Kategori akun bisa:
-
-- terbaca otomatis oleh Clara
-- diubah manual jika memang perlu
-
-Pilihan yang biasanya ada:
-
-- `Belum ditentukan`
-- `Mini`
-- `Reguler`
-
-### Tentang temperature customer
-
-Temperature customer bisa:
-
-- diisi otomatis oleh Clara
-- diubah manual jika memang perlu
-
-Pilihan yang biasanya ada:
-
-- `Belum ditentukan`
-- `Cold`
-- `Warm`
-- `Hot`
-
----
-
-## 5.7 Ops Dashboard
-
-### Fungsi halaman ini
-
-Dipakai untuk melihat performa operasional tim dan organisasi.
-
-### Yang dicari di sini
-
-- apakah pipeline sehat
-- apakah ada tekanan operasional
-- apakah ada alert KPI
-- apakah masalah di alert sejalan dengan angka besar
-
-### Cara pakai
-
-1. buka `Ops Dashboard`
-2. lihat KPI yang paling menonjol
-3. jangan berhenti di angka
-4. cocokkan dengan alert, review, atau lead yang relevan
-
----
-
-## 5.8 Manager Insights
-
-### Fungsi halaman ini
-
-Dipakai untuk membaca kondisi tim dari level menengah sebelum mengambil keputusan lintas tim.
-
-### Yang biasanya diperiksa head
-
-- team mana yang mulai longgar
-- team mana yang punya coaching priority tinggi
-- apakah pola hambatan hanya terjadi di satu team atau banyak team
-
----
-
-## 5.9 Access Control
-
-### Fungsi halaman ini
-
-Dipakai untuk mengelola akun dan akses.
-
-### Yang bisa dilakukan
-
-- cari user
-- lihat role
-- lihat status aktif
-- edit data dasar
-- reset password sesuai batas akses
-- nonaktifkan user
-
-### Aturan penting
-
-- role harus sekecil mungkin sesuai kebutuhan
-- akun yang tidak dipakai harus dinonaktifkan
-- jangan berbagi satu akun untuk banyak orang
-
----
-
-## 5.10 Channels
-
-### Fungsi halaman ini
-
-Dipakai untuk melihat sumber channel dan ingestion.
-
-Yang dilihat:
-
-- channel aktif
-- sumber data
-- volume data
-- aktivitas terakhir
-
----
-
-## 5.11 Knowledge Base
-
-### Fungsi halaman ini
-
-Tempat menyimpan jawaban resmi.
-
-Halaman ini penting untuk topik sensitif seperti:
-
-- legalitas
-- kebijakan
-- penjelasan produk resmi
-- aturan yang tidak boleh salah
-
-### Hal baru yang wajib dipahami
-
-Knowledge sekarang dibedakan menurut kategori akun:
-
-- knowledge `Mini`
-- knowledge `Reguler`
-
-Artinya:
-
-- jawaban untuk akun `Mini` bisa berbeda dari akun `Reguler`
-- head harus sadar kategori akun yang sedang dipakai sebelum menilai apakah satu draft sudah aman
-
----
-
-## 6. Apa Yang Harus Dilakukan Kalau Melihat Kondisi Ini
-
-## 6.1 Ada alert aktif
-
-Artinya:
-
-- ada masalah operasional yang masih berjalan
-
-Yang harus dilakukan:
-
-1. pahami masalahnya
-2. putuskan apakah cukup diproses
-3. atau harus dinaikkan jadi perhatian organisasi
-
-## 6.2 Ada bottleneck lintas tim
-
-Artinya:
-
-- masalah tidak lagi berhenti di satu sales atau satu manager
-
-Yang harus dilakukan:
-
-1. buka `Chat Review Center`
-2. lihat pola yang berulang
-3. cari apakah masalahnya di orang, proses, atau data
-
-## 6.3 KPI terasa tidak sehat
-
-Artinya:
-
-- ada tekanan operasional yang perlu diverifikasi
-
-Yang harus dilakukan:
-
-1. buka `Ops Dashboard`
-2. cek snapshot
-3. cek alert
-4. turun ke lead atau chat bila perlu
-
-## 6.4 Customer profile dan kategori akun terasa berantakan
-
-Artinya:
-
-- tim mungkin tidak bekerja dengan konteks customer yang sama
-
-Yang harus dilakukan:
-
-1. buka `Customer Detail`
-2. cek lead terkait
-3. cek apakah account category perlu diseragamkan
-4. pastikan tim punya konteks yang sama
-
-## 6.5 Akses user terasa terlalu luas atau terlalu sempit
-
-Artinya:
-
-- ada risiko governance atau akses kerja tidak tepat
-
-Yang harus dilakukan:
-
-1. buka `Access Control`
-2. cek role dan status user
-3. pastikan akses sesuai kebutuhan kerja
-
----
-
-## 7. Checklist Cepat Head
-
-Sebelum selesai kerja hari itu, cek:
-
-- apakah ada alert aktif yang belum jelas pemiliknya
-- apakah ada bottleneck lintas team
-- apakah hot lead penting dijaga
-- apakah akses user masih sesuai struktur tim
-- apakah jawaban sensitif punya landasan resmi
-- apakah data customer penting tidak pecah
-
----
-
-## 8. Hal Yang Jangan Dilakukan Head
-
-- jangan mengambil keputusan hanya dari satu metrik
-- jangan mengubah akses user tanpa alasan jelas
-- jangan mengabaikan alert aktif yang berulang
-- jangan membiarkan pipeline sehat hanya “terlihat sehat” tanpa verifikasi
-- jangan menganggap semua masalah tim berasal dari orang, kadang masalahnya justru di data atau alur kerja
-
----
-
-## 9. Troubleshooting Singkat
-
-## 9.1 Kenapa Alert Center kosong
-
-Kemungkinan:
-
-- memang tidak ada alert aktif sekarang
-- Anda sedang melihat status yang bukan `active`
-
-Yang harus dilakukan:
-
-1. cek filter
-2. kalau memang kosong, lanjut ke `Chat Review Center`, `Lead Management`, atau `Ops Dashboard`
-
-## 9.2 Kenapa Chat Review Center kosong
-
-Kemungkinan:
-
-- memang tidak ada bottleneck review saat ini
-- filter terlalu ketat
-
-Yang harus dilakukan:
-
-1. cek filter
-2. lanjut ke `Manager Insights`
-3. atau buka `Lead Management`
-
-## 9.3 Kenapa KPI terasa buruk tapi detailnya tidak jelas
-
-Kemungkinan:
-
-- angka ringkasan perlu diverifikasi di lead, alert, atau chat
-
-Yang harus dilakukan:
+Urutan kerja yang paling aman:
 
 1. buka `Alert Center`
-2. buka `Lead Management`
-3. buka `Chat Review Center`
-4. cocokkan masalah besar dengan kasus nyata
+2. buka `Head Insights`
+3. buka `Follow-up Center`
+4. buka `Lead Management`
+5. kalau perlu, turun ke `Lead Detail` atau `Customer Detail`
+6. cocokkan kondisinya di `Ops Dashboard`
+7. kalau ada pola lapangan, buka `Marketing Insights`
+8. kalau ada kebutuhan perbaikan jawaban, buka `Knowledge Base`
 
-## 9.4 Kenapa kategori akun belum muncul
+Logika urutan ini:
 
-Kemungkinan:
-
-- Clara belum cukup yakin membaca kategori akun
-- analisis chat belum dijalankan
-
-Yang harus dilakukan:
-
-1. cek apakah AI analysis sudah ada
-2. buka `Lead Detail` atau `Customer Detail`
-3. verifikasi bersama tim jika perlu
-
----
-
-## 10. Ringkasan Super Singkat
-
-Kalau Anda lupa semua isi manual ini, ingat 5 hal:
-
-- mulai kerja dari `Alert Center`
-- lihat bottleneck manusia dari `Chat Review Center`
-- lihat dampaknya di `Lead Management`
-- lihat gambaran besarnya di `Ops Dashboard`
-- jaga governance lewat `Access Control` dan `Knowledge Base`
-
-Kalau Anda bingung melihat satu item:
-
-- alert -> baca severity dan status
-- chat -> buka `Conversation Detail`
-- lead -> buka `Lead Detail`
-- customer -> buka `Customer Detail`
+- `Alert Center` memberi tahu apa yang mendesak hari ini
+- `Head Insights` memberi konteks tim mana yang mulai bermasalah
+- `Follow-up Center` membantu melihat chat/review yang butuh intervensi
+- `Lead Management` memperlihatkan dampak bottleneck ke pipeline nyata
+- `Ops Dashboard` membantu memastikan masalah itu benar-benar tercermin di KPI
 
 ---
 
-## 11. Penutup
+## 3. Fitur Per Fitur
 
-Clara paling mudah dipakai head kalau fokusnya tetap dijaga:
+## 3.1 Beranda
 
-- lihat masalah dari atas
-- tentukan prioritas
-- cek apakah masalah ada di orang, proses, atau data
-- intervensi hanya di tempat yang memang perlu
+### Fungsi
 
-Kalau empat hal itu dijaga, Clara akan jauh lebih berguna sebagai alat pengawasan operasional, bukan sekadar dashboard angka.
+Beranda dipakai untuk melihat ringkasan cepat sebelum masuk ke area detail.
+
+### Langkah pakai
+
+1. login sebagai `head`
+2. pastikan menu yang muncul sesuai role `head`
+3. baca ringkasan KPI singkat, aktivitas terbaru, dan shortcut halaman
+4. tentukan titik masuk hari ini:
+   - `Alert Center` kalau ada masalah aktif
+   - `Head Insights` kalau mau baca pola tim
+   - `Lead Management` kalau mau cek pipeline
+
+### Hasil yang harus muncul
+
+- tidak ada menu `Access Control` atau `Audit Logs`
+- ada shortcut ke `Head Insights`, `Ops Dashboard`, `Marketing Insights`, `Knowledge Base`
+
+### Test case cepat
+
+- ID: `HEAD-HOME-01`
+- Steps:
+  1. login sebagai `head`
+  2. buka `/dashboard`
+  3. verifikasi menu utama muncul
+  4. verifikasi menu admin superadmin-only tidak muncul
+- Expected:
+  - halaman terbuka
+  - menu sesuai role `head`
+
+---
+
+## 3.2 Alert Center
+
+### Fungsi
+
+Dipakai untuk membaca alert aktif yang butuh keputusan atau follow-up lintas tim.
+
+### Kapan dibuka
+
+- awal hari kerja
+- setelah refresh KPI
+- saat ada lead panas yang terasa macet
+
+### Langkah pakai
+
+1. buka `Alert Center`
+2. fokus ke item `active`
+3. baca severity, judul, dan sumber alert
+4. tentukan apakah masalah ini:
+   - cukup dipantau
+   - perlu diarahkan ke manager
+   - perlu dilihat langsung ke lead/conversation
+5. kalau alert terkait follow-up, lanjut ke `Follow-up Center` atau `Lead Management`
+
+### Kesalahan yang harus dihindari
+
+- menutup mata pada alert yang berulang
+- menyimpulkan masalah hanya dari badge tanpa lihat konteks lead
+
+### Test case cepat
+
+- ID: `HEAD-ALERT-01`
+- Steps:
+  1. buka `Alert Center`
+  2. filter item aktif
+  3. pilih satu alert
+  4. buka konteks lanjutan
+- Expected:
+  - alert aktif terlihat
+  - detail alert bisa dibaca
+  - ada arah tindak lanjut yang jelas
+
+---
+
+## 3.3 Follow-up Center
+
+### Fungsi
+
+Dipakai untuk melihat percakapan atau item review yang butuh intervensi level head.
+
+### Yang biasanya dicari
+
+- percakapan `high risk`
+- draft yang sensitif
+- item review yang berulang
+- bottleneck yang tidak selesai di level manager
+
+### Langkah pakai
+
+1. buka `Follow-up Center`
+2. prioritaskan item dengan risiko tertinggi
+3. buka detail conversation
+4. cek:
+   - masalah customer
+   - status balasan terakhir
+   - hasil AI
+   - apakah issue ini masalah orang, proses, atau knowledge
+5. tentukan tindakan:
+   - minta manager follow-up
+   - minta sales revisi
+   - arahkan pembuatan proposal knowledge
+
+### Test case cepat
+
+- ID: `HEAD-FOLLOWUP-01`
+- Steps:
+  1. buka `Follow-up Center`
+  2. pilih satu item pending/high risk
+  3. buka detail conversation
+  4. baca status review
+- Expected:
+  - item bisa dibuka
+  - head bisa membaca konteks dan menentukan intervensi
+
+---
+
+## 3.4 Head Insights
+
+### Fungsi
+
+Ini halaman utama `head` untuk membaca kondisi tim secara ringkas.
+
+### Yang harus diperhatikan
+
+- `coaching priority`
+- `discipline trend`
+- tim/anggota dengan progres lemah
+- boundary alert lintas organisasi/tim
+
+### Langkah pakai
+
+1. buka `Head Insights`
+2. cari tim yang paling perlu perhatian
+3. cocokkan insight dengan alert aktif
+4. pilih apakah harus turun ke:
+   - `Lead Management`
+   - `Customer List`
+   - `Follow-up Center`
+
+### Test case cepat
+
+- ID: `HEAD-INSIGHT-01`
+- Steps:
+  1. buka `Head Insights`
+  2. baca summary utama
+  3. identifikasi satu tim atau sinyal yang menonjol
+- Expected:
+  - summary tim muncul
+  - head bisa menentukan area yang perlu intervensi
+
+---
+
+## 3.5 Lead Management
+
+### Fungsi
+
+Dipakai untuk membaca apakah bottleneck tim benar-benar berdampak ke pipeline.
+
+### Fokus utama
+
+- lead `hot`
+- lead `overdue`
+- lead yang perlu sinkronisasi
+- lead dengan next follow-up tidak jelas
+
+### Langkah pakai
+
+1. buka `Lead Management`
+2. filter bucket yang paling bermasalah
+3. pilih lead dengan dampak bisnis terbesar
+4. buka detail lead jika perlu konteks penuh
+
+### Test case cepat
+
+- ID: `HEAD-LEAD-LIST-01`
+- Steps:
+  1. buka `Lead Management`
+  2. cari lead `hot` atau `overdue`
+  3. buka satu lead
+- Expected:
+  - list lead terbuka
+  - filter dan navigasi ke detail berjalan
+
+---
+
+## 3.6 Lead Detail
+
+### Fungsi
+
+Dipakai saat `head` perlu memahami satu lead secara lengkap.
+
+### Yang wajib dicek
+
+- owner / sales PIC
+- current stage
+- next follow-up
+- ringkasan dan notes
+- deal metrics
+- log disiplin
+
+### Kapan head harus turun ke sini
+
+- ada lead panas tapi belum jelas next step
+- ada mismatch antara KPI dan kondisi lapangan
+- ada risiko closure hilang karena follow-up lemah
+
+### Test case cepat
+
+- ID: `HEAD-LEAD-DETAIL-01`
+- Steps:
+  1. buka satu lead dari `Lead Management`
+  2. verifikasi stage, owner, next follow-up, dan deal metrics tampil
+  3. lihat timeline atau log disiplin
+- Expected:
+  - detail lead lengkap tampil
+  - head bisa membaca konteks keputusan
+
+---
+
+## 3.7 Customer List dan Customer Detail
+
+### Fungsi
+
+Dipakai saat masalah operasional ternyata berakar pada identitas customer yang kurang rapi.
+
+### Kapan dibuka
+
+- satu customer muncul di banyak lead
+- ada kebingungan kategori akun
+- tim terlihat membaca customer yang sama sebagai identitas berbeda
+
+### Langkah pakai
+
+1. buka `Customer List`
+2. cari nama customer
+3. buka `Customer Detail`
+4. cek:
+   - identitas
+   - account category
+   - temperature
+   - kaitan dengan lead yang ada
+
+### Test case cepat
+
+- ID: `HEAD-CUSTOMER-01`
+- Steps:
+  1. buka `Customer List`
+  2. cari satu customer
+  3. buka detailnya
+- Expected:
+  - detail customer tampil
+  - hubungan ke lead dan informasi segmentasi terlihat
+
+---
+
+## 3.8 Knowledge Base
+
+### Fungsi
+
+Untuk `head`, halaman ini dipakai untuk:
+
+- membaca jawaban resmi aktif
+- mengoreksi proposal knowledge
+- menyiapkan eskalasi ke `superadmin`
+
+### Yang boleh dilakukan head
+
+- melihat knowledge aktif
+- membaca proposal
+- memberi koreksi isi proposal
+- mengubah proposal sampai siap dieskalasi
+
+### Yang tidak boleh dilakukan head
+
+- approve final proposal
+- publish knowledge
+- menghapus knowledge master
+
+### Langkah pakai
+
+1. buka `Knowledge Base`
+2. baca proposal atau knowledge aktif yang relevan
+3. koreksi wording, struktur, atau isi proposal
+4. ubah status proposal menjadi siap dieskalasi jika memang sudah matang
+5. serahkan final approval ke `superadmin`
+
+### Test case cepat
+
+- ID: `HEAD-KNOWLEDGE-01`
+- Steps:
+  1. buka `Knowledge Base`
+  2. pilih satu proposal
+  3. ubah isi koreksi proposal
+  4. simpan atau eskalasi proposal
+- Expected:
+  - head bisa koreksi proposal
+  - head tidak melihat tombol approve final
+
+---
+
+## 3.9 Marketing Insights
+
+### Fungsi
+
+Dipakai untuk membaca pola objection, intent, dan angle konten dari percakapan nyata.
+
+### Tujuan untuk head
+
+- mencari pola yang harus diperbaiki secara operasional
+- menemukan topik yang layak dijadikan perbaikan knowledge
+- melihat apakah sinyal lapangan cocok dengan arah tim
+
+### Langkah pakai
+
+1. buka `Marketing Insights`
+2. baca objection teratas
+3. lihat audience signal dan stage signal
+4. cek apakah pola itu sejalan dengan alert/KPI
+5. bila perlu, arahkan manager untuk bikin proposal knowledge
+
+### Test case cepat
+
+- ID: `HEAD-MARKETING-01`
+- Steps:
+  1. buka `Marketing Insights`
+  2. baca top objection dan audience signal
+  3. verifikasi halaman memuat snapshot
+- Expected:
+  - insight marketing tampil
+  - head bisa membaca pola lapangan
+
+---
+
+## 3.10 Ops Dashboard
+
+### Fungsi
+
+Ini halaman KPI operasional utama untuk `head`.
+
+### Yang harus dibaca
+
+- total leads
+- hot leads
+- reply sent rate
+- overdue follow-up
+- pipeline value
+- won value
+- deposit
+- observation utama
+
+### Cara pakai
+
+1. buka `Ops Dashboard`
+2. baca snapshot aktif
+3. cek apakah angka besar sejalan dengan alert dan insight
+4. kalau ada gap, turun ke `Lead Management` atau `Follow-up Center`
+
+### Test case cepat
+
+- ID: `HEAD-KPI-01`
+- Steps:
+  1. buka `Ops Dashboard`
+  2. verifikasi snapshot tampil
+  3. lakukan refresh snapshot bila perlu
+- Expected:
+  - KPI utama terlihat
+  - snapshot bisa direfresh
+
+---
+
+## 4. Checklist Harian Head
+
+Pakai checklist ini sampai terbiasa:
+
+1. buka `Alert Center`
+2. cek `Head Insights`
+3. cek `Follow-up Center`
+4. cek lead panas/overdue
+5. cek satu atau dua customer bermasalah kalau ada pola identitas
+6. cocokkan kondisi dengan `Ops Dashboard`
+7. buka `Marketing Insights` jika perlu membaca pola lapangan
+8. buka `Knowledge Base` jika perlu mengoreksi dan mengeskalasi perbaikan
+
+---
+
+## 5. Ringkasan Test Case Head
+
+| ID | Fitur | Hasil yang diharapkan |
+| --- | --- | --- |
+| `HEAD-HOME-01` | Beranda | menu sesuai role `head` |
+| `HEAD-ALERT-01` | Alert Center | alert aktif bisa dibaca |
+| `HEAD-FOLLOWUP-01` | Follow-up Center | item review bisa dibuka |
+| `HEAD-INSIGHT-01` | Head Insights | summary tim terlihat |
+| `HEAD-LEAD-LIST-01` | Lead Management | list dan filter lead bekerja |
+| `HEAD-LEAD-DETAIL-01` | Lead Detail | detail lead lengkap |
+| `HEAD-CUSTOMER-01` | Customer Detail | data customer dan relasi lead tampil |
+| `HEAD-KNOWLEDGE-01` | Knowledge Base | head bisa koreksi, tidak bisa approve final |
+| `HEAD-MARKETING-01` | Marketing Insights | insight marketing tampil |
+| `HEAD-KPI-01` | Ops Dashboard | KPI snapshot tampil dan bisa refresh |

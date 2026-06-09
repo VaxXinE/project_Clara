@@ -1,512 +1,291 @@
-# Clara Manager Manual
+# CLARA Manager Manual
 
-Manual ini dibuat khusus untuk user `manager` di Clara.
+Manual ini dibuat khusus untuk akun `manager` di Clara.
 
-Tujuannya:
+Tujuan manual ini:
 
-- membantu manager cepat paham halaman yang memang dipakai manager
-- menjelaskan urutan kerja harian manager
-- menjelaskan cara membaca bottleneck percakapan dan kondisi tim
-- menjelaskan kapan harus turun ke lead atau customer detail
+- membantu `manager` memahami workflow yang benar
+- menjelaskan fitur yang memang dipakai `manager`
+- membantu `manager` membedakan kapan harus coaching, kapan harus eskalasi
+- memberi test case cepat untuk tiap fitur yang dia akses
 
 Kalau harus diingat dalam satu kalimat:
 
-> Tugas manager di Clara adalah melihat chat tim yang macet, memberi arahan yang jelas, lalu memastikan ritme kerja tim tetap sehat.
+> Tugas manager di Clara adalah membaca kualitas eksekusi sales, memperbaiki bottleneck percakapan, lalu menerjemahkan masalah lapangan menjadi coaching atau proposal perbaikan.
 
 ---
 
-## 1. Clara Dipakai Untuk Apa Oleh Manager
+## 1. Akses Manager Saat Ini
 
-Untuk manager, Clara dipakai bukan untuk membalas semua chat satu per satu.
+Fitur utama yang bisa diakses `manager`:
 
-Clara dipakai manager untuk:
+1. `Beranda`
+2. `Lead Management`
+3. `Customer List`
+4. `Chat Review Center`
+5. `Manager Insights`
+6. `Conversation Detail`
+7. `Lead Detail`
+8. `Customer Detail`
 
-- melihat chat mana yang macet
-- melihat siapa anggota tim yang mulai longgar
-- memberi coaching
-- mengecek lead penting
-- memastikan data customer tidak membingungkan tim
+Fitur khusus yang juga relevan:
 
-Jadi fokus manager adalah:
+- membuat atau mengubah review case
+- membuat proposal knowledge dari hasil percakapan
 
-- kualitas kerja
-- bottleneck
-- coaching
-- pengawasan lead penting
+Fitur yang **tidak** bisa diakses `manager`:
 
----
-
-## 2. Halaman Yang Paling Sering Dipakai Manager
-
-Urutan halaman yang paling sering dipakai manager:
-
-1. `Chat Review Center`
-2. `Conversation Detail`
-3. `Manager Insights`
-4. `Lead Management`
-5. `Lead Detail`
-6. `Customer List`
-7. `Customer Detail`
-8. `Alert Center`
-
-Aturan paling sederhana:
-
-- kalau mau lihat chat tim yang macet: buka `Chat Review Center`
-- kalau mau lihat konteks chat penuh: buka `Conversation Detail`
-- kalau mau lihat kondisi tim: buka `Manager Insights`
-- kalau mau cek lead penting: buka `Lead Management`
-- kalau mau cek data customer yang membingungkan: buka `Customer Detail`
+- `Access Control`
+- `Audit Logs`
+- `Channels`
+- `Ops Dashboard`
+- `Marketing Insights`
+- approval final knowledge
+- create/edit user, org, unit, team
 
 ---
 
-## 3. Alur Kerja Harian Manager
+## 2. Cara Memakai Clara Sebagai Manager
 
-### Saat mulai kerja
-
-1. login ke Clara
-2. buka `Chat Review Center`
-3. lihat item yang `high risk`, `stale`, atau `pending review`
-4. pilih satu item yang paling penting
-
-### Saat membaca kasus chat tim
-
-1. buka `Conversation Detail`
-2. baca chat terakhir
-3. lihat siapa yang bicara terakhir
-4. pahami apa yang membuat chat ini macet
-5. lihat apakah sales perlu:
-   - arahan
-   - revisi
-   - approval
-
-### Setelah selesai membaca chat
-
-1. buka `Manager Insights`
-2. lihat apakah ada team yang mulai longgar
-3. lihat `coaching priority`
-4. lihat `discipline by team`
-
-### Saat ada lead yang perlu diperiksa
-
-1. buka `Lead Management`
-2. cari lead yang `Hot`, `Overdue`, atau `Disiplin stale`
-3. buka `Lead Detail` bila perlu
-
-### Saat data customer terasa membingungkan
-
-1. buka `Customer List`
-2. cari customer yang dimaksud
-3. buka `Customer Detail`
-4. cek kategori akun
-5. cek temperature customer
-6. pastikan tim tidak membaca orang yang sama sebagai beberapa customer berbeda
-
----
-
-## 4. Urutan Kerja Yang Paling Aman
-
-Kalau Anda bingung harus mulai dari mana, pakai urutan ini:
-
-1. `Chat Review Center`
-2. `Conversation Detail`
-3. `Manager Insights`
-4. `Lead Management`
-5. `Lead Detail`
-6. `Customer Detail`
-7. `Alert Center`
-
-Alasannya:
-
-- `Chat Review Center` dipakai untuk melihat bottleneck utama
-- `Conversation Detail` dipakai untuk memahami konteks kasus
-- `Manager Insights` dipakai untuk membaca masalah tim secara lebih luas
-- `Lead Management` dipakai untuk melihat dampaknya di lead
-- `Customer Detail` dipakai kalau masalahnya berhubungan dengan identitas atau segmentasi customer
-
----
-
-## 5. Panduan Halaman Satu Per Satu
-
-## 5.1 Chat Review Center
-
-### Fungsi halaman ini
-
-Halaman ini adalah tempat kerja utama manager.
-
-### Yang biasanya terlihat
-
-- chat `high risk`
-- chat `stale`
-- `pending review`
-- item yang perlu analisis ulang
-- item yang butuh keputusan
-
-### Cara pakai
+Urutan kerja manager yang paling aman:
 
 1. buka `Chat Review Center`
-2. prioritaskan item yang paling tinggi risikonya
-3. buka detail chat
-4. putuskan tindakan:
-   - cukup dibimbing
-   - perlu revisi
-   - perlu approval
-   - perlu escalation
-
-### Jangan lakukan ini
-
-- membaca semua item tanpa prioritas
-- memberi coaching terlalu umum
-- menilai sales tanpa membaca konteks lengkap
+2. buka `Conversation Detail`
+3. buka `Manager Insights`
+4. cek `Lead Management`
+5. kalau perlu, buka `Customer Detail`
+6. bila insight cukup kuat, buat proposal knowledge
 
 ---
 
-## 5.2 Conversation Detail
+## 3. Fitur Per Fitur
 
-### Fungsi halaman ini
+## 3.1 Beranda
 
-Dipakai manager untuk melihat chat penuh sebelum memberi keputusan.
+### Fungsi
 
-### Yang harus dibaca
+Dipakai sebagai titik awal untuk masuk ke review, insight, dan lead penting.
 
-1. chat terbaru
-2. siapa yang bicara terakhir
-3. apa masalah inti customer
-4. hasil AI analysis
-5. draft balasan
-6. account category
-7. konteks lead
+### Test case cepat
 
-### Yang harus diputuskan manager
-
-- apakah sales sudah memahami masalah customer
-- apakah draft balasan aman
-- apakah sales butuh arahan atau revisi
-- apakah kasus perlu approval lebih tinggi
-
-### Catatan penting
-
-- `account category` mempengaruhi knowledge yang dipakai Clara
-- kalau kategori akun salah, coaching bisa meleset
+- ID: `MANAGER-HOME-01`
+- Steps:
+  1. login sebagai `manager`
+  2. buka `/dashboard`
+  3. verifikasi menu `Chat Review Center` dan `Manager Insights` muncul
+- Expected:
+  - beranda terbuka
+  - manager tidak melihat menu superadmin-only
 
 ---
 
-## 5.3 Manager Insights
+## 3.2 Chat Review Center
 
-### Fungsi halaman ini
+### Fungsi
 
-Dipakai untuk membaca kondisi tim secara ringkas.
+Tempat kerja utama manager untuk memantau percakapan yang macet atau berisiko.
 
-### Yang biasanya ada
+### Langkah pakai
 
-- `Discipline by Team`
-- `Coaching Priority`
-- `Objection Trend`
-- `Boundary Alert`
+1. buka `Chat Review Center`
+2. prioritaskan item `high risk`, `pending review`, atau `stale`
+3. buka conversation yang paling mendesak
+4. tentukan apakah perlu:
+   - coaching
+   - revisi jawaban
+   - review case
+   - proposal knowledge
 
-### Cara pakai
+### Test case cepat
 
-1. buka `Manager Insights`
-2. lihat tim mana yang mulai longgar
-3. klik team jika perlu melihat anggota
-4. lihat coaching priority
-5. turun ke lead atau chat kalau perlu detail
-
-### Pertanyaan yang dijawab halaman ini
-
-- siapa yang perlu dibantu sekarang
-- tim mana yang follow-up-nya mulai lemah
-- adakah pola masalah yang berulang
-
----
-
-## 5.4 Lead Management
-
-### Fungsi halaman ini
-
-Dipakai manager untuk memeriksa lead penting, bukan untuk scan semua lead seperti sales.
-
-### Fokus manager saat membuka halaman ini
-
-- lead `Hot`
-- lead `Overdue`
-- lead `Needs sync`
-- lead `Disiplin stale`
-
-### Cara pakai
-
-1. buka `Lead Management`
-2. fokus ke bucket yang paling berdampak
-3. cari lead yang butuh intervensi
-4. buka `Lead Detail` jika perlu
+- ID: `MANAGER-REVIEW-01`
+- Steps:
+  1. buka `Chat Review Center`
+  2. pilih satu item
+  3. buka detail conversation
+- Expected:
+  - list review tampil
+  - navigation ke conversation berjalan
 
 ---
 
-## 5.5 Lead Detail
+## 3.3 Conversation Detail
 
-### Fungsi halaman ini
+### Fungsi
 
-Dipakai manager untuk melihat apakah satu lead dikerjakan dengan benar.
+Dipakai manager untuk membaca konteks penuh sebelum memberi arahan.
 
-### Yang harus diperiksa
+### Yang wajib dicek
 
-- stage lead
-- owner
-- next follow-up
-- log disiplin
-- metrik deal
-- account category
+- siapa yang bicara terakhir
+- masalah customer
+- AI extraction
+- draft balasan
+- status approval/review
+- konteks lead
 
-### Tanda lead perlu perhatian manager
+### Test case cepat
 
-- follow-up kosong
-- log disiplin terlalu lama tidak diisi
-- metrik deal belum sinkron
-- owner tidak jelas
-
----
-
-## 5.6 Customer List
-
-### Fungsi halaman ini
-
-Dipakai manager untuk mencari customer yang ingin diperiksa.
-
-### Kapan harus buka
-
-- saat data customer terasa membingungkan
-- saat satu customer terkait dengan beberapa lead
-- saat ingin cek apakah segmentasi customer sudah tepat
+- ID: `MANAGER-CONV-01`
+- Steps:
+  1. buka satu conversation dari review center
+  2. baca transcript dan AI summary
+  3. verifikasi draft reply dan statusnya terlihat
+- Expected:
+  - context conversation lengkap tampil
 
 ---
 
-## 5.7 Customer Detail
+## 3.4 Manager Insights
 
-### Fungsi halaman ini
+### Fungsi
 
-Dipakai untuk memahami satu customer secara utuh dari sudut pandang manager.
+Dipakai untuk membaca pola kerja tim tanpa membuka satu per satu lead.
 
-### Yang harus diperiksa
+### Yang dicari
 
-- nama customer
-- telepon
-- email
-- alamat
-- kategori akun
-- temperature customer
-- lead terkait
+- coaching priority
+- discipline trend
+- tim atau anggota yang performanya turun
+- pola objection yang berulang
 
-### Kenapa halaman ini penting untuk manager
+### Test case cepat
 
-Karena kadang masalah tim bukan cuma di chat, tetapi di:
-
-- identitas customer yang salah baca
-- kategori akun yang salah
-- customer yang tersebar ke beberapa lead
-
-### Tentang kategori akun
-
-Kategori akun bisa:
-
-- terbaca otomatis oleh Clara
-- diubah manual bila tim yakin
-
-Pilihan yang biasanya ada:
-
-- `Belum ditentukan`
-- `Mini`
-- `Reguler`
-
-### Tentang temperature customer
-
-Temperature customer bisa:
-
-- diisi otomatis oleh Clara
-- diubah manual bila memang perlu
-
-Pilihan yang biasanya ada:
-
-- `Belum ditentukan`
-- `Cold`
-- `Warm`
-- `Hot`
+- ID: `MANAGER-INSIGHT-01`
+- Steps:
+  1. buka `Manager Insights`
+  2. baca summary tim
+  3. pilih satu sinyal yang perlu ditindaklanjuti
+- Expected:
+  - insight tim tampil
+  - manager bisa menentukan prioritas coaching
 
 ---
 
-## 5.8 Alert Center
+## 3.5 Review Case Management
 
-### Fungsi halaman ini
+### Fungsi
 
-Dipakai manager untuk melihat sinyal operasional yang perlu perhatian.
+Dipakai manager untuk menyimpan keputusan review atas percakapan tertentu.
 
-### Cara pakai
+### Langkah pakai
 
-1. fokus ke `active`
-2. baca severity
-3. pahami apakah ini perlu tindakan tim
-4. tentukan apakah cukup diproses atau perlu dibawa ke head
+1. buka conversation dari review center
+2. ambil suggestion review jika tersedia
+3. isi status review
+4. tambahkan note coaching
+5. simpan
 
----
+### Test case cepat
 
-## 6. Apa Yang Harus Dilakukan Kalau Melihat Kondisi Ini
-
-## 6.1 Chat `high risk`
-
-Artinya:
-
-- balasan berpotensi sensitif atau salah
-
-Yang harus dilakukan:
-
-1. buka `Conversation Detail`
-2. baca konteks penuh
-3. lihat hasil AI analysis
-4. cek draft
-5. beri arahan atau keputusan
-
-## 6.2 `Pending review`
-
-Artinya:
-
-- ada chat yang menunggu keputusan manusia
-
-Yang harus dilakukan:
-
-1. buka chat tersebut
-2. baca konteks
-3. putuskan tindakan
-
-## 6.3 `Stale`
-
-Artinya:
-
-- item sudah terlalu lama menunggu
-
-Yang harus dilakukan:
-
-1. cari penyebab macetnya
-2. tentukan apakah ini masalah sales, proses, atau data
-3. beri arahan yang jelas
-
-## 6.4 `Discipline by Team` melemah
-
-Artinya:
-
-- ritme kerja tim mulai turun
-
-Yang harus dilakukan:
-
-1. buka `Manager Insights`
-2. cek team yang dimaksud
-3. lihat apakah masalahnya ada di:
-   - chat
-   - follow-up
-   - log disiplin
-
-## 6.5 Customer profile terasa janggal
-
-Artinya:
-
-- nama, kategori akun, atau temperature mungkin terbaca tidak tepat
-
-Yang harus dilakukan:
-
-1. buka `Customer Detail`
-2. cek lead terkait
-3. lihat kategori akun
-4. lihat temperature
-5. minta koreksi jika memang perlu
+- ID: `MANAGER-REVIEWCASE-01`
+- Steps:
+  1. buka satu conversation
+  2. buat/update review case
+  3. tambah note
+- Expected:
+  - review case tersimpan
+  - note tampil saat dibuka ulang
 
 ---
 
-## 7. Checklist Cepat Manager
+## 3.6 Lead Management dan Lead Detail
 
-Sebelum selesai kerja hari itu, cek:
+### Fungsi
 
-- apakah ada chat high risk yang belum disentuh
-- apakah ada item pending review yang terlalu lama
-- apakah ada team yang mulai longgar
-- apakah hot lead milik tim masih dijaga
-- apakah coaching sudah spesifik dan bisa ditindaklanjuti
-- apakah customer profile penting tidak membingungkan tim
+Dipakai untuk melihat dampak review ke pipeline nyata.
 
----
+### Kapan dibuka
 
-## 8. Hal Yang Jangan Dilakukan Manager
+- setelah menemukan chat yang macet
+- saat ada lead `hot` tapi progresnya lemah
+- saat manager perlu lihat apakah next follow-up jelas
 
-- jangan menilai tim hanya dari satu chat
-- jangan memberi coaching yang terlalu umum
-- jangan mengabaikan `stale` atau `pending review`
-- jangan membiarkan lead panas tanpa owner yang jelas
-- jangan memperbaiki data customer tanpa membaca konteks lead terkait
+### Test case cepat
 
----
-
-## 9. Troubleshooting Singkat
-
-## 9.1 Kenapa Chat Review Center kosong
-
-Kemungkinan:
-
-- memang tidak ada bottleneck review saat ini
-- filter terlalu ketat
-
-Yang harus dilakukan:
-
-1. cek filter
-2. lanjut ke `Manager Insights`
-3. atau buka `Lead Management`
-
-## 9.2 Kenapa Manager Insights terlihat kosong
-
-Kemungkinan:
-
-- scope team Anda memang kecil
-- belum banyak sinyal yang terkumpul
-
-Yang harus dilakukan:
-
-1. cek team yang sedang Anda lihat
-2. buka lead atau chat yang relevan untuk verifikasi
-
-## 9.3 Kenapa kategori akun belum muncul
-
-Kemungkinan:
-
-- Clara belum cukup yakin membaca kategori akun
-- analisis chat belum dijalankan
-
-Yang harus dilakukan:
-
-1. cek apakah AI analysis sudah ada
-2. buka `Lead Detail` atau `Customer Detail`
-3. verifikasi bersama tim kalau perlu
+- ID: `MANAGER-LEAD-01`
+- Steps:
+  1. buka `Lead Management`
+  2. pilih satu lead penting
+  3. buka detail lead
+- Expected:
+  - data lead lengkap tampil
+  - manager bisa membaca owner, stage, follow-up, dan deal
 
 ---
 
-## 10. Ringkasan Super Singkat
+## 3.7 Customer List dan Customer Detail
 
-Kalau Anda lupa semua isi manual ini, ingat 4 hal:
+### Fungsi
 
-- mulai kerja dari `Chat Review Center`
-- lihat kondisi tim dari `Manager Insights`
-- cek lead penting dari `Lead Management`
-- cek customer yang membingungkan dari `Customer Detail`
+Dipakai kalau akar masalah ternyata ada di data customer atau segmentasi akun.
 
-Kalau Anda bingung melihat satu item:
+### Test case cepat
 
-- chat -> buka `Conversation Detail`
-- lead -> buka `Lead Detail`
-- customer -> buka `Customer Detail`
+- ID: `MANAGER-CUSTOMER-01`
+- Steps:
+  1. buka `Customer List`
+  2. cari customer terkait
+  3. buka detail
+- Expected:
+  - data identitas customer tampil
+  - account category dan temperature terbaca
 
 ---
 
-## 11. Penutup
+## 3.8 Proposal Knowledge
 
-Clara paling mudah dipakai manager kalau fokusnya tetap dijaga:
+### Fungsi
 
-- lihat bottleneck
-- beri arahan yang jelas
-- cek kondisi tim
-- turun ke lead atau customer hanya saat memang perlu
+Manager boleh membuat proposal knowledge dari percakapan yang punya nilai belajar tinggi.
 
-Kalau empat hal itu dijaga, Clara akan jauh lebih mudah dipakai sebagai alat coaching dan pengawasan. 
+### Kapan dibuat
+
+- objection berulang
+- angle jawaban resmi belum ada
+- ada pola customer yang perlu dibakukan jadi guidance
+
+### Langkah pakai
+
+1. buka conversation yang layak
+2. buat proposal knowledge
+3. isi ringkasan insight
+4. simpan untuk dikoreksi `head`
+
+### Test case cepat
+
+- ID: `MANAGER-KNOWLEDGE-01`
+- Steps:
+  1. buka conversation relevan
+  2. buat proposal knowledge
+  3. simpan
+- Expected:
+  - proposal tersimpan
+  - manager tidak melihat tombol approve final
+
+---
+
+## 4. Checklist Harian Manager
+
+1. buka `Chat Review Center`
+2. baca 3-5 item paling berisiko
+3. buka `Conversation Detail` yang paling penting
+4. simpan review case atau coaching note
+5. cek `Manager Insights`
+6. cek dampaknya di `Lead Management`
+7. buat proposal knowledge kalau ada pola yang layak dibakukan
+
+---
+
+## 5. Ringkasan Test Case Manager
+
+| ID | Fitur | Hasil yang diharapkan |
+| --- | --- | --- |
+| `MANAGER-HOME-01` | Beranda | menu manager tampil sesuai role |
+| `MANAGER-REVIEW-01` | Chat Review Center | list review bisa dibuka |
+| `MANAGER-CONV-01` | Conversation Detail | transcript, AI, draft terlihat |
+| `MANAGER-INSIGHT-01` | Manager Insights | summary tim tampil |
+| `MANAGER-REVIEWCASE-01` | Review Case | review case dan note tersimpan |
+| `MANAGER-LEAD-01` | Lead Detail | data lead lengkap tampil |
+| `MANAGER-CUSTOMER-01` | Customer Detail | data customer tampil |
+| `MANAGER-KNOWLEDGE-01` | Proposal Knowledge | proposal bisa dibuat, tidak bisa approve final |

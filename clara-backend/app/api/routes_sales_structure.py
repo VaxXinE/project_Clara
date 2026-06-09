@@ -33,7 +33,7 @@ router = APIRouter(prefix="/sales-structure", tags=["sales-structure"])
 @router.get("/units", response_model=list[SalesUnitResponse])
 def list_sales_units_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     return list_sales_units(db=db, current_user=current_user)
 
@@ -43,7 +43,7 @@ def create_sales_unit_endpoint(
     payload: CreateSalesUnitRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         unit = create_sales_unit(db=db, payload=payload, current_user=current_user)
@@ -68,7 +68,7 @@ def update_sales_unit_endpoint(
     payload: UpdateSalesUnitRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         unit = update_sales_unit(
@@ -98,7 +98,7 @@ def delete_sales_unit_endpoint(
     unit_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         delete_sales_unit(db=db, unit_id=unit_id, current_user=current_user)
@@ -120,7 +120,7 @@ def delete_sales_unit_endpoint(
 @router.get("/teams", response_model=list[SalesTeamResponse])
 def list_sales_teams_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     return list_sales_teams(db=db, current_user=current_user)
 
@@ -130,7 +130,7 @@ def create_sales_team_endpoint(
     payload: CreateSalesTeamRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         team = create_sales_team(db=db, payload=payload, current_user=current_user)
@@ -155,7 +155,7 @@ def update_sales_team_endpoint(
     payload: UpdateSalesTeamRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         team = update_sales_team(
@@ -185,7 +185,7 @@ def delete_sales_team_endpoint(
     team_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         delete_sales_team(db=db, team_id=team_id, current_user=current_user)

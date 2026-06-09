@@ -48,6 +48,27 @@ function toDateTimeLocal(value: string | null): string {
   return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
+function buildOutcomeDraftMap(
+  items: MarketingExecutionItem[],
+): Record<string, ExecutionOutcomeDraft> {
+  return Object.fromEntries(
+    items.map((item) => [
+      item.id,
+      {
+        campaign_name: item.campaign_name ?? "",
+        published_at: toDateTimeLocal(item.published_at),
+        leads_generated: String(item.leads_generated),
+        qualified_leads: String(item.qualified_leads),
+        won_leads: String(item.won_leads),
+        attributed_pipeline_value: String(item.attributed_pipeline_value),
+        attributed_won_value: String(item.attributed_won_value),
+        attributed_deposit_amount: String(item.attributed_deposit_amount),
+        result_notes: item.result_notes ?? "",
+      },
+    ]),
+  );
+}
+
 export default function MarketingInsightsPage() {
   const router = useRouter();
   const [insights, setInsights] = useState<MarketingInsightsPreview | null>(null);
@@ -91,6 +112,7 @@ export default function MarketingInsightsPage() {
           apiFetch<CurrentUser[]>("/auth/users"),
         ]);
         setInsights(insightData);
+        setOutcomeDrafts(buildOutcomeDraftMap(insightData.execution_items));
         setSnapshots(snapshotData);
         setUsers(
           scopedUsers.filter(
@@ -113,30 +135,6 @@ export default function MarketingInsightsPage() {
     void loadInsights();
   }, [router]);
 
-  useEffect(() => {
-    if (!insights) {
-      return;
-    }
-
-    setOutcomeDrafts((current) => {
-      const next = { ...current };
-      for (const item of insights.execution_items) {
-        next[item.id] = {
-          campaign_name: item.campaign_name ?? "",
-          published_at: toDateTimeLocal(item.published_at),
-          leads_generated: String(item.leads_generated),
-          qualified_leads: String(item.qualified_leads),
-          won_leads: String(item.won_leads),
-          attributed_pipeline_value: String(item.attributed_pipeline_value),
-          attributed_won_value: String(item.attributed_won_value),
-          attributed_deposit_amount: String(item.attributed_deposit_amount),
-          result_notes: item.result_notes ?? "",
-        };
-      }
-      return next;
-    });
-  }, [insights]);
-
   async function handleGenerateSnapshot() {
     setIsGeneratingSnapshot(true);
     setErrorMessage("");
@@ -153,6 +151,7 @@ export default function MarketingInsightsPage() {
         "/dashboard/marketing/insights-preview"
       );
       setInsights(latestInsights);
+      setOutcomeDrafts(buildOutcomeDraftMap(latestInsights.execution_items));
       await loadSnapshotList();
     } catch (error) {
       setErrorMessage(
@@ -188,6 +187,10 @@ export default function MarketingInsightsPage() {
             }
           : previous
       );
+      setOutcomeDrafts((current) => ({
+        ...current,
+        ...buildOutcomeDraftMap([createdItem]),
+      }));
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -225,6 +228,10 @@ export default function MarketingInsightsPage() {
             }
           : previous
       );
+      setOutcomeDrafts((current) => ({
+        ...current,
+        ...buildOutcomeDraftMap([updatedItem]),
+      }));
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -247,7 +254,7 @@ export default function MarketingInsightsPage() {
       actions={
         insights ? (
           <>
-            <div className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-600">
+            <div className="rounded-full border border-[#f0cb73]/18 bg-[#1f1810] px-4 py-2.5 text-sm text-slate-200">
               Snapshot: {formatDateTime(insights.generated_at)}
             </div>
             <button
@@ -265,7 +272,7 @@ export default function MarketingInsightsPage() {
       <div className="space-y-6">
 
         {isLoading && (
-          <div className="clara-empty-state text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-slate-300">
             Loading marketing insights...
           </div>
         )}
@@ -335,19 +342,19 @@ export default function MarketingInsightsPage() {
                   ) : (
                     <div className="space-y-3">
                       {insights.top_objections.map((item) => (
-                        <div
+                        <article
                           key={item.topic}
-                          className="rounded-[20px] bg-slate-50 p-4"
+                          className="clara-card-soft rounded-[20px] p-4"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-slate-900">
+                            <p className="text-sm font-semibold text-slate-100">
                               {item.topic}
                             </p>
                             <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
                               {item.count}
                             </span>
                           </div>
-                        </div>
+                        </article>
                       ))}
                     </div>
                   )}
@@ -364,29 +371,29 @@ export default function MarketingInsightsPage() {
                       {insights.top_content_recommendations.map((item) => (
                         <article
                           key={`${item.title}-${item.suggested_format}`}
-                          className="rounded-[22px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f9fbfd_100%)] p-4"
+                          className="clara-card-soft rounded-[22px] p-4"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-950">
+                            <h3 className="text-base font-semibold text-slate-100">
                               {item.title}
                             </h3>
                             <span
                               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                                 item.priority === "high"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-amber-100 text-amber-700"
+                                  ? "bg-red-600/15 text-red-200"
+                                  : "bg-amber-600/15 text-amber-200"
                               }`}
                             >
                               {item.priority}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm text-slate-600">
+                          <p className="mt-2 text-sm text-slate-300">
                             {item.rationale}
                           </p>
                           <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                             Suggested format
                           </p>
-                          <p className="mt-1 text-sm text-slate-800">
+                          <p className="mt-1 text-sm text-slate-100">
                             {formatStatusLabel(item.suggested_format)}
                           </p>
                         </article>
@@ -406,17 +413,17 @@ export default function MarketingInsightsPage() {
                       {insights.content_briefs.map((brief) => (
                         <article
                           key={`${brief.title}-${brief.suggested_format}`}
-                          className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfd_100%)] p-5 shadow-[0_10px_26px_rgba(15,23,42,0.04)]"
+                          className="clara-card rounded-[24px] p-5"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-950">
+                            <h3 className="text-base font-semibold text-slate-100">
                               {brief.title}
                             </h3>
                             <span
                               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                                 brief.urgency === "high"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-amber-100 text-amber-700"
+                                  ? "bg-red-600/15 text-red-200"
+                                  : "bg-amber-600/15 text-amber-200"
                               }`}
                             >
                               {brief.urgency}
@@ -442,11 +449,11 @@ export default function MarketingInsightsPage() {
                             />
                           </div>
 
-                          <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          <div className="mt-4 rounded-2xl bg-[rgba(31,24,17,0.9)] p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                               Key message
                             </p>
-                            <p className="mt-2 text-sm leading-6 text-slate-700">
+                            <p className="mt-2 text-sm leading-6 text-slate-200">
                               {brief.key_message}
                             </p>
                           </div>
@@ -488,34 +495,34 @@ export default function MarketingInsightsPage() {
                       {insights.execution_items.map((item) => (
                         <article
                           key={item.id}
-                          className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfd_100%)] p-5"
+                          className="clara-card rounded-[24px] p-5"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-950">
+                            <h3 className="text-base font-semibold text-slate-100">
                               {item.title}
                             </h3>
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            <span className="rounded-full bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-slate-100">
                               {formatStatusLabel(item.item_type)}
                             </span>
-                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                            <span className="rounded-full bg-amber-600/15 px-2.5 py-1 text-xs font-semibold text-amber-200">
                               {item.priority}
                             </span>
                           </div>
 
-                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                          <p className="mt-3 text-sm leading-6 text-slate-300">
                             {item.summary}
                           </p>
 
                           <div className="mt-4 grid gap-4 md:grid-cols-2">
                             <SignalBlock label="Recommended action" value={item.recommended_action} />
-                            <div className="rounded-2xl bg-slate-50 p-4">
+                            <div className="rounded-2xl bg-[rgba(31,24,17,0.9)] p-4">
                               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Ownership
                               </p>
-                              <p className="mt-2 text-sm text-slate-700">
+                              <p className="mt-2 text-sm text-slate-300">
                                 Dibuat oleh {item.created_by_user_name ?? "System"}
                               </p>
-                              <p className="mt-1 text-sm text-slate-700">
+                              <p className="mt-1 text-sm text-slate-300">
                                 PIC: {item.assigned_user_name ?? "Belum di-assign"}
                               </p>
                             </div>
@@ -534,7 +541,7 @@ export default function MarketingInsightsPage() {
                                   })
                                 }
                                 disabled={updatingExecutionItemId === item.id}
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                                className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
                               >
                                 {EXECUTION_STATUS_OPTIONS.map((option) => (
                                   <option key={option} value={option}>
@@ -556,7 +563,7 @@ export default function MarketingInsightsPage() {
                                   })
                                 }
                                 disabled={updatingExecutionItemId === item.id}
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                                className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
                               >
                                 <option value="">Belum di-assign</option>
                                 {users.map((user) => (
@@ -585,7 +592,7 @@ export default function MarketingInsightsPage() {
                                     },
                                   }))
                                 }
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                                className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
                               />
                             </label>
 
@@ -605,7 +612,7 @@ export default function MarketingInsightsPage() {
                                     },
                                   }))
                                 }
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                                className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
                               />
                             </label>
                           </div>
@@ -701,7 +708,7 @@ export default function MarketingInsightsPage() {
                                 }))
                               }
                               rows={3}
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                              className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
                             />
                           </label>
 
@@ -750,11 +757,11 @@ export default function MarketingInsightsPage() {
                           </div>
 
                           {item.notes && (
-                            <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                            <div className="mt-4 rounded-2xl bg-[rgba(31,24,17,0.9)] p-4">
                               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Notes
                               </p>
-                              <p className="mt-2 text-sm leading-6 text-slate-700">
+                              <p className="mt-2 text-sm leading-6 text-slate-300">
                                 {item.notes}
                               </p>
                             </div>
@@ -776,18 +783,18 @@ export default function MarketingInsightsPage() {
                       {snapshots.map((snapshot) => (
                         <article
                           key={snapshot.id}
-                          className="rounded-[22px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f9fbfd_100%)] p-4"
+                          className="clara-card-soft rounded-[22px] p-4"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <h3 className="text-sm font-semibold text-slate-950">
+                              <h3 className="text-sm font-semibold text-slate-100">
                                 {formatDateTime(snapshot.created_at)}
                               </h3>
                               <p className="mt-1 text-xs text-slate-500">
                                 Period: {snapshot.period_start} s/d {snapshot.period_end}
                               </p>
                             </div>
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            <span className="rounded-full bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-slate-100">
                               {snapshot.scope_type}
                             </span>
                           </div>
@@ -883,17 +890,17 @@ export default function MarketingInsightsPage() {
                       {insights.ads_signals.map((signal) => (
                         <article
                           key={`${signal.title}-${signal.budget_shift}`}
-                          className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbfd_100%)] p-5"
+                          className="clara-card rounded-[24px] p-5"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-950">
+                            <h3 className="text-base font-semibold text-slate-100">
                               {signal.title}
                             </h3>
                             <span
                               className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                                 signal.urgency === "high"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-sky-100 text-sky-700"
+                                  ? "bg-red-600/15 text-red-200"
+                                  : "bg-sky-600/15 text-sky-200"
                               }`}
                             >
                               {signal.urgency}
@@ -951,27 +958,27 @@ export default function MarketingInsightsPage() {
                       {insights.monthly_content_plan.map((item) => (
                         <article
                           key={`${item.window_label}-${item.theme}`}
-                          className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)]"
+                          className="clara-card-soft rounded-[22px] p-4"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
                               {item.window_label}
                             </h3>
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            <span className="rounded-full bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-slate-100">
                               {formatStatusLabel(item.suggested_format)}
                             </span>
                           </div>
-                          <p className="mt-3 text-base font-semibold text-slate-950">
+                          <p className="mt-3 text-base font-semibold text-slate-100">
                             {item.theme}
                           </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                          <p className="mt-2 text-sm leading-6 text-slate-300">
                             {item.objective}
                           </p>
-                          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
+                          <div className="mt-4 rounded-2xl bg-[rgba(31,24,17,0.9)] px-4 py-3">
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                               Primary metric
                             </p>
-                            <p className="mt-1 text-sm font-medium text-slate-800">
+                            <p className="mt-1 text-sm font-medium text-slate-100">
                               {item.primary_metric}
                             </p>
                           </div>
@@ -1001,7 +1008,7 @@ function Panel({
   return (
     <section className="clara-card rounded-[28px] p-5">
       <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-      <p className="mt-1 text-sm text-slate-600">{description}</p>
+      <p className="mt-1 text-sm text-slate-300">{description}</p>
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -1017,16 +1024,16 @@ function MetricCard({
   tone: "slate" | "blue" | "green" | "red";
 }) {
   const toneClass = {
-    slate: "bg-white border-slate-200 text-slate-950",
-    blue: "bg-blue-50 border-blue-200 text-blue-950",
-    green: "bg-green-50 border-green-200 text-green-950",
-    red: "bg-red-50 border-red-200 text-red-950",
+    slate: "bg-[linear-gradient(180deg,rgba(31,24,17,0.98)_0%,rgba(21,16,12,0.98)_100%)] border border-[#f0cb73]/12 text-[#f8e8c1]",
+    blue: "bg-[linear-gradient(180deg,rgba(10,29,50,0.95)_0%,rgba(6,18,36,0.94)_100%)] border border-[#7dd3fc]/20 text-sky-100",
+    green: "bg-[linear-gradient(180deg,rgba(10,30,24,0.95)_0%,rgba(7,22,16,0.94)_100%)] border border-[#4ade80]/20 text-emerald-100",
+    red: "bg-[linear-gradient(180deg,rgba(59,15,15,0.95)_0%,rgba(38,9,9,0.94)_100%)] border border-[#f87171]/20 text-rose-100",
   }[tone];
 
   return (
     <div className={`clara-card rounded-[24px] p-5 ${toneClass}`}>
-      <p className="text-sm font-medium">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight">{value}</p>
+      <p className="text-sm font-medium text-slate-200">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-white">{value}</p>
     </div>
   );
 }
@@ -1052,7 +1059,7 @@ function BreakdownGroup({
               key={`${title}-${item.label}`}
               className="clara-card-soft flex items-center justify-between rounded-xl px-3 py-2"
             >
-              <span className="text-sm text-slate-700">
+              <span className="text-sm text-slate-300">
                 {formatStatusLabel(item.label)}
               </span>
               <span className="text-sm font-semibold text-slate-950">
@@ -1069,14 +1076,14 @@ function BreakdownGroup({
 function KpiRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="clara-card-soft flex items-center justify-between rounded-xl px-4 py-3">
-      <span className="text-sm text-slate-600">{label}</span>
-      <span className="text-sm font-semibold text-slate-950">{value}</span>
+      <span className="text-sm text-slate-300">{label}</span>
+      <span className="text-sm font-semibold text-slate-100">{value}</span>
     </div>
   );
 }
 
 function EmptyText({ text }: { text: string }) {
-  return <p className="text-sm text-slate-600">{text}</p>;
+  return <p className="text-sm text-slate-300">{text}</p>;
 }
 
 function BriefRow({ label, value }: { label: string; value: string }) {
@@ -1085,7 +1092,7 @@ function BriefRow({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
-      <p className="mt-1 text-sm leading-6 text-slate-700">{value}</p>
+      <p className="mt-1 text-sm leading-6 text-slate-200">{value}</p>
     </div>
   );
 }
@@ -1096,7 +1103,7 @@ function SignalBlock({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-200">{value}</p>
     </div>
   );
 }
@@ -1119,8 +1126,8 @@ function TrendRow({
   return (
     <div className="clara-card-soft rounded-xl px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-slate-600">{label}</span>
-        <span className="text-sm font-semibold text-slate-950">{value}</span>
+        <span className="text-sm text-slate-300">{label}</span>
+        <span className="text-sm font-semibold text-slate-100">{value}</span>
       </div>
       {hasDelta && (
         <p
@@ -1160,7 +1167,7 @@ function OutcomeNumberField({
         step="1"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+        className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
       />
     </label>
   );

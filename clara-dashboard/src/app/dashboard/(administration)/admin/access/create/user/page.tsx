@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
-import { getRoleDisplayLabel, isAdminLike, isOwnerLike } from "@/lib/roles";
+import { getRoleDisplayLabel, isOwnerLike } from "@/lib/roles";
 import type {
   CreateUserRequest,
   CurrentUser,
@@ -31,18 +31,13 @@ export default function AdminAccessCreateUserPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const isAdminScoped =
-    currentUser !== null &&
-    isAdminLike(currentUser.role) &&
-    !isOwnerLike(currentUser.role);
-
   useEffect(() => {
     async function bootstrap() {
       try {
         const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
 
-        if (!isAdminLike(me.role)) {
+        if (!isOwnerLike(me.role)) {
           router.replace("/workspace");
           return;
         }
@@ -56,9 +51,7 @@ export default function AdminAccessCreateUserPage() {
         setTeams(teamData);
         setUserForm((current) => ({
           ...current,
-          organization_id: isOwnerLike(me.role)
-            ? (current.organization_id ?? organizationData[0]?.id ?? null)
-            : me.organization_id,
+          organization_id: current.organization_id ?? organizationData[0]?.id ?? null,
         }));
       } catch (error) {
         setErrorMessage(
@@ -120,7 +113,7 @@ export default function AdminAccessCreateUserPage() {
             <div>
               <h2 className="text-lg font-semibold text-[#fff0c9]">Create User</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">
-                Head otomatis terikat ke organization miliknya sendiri.
+                Hanya superadmin yang bisa membuat user dari halaman ini.
               </p>
             </div>
 
@@ -181,7 +174,6 @@ export default function AdminAccessCreateUserPage() {
                   label: `${organization.name} (${organization.slug})`,
                 })),
               ]}
-              disabled={isAdminScoped}
             />
 
             <SelectField

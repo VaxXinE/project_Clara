@@ -10,8 +10,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
-from bootstrap_owner import BootstrapError, run_bootstrap
-from import_clara_knowledge import KnowledgeImportError, run_import
+from bootstrap_owner import BootstrapError, run_bootstrap  # noqa: E402
+from import_clara_knowledge import KnowledgeImportError, run_import  # noqa: E402
 
 
 def get_backend_root() -> Path:

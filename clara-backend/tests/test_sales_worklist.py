@@ -7,7 +7,6 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.lead import Lead
 from app.models.lead_task import LeadTask

@@ -142,6 +142,10 @@ export default function DashboardHomePage() {
   const topSales = kpi?.sales_performance[0] ?? null;
   const topOrganization = kpi?.organization_performance[0] ?? null;
   const primaryObservation = kpi?.key_observations[0] ?? null;
+  const topOrganizationWonRate =
+    topOrganization && topOrganization.total_leads > 0
+      ? topOrganization.won_leads / topOrganization.total_leads
+      : 0;
 
   return (
     <WorkspaceShell
@@ -325,7 +329,7 @@ export default function DashboardHomePage() {
                   />
                   <PulseRow
                     label="Won Rate"
-                    value={`${(topOrganization.won_rate * 100).toFixed(0)}%`}
+                    value={`${(topOrganizationWonRate * 100).toFixed(0)}%`}
                   />
                 </div>
               </PanelFrame>

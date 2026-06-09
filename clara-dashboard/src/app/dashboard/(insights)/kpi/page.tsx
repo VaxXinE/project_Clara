@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -49,7 +49,7 @@ export default function KpiCommandCenterPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  async function loadKpiPage() {
+  const loadKpiPage = useCallback(async () => {
     try {
       const kpiPath =
         sourceChannelFilter === "all"
@@ -83,15 +83,21 @@ export default function KpiCommandCenterPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [router, sourceChannelFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void loadKpiPage();
+      void (async () => {
+        try {
+          await loadKpiPage();
+        } catch {
+          // loadKpiPage already mengatur error state.
+        }
+      })();
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [router, sourceChannelFilter]);
+  }, [loadKpiPage]);
 
   async function reloadAlertHistory() {
     const alertsResponse = await apiFetch<KpiAlertHistoryResponse>(

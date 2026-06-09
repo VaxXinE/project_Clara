@@ -161,98 +161,6 @@ function leadNeedsDealMetricsSync(
   return explicitDealStatus !== currentStage;
 }
 
-function isLeadOverdue(nextFollowUpAt: string | null): boolean {
-  if (!nextFollowUpAt) {
-    return false;
-  }
-
-  return new Date(nextFollowUpAt).getTime() <= Date.now();
-}
-
-function buildLeadActionPlan(lead: LeadDetail) {
-  const items: Array<{
-    condition: string;
-    action: string;
-    detail: string;
-  }> = [];
-
-  if (isLeadOverdue(lead.next_follow_up_at)) {
-    items.push({
-      condition: "Jika next follow-up sudah overdue",
-      action:
-        "Review conversation terakhir lalu ubah field Next follow-up ke jadwal baru yang pasti akan dikerjakan.",
-      detail:
-        "Kalau customer sudah tidak responsif, tetap catat hasil terakhir di discipline log. Jangan biarkan lead aktif tanpa tanggal follow-up yang hidup.",
-    });
-  }
-
-  if (lead.discipline_summary.compliance_status === "stale_log") {
-    items.push({
-      condition: "Jika compliance = stale log",
-      action:
-        "Isi Daily Discipline Log baru hari ini dengan aktivitas terbaru yang benar-benar dilakukan.",
-      detail:
-        "Minimal isi result status, objection utama, mood customer, dan next follow-up. Ini dipakai untuk menghidupkan kembali ritme kerja lead ini.",
-    });
-  }
-
-  if (lead.discipline_summary.compliance_status === "missing_today_log") {
-    items.push({
-      condition: "Jika compliance = missing today log",
-      action:
-        "Catat satu aktivitas kerja hari ini walaupun hasilnya masih waiting customer atau no response.",
-      detail:
-        "Status ini bukan berarti gagal, tapi artinya belum ada bukti aksi hari ini. User harus meninggalkan jejak kerja yang jelas.",
-    });
-  }
-
-  if (leadNeedsDealMetricsSync(lead.current_stage, lead.deal?.status ?? null)) {
-    items.push({
-      condition: "Jika deal metrics belum sinkron",
-      action:
-        "Scroll ke Deal Metrics, sesuaikan deal status dengan kondisi lead saat ini, lalu klik Simpan Deal Metrics.",
-      detail:
-        "Ini wajib terutama saat stage sudah `won` atau `lost`. Kalau tidak disinkronkan, dashboard KPI akan membaca data yang salah.",
-    });
-  }
-
-  if (!lead.summary?.trim() || !lead.assigned_user_name) {
-    items.push({
-      condition: "Jika summary atau owner belum rapi",
-      action:
-        "Lengkapi Lead Context: isi summary 2-3 kalimat, pastikan owner benar, dan simpan.",
-      detail:
-        "Targetnya agar siapa pun yang buka lead ini langsung paham posisi customer tanpa harus baca seluruh riwayat dari nol.",
-    });
-  }
-
-  if (
-    !lead.tasks.some(
-      (task) => task.status === "open" || task.status === "snoozed",
-    )
-  ) {
-    items.push({
-      condition: "Jika masih ada pekerjaan lanjutan tapi belum ada task",
-      action:
-        "Buat Follow-up Task untuk pekerjaan manual seperti telepon ulang, kirim proposal, atau koordinasi internal.",
-      detail:
-        "Jangan hanya simpan di kepala atau notes. Task dipakai supaya pekerjaan berikutnya bisa ditracking dan tidak hilang.",
-    });
-  }
-
-  if (!items.length) {
-    items.push({
-      condition: "Jika tidak ada alarm utama",
-      action:
-        "Cukup cek cepat conversation terakhir lalu lanjut ke lead berikutnya.",
-      detail:
-        "Artinya lead ini sudah punya konteks, jadwal, dan jejak kerja yang cukup aman untuk sekarang.",
-    });
-  }
-
-  return items.slice(0, 4);
-}
-
 export default function LeadDetailPage() {
   const params = useParams<{ leadId: string }>();
   const leadId = params.leadId;
@@ -448,32 +356,19 @@ export default function LeadDetailPage() {
       ),
     [lead],
   );
-  const leadActionPlan = useMemo(
-    () => (lead ? buildLeadActionPlan(lead) : []),
-    [lead],
-  );
   const timelinePageSize = 2;
   const timelineTotalPages = lead
     ? Math.max(1, Math.ceil(lead.timeline.length / timelinePageSize))
     : 1;
+  const effectiveTimelinePage = Math.min(timelinePage, timelineTotalPages);
   const visibleTimeline = useMemo(() => {
     if (!lead) {
       return [];
     }
 
-    const startIndex = (timelinePage - 1) * timelinePageSize;
+    const startIndex = (effectiveTimelinePage - 1) * timelinePageSize;
     return lead.timeline.slice(startIndex, startIndex + timelinePageSize);
-  }, [lead, timelinePage]);
-
-  useEffect(() => {
-    setTimelinePage(1);
-  }, [leadId]);
-
-  useEffect(() => {
-    if (timelinePage > timelineTotalPages) {
-      setTimelinePage(timelineTotalPages);
-    }
-  }, [timelinePage, timelineTotalPages]);
+  }, [effectiveTimelinePage, lead]);
 
   async function handleSaveLead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1570,7 +1465,7 @@ export default function LeadDetailPage() {
                       {lead.timeline.length > timelinePageSize ? (
                         <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
                           <p className="text-sm text-slate-600">
-                            Halaman {timelinePage} dari {timelineTotalPages} ·
+                            Halaman {effectiveTimelinePage} dari {timelineTotalPages} ·
                             menampilkan {visibleTimeline.length} dari{" "}
                             {lead.timeline.length} aktivitas.
                           </p>
@@ -1582,7 +1477,7 @@ export default function LeadDetailPage() {
                                   Math.max(1, current - 1),
                                 )
                               }
-                              disabled={timelinePage === 1}
+                              disabled={effectiveTimelinePage === 1}
                               className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Sebelumnya
@@ -1594,7 +1489,7 @@ export default function LeadDetailPage() {
                                   Math.min(timelineTotalPages, current + 1),
                                 )
                               }
-                              disabled={timelinePage === timelineTotalPages}
+                              disabled={effectiveTimelinePage === timelineTotalPages}
                               className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Berikutnya
@@ -1640,12 +1535,7 @@ function DetailSelect({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (disabled) {
-      setIsOpen(false);
-    }
-  }, [disabled]);
+  const isDropdownOpen = !disabled && isOpen;
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -1676,7 +1566,7 @@ function DetailSelect({
     <div ref={containerRef} className="relative">
       <button
         type="button"
-        aria-expanded={isOpen}
+        aria-expanded={isDropdownOpen}
         aria-haspopup="listbox"
         disabled={disabled}
         onClick={() => setIsOpen((previous) => !previous)}
@@ -1686,7 +1576,7 @@ function DetailSelect({
         <span
           aria-hidden="true"
           className={`text-slate-500 transition-transform ${
-            isOpen ? "rotate-180" : ""
+            isDropdownOpen ? "rotate-180" : ""
           }`}
         >
           <svg
@@ -1706,7 +1596,7 @@ function DetailSelect({
         </span>
       </button>
 
-      {isOpen ? (
+      {isDropdownOpen ? (
         <div className="absolute inset-x-0 z-10 mt-2 rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.99)_0%,rgba(17,12,9,0.99)_100%)] p-2 shadow-[0_18px_36px_rgba(0,0,0,0.28)]">
           <ul
             role="listbox"
@@ -1748,26 +1638,6 @@ function DetailSelect({
         </div>
       ) : null}
     </div>
-  );
-}
-
-function LeadActionCard({
-  title,
-  action,
-  detail,
-}: {
-  title: string;
-  action: string;
-  detail: string;
-}) {
-  return (
-    <article className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4 shadow-[0_12px_28px_rgba(0,0,0,0.16)]">
-      <h3 className="text-sm font-semibold text-[#f0cb73]">{title}</h3>
-      <p className="mt-2 text-sm font-medium leading-6 text-[#fff0c9]">
-        {action}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{detail}</p>
-    </article>
   );
 }
 

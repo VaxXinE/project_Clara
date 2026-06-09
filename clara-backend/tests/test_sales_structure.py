@@ -24,23 +24,23 @@ def csrf_headers(client: TestClient) -> dict[str, str]:
     return {"X-CSRF-Token": csrf_token}
 
 
-def test_head_can_create_unit_team_and_assign_user(
+def test_superadmin_can_create_unit_team_and_assign_user(
     client: TestClient,
     db_session_factory: sessionmaker,
     seeded_data: dict[str, object],
 ) -> None:
-    admin_a = seeded_data["admin_a"]
+    owner = seeded_data["owner"]
     manager_a = seeded_data["manager_a"]
     marketing_a = seeded_data["marketing_a"]
 
-    login(client, email=admin_a.email, password="AdminPass123!")
+    login(client, email=owner.email, password="OwnerPass123!")
 
     unit_response = client.post(
         "/sales-structure/units",
         json={
             "name": "Jakarta Timur",
             "code": "jkt-timur",
-            "organization_id": str(admin_a.organization_id),
+            "organization_id": str(owner.organization_id),
         },
         headers=csrf_headers(client),
     )
@@ -52,7 +52,7 @@ def test_head_can_create_unit_team_and_assign_user(
         json={
             "name": "Team Anggrek",
             "code": "team-anggrek",
-            "organization_id": str(admin_a.organization_id),
+            "organization_id": str(owner.organization_id),
             "unit_id": unit_payload["id"],
             "manager_user_id": str(manager_a.id),
         },
@@ -79,12 +79,11 @@ def test_head_can_create_unit_team_and_assign_user(
     assert str(refreshed_user.team_id) == team_payload["id"]
 
 
-def test_head_cannot_manage_sales_structure_in_other_organization(
+def test_head_cannot_access_sales_structure_management_endpoints(
     client: TestClient,
     seeded_data: dict[str, object],
 ) -> None:
     admin_a = seeded_data["admin_a"]
-    org_b = seeded_data["org_b"]
 
     login(client, email=admin_a.email, password="AdminPass123!")
 
@@ -93,16 +92,12 @@ def test_head_cannot_manage_sales_structure_in_other_organization(
         json={
             "name": "Bandung",
             "code": "bdg",
-            "organization_id": str(org_b.id),
+            "organization_id": str(admin_a.organization_id),
         },
         headers=csrf_headers(client),
     )
 
-    assert response.status_code == 400
-    assert (
-        response.json()["detail"]
-        == "Head hanya boleh mengelola hierarchy di organization sendiri."
-    )
+    assert response.status_code == 403
 
 
 def test_superadmin_can_list_cross_org_units(
@@ -137,20 +132,21 @@ def test_superadmin_can_list_cross_org_units(
     assert str(org_b.id) in returned_org_ids
 
 
-def test_head_cannot_assign_non_manager_as_team_manager(
+def test_superadmin_cannot_assign_non_manager_as_team_manager(
     client: TestClient,
     seeded_data: dict[str, object],
 ) -> None:
+    owner = seeded_data["owner"]
     admin_a = seeded_data["admin_a"]
 
-    login(client, email=admin_a.email, password="AdminPass123!")
+    login(client, email=owner.email, password="OwnerPass123!")
 
     response = client.post(
         "/sales-structure/teams",
         json={
             "name": "Team Keliru",
             "code": "team-keliru",
-            "organization_id": str(admin_a.organization_id),
+            "organization_id": str(owner.organization_id),
             "manager_user_id": str(admin_a.id),
         },
         headers=csrf_headers(client),

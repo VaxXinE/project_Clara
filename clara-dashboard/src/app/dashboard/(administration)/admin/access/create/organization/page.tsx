@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
-import { isAdminLike, isOwnerLike } from "@/lib/roles";
+import { isOwnerLike } from "@/lib/roles";
 import type {
   CreateOrganizationRequest,
   CurrentUser,
@@ -32,7 +32,7 @@ export default function AdminAccessCreateOrganizationPage() {
         const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
 
-        if (!isAdminLike(me.role)) {
+        if (!isOwnerLike(me.role)) {
           router.replace("/workspace");
           return;
         }
@@ -126,7 +126,7 @@ export default function AdminAccessCreateOrganizationPage() {
 
             {!canManageOrganizations ? (
               <p className="clara-card-soft rounded-xl p-3 text-sm text-[#f0cb73]">
-                Head tidak bisa membuat organization baru dari UI ini.
+                Hanya superadmin yang bisa membuat organization baru dari UI ini.
               </p>
             ) : null}
 

@@ -30,6 +30,20 @@ Kalau kamu butuh panduan untuk **user akhir**, lihat manual ini:
 - Manual user:
   - [docs/CLARA_USER_MANUAL.md](docs/CLARA_USER_MANUAL.md)
   - [docs/CLARA_USER_MANUAL.pdf](docs/CLARA_USER_MANUAL.pdf)
+- Manual per role:
+  - [docs/CLARA_SUPERADMIN_MANUAL.md](docs/CLARA_SUPERADMIN_MANUAL.md)
+  - [docs/CLARA_HEAD_MANUAL.md](docs/CLARA_HEAD_MANUAL.md)
+  - [docs/CLARA_MANAGER_MANUAL.md](docs/CLARA_MANAGER_MANUAL.md)
+  - [docs/CLARA_SALES_MANUAL.md](docs/CLARA_SALES_MANUAL.md)
+- Use case onboarding per role:
+  - [docs/CLARA_ROLE_USE_CASES.md](docs/CLARA_ROLE_USE_CASES.md)
+- Tutorial detail per role:
+  - [docs/CLARA_SUPERADMIN_TUTORIAL.md](docs/CLARA_SUPERADMIN_TUTORIAL.md)
+  - [docs/CLARA_HEAD_TUTORIAL.md](docs/CLARA_HEAD_TUTORIAL.md)
+  - [docs/CLARA_MANAGER_TUTORIAL.md](docs/CLARA_MANAGER_TUTORIAL.md)
+  - [docs/CLARA_SALES_TUTORIAL.md](docs/CLARA_SALES_TUTORIAL.md)
+- Flowchart arsitektur dan operasional:
+  - [docs/CLARA_PROJECT_FLOWCHART.md](docs/CLARA_PROJECT_FLOWCHART.md)
 - Manual test:
   - [MANUAL_TEST_CASES_CLARA.md](MANUAL_TEST_CASES_CLARA.md)
   - [TEST_CONVERSATIONS_CLARA.md](TEST_CONVERSATIONS_CLARA.md)

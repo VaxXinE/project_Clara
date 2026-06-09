@@ -379,12 +379,6 @@ def resolve_customer_profile_name(
     conversation: Conversation | None = None,
     preferred_name: str | None = None,
 ) -> str:
-    if preferred_name and preferred_name.strip():
-        return preferred_name.strip()
-
-    if lead is not None and lead.display_name.strip():
-        return lead.display_name.strip()
-
     if conversation is not None:
         customer_messages = [
             message
@@ -395,6 +389,12 @@ def resolve_customer_profile_name(
             return customer_messages[0].sender_name.strip()
         if conversation.title.strip():
             return conversation.title.strip()
+
+    if preferred_name and preferred_name.strip():
+        return preferred_name.strip()
+
+    if lead is not None and lead.display_name.strip():
+        return lead.display_name.strip()
 
     return "Unknown Customer"
 

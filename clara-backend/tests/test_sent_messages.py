@@ -1,8 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
-from uuid import UUID
-
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker

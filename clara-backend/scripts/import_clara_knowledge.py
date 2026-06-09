@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 from dataclasses import dataclass
@@ -92,6 +93,54 @@ def get_variant_dir(root_dir: Path, variant: str) -> Path:
 def get_owner_by_email(db: Session, email: str) -> User | None:
     normalized_email = email.strip().lower()
     return db.scalars(select(User).where(User.email == normalized_email)).first()
+
+
+def list_superadmins(db: Session) -> list[User]:
+    return db.scalars(
+        select(User).where(User.role == "superadmin").order_by(User.created_at.asc())
+    ).all()
+
+
+def resolve_knowledge_owner(
+    db: Session,
+    *,
+    owner_email: str,
+) -> User | None:
+    normalized_email = owner_email.strip().lower()
+    if normalized_email:
+        owner = get_owner_by_email(db=db, email=normalized_email)
+
+        if owner is None:
+            raise KnowledgeImportError(
+                "Superadmin untuk import knowledge tidak ditemukan: "
+                f"{normalized_email}"
+            )
+
+        if owner.role != "superadmin":
+            raise KnowledgeImportError(
+                f"User {owner.email} ditemukan, tapi rolenya {owner.role}, "
+                "bukan superadmin."
+            )
+
+        return owner
+
+    superadmins = list_superadmins(db)
+    if not superadmins:
+        raise KnowledgeImportError(
+            "Tidak ada user superadmin di database. "
+            "Buat superadmin dulu sebelum import knowledge."
+        )
+
+    if len(superadmins) == 1:
+        return superadmins[0]
+
+    available_emails = ", ".join(user.email for user in superadmins)
+    raise KnowledgeImportError(
+        "Ditemukan lebih dari satu superadmin. "
+        "Tentukan owner secara eksplisit dengan "
+        "`--owner-email` atau env `CLARA_KNOWLEDGE_OWNER_EMAIL`. "
+        f"Pilihan yang tersedia: {available_emails}"
+    )
 
 
 def load_file_content(file_path: Path) -> str:
@@ -231,7 +280,11 @@ def upsert_knowledge_entries(
     return results
 
 
-def run_import(db: Session | None = None) -> KnowledgeImportResult:
+def run_import(
+    db: Session | None = None,
+    *,
+    owner_email: str | None = None,
+) -> KnowledgeImportResult:
     knowledge_root = get_knowledge_root()
 
     if not knowledge_root.exists():
@@ -239,8 +292,9 @@ def run_import(db: Session | None = None) -> KnowledgeImportResult:
             f"Folder knowledge tidak ditemukan di {knowledge_root}"
         )
 
-    owner_email = (
-        os.getenv("CLARA_KNOWLEDGE_OWNER_EMAIL")
+    resolved_owner_email = (
+        owner_email
+        or os.getenv("CLARA_KNOWLEDGE_OWNER_EMAIL")
         or settings.clara_knowledge_owner_email
         or ""
     ).strip()
@@ -249,20 +303,11 @@ def run_import(db: Session | None = None) -> KnowledgeImportResult:
     session = db or SessionLocal()
 
     try:
-        if owner_email:
-            owner = get_owner_by_email(db=session, email=owner_email)
-
-            if owner is None:
-                raise KnowledgeImportError(
-                    f"Superadmin untuk import knowledge tidak ditemukan: {owner_email}"
-                )
-
-            if owner.role != "superadmin":
-                raise KnowledgeImportError(
-                    f"User {owner.email} ditemukan, tapi rolenya {owner.role}, bukan superadmin."
-                )
-
-            created_by_user_id = owner.id
+        owner = resolve_knowledge_owner(
+            db=session,
+            owner_email=resolved_owner_email,
+        )
+        created_by_user_id = owner.id
 
         imported_items = build_import_items(knowledge_root)
         legacy_deactivated_count = deactivate_legacy_imports(session)
@@ -293,8 +338,22 @@ def run_import(db: Session | None = None) -> KnowledgeImportResult:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Import Clara knowledge markdown ke tabel product_knowledge."
+    )
+    parser.add_argument(
+        "--owner-email",
+        help=(
+            "Email superadmin yang akan dicatat sebagai pembuat knowledge. "
+            "Kalau tidak diisi, script akan pakai env "
+            "CLARA_KNOWLEDGE_OWNER_EMAIL atau auto-detect bila hanya ada satu "
+            "superadmin di database."
+        ),
+    )
+    args = parser.parse_args()
+
     try:
-        result = run_import()
+        result = run_import(owner_email=args.owner_email)
     except KnowledgeImportError as exc:
         print(f"Import gagal: {exc}")
         return 1

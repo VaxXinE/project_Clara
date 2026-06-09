@@ -57,8 +57,23 @@ class AIExtractionCreate(BaseModel):
     next_best_action: str = Field(min_length=1, max_length=1000)
     content_insight: str = Field(min_length=1, max_length=1000)
     internal_notes: str = Field(min_length=1, max_length=1000)
-    account_category_prediction: AccountCategoryPrediction
-    customer_profile_autofill: CustomerProfileAutofill
+    account_category_prediction: AccountCategoryPrediction = Field(
+        default_factory=lambda: AccountCategoryPrediction(
+            value="unknown",
+            confidence_score=0.0,
+            evidence="Belum ada prediksi kategori akun.",
+        )
+    )
+    customer_profile_autofill: CustomerProfileAutofill = Field(
+        default_factory=lambda: CustomerProfileAutofill(
+            display_name=None,
+            phone=None,
+            email=None,
+            address=None,
+            confidence_score=0.0,
+            evidence="Belum ada data profil yang bisa diisi otomatis.",
+        )
+    )
 
     confidence_score: float = Field(ge=0.0, le=1.0)
 

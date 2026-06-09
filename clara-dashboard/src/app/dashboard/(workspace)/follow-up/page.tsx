@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -155,7 +155,7 @@ export default function FollowUpPage() {
   const [actionBucketFilter, setActionBucketFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  async function loadWorklist() {
+  const loadWorklist = useCallback(async () => {
     try {
       const me = await apiFetch<CurrentUser>("/auth/me");
       setCurrentUser(me);
@@ -178,15 +178,21 @@ export default function FollowUpPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [router]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void loadWorklist();
+      void (async () => {
+        try {
+          await loadWorklist();
+        } catch {
+          // loadWorklist already mengatur error state.
+        }
+      })();
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [router]);
+  }, [loadWorklist]);
 
   async function handleTaskAction(
     item: SalesWorklistItem,

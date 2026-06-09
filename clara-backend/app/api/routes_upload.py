@@ -24,6 +24,7 @@ from app.models.user import User
 from app.services.audit_service import create_audit_log
 from app.services.customer_profile_service import sync_customer_profile_temperature
 from app.services.customer_profile_service import (
+    customer_profile_contact_fields_supported,
     ensure_customer_profile_for_lead,
     is_placeholder_profile_name,
     normalize_ai_email,
@@ -54,7 +55,7 @@ CONTACT_EMAIL_PATTERN = re.compile(
 
 class UploadRawChatRequest(BaseModel):
     raw_text: str
-    title: str
+    title: str | None = None
 
 
 class ManualConversationIdentityHints(BaseModel):
@@ -176,6 +177,59 @@ def normalize_conversation_title_or_raise(raw_title: str | None) -> str:
     return normalized_title
 
 
+def infer_conversation_title_from_messages(
+    *,
+    parsed_messages: Sequence,
+    source: str,
+) -> str:
+    for message in parsed_messages:
+        sender_name = str(getattr(message, "sender_name", "")).strip()
+        sender_type = str(getattr(message, "sender_type", "")).strip().lower()
+        if (
+            sender_type == "customer"
+            and sender_name
+            and not is_placeholder_profile_name(sender_name)
+        ):
+            return sender_name
+
+    for message in parsed_messages:
+        sender_name = str(getattr(message, "sender_name", "")).strip()
+        if sender_name and not is_placeholder_profile_name(sender_name):
+            return sender_name
+
+    source_label = "WhatsApp" if source == "whatsapp_txt" else "Telegram"
+    return f"{source_label} Conversation"
+
+
+def infer_customer_name_from_messages(parsed_messages: Sequence) -> str | None:
+    for message in parsed_messages:
+        sender_name = str(getattr(message, "sender_name", "")).strip()
+        sender_type = str(getattr(message, "sender_type", "")).strip().lower()
+        if (
+            sender_type == "customer"
+            and sender_name
+            and not is_placeholder_profile_name(sender_name)
+        ):
+            return sender_name
+
+    return None
+
+
+def resolve_manual_conversation_title(
+    *,
+    raw_title: str | None,
+    parsed_messages: Sequence,
+    source: str,
+) -> str:
+    normalized_title = (raw_title or "").strip()
+    if len(normalized_title) >= 2:
+        return normalized_title
+    return infer_conversation_title_from_messages(
+        parsed_messages=parsed_messages,
+        source=source,
+    )
+
+
 def build_message_fingerprint(message: object) -> tuple[str, str, str, str]:
     sender_name = str(getattr(message, "sender_name", "")).strip().casefold()
     sender_type = str(getattr(message, "sender_type", "")).strip().casefold()
@@ -294,14 +348,15 @@ def sync_continued_conversation_effects(
     if not new_messages:
         return
 
+    preferred_customer_name = infer_customer_name_from_messages(new_messages) or title
     lead = ensure_conversation_lead(
         db=db,
         conversation=conversation,
-        preferred_name=title,
+        preferred_name=preferred_customer_name,
     )
     promoted_lead_name = derive_lead_display_name(
         conversation=conversation,
-        preferred_name=title,
+        preferred_name=preferred_customer_name,
     )
     if (
         promoted_lead_name
@@ -421,6 +476,8 @@ def create_or_update_conversation_from_messages(
                     message_timestamp=parsed_message.message_timestamp,
                 )
             )
+        if new_messages:
+            db.flush()
 
         if parsed_messages:
             first_timestamp = parsed_messages[0].message_timestamp
@@ -465,10 +522,11 @@ def create_or_update_conversation_from_messages(
         )
 
         if new_messages and previous_status != existing_conversation.status:
+            preferred_customer_name = infer_customer_name_from_messages(new_messages) or title
             lead = ensure_conversation_lead(
                 db=db,
                 conversation=existing_conversation,
-                preferred_name=title,
+                preferred_name=preferred_customer_name,
             )
             create_lead_activity_event(
                 db=db,
@@ -483,7 +541,6 @@ def create_or_update_conversation_from_messages(
 
         db.add(existing_conversation)
         db.commit()
-        db.refresh(existing_conversation)
 
         operation_status = "updated" if new_messages else "unchanged"
         return existing_conversation, operation_status, len(new_messages)
@@ -518,15 +575,25 @@ def create_or_update_conversation_from_messages(
                 message_timestamp=parsed_message.message_timestamp,
             )
         )
+    db.flush()
 
+    preferred_customer_name = infer_customer_name_from_messages(parsed_messages) or title
     lead = ensure_conversation_lead(
         db=db,
         conversation=conversation,
-        preferred_name=title,
+        preferred_name=preferred_customer_name,
+        sync_customer_profile=False,
     )
     lead.last_contact_at = conversation.last_message_at
     db.commit()
-    db.refresh(conversation)
+    persisted_lead = db.get(Lead, lead.id)
+    if persisted_lead is not None and customer_profile_contact_fields_supported(db):
+        ensure_customer_profile_for_lead(
+            db=db,
+            lead=persisted_lead,
+            preferred_name=preferred_customer_name,
+        )
+        db.commit()
     return conversation, "created", len(parsed_messages)
 
 
@@ -562,13 +629,12 @@ def detect_upload_channel(
 @router.post("/whatsapp-txt", status_code=status.HTTP_201_CREATED)
 async def upload_whatsapp_txt(
     request: Request,
-    title: str = Form(...),
+    title: str | None = Form(default=None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
-    normalized_title = normalize_conversation_title_or_raise(title)
 
     if not file.filename or not file.filename.endswith(".txt"):
         raise HTTPException(
@@ -599,6 +665,12 @@ async def upload_whatsapp_txt(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+    normalized_title = resolve_manual_conversation_title(
+        raw_title=title,
+        parsed_messages=parsed_messages,
+        source="whatsapp_txt",
+    )
 
     conversation, upload_status, appended_message_count = create_or_update_conversation_from_messages(
         db=db,
@@ -635,13 +707,12 @@ async def upload_whatsapp_txt(
 @router.post("/telegram-txt", status_code=status.HTTP_201_CREATED)
 async def upload_telegram_txt(
     request: Request,
-    title: str = Form(...),
+    title: str | None = Form(default=None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
-    normalized_title = normalize_conversation_title_or_raise(title)
 
     if not file.filename or not file.filename.endswith(".txt"):
         raise HTTPException(
@@ -672,6 +743,12 @@ async def upload_telegram_txt(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+    normalized_title = resolve_manual_conversation_title(
+        raw_title=title,
+        parsed_messages=parsed_messages,
+        source="telegram_txt",
+    )
 
     conversation, upload_status, appended_message_count = create_or_update_conversation_from_messages(
         db=db,
@@ -715,7 +792,6 @@ async def upload_whatsapp_raw_text(
     validate_upload_access(current_user)
 
     raw_text = payload.raw_text.strip()
-    normalized_title = normalize_conversation_title_or_raise(payload.title)
     if not raw_text:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -731,6 +807,12 @@ async def upload_whatsapp_raw_text(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+    normalized_title = resolve_manual_conversation_title(
+        raw_title=payload.title,
+        parsed_messages=parsed_messages,
+        source="whatsapp_txt",
+    )
 
     conversation, upload_status, appended_message_count = create_or_update_conversation_from_messages(
         db=db,
@@ -774,7 +856,6 @@ async def upload_telegram_raw_text(
     validate_upload_access(current_user)
 
     raw_text = payload.raw_text.strip()
-    normalized_title = normalize_conversation_title_or_raise(payload.title)
     if not raw_text:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -790,6 +871,12 @@ async def upload_telegram_raw_text(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+    normalized_title = resolve_manual_conversation_title(
+        raw_title=payload.title,
+        parsed_messages=parsed_messages,
+        source="telegram_txt",
+    )
 
     conversation, upload_status, appended_message_count = create_or_update_conversation_from_messages(
         db=db,

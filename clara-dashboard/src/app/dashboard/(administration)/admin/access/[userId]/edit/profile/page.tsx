@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
-import { getRoleDisplayLabel, isAdminLike, isOwnerLike } from "@/lib/roles";
+import { getRoleDisplayLabel, isOwnerLike } from "@/lib/roles";
 import type {
   CurrentUser,
   OrganizationItem,
@@ -35,18 +35,13 @@ export default function AdminAccessEditProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const isAdminScoped =
-    currentUser !== null &&
-    isAdminLike(currentUser.role) &&
-    !isOwnerLike(currentUser.role);
-
   useEffect(() => {
     async function bootstrap() {
       try {
         const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
 
-        if (!isAdminLike(me.role)) {
+        if (!isOwnerLike(me.role)) {
           router.replace("/workspace");
           return;
         }
@@ -63,14 +58,6 @@ export default function AdminAccessEditProfilePage() {
         const nextTargetUser = userData.find((user) => user.id === userId) ?? null;
         if (!nextTargetUser) {
           setErrorMessage("User tidak ditemukan.");
-          return;
-        }
-
-        if (
-          !isOwnerLike(me.role) &&
-          nextTargetUser.organization_id !== me.organization_id
-        ) {
-          router.replace("/admin/access");
           return;
         }
 
@@ -200,7 +187,6 @@ export default function AdminAccessEditProfilePage() {
                     label: `${organization.name} (${organization.slug})`,
                   })),
                 ]}
-                disabled={isAdminScoped}
               />
             </div>
 

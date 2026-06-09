@@ -113,9 +113,6 @@ def derive_lead_display_name(
     conversation: Conversation,
     preferred_name: str | None = None,
 ) -> str:
-    if preferred_name and preferred_name.strip() and not is_placeholder_profile_name(preferred_name):
-        return preferred_name.strip()
-
     customer_messages = [
         message
         for message in conversation.messages
@@ -125,6 +122,9 @@ def derive_lead_display_name(
     ]
     if customer_messages:
         return customer_messages[0].sender_name.strip()
+
+    if preferred_name and preferred_name.strip() and not is_placeholder_profile_name(preferred_name):
+        return preferred_name.strip()
 
     if conversation.title.strip():
         return conversation.title.strip()
@@ -141,6 +141,7 @@ def ensure_conversation_lead(
     conversation: Conversation,
     preferred_name: str | None = None,
     account_category: str | None = None,
+    sync_customer_profile: bool = True,
 ) -> Lead:
     if conversation.lead_id is not None:
         lead = db.get(Lead, conversation.lead_id)
@@ -175,7 +176,7 @@ def ensure_conversation_lead(
         actor_user_id=conversation.sales_user_id,
         to_value=lead.display_name,
     )
-    if customer_profile_contact_fields_supported(db):
+    if sync_customer_profile and customer_profile_contact_fields_supported(db):
         ensure_customer_profile_for_lead(
             db=db,
             lead=lead,

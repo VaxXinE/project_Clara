@@ -7,14 +7,13 @@ import {
   faBookOpen,
   faBriefcase,
   faBuildingShield,
+  faBullhorn,
   faCalendarCheck,
   faChartColumn,
   faChartLine,
-  faChevronDown,
   faCloudArrowUp,
   faComments,
   faGaugeHigh,
-  faRightFromBracket,
   faTriangleExclamation,
   faUsersGear,
   faWandSparkles,
@@ -30,7 +29,6 @@ import { apiFetch } from "@/lib/api";
 import {
   canAccessQueueAndActionCenter,
   getRoleDisplayLabel,
-  isHeadRole,
   normalizeWorkspaceRole,
 } from "@/lib/roles";
 import type {
@@ -165,13 +163,19 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     });
   }
 
-  if (currentUser && isSuperadminScopedRole) {
+  if (currentUser && (isHeadScopedRole || isSuperadminScopedRole)) {
     insightItems.push(
       {
         href: "/knowledge",
         label: "Knowledge Base",
         icon: faBookOpen,
         description: "Jawaban resmi",
+      },
+      {
+        href: "/marketing",
+        label: "Marketing Insights",
+        icon: faBullhorn,
+        description: "Analisis sinyal marketing",
       },
       {
         href: "/kpi",
@@ -181,12 +185,23 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       },
     );
 
-    adminItems.push({
-      href: "/admin/access",
-      label: "Access Control",
-      icon: faUsersGear,
-      description: "Role dan akses",
-    });
+  }
+
+  if (currentUser && isSuperadminScopedRole) {
+    adminItems.push(
+      {
+        href: "/admin/access",
+        label: "Access Control",
+        icon: faUsersGear,
+        description: "Role dan akses",
+      },
+      {
+        href: "/admin/ops",
+        label: "Audit Logs",
+        icon: faBuildingShield,
+        description: "Jejak audit dan status sistem",
+      },
+    );
   }
 
   const groups: NavGroup[] = [{ title: "Workspace", items: workspaceItems }];
@@ -208,14 +223,6 @@ function isNavItemActive(pathname: string, href: string): boolean {
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function getWorkspaceTitle(currentUser?: CurrentUser | null) {
-  if (!currentUser) {
-    return "SCC Workspace";
-  }
-
-  return currentUser.name;
 }
 
 function getAccountProfileHref() {
@@ -271,12 +278,15 @@ export function WorkspaceShell({
   const navGroups = buildNavGroups(resolvedCurrentUser);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [accountMenuPathname, setAccountMenuPathname] = useState(pathname);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [globalNotifications, setGlobalNotifications] = useState<
     OpsNotificationItem[]
   >([]);
   const normalizedRole = normalizeWorkspaceRole(resolvedCurrentUser?.role);
-  const isHeadScopedRole = isHeadRole(resolvedCurrentUser?.role);
+  const isHeadScopedRole = normalizedRole === "head";
+  const isAccountMenuVisible =
+    accountMenuOpen && accountMenuPathname === pathname;
 
   useEffect(() => {
     if (!currentUser) {
@@ -301,12 +311,7 @@ export function WorkspaceShell({
   }, [mobileNavOpen]);
 
   useEffect(() => {
-    setAccountMenuOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
     if (!resolvedCurrentUser) {
-      setGlobalNotifications([]);
       return;
     }
 
@@ -447,7 +452,9 @@ export function WorkspaceShell({
                           </span>
                           <span
                             className={`mt-0.5 block truncate text-xs ${
-                              active ? "text-[#352614]" : "text-slate-400"
+                              active
+                                ? "text-[#352614]"
+                                : "text-slate-400"
                             }`}
                           >
                             {item.description}
@@ -482,10 +489,13 @@ export function WorkspaceShell({
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setAccountMenuOpen((current) => !current)}
+                    onClick={() => {
+                      setAccountMenuPathname(pathname);
+                      setAccountMenuOpen((current) => !current);
+                    }}
                     className="inline-flex h-10 w-10 items-center text-center gap-1.5 rounded-full border border-[#7a5520]/18 bg-[#2b1c0f] px-3 text-xs font-semibold uppercase text-[#f0cb73] shadow-[0_10px_20px_rgba(0,0,0,0.18)] transition hover:bg-[#362312]"
                     aria-label="Buka menu akun"
-                    aria-expanded={accountMenuOpen}
+                    aria-expanded={isAccountMenuVisible}
                   >
                     <span className="hidden sm:inline mx-auto">
                       {resolvedCurrentUser?.name
@@ -498,7 +508,7 @@ export function WorkspaceShell({
                     </span>
                   </button>
 
-                  {accountMenuOpen ? (
+                  {isAccountMenuVisible ? (
                     <div className="absolute right-0 top-[calc(100%+0.6rem)] z-40 w-[188px] overflow-hidden rounded-[14px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.98)_0%,rgba(18,13,10,0.98)_100%)] text-[#fff0c9] shadow-[0_16px_34px_rgba(0,0,0,0.28)]">
                       <div className="border-b border-[#f0cb73]/12 px-3.5 py-3">
                         <p className="text-lg font-semibold leading-5 text-[#fff0c9]">

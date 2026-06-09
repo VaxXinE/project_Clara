@@ -254,7 +254,7 @@ def create_user_endpoint(
     request: Request,
     payload: CreateUserRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     payload_to_create = payload
     requested_role = normalize_role(payload.role)
@@ -342,7 +342,7 @@ def update_user_endpoint(
     payload: UpdateUserRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     requested_role = normalize_role(payload.role) if payload.role is not None else None
     current_role = normalize_role(current_user.role)
@@ -418,7 +418,7 @@ def deactivate_user_endpoint(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))
@@ -477,7 +477,7 @@ def activate_user_endpoint(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))
@@ -531,7 +531,7 @@ def reset_user_password_endpoint(
     payload: ResetUserPasswordRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))
@@ -588,7 +588,7 @@ def delete_user_endpoint(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))

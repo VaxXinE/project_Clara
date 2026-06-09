@@ -16,7 +16,6 @@ import {
 } from "@/lib/format";
 import {
   canAccessQueueAndActionCenter,
-  isManagerLike,
   normalizeWorkspaceRole,
 } from "@/lib/roles";
 import type {
@@ -54,7 +53,7 @@ function canManageReviewCase(role?: string | null): boolean {
 }
 
 function canReviewKnowledgeProposal(role?: string | null): boolean {
-  return ["head", "superadmin"].includes((role ?? "").toLowerCase());
+  return ["superadmin"].includes((role ?? "").toLowerCase());
 }
 
 function formatReviewCaseStatus(value: string): string {
@@ -91,65 +90,6 @@ function getAccountCategoryBadgeClass(value: string): string {
     default:
       return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
   }
-}
-
-function buildConversationActionPlan(detail: SalesConversationDetail) {
-  const extraction = detail.latest_ai_extraction;
-  const suggestion = detail.latest_reply_suggestion;
-  const sentCount = detail.sent_messages.length;
-  const items: Array<{
-    condition: string;
-    action: string;
-    detail: string;
-  }> = [];
-
-  items.push({
-    condition: "Jika baru buka conversation",
-    action: "Baca 5-10 chat terakhir dulu sebelum klik tombol apa pun.",
-    detail:
-      "Tujuannya supaya user tidak balas berdasarkan summary lama. Konteks terbaru customer tetap sumber keputusan utama.",
-  });
-
-  if (!extraction) {
-    items.push({
-      condition: "Jika AI analysis belum ada",
-      action: "Jalankan AI analysis dulu.",
-      detail:
-        "Tanpa ini user belum punya ringkasan stage, risk, objection, dan next best action. Jangan lompat langsung bikin balasan.",
-    });
-  } else if (!suggestion) {
-    items.push({
-      condition: "Jika AI analysis sudah ada tapi draft belum ada",
-      action: "Generate reply suggestion lalu review hasilnya.",
-      detail:
-        "Tujuannya bukan asal cepat, tapi supaya user mulai dari draft yang sudah mempertimbangkan objection dan risk yang terdeteksi.",
-    });
-  } else if (sentCount === 0) {
-    items.push({
-      condition: "Jika draft sudah ada tapi belum ada pesan terkirim",
-      action: "Review draft, lalu kirim atau ajukan approval sesuai level risikonya.",
-      detail:
-        "Pastikan jawaban relevan dengan pertanyaan terakhir customer dan tidak mengandung klaim sensitif yang belum diverifikasi.",
-    });
-  } else {
-    items.push({
-      condition: "Jika chat sudah ditindaklanjuti",
-      action: "Tutup loop ke CRM dengan update lead detail.",
-      detail:
-        "Setelah balasan terkirim, user harus cek apakah stage, follow-up berikutnya, discipline log, atau task lanjutan perlu diperbarui.",
-    });
-  }
-
-  if (extraction?.risk_level === "high") {
-    items.push({
-      condition: "Jika risk level = high",
-      action: "Jangan kirim balasan langsung tanpa review manusia atau approval.",
-      detail:
-        "Baca reasoning AI dengan teliti. Kalau ada potensi mis-selling, janji berlebihan, atau klaim sensitif, eskalasikan dulu.",
-    });
-  }
-
-  return items.slice(0, 4);
 }
 
 function getLatestConversationMessage(detail: SalesConversationDetail) {
@@ -308,6 +248,43 @@ export default function SalesConversationDetailPage() {
       ]);
       setDetail(data);
       setCurrentUser(me);
+      const reviewCase = data.chat_review_case;
+      setReviewStatusInput(reviewCase?.status ?? "draft");
+      setReviewLabelInput(reviewCase?.review_label ?? "unik");
+      setReviewerUserInput(reviewCase?.reviewer_user_id ?? me.id ?? "");
+      setReviewSummaryInput(reviewCase?.review_summary ?? "");
+      setCoachingFocusInput(reviewCase?.coaching_focus ?? "");
+      setRecommendedActionInput(reviewCase?.recommended_action ?? "");
+
+      const knowledgeProposal = data.knowledge_update_proposal;
+      setKnowledgeProposalTitleInput(
+        knowledgeProposal?.title ?? `${data.title} · update knowledge`,
+      );
+      setKnowledgeProposalCategoryInput(knowledgeProposal?.category ?? "general");
+      setKnowledgeProposalContentInput(
+        knowledgeProposal?.proposed_content ??
+          [
+            reviewCase?.review_summary
+              ? `Ringkasan kasus: ${reviewCase.review_summary}`
+              : "",
+            reviewCase?.coaching_focus
+              ? `Fokus coaching: ${reviewCase.coaching_focus}`
+              : "",
+            reviewCase?.recommended_action
+              ? `Aksi yang direkomendasikan: ${reviewCase.recommended_action}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n"),
+      );
+      setKnowledgeProposalSourceTypeInput(
+        knowledgeProposal?.source_type ?? "coaching_case",
+      );
+      setKnowledgeProposalRationaleInput(knowledgeProposal?.rationale ?? "");
+      setKnowledgeProposalStatusInput(knowledgeProposal?.status ?? "draft");
+      setKnowledgeProposalDecisionNoteInput(
+        knowledgeProposal?.review_decision_note ?? "",
+      );
       if (canManageReviewCase(me.role)) {
         const candidates = await apiFetch<ChatReviewerCandidateItem[]>(
           "/dashboard/sales/reviewer-candidates",
@@ -335,50 +312,6 @@ export default function SalesConversationDetailPage() {
 
     return () => clearTimeout(timer);
   }, [loadConversationDetail]);
-
-  useEffect(() => {
-    if (!detail) {
-      return;
-    }
-
-    const reviewCase = detail.chat_review_case;
-    setReviewStatusInput(reviewCase?.status ?? "draft");
-    setReviewLabelInput(reviewCase?.review_label ?? "unik");
-    setReviewerUserInput(reviewCase?.reviewer_user_id ?? currentUser?.id ?? "");
-    setReviewSummaryInput(reviewCase?.review_summary ?? "");
-    setCoachingFocusInput(reviewCase?.coaching_focus ?? "");
-    setRecommendedActionInput(reviewCase?.recommended_action ?? "");
-
-    const knowledgeProposal = detail.knowledge_update_proposal;
-    setKnowledgeProposalTitleInput(
-      knowledgeProposal?.title ?? `${detail.title} · update knowledge`,
-    );
-    setKnowledgeProposalCategoryInput(knowledgeProposal?.category ?? "general");
-    setKnowledgeProposalContentInput(
-      knowledgeProposal?.proposed_content ??
-        [
-          reviewCase?.review_summary
-            ? `Ringkasan kasus: ${reviewCase.review_summary}`
-            : "",
-          reviewCase?.coaching_focus
-            ? `Fokus coaching: ${reviewCase.coaching_focus}`
-            : "",
-          reviewCase?.recommended_action
-            ? `Aksi yang direkomendasikan: ${reviewCase.recommended_action}`
-            : "",
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
-    );
-    setKnowledgeProposalSourceTypeInput(
-      knowledgeProposal?.source_type ?? "coaching_case",
-    );
-    setKnowledgeProposalRationaleInput(knowledgeProposal?.rationale ?? "");
-    setKnowledgeProposalStatusInput(knowledgeProposal?.status ?? "draft");
-    setKnowledgeProposalDecisionNoteInput(
-      knowledgeProposal?.review_decision_note ?? "",
-    );
-  }, [detail, currentUser]);
 
   async function handleSaveReviewCase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -537,7 +470,7 @@ export default function SalesConversationDetailPage() {
       );
       setKnowledgeProposalSuccessMessage(
         proposal.status === "pending_approval"
-          ? "Proposal knowledge berhasil diajukan ke approval queue."
+          ? "Proposal knowledge berhasil dieskalasi ke superadmin review queue."
           : "Proposal knowledge berhasil disimpan sebagai draft.",
       );
     } catch (error) {
@@ -587,7 +520,7 @@ export default function SalesConversationDetailPage() {
       );
       setKnowledgeProposalSuccessMessage(
         status === "approved"
-          ? "Proposal knowledge berhasil di-approve dan dipublish."
+          ? "Proposal knowledge berhasil di-approve dan dipublish oleh superadmin."
           : "Proposal knowledge berhasil di-reject.",
       );
     } catch (error) {
@@ -1527,8 +1460,9 @@ function ConversationDetailContent({
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
                       Setelah coaching case jelas, naikkan insight penting jadi
-                      proposal knowledge supaya bisa direview dan dipublish ke
-                      knowledge base resmi.
+                      proposal knowledge supaya bisa dikoreksi, dieskalasi ke
+                      superadmin, lalu dipublish ke knowledge base resmi bila
+                      disetujui.
                     </p>
                   </div>
                   {knowledgeProposal ? (
@@ -1679,7 +1613,9 @@ function ConversationDetailContent({
                           >
                             {isSavingKnowledgeProposal
                               ? "Menyimpan proposal..."
-                              : "Simpan Proposal Knowledge"}
+                              : knowledgeProposalStatusInput === "pending_approval"
+                                ? "Simpan & Eskalasi ke Superadmin"
+                                : "Simpan Proposal Knowledge"}
                           </button>
                         </div>
                       </form>

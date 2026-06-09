@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import re
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
@@ -264,8 +263,6 @@ def sync_extension_messages(
         for message in existing_messages
         if message.external_message_id
     }
-    retained_message_ids: set[UUID] = set()
-
     for message in normalized_messages:
         external_message_id = build_extension_message_key(
             current_user=current_user,
@@ -291,13 +288,6 @@ def sync_extension_messages(
             existing_message.message_text = message.text
             existing_message.message_timestamp = message.timestamp
             db.add(existing_message)
-
-        retained_message_ids.add(existing_message.id)
-
-    for message in existing_messages:
-        if message.id not in retained_message_ids:
-            db.delete(message)
-
 
 def is_extension_cache_fresh(
     *,

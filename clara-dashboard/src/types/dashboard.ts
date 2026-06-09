@@ -1109,6 +1109,11 @@ export type CreateOrganizationRequest = {
   slug: string;
 };
 
+export type UpdateOrganizationRequest = {
+  name?: string | null;
+  slug?: string | null;
+};
+
 export type SalesUnitItem = {
   id: string;
   organization_id: string;
@@ -1123,6 +1128,11 @@ export type CreateSalesUnitRequest = {
   organization_id?: string | null;
   name: string;
   code: string;
+};
+
+export type UpdateSalesUnitRequest = {
+  name?: string | null;
+  code?: string | null;
 };
 
 export type SalesTeamItem = {
@@ -1145,6 +1155,13 @@ export type CreateSalesTeamRequest = {
   manager_user_id?: string | null;
   name: string;
   code: string;
+};
+
+export type UpdateSalesTeamRequest = {
+  unit_id?: string | null;
+  manager_user_id?: string | null;
+  name?: string | null;
+  code?: string | null;
 };
 
 export type CreateUserRequest = {

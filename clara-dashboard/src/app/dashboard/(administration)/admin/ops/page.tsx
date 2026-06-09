@@ -24,7 +24,7 @@ export default function AdminOpsPage() {
         setCurrentUser(me);
 
         if (!canAccessAdminPages(me.role)) {
-          router.replace("/dashboard");
+          router.replace("/workspace");
           return;
         }
 

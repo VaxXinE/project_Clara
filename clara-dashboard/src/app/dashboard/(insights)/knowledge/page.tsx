@@ -45,7 +45,7 @@ export default function ProductKnowledgePage() {
     null,
   );
   const canManageKnowledge = currentUser?.role === "superadmin";
-  const canReviewProposals = ["head", "superadmin"].includes(
+  const canReviewProposals = ["superadmin"].includes(
     currentUser?.role ?? "",
   );
   const canSeeProposalQueue = ["manager", "head", "superadmin"].includes(
@@ -120,18 +120,10 @@ export default function ProductKnowledgePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (items.length === 0) {
-      setSelectedKnowledgeId(null);
-      return;
-    }
-
-    setSelectedKnowledgeId((current) =>
-      current && items.some((item) => item.id === current)
-        ? current
-        : items[0].id,
-    );
-  }, [items]);
+  const effectiveSelectedKnowledgeId =
+    selectedKnowledgeId && items.some((item) => item.id === selectedKnowledgeId)
+      ? selectedKnowledgeId
+      : items[0]?.id ?? null;
 
   function resetForm() {
     setForm(EMPTY_FORM);
@@ -250,7 +242,9 @@ export default function ProductKnowledgePage() {
     status: "approved" | "rejected",
   ) {
     if (!canReviewProposals) {
-      setErrorMessage("Hanya head atau superadmin yang boleh review proposal.");
+      setErrorMessage(
+        "Hanya superadmin yang boleh approve atau reject proposal knowledge.",
+      );
       return;
     }
 
@@ -272,7 +266,7 @@ export default function ProductKnowledgePage() {
       );
       setSuccessMessage(
         status === "approved"
-          ? "Proposal knowledge berhasil di-approve dan dipublish."
+          ? "Proposal knowledge berhasil di-approve dan dipublish oleh superadmin."
           : "Proposal knowledge berhasil di-reject.",
       );
       await loadKnowledge();
@@ -289,7 +283,9 @@ export default function ProductKnowledgePage() {
 
   const activeItemsCount = items.filter((item) => item.is_active).length;
   const selectedKnowledge =
-    items.find((item) => item.id === selectedKnowledgeId) ?? items[0] ?? null;
+    items.find((item) => item.id === effectiveSelectedKnowledgeId) ??
+    items[0] ??
+    null;
 
   return (
     <WorkspaceShell
@@ -322,8 +318,8 @@ export default function ProductKnowledgePage() {
           />
           <InfoCard
             label="Hak Akses"
-            value={canManageKnowledge ? "Owner" : "Read Only"}
-            description="Owner bisa menambah dan mengubah isi, role lain tetap bisa membaca."
+            value={canManageKnowledge ? "Superadmin" : "Read Only"}
+            description="Hanya superadmin yang bisa menambah, mengubah, menghapus, dan publish knowledge resmi."
           />
         </section>
 
@@ -336,6 +332,8 @@ export default function ProductKnowledgePage() {
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
                   Usulan knowledge yang datang dari coaching review lapangan.
+                  Manager dan head bisa mengoreksi lalu mengeskalasi, keputusan
+                  approve dan publish final tetap di superadmin.
                 </p>
               </div>
               <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">

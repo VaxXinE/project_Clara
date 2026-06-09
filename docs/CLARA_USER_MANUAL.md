@@ -131,16 +131,16 @@ Artinya:
 | Customer List `/dashboard/customers` | Ya | Ya | Ya | Ya |
 | Customer Detail `/dashboard/customers/:id` | Ya | Ya | Ya | Ya |
 | Action Center `/dashboard/follow-up` | Ya | Tidak | Tidak | Ya |
-| Alert Center `/dashboard/notifications` | Ya | Ya | Ya | Ya |
+| Alert Center `/dashboard/notifications` | Tidak | Tidak | Ya | Ya |
 | Lead Capture `/dashboard/upload` | Ya | Tidak | Tidak | Ya |
 | Chat Review Center `/dashboard/approvals` | Tidak | Ya | Ya | Ya |
 | Manager Insights `/dashboard/manager-insights` | Tidak | Ya | Ya | Ya |
-| Channels `/dashboard/channels` | Tidak | Tidak | Ya | Ya |
+| Channels `/dashboard/channels` | Tidak | Tidak | Tidak | Ya |
 | Knowledge Base `/dashboard/knowledge` | Tidak | Tidak | Ya | Ya |
 | Ops Dashboard `/dashboard/kpi` | Tidak | Tidak | Ya | Ya |
 | Marketing Insights `/dashboard/marketing` | Tidak | Tidak | Ya | Ya |
-| Access Control `/dashboard/admin/access` | Tidak | Tidak | Ya | Ya |
-| Admin Ops `/dashboard/admin/ops` | Tidak | Tidak | Ya | Ya |
+| Access Control `/dashboard/admin/access` | Tidak | Tidak | Tidak | Ya |
+| Admin Ops `/dashboard/admin/ops` | Tidak | Tidak | Tidak | Ya |
 
 ---
 
@@ -449,7 +449,12 @@ Yang dilakukan:
 
 ## 7. Manual Head Dan Superadmin
 
-Bab ini dibuat terutama untuk `head`. `superadmin` bisa membacanya juga, lalu menambahkan sudut pandang lintas organisasi.
+Bab ini menjelaskan ringkasan kerja `head` dan `superadmin`.
+
+Kalau butuh versi lebih detail, buka:
+
+- [CLARA_HEAD_MANUAL.md](./CLARA_HEAD_MANUAL.md)
+- [CLARA_SUPERADMIN_MANUAL.md](./CLARA_SUPERADMIN_MANUAL.md)
 
 ### 7.1 Tujuan kerja head di Clara
 
@@ -465,16 +470,15 @@ Fokus utamanya:
 ### 7.2 Halaman yang paling sering dipakai head
 
 1. `Alert Center`
-2. `Chat Review Center`
+2. `Follow-up Center`
 3. `Lead Management`
 4. `Lead Detail`
 5. `Customer List`
 6. `Customer Detail`
 7. `Ops Dashboard`
-8. `Manager Insights`
-9. `Access Control`
-10. `Channels`
-11. `Knowledge Base`
+8. `Head Insights`
+9. `Knowledge Base`
+10. `Marketing Insights`
 
 ### 7.3 Urutan kerja head
 
@@ -486,7 +490,7 @@ Fokus utamanya:
 
 #### Setelah itu
 
-1. buka `Chat Review Center`
+1. buka `Follow-up Center`
 2. lihat chat atau bottleneck yang butuh campur tangan
 3. turun ke detail jika perlu
 
@@ -512,10 +516,9 @@ Fokus utamanya:
 
 #### Saat perlu intervensi sistem
 
-1. buka `Access Control`
-2. cek apakah role dan akses sudah tepat
-3. buka `Channels` jika ingin melihat sumber data
-4. buka `Knowledge Base` jika ingin mengecek landasan jawaban resmi
+1. buka `Knowledge Base`
+2. koreksi proposal knowledge jika memang perlu
+3. eskalasi proposal yang sudah siap ke `superadmin`
 
 ### 7.4 Keputusan head yang paling sering
 
@@ -1047,7 +1050,7 @@ Halaman ini dipakai untuk melihat kondisi tim secara ringkas.
 
 ### Fungsi halaman ini
 
-Halaman ini dipakai head dan superadmin untuk melihat sumber channel dan ingestion.
+Halaman ini dipakai `superadmin` untuk melihat sumber channel dan ingestion.
 
 Yang dilihat:
 
@@ -1109,7 +1112,7 @@ Yang dicari:
 
 ### Fungsi halaman ini
 
-Dipakai untuk mengelola akun dan akses.
+Dipakai `superadmin` untuk mengelola akun dan akses.
 
 Yang bisa dilakukan:
 
@@ -1130,7 +1133,7 @@ Yang bisa dilakukan:
 
 ### Fungsi halaman ini
 
-Dipakai untuk kebutuhan operasional tingkat admin atau governance.
+Dipakai `superadmin` untuk kebutuhan operasional tingkat admin atau governance.
 
 Karena halaman ini bisa berubah sesuai implementasi, pakai hanya jika memang Anda punya tanggung jawab admin.
 
@@ -1505,11 +1508,11 @@ Latihan pertama yang disarankan:
 
 1. login
 2. buka `Alert Center`
-3. buka `Chat Review Center`
+3. buka `Follow-up Center`
 4. buka `Lead Management`
 5. buka `Customer List`
 6. buka `Ops Dashboard`
-7. buka `Access Control`
+7. buka `Knowledge Base`
 
 ---
 

@@ -877,6 +877,41 @@ def get_latest_sent_message(conversation: Conversation) -> SentMessage | None:
     )
 
 
+def summarize_conversation_operational_state(
+    conversations: list[Conversation],
+) -> tuple[
+    dict[UUID, AIExtraction],
+    int,
+    int,
+    int,
+]:
+    latest_extraction_by_conversation: dict[UUID, AIExtraction] = {}
+    total_reply_suggestions = 0
+    approved_reply_count = 0
+    reply_sent_count = 0
+
+    for conversation in conversations:
+        latest_extraction = get_latest_extraction(conversation)
+        latest_suggestion = get_latest_reply_suggestion(conversation)
+        latest_sent_message = get_latest_sent_message(conversation)
+
+        if latest_extraction is not None:
+            latest_extraction_by_conversation[conversation.id] = latest_extraction
+        if latest_suggestion is not None:
+            total_reply_suggestions += 1
+            if latest_suggestion.approval_status == "approved":
+                approved_reply_count += 1
+        if latest_sent_message is not None:
+            reply_sent_count += 1
+
+    return (
+        latest_extraction_by_conversation,
+        total_reply_suggestions,
+        approved_reply_count,
+        reply_sent_count,
+    )
+
+
 def get_latest_conversation_for_lead(lead: Lead) -> Conversation | None:
     if not lead.conversations:
         return None
@@ -1993,6 +2028,32 @@ def sync_ops_notifications(
                 }
             )
 
+    if not is_sales_notification_owner and current_user.organization_id is not None:
+        oversight_lead_statement = (
+            select(Lead)
+            .where(Lead.organization_id == current_user.organization_id)
+            .options(selectinload(Lead.assigned_user))
+            .order_by(desc(Lead.updated_at), desc(Lead.created_at))
+        )
+        for lead in db.scalars(oversight_lead_statement).all()[:50]:
+            next_follow_up_at = ensure_aware_utc(lead.next_follow_up_at)
+            if next_follow_up_at is None or next_follow_up_at > now:
+                continue
+
+            desired_notifications.append(
+                {
+                    "source_type": "oversight_follow_up",
+                    "source_key": f"oversight-follow-up:{lead.id}",
+                    "severity": "high",
+                    "title": f"Follow-up overdue: {lead.display_name}",
+                    "body": (
+                        "Lead ini melewati jadwal follow-up dan perlu perhatian "
+                        "manager/head agar tidak diam terlalu lama."
+                    ),
+                    "target_href": f"/dashboard/crm/{lead.id}",
+                }
+            )
+
     for item in approval_queue.items[:20]:
         severity = "high" if item.risk_level == "high" or item.action_mode == "escalate_to_human" else "medium"
         desired_notifications.append(
@@ -2059,7 +2120,7 @@ def sync_ops_notifications(
     statement = select(OpsNotification).where(
         OpsNotification.organization_id == current_user.organization_id
     )
-    if not is_superadmin_like(current_user.role):
+    if not is_head_like(current_user.role):
         statement = statement.where(OpsNotification.user_id == current_user.id)
 
     existing_notifications = list(db.scalars(statement).all())
@@ -2085,7 +2146,7 @@ def sync_ops_notifications(
         if notification is None:
             notification = OpsNotification(
                 organization_id=current_user.organization_id,
-                user_id=None if is_superadmin_like(current_user.role) else current_user.id,
+                user_id=None if is_head_like(current_user.role) else current_user.id,
                 source_type=str(item["source_type"]),
                 source_key=str(item["source_key"]),
                 workflow_scope=_resolve_notification_workflow_scope(str(item["source_type"])),
@@ -2146,7 +2207,7 @@ def sync_ops_notifications(
             desc(OpsNotification.created_at),
         )
     )
-    if not is_superadmin_like(current_user.role):
+    if not is_head_like(current_user.role):
         refreshed_statement = refreshed_statement.where(
             OpsNotification.user_id == current_user.id
         )
@@ -2351,23 +2412,21 @@ def get_marketing_insights_preview(
             if organization_id is not None
         }
 
-    total_conversations_statement = select(func.count(Conversation.id))
-    if not can_view_global:
-        total_conversations_statement = total_conversations_statement.where(
-            Conversation.organization_id == current_user.organization_id
-        )
-    total_conversations = db.scalar(total_conversations_statement) or 0
-
-    extractions_statement = (
-        select(AIExtraction)
-        .join(Conversation, AIExtraction.conversation_id == Conversation.id)
-        .order_by(desc(AIExtraction.created_at))
+    conversations_statement = select(Conversation).options(
+        selectinload(Conversation.ai_extractions),
+        selectinload(Conversation.reply_suggestions),
+        selectinload(Conversation.sent_messages),
     )
     if not can_view_global:
-        extractions_statement = extractions_statement.where(
+        conversations_statement = conversations_statement.where(
             Conversation.organization_id == current_user.organization_id
         )
-    extractions = list(db.scalars(extractions_statement).all())
+    elif organization_ids:
+        conversations_statement = conversations_statement.where(
+            Conversation.organization_id.in_(organization_ids)
+        )
+    conversations = list(db.scalars(conversations_statement).all())
+    total_conversations = len(conversations)
 
     objection_counter: Counter[str] = Counter()
     lead_temperature_counter: Counter[str] = Counter()
@@ -2376,11 +2435,12 @@ def get_marketing_insights_preview(
     sentiment_counter: Counter[str] = Counter()
     pipeline_stage_counter: Counter[str] = Counter()
 
-    latest_extraction_by_conversation: dict[UUID, AIExtraction] = {}
-
-    for extraction in extractions:
-        if extraction.conversation_id not in latest_extraction_by_conversation:
-            latest_extraction_by_conversation[extraction.conversation_id] = extraction
+    (
+        latest_extraction_by_conversation,
+        total_reply_suggestions,
+        approved_reply_count,
+        reply_sent_count,
+    ) = summarize_conversation_operational_state(conversations)
 
     for extraction in latest_extraction_by_conversation.values():
         lead_temperature_counter[extraction.lead_temperature] += 1
@@ -2398,35 +2458,6 @@ def get_marketing_insights_preview(
         MarketingObjectionInsight(topic=topic, count=count)
         for topic, count in objection_counter.most_common(10)
     ]
-
-    reply_sent_count_statement = (
-        select(func.count(SentMessage.id))
-        .join(Conversation, SentMessage.conversation_id == Conversation.id)
-    )
-    approved_reply_count_statement = (
-        select(func.count(ReplySuggestion.id))
-        .join(Conversation, ReplySuggestion.conversation_id == Conversation.id)
-        .where(ReplySuggestion.approval_status == "approved")
-    )
-    total_reply_suggestions_statement = (
-        select(func.count(ReplySuggestion.id))
-        .join(Conversation, ReplySuggestion.conversation_id == Conversation.id)
-    )
-
-    if not can_view_global:
-        reply_sent_count_statement = reply_sent_count_statement.where(
-            Conversation.organization_id == current_user.organization_id
-        )
-        approved_reply_count_statement = approved_reply_count_statement.where(
-            Conversation.organization_id == current_user.organization_id
-        )
-        total_reply_suggestions_statement = total_reply_suggestions_statement.where(
-            Conversation.organization_id == current_user.organization_id
-        )
-
-    reply_sent_count = db.scalar(reply_sent_count_statement) or 0
-    approved_reply_count = db.scalar(approved_reply_count_statement) or 0
-    total_reply_suggestions = db.scalar(total_reply_suggestions_statement) or 0
 
     top_content_recommendations = build_content_recommendations(
         objection_counter=objection_counter,

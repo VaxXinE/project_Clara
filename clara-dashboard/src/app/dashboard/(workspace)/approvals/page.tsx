@@ -173,21 +173,6 @@ export default function ChatReviewCenterPage() {
     : isHeadView
       ? "/dashboard/notifications"
       : "/dashboard/manager-insights";
-  const fallbackLabel = canAccessQueue
-    ? "Kembali ke Queue"
-    : isHeadView
-      ? "Buka Alert Center"
-      : "Buka Manager Insights";
-  const emptyStateTitle = canAccessQueue
-    ? "Tidak ada chat yang macet saat ini"
-    : isHeadView
-      ? "Tidak ada chat lintas tim yang perlu review saat ini"
-      : "Tidak ada chat tim yang perlu review saat ini";
-  const emptyStateDescription = canAccessQueue
-    ? "Chat Review Center hanya menampilkan chat yang butuh analisis ulang, draft baru, approval, escalation, atau sudah stale. Kalau kosong, lanjutkan eksekusi lewat Queue atau Action Center."
-    : isHeadView
-      ? "Chat Review Center hanya menampilkan chat yang butuh analisis ulang, draft baru, approval, escalation, atau sudah stale. Kalau kosong, berarti tidak ada bottleneck review lintas tim saat ini. Lanjutkan pantau Alert Center, KPI, atau Lead Management."
-      : "Chat Review Center hanya menampilkan chat yang butuh analisis ulang, draft baru, approval, escalation, atau sudah stale. Kalau kosong, berarti tidak ada bottleneck di tim saat ini. Lanjutkan pantau Manager Insights atau buka Lead Management.";
 
   return (
     <WorkspaceShell

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
-import { isAdminLike, isOwnerLike } from "@/lib/roles";
+import { isOwnerLike } from "@/lib/roles";
 import type {
   CreateSalesUnitRequest,
   CurrentUser,
@@ -25,18 +25,13 @@ export default function AdminAccessCreateUnitPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  const isAdminScoped =
-    currentUser !== null &&
-    isAdminLike(currentUser.role) &&
-    !isOwnerLike(currentUser.role);
-
   useEffect(() => {
     async function bootstrap() {
       try {
         const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
 
-        if (!isAdminLike(me.role)) {
+        if (!isOwnerLike(me.role)) {
           router.replace("/workspace");
           return;
         }
@@ -45,9 +40,7 @@ export default function AdminAccessCreateUnitPage() {
         setOrganizations(organizationData);
         setUnitForm((current) => ({
           ...current,
-          organization_id: isOwnerLike(me.role)
-            ? (current.organization_id ?? organizationData[0]?.id ?? null)
-            : me.organization_id,
+          organization_id: current.organization_id ?? organizationData[0]?.id ?? null,
         }));
       } catch (error) {
         setErrorMessage(
@@ -128,7 +121,6 @@ export default function AdminAccessCreateUnitPage() {
                   label: `${organization.name} (${organization.slug})`,
                 })),
               ]}
-              disabled={isAdminScoped}
             />
 
             <InputField

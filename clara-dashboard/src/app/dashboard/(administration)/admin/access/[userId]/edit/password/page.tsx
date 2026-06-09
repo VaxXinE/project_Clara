@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { getPasswordStrength } from "@/lib/format";
-import { isAdminLike, isOwnerLike } from "@/lib/roles";
+import { isOwnerLike } from "@/lib/roles";
 import type { CurrentUser, ResetUserPasswordRequest } from "@/types/dashboard";
 
 import {
@@ -31,10 +31,7 @@ export default function AdminAccessEditPasswordPage() {
 
   const passwordStrength = getPasswordStrength(passwordForm.password);
   const canResetPassword = useMemo(() => {
-    if (!currentUser || !targetUser) {
-      return false;
-    }
-    return isOwnerLike(currentUser.role) || targetUser.created_by_user_id === currentUser.id;
+    return Boolean(currentUser && targetUser && isOwnerLike(currentUser.role));
   }, [currentUser, targetUser]);
 
   useEffect(() => {
@@ -43,7 +40,7 @@ export default function AdminAccessEditPasswordPage() {
         const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
 
-        if (!isAdminLike(me.role)) {
+        if (!isOwnerLike(me.role)) {
           router.replace("/workspace");
           return;
         }
@@ -53,14 +50,6 @@ export default function AdminAccessEditPasswordPage() {
 
         if (!nextTargetUser) {
           setErrorMessage("User tidak ditemukan.");
-          return;
-        }
-
-        if (
-          !isOwnerLike(me.role) &&
-          nextTargetUser.organization_id !== me.organization_id
-        ) {
-          router.replace("/admin/access");
           return;
         }
 
@@ -127,7 +116,7 @@ export default function AdminAccessEditPasswordPage() {
             <div>
               <h2 className="text-lg font-semibold text-[#fff0c9]">Reset Password</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">
-                Superadmin bisa mengganti semua password user. Head hanya bisa mengganti password user yang dia buat sendiri.
+                Hanya superadmin yang bisa mengganti password user dari halaman ini.
               </p>
             </div>
 
@@ -154,7 +143,7 @@ export default function AdminAccessEditPasswordPage() {
               </form>
             ) : (
               <p className="rounded-xl border border-[#f0cb73]/14 bg-[#241a10] p-3 text-xs text-[#f0cb73]">
-                Head hanya bisa mengganti password user yang dibuat dari akunnya sendiri.
+                Aksi ini hanya tersedia untuk superadmin.
               </p>
             )}
           </div>

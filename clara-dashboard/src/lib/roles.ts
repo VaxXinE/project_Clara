@@ -66,7 +66,7 @@ export function canAccessStrategicInsights(role?: string | null): boolean {
 }
 
 export function canAccessAdminPages(role?: string | null): boolean {
-  return isAdminLike(role);
+  return isOwnerLike(role);
 }
 
 export function getRoleDisplayLabel(role?: string | null): string {

@@ -87,39 +87,22 @@ def test_inactive_user_cannot_login(
     assert response.json()["detail"] == "Akun user ini sedang nonaktif."
 
 
-def test_head_can_only_reset_password_for_user_they_created(
+def test_head_cannot_reset_password_via_access_control_api(
     client: TestClient,
-    db_session_factory: sessionmaker,
     seeded_data: dict[str, object],
 ) -> None:
     admin_a = seeded_data["admin_a"]
     marketing_a = seeded_data["marketing_a"]
-    marketing_b = seeded_data["marketing_b"]
 
     login(client, email=admin_a.email, password="AdminPass123!")
 
-    allowed_response = client.post(
+    response = client.post(
         f"/auth/users/{marketing_a.id}/reset-password",
         json={"password": "ResetPass123!"},
         headers=csrf_headers(client),
     )
-    assert allowed_response.status_code == 200, allowed_response.text
-
-    forbidden_response = client.post(
-        f"/auth/users/{marketing_b.id}/reset-password",
-        json={"password": "NopePass123!"},
-        headers=csrf_headers(client),
-    )
-    assert forbidden_response.status_code == 403
-    assert (
-        forbidden_response.json()["detail"]
-        == "Head can only reset passwords for users they created."
-    )
-
-    db = db_session_factory()
-    refreshed_user = db.get(User, marketing_a.id)
-    assert refreshed_user is not None
-    assert verify_password("ResetPass123!", refreshed_user.hashed_password)
+    assert response.status_code == 403
+    assert response.json()["detail"] == "You do not have permission to access this resource."
 
 
 def test_superadmin_can_reset_any_user_password(
@@ -144,6 +127,34 @@ def test_superadmin_can_reset_any_user_password(
     refreshed_user = db.get(User, marketing_b.id)
     assert refreshed_user is not None
     assert verify_password("SuperadminReset123!", refreshed_user.hashed_password)
+
+
+def test_head_cannot_access_access_control_or_audit_pages(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    create_user_response = client.post(
+        "/auth/users",
+        json={
+            "name": "Sales Forbidden",
+            "email": "sales.forbidden@org-a.local",
+            "password": "SalesPass123!",
+            "role": "sales",
+            "organization_id": str(admin_a.organization_id),
+        },
+        headers=csrf_headers(client),
+    )
+    assert create_user_response.status_code == 403
+
+    audit_logs_response = client.get("/audit-logs")
+    assert audit_logs_response.status_code == 403
+
+    admin_ops_response = client.get("/dashboard/admin/ops-overview")
+    assert admin_ops_response.status_code == 403
 
 
 def test_only_superadmin_can_create_product_knowledge(

@@ -6,12 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
-import {
-  canAccessQueueAndActionCenter,
-  isHeadRole,
-  isManagerRole,
-  normalizeWorkspaceRole,
-} from "@/lib/roles";
+import { canAccessQueueAndActionCenter, isHeadRole, isManagerRole, normalizeWorkspaceRole } from "@/lib/roles";
 import type {
   CurrentUser,
   OpsNotificationItem,
@@ -124,7 +119,40 @@ export default function NotificationsPage() {
   }
 
   useEffect(() => {
-    void loadNotifications();
+    let isCancelled = false;
+
+    async function bootstrapNotifications() {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      try {
+        const [me, data] = await Promise.all([
+          apiFetch<CurrentUser>("/auth/me"),
+          apiFetch<OpsNotificationResponse>("/dashboard/notifications"),
+        ]);
+        if (isCancelled) {
+          return;
+        }
+        setCurrentUser(me);
+        setNotifications(data);
+      } catch (error) {
+        if (!isCancelled) {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Gagal memuat notification center.",
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void bootstrapNotifications();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   async function handleAcknowledge(item: OpsNotificationItem) {
@@ -204,7 +232,6 @@ export default function NotificationsPage() {
     }
   }
 
-  const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
   const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
   const isManagerMonitorView =
     isManagerRole(currentUser?.role) && !canAccessQueue;
@@ -237,11 +264,15 @@ export default function NotificationsPage() {
     1,
     Math.ceil(filteredNotifications.length / pageSize),
   );
+  const effectiveNotificationPage = Math.min(
+    notificationPage,
+    totalNotificationPages,
+  );
 
   const paginatedNotifications = useMemo(() => {
-    const startIndex = (notificationPage - 1) * pageSize;
+    const startIndex = (effectiveNotificationPage - 1) * pageSize;
     return filteredNotifications.slice(startIndex, startIndex + pageSize);
-  }, [filteredNotifications, notificationPage]);
+  }, [effectiveNotificationPage, filteredNotifications]);
 
   const groupedNotifications = useMemo<NotificationGroup[]>(() => {
     const groups = new Map<string, OpsNotificationItem[]>();
@@ -278,16 +309,6 @@ export default function NotificationsPage() {
   const isActiveStatusView = statusFilter === "active";
   const showActiveEmptyState =
     hasAnyNotifications && isActiveStatusView && filteredNotifications.length === 0;
-
-  useEffect(() => {
-    setNotificationPage(1);
-  }, [statusFilter, severityFilter]);
-
-  useEffect(() => {
-    if (notificationPage > totalNotificationPages) {
-      setNotificationPage(totalNotificationPages);
-    }
-  }, [notificationPage, totalNotificationPages]);
 
   return (
     <WorkspaceShell
@@ -431,7 +452,10 @@ export default function NotificationsPage() {
                       <div className="flex flex-wrap gap-3">
                         <button
                           type="button"
-                          onClick={() => setStatusFilter("resolved")}
+                          onClick={() => {
+                            setStatusFilter("resolved");
+                            setNotificationPage(1);
+                          }}
                           className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                         >
                           Lihat Histori Alert
@@ -477,7 +501,10 @@ export default function NotificationsPage() {
                       <span>Filter status</span>
                       <select
                         value={statusFilter}
-                        onChange={(event) => setStatusFilter(event.target.value)}
+                        onChange={(event) => {
+                          setStatusFilter(event.target.value);
+                          setNotificationPage(1);
+                        }}
                         className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none"
                       >
                         <option value="all">Semua status</option>
@@ -491,7 +518,10 @@ export default function NotificationsPage() {
                       <span>Filter severity</span>
                       <select
                         value={severityFilter}
-                        onChange={(event) => setSeverityFilter(event.target.value)}
+                        onChange={(event) => {
+                          setSeverityFilter(event.target.value);
+                          setNotificationPage(1);
+                        }}
                         className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none"
                       >
                         <option value="all">Semua severity</option>
@@ -506,7 +536,7 @@ export default function NotificationsPage() {
                         Menampilkan {paginatedNotifications.length} dari {filteredNotifications.length} alert
                       </p>
                       <p className="mt-2 text-sm text-[#d8bc84]">
-                        Halaman {notificationPage} dari {totalNotificationPages}
+                        Halaman {effectiveNotificationPage} dari {totalNotificationPages}
                       </p>
                     </div>
                   </div>
@@ -762,7 +792,7 @@ export default function NotificationsPage() {
                           onClick={() =>
                             setNotificationPage((current) => Math.max(1, current - 1))
                           }
-                          disabled={notificationPage === 1}
+                          disabled={effectiveNotificationPage === 1}
                           className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Sebelumnya
@@ -774,7 +804,7 @@ export default function NotificationsPage() {
                               Math.min(totalNotificationPages, current + 1),
                             )
                           }
-                          disabled={notificationPage === totalNotificationPages}
+                          disabled={effectiveNotificationPage === totalNotificationPages}
                           className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Berikutnya
@@ -845,4 +875,3 @@ function MetricCard({ label, value }: { label: string; value: string }) {
     </article>
   );
 }
-

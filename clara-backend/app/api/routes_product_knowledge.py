@@ -44,7 +44,7 @@ def list_knowledge_update_proposals_endpoint(
     ),
     category: str | None = Query(default=None, min_length=1, max_length=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("manager", "head")),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
 ):
     try:
         proposals = list_knowledge_update_proposals(
@@ -70,7 +70,7 @@ def upsert_knowledge_update_proposal_for_conversation_endpoint(
     payload: KnowledgeUpdateProposalUpsertRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("manager", "head")),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
 ):
     try:
         proposal = upsert_knowledge_update_proposal_for_conversation(
@@ -114,7 +114,7 @@ def review_knowledge_update_proposal_endpoint(
     payload: KnowledgeUpdateProposalReviewRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         proposal = review_knowledge_update_proposal(
@@ -158,7 +158,7 @@ def list_product_knowledge_endpoint(
     category: str | None = Query(default=None, min_length=1, max_length=100),
     is_active: bool | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         return list_product_knowledge(

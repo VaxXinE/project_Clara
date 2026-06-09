@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { apiFetch } from "@/lib/api";
-import { getRoleDisplayLabel } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 type LoginResponse = {

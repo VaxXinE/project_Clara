@@ -80,7 +80,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("/channels", response_model=ChannelOverviewResponse)
 def channel_overview(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head", "superadmin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_channel_overview(db=db, current_user=current_user)
 
@@ -755,6 +755,6 @@ def list_marketing_snapshots_endpoint(
 @router.get("/admin/ops-overview", response_model=OpsDatabaseOverviewResponse)
 def admin_ops_overview(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("head")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     return get_ops_database_overview(db=db, current_user=current_user)

@@ -7,12 +7,15 @@ import { useEffect, useMemo, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
-import { isAdminLike, isOwnerLike } from "@/lib/roles";
+import { canLeadSalesTeam, isOwnerLike } from "@/lib/roles";
 import type {
   CurrentUser,
   OrganizationItem,
   SalesTeamItem,
   SalesUnitItem,
+  UpdateOrganizationRequest,
+  UpdateSalesTeamRequest,
+  UpdateSalesUnitRequest,
 } from "@/types/dashboard";
 
 import {
@@ -37,6 +40,25 @@ export default function AdminAccessPage() {
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [userStatusFilter, setUserStatusFilter] = useState("all");
   const [userPage, setUserPage] = useState(1);
+  const [editingOrganizationId, setEditingOrganizationId] = useState<string | null>(null);
+  const [editingOrganizationForm, setEditingOrganizationForm] =
+    useState<UpdateOrganizationRequest>({
+      name: "",
+      slug: "",
+    });
+  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
+  const [editingUnitForm, setEditingUnitForm] = useState<UpdateSalesUnitRequest>({
+    name: "",
+    code: "",
+  });
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [editingTeamForm, setEditingTeamForm] = useState<UpdateSalesTeamRequest>({
+    name: "",
+    code: "",
+    unit_id: null,
+    manager_user_id: null,
+  });
+  const [structureActionKey, setStructureActionKey] = useState<string | null>(null);
 
   const userPageSize = 8;
 
@@ -54,7 +76,7 @@ export default function AdminAccessPage() {
     setTeams(teamData);
     setUsers(userData);
 
-    if (activeUser && !isAdminLike(activeUser.role)) {
+    if (activeUser && !isOwnerLike(activeUser.role)) {
       router.replace("/workspace");
     }
   }
@@ -65,7 +87,7 @@ export default function AdminAccessPage() {
         const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
 
-        if (!isAdminLike(me.role)) {
+        if (!isOwnerLike(me.role)) {
           router.replace("/workspace");
           return;
         }
@@ -138,6 +160,106 @@ export default function AdminAccessPage() {
     }
   }
 
+  function beginEditOrganization(organization: OrganizationItem) {
+    setEditingOrganizationId(organization.id);
+    setEditingOrganizationForm({
+      name: organization.name,
+      slug: organization.slug,
+    });
+    setSuccessMessage("");
+    setErrorMessage("");
+  }
+
+  function beginEditUnit(unit: SalesUnitItem) {
+    setEditingUnitId(unit.id);
+    setEditingUnitForm({
+      name: unit.name,
+      code: unit.code,
+    });
+    setSuccessMessage("");
+    setErrorMessage("");
+  }
+
+  function beginEditTeam(team: SalesTeamItem) {
+    setEditingTeamId(team.id);
+    setEditingTeamForm({
+      name: team.name,
+      code: team.code,
+      unit_id: team.unit_id,
+      manager_user_id: team.manager_user_id,
+    });
+    setSuccessMessage("");
+    setErrorMessage("");
+  }
+
+  async function handleUpdateOrganization(organizationId: string) {
+    setStructureActionKey(`organization:${organizationId}`);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      await apiFetch<OrganizationItem>(`/organizations/${organizationId}`, {
+        method: "PATCH",
+        body: editingOrganizationForm,
+      });
+      setSuccessMessage("Organization berhasil diperbarui.");
+      setEditingOrganizationId(null);
+      await loadPageData();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal memperbarui organization.",
+      );
+    } finally {
+      setStructureActionKey(null);
+    }
+  }
+
+  async function handleUpdateUnit(unitId: string) {
+    setStructureActionKey(`unit:${unitId}`);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      await apiFetch<SalesUnitItem>(`/sales-structure/units/${unitId}`, {
+        method: "PATCH",
+        body: editingUnitForm,
+      });
+      setSuccessMessage("Sales unit berhasil diperbarui.");
+      setEditingUnitId(null);
+      await loadPageData();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal memperbarui sales unit.",
+      );
+    } finally {
+      setStructureActionKey(null);
+    }
+  }
+
+  async function handleUpdateTeam(teamId: string) {
+    setStructureActionKey(`team:${teamId}`);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      await apiFetch<SalesTeamItem>(`/sales-structure/teams/${teamId}`, {
+        method: "PATCH",
+        body: editingTeamForm,
+      });
+      setSuccessMessage("Sales team berhasil diperbarui.");
+      setEditingTeamId(null);
+      await loadPageData();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal memperbarui sales team.",
+      );
+    } finally {
+      setStructureActionKey(null);
+    }
+  }
+
   const filteredUsers = useMemo(() => {
     const normalizedQuery = userSearchQuery.trim().toLowerCase();
 
@@ -172,21 +294,12 @@ export default function AdminAccessPage() {
     1,
     Math.ceil(filteredUsers.length / userPageSize),
   );
+  const effectiveUserPage = Math.min(userPage, totalUserPages);
 
   const paginatedUsers = useMemo(() => {
-    const startIndex = (userPage - 1) * userPageSize;
+    const startIndex = (effectiveUserPage - 1) * userPageSize;
     return filteredUsers.slice(startIndex, startIndex + userPageSize);
-  }, [filteredUsers, userPage]);
-
-  useEffect(() => {
-    setUserPage(1);
-  }, [userRoleFilter, userSearchQuery, userStatusFilter]);
-
-  useEffect(() => {
-    if (userPage > totalUserPages) {
-      setUserPage(totalUserPages);
-    }
-  }, [totalUserPages, userPage]);
+  }, [effectiveUserPage, filteredUsers]);
 
   return (
     <WorkspaceShell
@@ -222,12 +335,12 @@ export default function AdminAccessPage() {
           <div className="clara-alert clara-alert-success">{successMessage}</div>
         ) : null}
 
-        {!isLoading && currentUser && isAdminLike(currentUser.role) ? (
+        {!isLoading && currentUser && isOwnerLike(currentUser.role) ? (
           <>
             <section className="grid gap-6 lg:grid-cols-3">
               <Panel
                 title="Available Organizations"
-                description="Superadmin melihat semua organization. Head hanya organization miliknya."
+                description="Organization yang terdaftar di Clara dan bisa dikelola penuh oleh superadmin."
                 className="h-full"
                 contentClassName="h-full"
                 action={
@@ -247,15 +360,84 @@ export default function AdminAccessPage() {
                         key={organization.id}
                         className="rounded-xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
                       >
-                        <p className="text-sm font-semibold text-[#fff0c9]">
-                          {organization.name}
-                        </p>
-                        <p className="mt-1 text-xs text-[#b89a62]">
-                          slug: {organization.slug}
-                        </p>
-                        <p className="mt-1 text-xs text-[#b89a62]">
-                          created: {formatDateTime(organization.created_at)}
-                        </p>
+                        {editingOrganizationId === organization.id ? (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                                Organization Name
+                              </label>
+                              <input
+                                value={editingOrganizationForm.name ?? ""}
+                                onChange={(event) =>
+                                  setEditingOrganizationForm((current) => ({
+                                    ...current,
+                                    name: event.target.value,
+                                  }))
+                                }
+                                className="clara-input mt-2"
+                                placeholder="Organization name"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                                Slug
+                              </label>
+                              <input
+                                value={editingOrganizationForm.slug ?? ""}
+                                onChange={(event) =>
+                                  setEditingOrganizationForm((current) => ({
+                                    ...current,
+                                    slug: event.target.value,
+                                  }))
+                                }
+                                className="clara-input mt-2"
+                                placeholder="organization-slug"
+                              />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleUpdateOrganization(organization.id)}
+                                disabled={structureActionKey === `organization:${organization.id}`}
+                                className="clara-button clara-button-primary"
+                              >
+                                {structureActionKey === `organization:${organization.id}`
+                                  ? "Saving..."
+                                  : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingOrganizationId(null)}
+                                className="clara-button clara-button-ghost"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm font-semibold text-[#fff0c9]">
+                              {organization.name}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              slug: {organization.slug}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              created: {formatDateTime(organization.created_at)}
+                            </p>
+                            {isOwnerLike(currentUser.role) ? (
+                              <div className="mt-3">
+                                <button
+                                  type="button"
+                                  onClick={() => beginEditOrganization(organization)}
+                                  className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            ) : null}
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -282,16 +464,81 @@ export default function AdminAccessPage() {
                         key={unit.id}
                         className="rounded-xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
                       >
-                        <p className="text-sm font-semibold text-[#fff0c9]">
-                          {unit.name}
-                        </p>
-                        <p className="mt-1 text-xs text-[#b89a62]">code: {unit.code}</p>
-                        <p className="mt-1 text-xs text-[#b89a62]">
-                          org: {unit.organization_name ?? unit.organization_id}
-                        </p>
-                        <p className="mt-1 text-xs text-[#b89a62]">
-                          teams: {unit.team_count}
-                        </p>
+                        {editingUnitId === unit.id ? (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                                Unit Name
+                              </label>
+                              <input
+                                value={editingUnitForm.name ?? ""}
+                                onChange={(event) =>
+                                  setEditingUnitForm((current) => ({
+                                    ...current,
+                                    name: event.target.value,
+                                  }))
+                                }
+                                className="clara-input mt-2"
+                                placeholder="Unit name"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                                Unit Code
+                              </label>
+                              <input
+                                value={editingUnitForm.code ?? ""}
+                                onChange={(event) =>
+                                  setEditingUnitForm((current) => ({
+                                    ...current,
+                                    code: event.target.value,
+                                  }))
+                                }
+                                className="clara-input mt-2"
+                                placeholder="unit-code"
+                              />
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleUpdateUnit(unit.id)}
+                                disabled={structureActionKey === `unit:${unit.id}`}
+                                className="clara-button clara-button-primary"
+                              >
+                                {structureActionKey === `unit:${unit.id}` ? "Saving..." : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingUnitId(null)}
+                                className="clara-button clara-button-ghost"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm font-semibold text-[#fff0c9]">
+                              {unit.name}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">code: {unit.code}</p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              org: {unit.organization_name ?? unit.organization_id}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              teams: {unit.team_count}
+                            </p>
+                            <div className="mt-3">
+                              <button
+                                type="button"
+                                onClick={() => beginEditUnit(unit)}
+                                className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -318,16 +565,133 @@ export default function AdminAccessPage() {
                         key={team.id}
                         className="rounded-xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
                       >
-                        <p className="text-sm font-semibold text-[#fff0c9]">
-                          {team.name}
-                        </p>
-                        <div className="mt-1 space-y-1 text-xs text-[#b89a62]">
-                          <p>code: {team.code}</p>
-                          <p>org: {team.organization_name ?? team.organization_id}</p>
-                          <p>unit: {team.unit_name ?? "-"}</p>
-                          <p>manager: {team.manager_user_name ?? "-"}</p>
-                          <p>members: {team.member_count}</p>
-                        </div>
+                        {editingTeamId === team.id ? (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                                Team Name
+                              </label>
+                              <input
+                                value={editingTeamForm.name ?? ""}
+                                onChange={(event) =>
+                                  setEditingTeamForm((current) => ({
+                                    ...current,
+                                    name: event.target.value,
+                                  }))
+                                }
+                                className="clara-input mt-2"
+                                placeholder="Team name"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                                Team Code
+                              </label>
+                              <input
+                                value={editingTeamForm.code ?? ""}
+                                onChange={(event) =>
+                                  setEditingTeamForm((current) => ({
+                                    ...current,
+                                    code: event.target.value,
+                                  }))
+                                }
+                                className="clara-input mt-2"
+                                placeholder="team-code"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                                Unit
+                              </label>
+                              <select
+                                value={editingTeamForm.unit_id ?? ""}
+                                onChange={(event) =>
+                                  setEditingTeamForm((current) => ({
+                                    ...current,
+                                    unit_id: event.target.value || null,
+                                  }))
+                                }
+                                className="clara-select mt-2"
+                              >
+                                <option value="">Tanpa unit spesifik</option>
+                                {units
+                                  .filter((unit) => unit.organization_id === team.organization_id)
+                                  .map((unit) => (
+                                    <option key={unit.id} value={unit.id}>
+                                      {unit.name} ({unit.code})
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                                Manager
+                              </label>
+                              <select
+                                value={editingTeamForm.manager_user_id ?? ""}
+                                onChange={(event) =>
+                                  setEditingTeamForm((current) => ({
+                                    ...current,
+                                    manager_user_id: event.target.value || null,
+                                  }))
+                                }
+                                className="clara-select mt-2"
+                              >
+                                <option value="">Belum ditunjuk</option>
+                                {users
+                                  .filter(
+                                    (user) =>
+                                      user.organization_id === team.organization_id &&
+                                      canLeadSalesTeam(user.role),
+                                  )
+                                  .map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                      {user.name} ({user.email})
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleUpdateTeam(team.id)}
+                                disabled={structureActionKey === `team:${team.id}`}
+                                className="clara-button clara-button-primary"
+                              >
+                                {structureActionKey === `team:${team.id}` ? "Saving..." : "Save"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingTeamId(null)}
+                                className="clara-button clara-button-ghost"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm font-semibold text-[#fff0c9]">
+                              {team.name}
+                            </p>
+                            <div className="mt-1 space-y-1 text-xs text-[#b89a62]">
+                              <p>code: {team.code}</p>
+                              <p>org: {team.organization_name ?? team.organization_id}</p>
+                              <p>unit: {team.unit_name ?? "-"}</p>
+                              <p>manager: {team.manager_user_name ?? "-"}</p>
+                              <p>members: {team.member_count}</p>
+                            </div>
+                            <div className="mt-3">
+                              <button
+                                type="button"
+                                onClick={() => beginEditTeam(team)}
+                                className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -357,7 +721,10 @@ export default function AdminAccessPage() {
                           </label>
                           <input
                             value={userSearchQuery}
-                            onChange={(event) => setUserSearchQuery(event.target.value)}
+                            onChange={(event) => {
+                              setUserSearchQuery(event.target.value);
+                              setUserPage(1);
+                            }}
                             placeholder="Cari nama, email, team, unit..."
                             className="clara-input mt-2"
                           />
@@ -369,7 +736,10 @@ export default function AdminAccessPage() {
                           </label>
                           <select
                             value={userRoleFilter}
-                            onChange={(event) => setUserRoleFilter(event.target.value)}
+                            onChange={(event) => {
+                              setUserRoleFilter(event.target.value);
+                              setUserPage(1);
+                            }}
                             className="clara-select mt-2"
                           >
                             <option value="all">Semua role</option>
@@ -386,7 +756,10 @@ export default function AdminAccessPage() {
                           </label>
                           <select
                             value={userStatusFilter}
-                            onChange={(event) => setUserStatusFilter(event.target.value)}
+                            onChange={(event) => {
+                              setUserStatusFilter(event.target.value);
+                              setUserPage(1);
+                            }}
                             className="clara-select mt-2"
                           >
                             <option value="all">Semua status</option>
@@ -401,7 +774,7 @@ export default function AdminAccessPage() {
                           Menampilkan {paginatedUsers.length} dari {filteredUsers.length} user
                         </p>
                         <p>
-                          Halaman {userPage} dari {totalUserPages}
+                          Halaman {effectiveUserPage} dari {totalUserPages}
                         </p>
                       </div>
                     </div>
@@ -522,7 +895,7 @@ export default function AdminAccessPage() {
                             onClick={() =>
                               setUserPage((current) => Math.max(1, current - 1))
                             }
-                            disabled={userPage === 1}
+                            disabled={effectiveUserPage === 1}
                             className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Sebelumnya
@@ -534,7 +907,7 @@ export default function AdminAccessPage() {
                                 Math.min(totalUserPages, current + 1),
                               )
                             }
-                            disabled={userPage === totalUserPages}
+                            disabled={effectiveUserPage === totalUserPages}
                             className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             Berikutnya

@@ -761,26 +761,6 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InfoCard({
-  label,
-  value,
-  description,
-}: {
-  label: string;
-  value: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
-        {label}
-      </p>
-      <p className="mt-3 text-base font-semibold text-[#fff0c9]">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
-    </div>
-  );
-}
-
 function ActionHint({ title, description }: { title: string; description: string }) {
   return (
     <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">

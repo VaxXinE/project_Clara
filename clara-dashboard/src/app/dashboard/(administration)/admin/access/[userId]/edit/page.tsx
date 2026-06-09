@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
-import { isAdminLike, isOwnerLike } from "@/lib/roles";
+import { isOwnerLike } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 export default function AdminAccessEditHubPage() {
@@ -19,24 +19,15 @@ export default function AdminAccessEditHubPage() {
       try {
         const me = await apiFetch<CurrentUser>("/auth/me");
 
-        if (!isAdminLike(me.role)) {
+        if (!isOwnerLike(me.role)) {
           router.replace("/workspace");
           return;
         }
 
         const userData = await apiFetch<CurrentUser[]>("/auth/users");
-
         const nextTargetUser = userData.find((user) => user.id === userId) ?? null;
         if (!nextTargetUser) {
           setErrorMessage("User tidak ditemukan.");
-          return;
-        }
-
-        if (
-          !isOwnerLike(me.role) &&
-          nextTargetUser.organization_id !== me.organization_id
-        ) {
-          router.replace("/admin/access");
           return;
         }
 

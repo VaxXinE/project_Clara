@@ -184,3 +184,145 @@ def test_admin_can_create_and_update_marketing_execution_item(
     preview_payload = preview_response.json()
     assert preview_payload["execution_summary"]["total_items"] >= 1
     assert preview_payload["execution_summary"]["leads_generated"] >= 14
+
+
+def test_marketing_operational_kpi_uses_latest_conversation_state_like_kpi_page(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    owned_conversation = seeded_data["owned_conversation"]
+
+    db = db_session_factory()
+    conversation = db.get(type(owned_conversation), owned_conversation.id)
+    assert conversation is not None
+
+    message_time = datetime.now(timezone.utc) - timedelta(hours=2)
+
+    first_extraction = AIExtraction(
+        conversation_id=conversation.id,
+        model_name="test-model",
+        schema_version="v1",
+        lead_temperature="warm",
+        pipeline_stage="qualification",
+        buying_intent="medium",
+        sentiment="cautious",
+        risk_level="medium",
+        main_objections=["harga"],
+        budget_signal={"detected": True},
+        recommended_reply_strategy={"tone": "calm"},
+        customer_summary="Masih menimbang harga.",
+        next_best_action="Jelaskan value lebih konkret.",
+        content_insight="Edukasi value for money.",
+        internal_notes="Perlu trust building.",
+        confidence_score=0.82,
+        created_at=message_time,
+    )
+    db.add(first_extraction)
+    db.flush()
+
+    first_suggestion = ReplySuggestion(
+        conversation_id=conversation.id,
+        ai_extraction_id=first_extraction.id,
+        model_name="test-model",
+        action_mode="human_approval_required",
+        approval_status="rejected",
+        risk_level="medium",
+        suggested_replies=[
+            {
+                "tone": "neutral",
+                "text": "Kami punya beberapa pilihan paket.",
+                "reasoning": "Draft awal.",
+            }
+        ],
+        policy_reasons=["needs_better_value_positioning"],
+        created_at=message_time + timedelta(minutes=5),
+    )
+    db.add(first_suggestion)
+    db.flush()
+
+    db.add(
+        SentMessage(
+            conversation_id=conversation.id,
+            reply_suggestion_id=first_suggestion.id,
+            send_mode="manual",
+            message_text="Draft lama yang sempat terkirim.",
+            sent_by_name="Marketing Beta",
+            sent_at=message_time + timedelta(minutes=8),
+        )
+    )
+
+    second_extraction = AIExtraction(
+        conversation_id=conversation.id,
+        model_name="test-model",
+        schema_version="v1",
+        lead_temperature="hot",
+        pipeline_stage="closing",
+        buying_intent="high",
+        sentiment="positive",
+        risk_level="low",
+        main_objections=["harga"],
+        budget_signal={"detected": True},
+        recommended_reply_strategy={"tone": "confident"},
+        customer_summary="Sudah siap closing jika value jelas.",
+        next_best_action="Dorong ke langkah closing.",
+        content_insight="Perkuat social proof.",
+        internal_notes="Prospek siap lanjut.",
+        confidence_score=0.94,
+        created_at=message_time + timedelta(minutes=20),
+    )
+    db.add(second_extraction)
+    db.flush()
+
+    second_suggestion = ReplySuggestion(
+        conversation_id=conversation.id,
+        ai_extraction_id=second_extraction.id,
+        model_name="test-model",
+        action_mode="reply_direct",
+        approval_status="approved",
+        risk_level="low",
+        suggested_replies=[
+            {
+                "tone": "confident",
+                "text": "Kalau cocok, hari ini bisa langsung kita bantu proses.",
+                "reasoning": "State terbaru yang approved.",
+            }
+        ],
+        policy_reasons=["safe_to_reply"],
+        created_at=message_time + timedelta(minutes=25),
+    )
+    db.add(second_suggestion)
+    db.flush()
+
+    db.add(
+        SentMessage(
+            conversation_id=conversation.id,
+            reply_suggestion_id=second_suggestion.id,
+            send_mode="manual",
+            message_text="Reply final terbaru.",
+            sent_by_name="Marketing Beta",
+            sent_at=message_time + timedelta(minutes=30),
+        )
+    )
+    db.commit()
+    db.close()
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    marketing_response = client.get("/dashboard/marketing/insights-preview")
+    assert marketing_response.status_code == 200, marketing_response.text
+    marketing_payload = marketing_response.json()
+
+    kpi_response = client.get("/dashboard/kpi/command-center")
+    assert kpi_response.status_code == 200, kpi_response.text
+    kpi_payload = kpi_response.json()
+
+    assert marketing_payload["total_conversations"] == 1
+    assert marketing_payload["kpi_summary"]["reply_sent_rate"] == 1.0
+    assert marketing_payload["kpi_summary"]["approved_reply_rate"] == 1.0
+    assert marketing_payload["kpi_summary"]["analysis_coverage_rate"] == 1.0
+
+    assert kpi_payload["summary"]["reply_sent_rate"] == 1.0
+    assert kpi_payload["summary"]["approved_reply_rate"] == 1.0
+    assert kpi_payload["summary"]["analyzed_conversations"] == 1
