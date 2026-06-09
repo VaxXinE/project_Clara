@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LeadDealItem(BaseModel):
@@ -31,6 +31,8 @@ class LeadTaskItem(BaseModel):
     assigned_user_name: str | None
     completed_by_user_id: UUID | None
     completed_by_user_name: str | None
+    workflow_scope: str
+    requested_by_role: str | None
     task_type: str
     status: str
     title: str
@@ -76,11 +78,41 @@ class LeadActivityEventItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class LeadDisciplineLogItem(BaseModel):
+    id: UUID
+    lead_id: UUID
+    organization_id: UUID | None
+    actor_user_id: UUID | None
+    actor_user_name: str | None
+    log_date: date
+    activity_type: str
+    result_status: str
+    main_objection: str | None
+    customer_mood: str | None
+    notes: str | None
+    next_follow_up_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LeadDisciplineSummaryItem(BaseModel):
+    latest_log_date: date | None
+    latest_activity_type: str | None
+    latest_result_status: str | None
+    log_count: int
+    logs_today_count: int
+    days_since_latest_log: int | None
+    compliance_status: str
+
+
 class CustomerRelatedLeadItem(BaseModel):
     id: UUID
     display_name: str
     source_channel: str
     source_label: str
+    account_category: str
     current_stage: str
     lead_temperature: str
     last_contact_at: datetime | None
@@ -101,12 +133,35 @@ class CustomerMergeCandidateItem(BaseModel):
     last_contact_at: datetime | None
 
 
+class CustomerProfileListItem(BaseModel):
+    id: UUID
+    assigned_user_id: UUID | None
+    assigned_user_name: str | None
+    display_name: str
+    phone: str | None
+    email: str | None
+    status: str
+    lead_count: int
+    active_lead_count: int
+    conversation_count: int
+    hot_lead_count: int
+    source_labels: list[str]
+    last_contact_at: datetime | None
+    identity_confidence: float
+
+
 class CustomerProfileSummaryItem(BaseModel):
     id: UUID
     organization_id: UUID | None
     assigned_user_id: UUID | None
     assigned_user_name: str | None
     display_name: str
+    phone: str | None
+    email: str | None
+    address: str | None
+    status: str
+    temperature: str
+    temperature_source: str
     canonical_key: str
     identity_confidence: float
     match_strategy: str
@@ -121,6 +176,16 @@ class CustomerProfileSummaryItem(BaseModel):
     updated_at: datetime
     merge_candidates: list[CustomerMergeCandidateItem] = []
     related_leads: list[CustomerRelatedLeadItem]
+
+
+class CustomerProfileUpdateRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=255)
+    phone: str | None = Field(default=None, max_length=50)
+    email: str | None = Field(default=None, max_length=255)
+    address: str | None = Field(default=None, max_length=2000)
+    status: str = Field(default="active", max_length=20)
+    account_category: str | None = Field(default=None, max_length=20)
+    temperature: str | None = Field(default=None, max_length=20)
 
 
 class CustomerProfileMergeRequest(BaseModel):
@@ -140,6 +205,7 @@ class LeadListItem(BaseModel):
     source: str
     source_channel: str
     source_label: str
+    account_category: str
     current_stage: str
     lead_temperature: str
     summary: str | None
@@ -150,6 +216,9 @@ class LeadListItem(BaseModel):
     updated_at: datetime
     conversation_count: int
     latest_conversation_id: UUID | None
+    deal_status: str | None = None
+    discipline_compliance_status: str = "missing_today_log"
+    needs_deal_sync: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -160,9 +229,12 @@ class LeadDetail(LeadListItem):
     deal: LeadDealItem | None
     tasks: list[LeadTaskItem]
     timeline: list[LeadActivityEventItem]
+    discipline_summary: LeadDisciplineSummaryItem
+    discipline_logs: list[LeadDisciplineLogItem]
 
 
 class LeadUpdateRequest(BaseModel):
+    account_category: str | None = None
     current_stage: str | None = None
     lead_temperature: str | None = None
     summary: str | None = None
@@ -203,3 +275,34 @@ class LeadDealUpsertRequest(BaseModel):
     expected_close_date: date | None = None
     closed_at: datetime | None = None
     notes: str | None = None
+
+
+class LeadDisciplineLogCreateRequest(BaseModel):
+    log_date: date | None = None
+    activity_type: str
+    result_status: str
+    main_objection: str | None = None
+    customer_mood: str | None = None
+    notes: str | None = None
+    next_follow_up_at: datetime | None = None
+
+
+class LeadDisciplineLogUpdateRequest(BaseModel):
+    log_date: date | None = None
+    activity_type: str | None = None
+    result_status: str | None = None
+    main_objection: str | None = None
+    customer_mood: str | None = None
+    notes: str | None = None
+    next_follow_up_at: datetime | None = None
+
+
+class LeadDisciplineSuggestionResponse(BaseModel):
+    activity_type: str
+    result_status: str
+    main_objection: str | None
+    customer_mood: str | None
+    notes: str
+    next_follow_up_at: datetime | None
+    confidence_score: float
+    source_summary: str

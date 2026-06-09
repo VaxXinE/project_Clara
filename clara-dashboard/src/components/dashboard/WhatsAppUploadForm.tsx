@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
@@ -19,17 +20,25 @@ const INPUT_MODE_OPTIONS = [
 
 export function WhatsAppUploadForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const initialTitle = searchParams.get("title") ?? "";
+  const initialChannel = searchParams.get("channel") ?? "whatsapp";
+  const initialMode = searchParams.get("mode");
+  const returnToConversationId = searchParams.get("conversationId");
+  const isContinueMode = initialMode === "continue";
 
   const [channelOptions, setChannelOptions] = useState<ChannelDefinitionItem[]>(
     [],
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedChannel, setSelectedChannel] = useState("whatsapp");
+  const [selectedChannel, setSelectedChannel] = useState(initialChannel);
   const [inputMode, setInputMode] =
-    useState<(typeof INPUT_MODE_OPTIONS)[number]["value"]>("file");
+    useState<(typeof INPUT_MODE_OPTIONS)[number]["value"]>(
+      isContinueMode ? "paste" : "file",
+    );
   const [pastedText, setPastedText] = useState("");
-  const [conversationTitle, setConversationTitle] = useState("");
+  const [conversationTitle, setConversationTitle] = useState(initialTitle);
   const [isUploading, setIsUploading] = useState(false);
   const [isDetectingChannel, setIsDetectingChannel] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -100,6 +109,12 @@ export function WhatsAppUploadForm() {
     setErrorMessage("");
     setDetectionMessage("");
 
+    const normalizedConversationTitle = conversationTitle.trim();
+    if (normalizedConversationTitle.length < 2) {
+      setErrorMessage("Nama customer wajib diisi untuk judul conversation.");
+      return;
+    }
+
     const channelConfig = channelOptions.find(
       (item) => item.key === selectedChannel,
     );
@@ -125,6 +140,7 @@ export function WhatsAppUploadForm() {
 
         const formData = new FormData();
         formData.append("file", selectedFile);
+        formData.append("title", normalizedConversationTitle);
         result = await apiFetch<UploadConversationResponse>(
           channelConfig?.file_endpoint ?? "/upload/whatsapp-txt",
           {
@@ -145,13 +161,20 @@ export function WhatsAppUploadForm() {
             method: "POST",
             body: {
               raw_text: pastedText,
-              title: conversationTitle.trim() || null,
+              title: normalizedConversationTitle,
             },
           },
         );
       }
 
-      router.push(`/dashboard/sales/conversations/${result.conversation_id}`);
+      const nextParams = new URLSearchParams({
+        uploadStatus: result.status,
+        appended: String(result.appended_message_count),
+        messageCount: String(result.message_count),
+      });
+      router.push(
+        `/dashboard/sales/conversations/${result.conversation_id}?${nextParams.toString()}`,
+      );
       router.refresh();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Upload gagal.");
@@ -211,6 +234,28 @@ export function WhatsAppUploadForm() {
       onSubmit={handleUpload}
       className="clara-card space-y-5 rounded-[30px] p-5 sm:p-6"
     >
+      {isContinueMode ? (
+        <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <p className="font-semibold">Mode chat lanjutan aktif.</p>
+          <p className="mt-2 leading-6">
+            Paste atau upload chat terbaru customer untuk melanjutkan
+            conversation yang sudah ada. Selama nama customer dan channel tetap
+            sama, Clara akan mencoba menempelkan pesan baru ke thread yang
+            sama.
+          </p>
+          {returnToConversationId ? (
+            <div className="mt-3">
+              <Link
+                href={`/dashboard/sales/conversations/${returnToConversationId}`}
+                className="text-sm font-semibold underline"
+              >
+                Kembali ke detail conversation
+              </Link>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <div>
         <label
           htmlFor="channelType"
@@ -238,6 +283,32 @@ export function WhatsAppUploadForm() {
             {activeChannel.description}
           </p>
         ) : null}
+      </div>
+
+      <div>
+        <label
+          htmlFor="conversationTitle"
+          className="text-sm font-semibold text-slate-900"
+        >
+          Nama Customer / Judul Conversation
+        </label>
+        <input
+          id="conversationTitle"
+          type="text"
+          value={conversationTitle}
+          onChange={(event) => {
+            setConversationTitle(event.target.value);
+          }}
+          placeholder="Contoh: Rina Pratama"
+          className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+        />
+        <p className="mt-2 text-xs text-slate-500">
+          Wajib diisi dengan nama customer. Nilai ini akan dipakai sebagai
+          judul conversation dan nama awal customer di Clara.
+          {isContinueMode
+            ? " Kalau judul diganti, Clara bisa menganggap ini conversation baru."
+            : ""}
+        </p>
       </div>
 
       <div>
@@ -289,24 +360,6 @@ export function WhatsAppUploadForm() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="conversationTitle"
-              className="text-sm font-semibold text-slate-900"
-            >
-              Judul Conversation (opsional)
-            </label>
-            <input
-              id="conversationTitle"
-              type="text"
-              value={conversationTitle}
-              onChange={(event) => {
-                setConversationTitle(event.target.value);
-              }}
-              placeholder="Contoh: Chat Leoni Telegram"
-              className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
-            />
-          </div>
           <div>
             <label
               htmlFor="pastedText"
@@ -369,6 +422,7 @@ export function WhatsAppUploadForm() {
         disabled={
           isUploading ||
           channelOptions.length === 0 ||
+          conversationTitle.trim().length < 2 ||
           (inputMode === "file"
             ? !selectedFile
             : pastedText.trim().length === 0)

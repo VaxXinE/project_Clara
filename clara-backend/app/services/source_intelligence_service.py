@@ -11,7 +11,11 @@ CHANNEL_REGISTRY: dict[str, dict[str, object]] = {
         "supports_live_sync": True,
         "file_endpoint": "/upload/whatsapp-txt",
         "text_endpoint": "/upload/whatsapp-text",
-        "supported_sources": ["whatsapp_extension", "whatsapp_txt"],
+        "supported_sources": [
+            "whatsapp_extension",
+            "whatsapp_txt",
+            "whatsapp_webhook",
+        ],
         "sample_hint": "12/04/26, 09.12 - Customer: Halo kak",
     },
     "telegram": {
@@ -74,6 +78,7 @@ def build_source_label(source: str | None) -> str:
     source_key = normalize_source_key(source)
     explicit_labels = {
         "whatsapp_extension": "WhatsApp Extension",
+        "whatsapp_webhook": "WhatsApp Webhook",
         "whatsapp_txt": "WhatsApp TXT Import",
         "telegram_txt": "Telegram TXT Import",
         "telegram_extension": "Telegram Extension",

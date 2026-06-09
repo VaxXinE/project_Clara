@@ -7,6 +7,9 @@ from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.product_knowledge_schema import (
+    KnowledgeUpdateProposalResponse,
+    KnowledgeUpdateProposalReviewRequest,
+    KnowledgeUpdateProposalUpsertRequest,
     ProductKnowledgeCreateRequest,
     ProductKnowledgeResponse,
     ProductKnowledgeUpdateRequest,
@@ -20,8 +23,133 @@ from app.services.product_knowledge_service import (
     list_product_knowledge,
     update_product_knowledge,
 )
+from app.services.knowledge_update_queue_service import (
+    KnowledgeUpdateProposalError,
+    build_knowledge_update_proposal_item,
+    list_knowledge_update_proposals,
+    review_knowledge_update_proposal,
+    upsert_knowledge_update_proposal_for_conversation,
+)
 
 router = APIRouter(prefix="/product-knowledge", tags=["product-knowledge"])
+
+
+@router.get("/proposals", response_model=list[KnowledgeUpdateProposalResponse])
+def list_knowledge_update_proposals_endpoint(
+    status_filter: str | None = Query(
+        default=None,
+        alias="status",
+        min_length=1,
+        max_length=50,
+    ),
+    category: str | None = Query(default=None, min_length=1, max_length=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    try:
+        proposals = list_knowledge_update_proposals(
+            db=db,
+            current_user=current_user,
+            status=status_filter,
+            category=category,
+        )
+        return [build_knowledge_update_proposal_item(item) for item in proposals]
+    except AccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+
+@router.put(
+    "/conversations/{conversation_id}/proposal",
+    response_model=KnowledgeUpdateProposalResponse,
+)
+def upsert_knowledge_update_proposal_for_conversation_endpoint(
+    conversation_id: UUID,
+    payload: KnowledgeUpdateProposalUpsertRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    try:
+        proposal = upsert_knowledge_update_proposal_for_conversation(
+            db=db,
+            conversation_id=conversation_id,
+            payload=payload,
+            current_user=current_user,
+        )
+        create_audit_log(
+            db=db,
+            action="product_knowledge.proposal.upsert",
+            resource_type="knowledge_update_proposal",
+            resource_id=str(proposal.id),
+            current_user=current_user,
+            request=request,
+            metadata={
+                "conversation_id": str(proposal.conversation_id),
+                "status": proposal.status,
+                "category": proposal.category,
+            },
+        )
+        return build_knowledge_update_proposal_item(proposal)
+    except KnowledgeUpdateProposalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except AccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+
+@router.patch(
+    "/proposals/{proposal_id}/review",
+    response_model=KnowledgeUpdateProposalResponse,
+)
+def review_knowledge_update_proposal_endpoint(
+    proposal_id: UUID,
+    payload: KnowledgeUpdateProposalReviewRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("superadmin")),
+):
+    try:
+        proposal = review_knowledge_update_proposal(
+            db=db,
+            proposal_id=proposal_id,
+            payload=payload,
+            current_user=current_user,
+        )
+        create_audit_log(
+            db=db,
+            action="product_knowledge.proposal.review",
+            resource_type="knowledge_update_proposal",
+            resource_id=str(proposal.id),
+            current_user=current_user,
+            request=request,
+            metadata={
+                "status": proposal.status,
+                "published_product_knowledge_id": str(
+                    proposal.published_product_knowledge_id
+                )
+                if proposal.published_product_knowledge_id
+                else None,
+            },
+        )
+        return build_knowledge_update_proposal_item(proposal)
+    except KnowledgeUpdateProposalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    except AccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("", response_model=list[ProductKnowledgeResponse])
@@ -30,7 +158,7 @@ def list_product_knowledge_endpoint(
     category: str | None = Query(default=None, min_length=1, max_length=100),
     is_active: bool | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         return list_product_knowledge(
@@ -56,7 +184,7 @@ def create_product_knowledge_endpoint(
     payload: ProductKnowledgeCreateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("owner")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         entry = create_product_knowledge(
@@ -91,7 +219,7 @@ def update_product_knowledge_endpoint(
     payload: ProductKnowledgeUpdateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("owner")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         entry = update_product_knowledge(
@@ -131,7 +259,7 @@ def delete_product_knowledge_endpoint(
     knowledge_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("owner")),
+    current_user: User = Depends(require_roles("superadmin")),
 ) -> Response:
     try:
         delete_product_knowledge(

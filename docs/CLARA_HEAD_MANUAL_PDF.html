@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <title>CLARA Head Manual</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 14mm 14mm 16mm 14mm;
+      }
+
+      :root {
+        --ink: #171a29;
+        --muted: #59607b;
+        --gold: #c89538;
+        --gold-soft: #f6d98c;
+        --line: #e8dcc9;
+        --paper: #fffdfa;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        line-height: 1.5;
+        font-size: 11.2px;
+      }
+
+      h1, h2, h3 { margin: 0 0 10px; line-height: 1.2; }
+      h1 { font-size: 26px; }
+      h2 {
+        margin-top: 18px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--line);
+        font-size: 18px;
+      }
+      h3 { margin-top: 14px; font-size: 14px; }
+      p { margin: 0 0 8px; }
+      ul, ol { margin: 0 0 10px 18px; padding: 0; }
+      li { margin-bottom: 3px; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 10px 0 14px;
+        font-size: 10px;
+      }
+      th, td {
+        border: 1px solid var(--line);
+        padding: 6px 8px;
+        vertical-align: top;
+        text-align: left;
+      }
+      th { background: #f5ecdd; }
+      .cover {
+        min-height: 256mm;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 18mm 16mm;
+        background:
+          linear-gradient(140deg, rgba(16,18,29,.95), rgba(28,31,50,.92)),
+          url("../clara-dashboard/public/assets/background.png") center/cover no-repeat;
+        color: white;
+        border-radius: 18px;
+        overflow: hidden;
+      }
+      .pill {
+        display: inline-block;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(246, 217, 140, 0.12);
+        color: var(--gold-soft);
+        border: 1px solid rgba(246, 217, 140, 0.22);
+        letter-spacing: .14em;
+        font-size: 10px;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+      .cover h1 {
+        margin-top: 16px;
+        font-size: 31px;
+        max-width: 520px;
+      }
+      .cover p {
+        max-width: 560px;
+        color: rgba(255,255,255,.82);
+        font-size: 13px;
+      }
+      .card,
+      .section-box,
+      .image-block,
+      .note {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .card {
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 18px;
+        padding: 14px;
+        margin-top: 12px;
+      }
+      .card h3 {
+        color: var(--gold-soft);
+        margin-bottom: 8px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: .14em;
+      }
+      .section-box {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 16px;
+        padding: 14px;
+        margin: 12px 0 14px;
+      }
+      .image-block {
+        margin: 12px 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 10px;
+        background: white;
+      }
+      .image-block img {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 205mm;
+        object-fit: contain;
+        border-radius: 12px;
+      }
+      .caption {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+      .note {
+        padding: 12px 14px;
+        border-left: 4px solid var(--gold);
+        background: #fff8eb;
+        border-radius: 10px;
+        margin: 10px 0 16px;
+      }
+      .page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+      .footer {
+        margin-top: 22px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="cover">
+      <div>
+        <span class="pill">CLARA Head Manual</span>
+        <h1>Panduan Khusus Head Menggunakan Clara</h1>
+        <p>
+          Dokumen ini dibuat khusus untuk head. Fokusnya adalah membaca alert,
+          melihat bottleneck lintas tim, memantau KPI, menjaga kualitas pipeline,
+          dan memastikan governance akses serta knowledge tetap rapi.
+        </p>
+      </div>
+      <div>
+        <div class="card">
+          <h3>Fokus</h3>
+          <p>Alert Center, Chat Review Center, Lead Management, Customer Detail, Ops Dashboard, Access Control, Channels, dan Knowledge Base.</p>
+        </div>
+        <div class="card">
+          <h3>Versi Dokumen</h3>
+          <p>Disusun berdasarkan workflow head Clara yang aktif per 3 Juni 2026.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h1>Daftar Isi</h1>
+      <div class="section-box">
+        <ol>
+          <li>Clara dipakai untuk apa oleh head</li>
+          <li>Halaman yang paling sering dipakai head</li>
+          <li>Alur kerja harian head</li>
+          <li>Panduan halaman satu per satu</li>
+          <li>Tindakan berdasarkan kondisi</li>
+          <li>Checklist dan hal yang jangan dilakukan</li>
+          <li>Troubleshooting singkat</li>
+        </ol>
+      </div>
+
+      <h2>1. Clara Dipakai Untuk Apa Oleh Head</h2>
+      <p>
+        Untuk head, Clara dipakai untuk melihat masalah operasional dari level atas,
+        membaca bottleneck lintas tim, memantau lead penting, mengecek customer
+        intelligence, memantau KPI, dan menjaga governance akses serta knowledge.
+      </p>
+
+      <h2>2. Halaman Yang Paling Sering Dipakai Head</h2>
+      <ol>
+        <li>Alert Center</li>
+        <li>Chat Review Center</li>
+        <li>Lead Management</li>
+        <li>Lead Detail</li>
+        <li>Customer List</li>
+        <li>Customer Detail</li>
+        <li>Ops Dashboard</li>
+        <li>Manager Insights</li>
+        <li>Access Control</li>
+        <li>Channels</li>
+        <li>Knowledge Base</li>
+      </ol>
+
+      <div class="note">
+        Aturan cepat: head tidak bekerja dari Queue harian sales. Head bekerja dari
+        Alert Center, Chat Review Center, Lead Management, dan KPI.
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>3. Alur Kerja Harian Head</h2>
+      <ol>
+        <li>Buka Alert Center.</li>
+        <li>Baca alert aktif yang paling penting.</li>
+        <li>Buka Chat Review Center untuk melihat bottleneck percakapan.</li>
+        <li>Buka Lead Management untuk melihat dampaknya di pipeline.</li>
+        <li>Buka Customer Detail bila masalah menyentuh identitas atau segmentasi customer.</li>
+        <li>Buka Ops Dashboard untuk membaca kondisi tim secara lebih luas.</li>
+        <li>Jika perlu, buka Access Control, Channels, atau Knowledge Base untuk intervensi.</li>
+      </ol>
+
+      <div class="image-block">
+        <img src="assets/manual/screenshots/alert_center.png" alt="Alert Center Clara" />
+        <div class="caption">
+          Tampilan Alert Center Clara asli. Head biasanya memulai pengawasan harian
+          dari halaman ini.
+        </div>
+      </div>
+
+      <div class="image-block">
+        <img src="assets/manual/screenshots/ops_dashboard1.png" alt="Ops Dashboard Clara" />
+        <div class="caption">
+          Tampilan Ops Dashboard Clara asli. Head memakainya untuk membaca kesehatan
+          operasional tim dari level yang lebih tinggi.
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>4. Panduan Halaman Satu Per Satu</h2>
+
+      <h3>4.1 Alert Center</h3>
+      <p>
+        Ini adalah titik masuk utama untuk melihat masalah operasional aktif.
+      </p>
+      <ul>
+        <li>Fokus ke alert active.</li>
+        <li>Baca severity dan sumber alert.</li>
+        <li>Tentukan apakah cukup diproses atau perlu keputusan organisasi.</li>
+      </ul>
+
+      <h3>4.2 Chat Review Center</h3>
+      <p>
+        Dipakai untuk melihat chat yang macet, high risk, atau butuh escalation.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/chat_review_center.png" alt="Chat Review Center Clara" />
+        <div class="caption">
+          Tampilan Chat Review Center Clara asli. Head memakainya untuk melihat
+          bottleneck percakapan yang perlu perhatian lebih tinggi.
+        </div>
+      </div>
+
+      <h3>4.3 Lead Management</h3>
+      <p>
+        Dipakai head untuk membaca apakah pipeline tertahan di area tertentu.
+      </p>
+      <ul>
+        <li>Fokus ke Hot, Overdue, Needs sync, dan Disiplin stale.</li>
+        <li>Buka lead yang berdampak besar lebih dulu.</li>
+      </ul>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/lead_management.png" alt="Lead Management Clara" />
+        <div class="caption">
+          Tampilan Lead Management Clara asli. Head memakainya untuk membaca
+          dampak masalah pada pipeline.
+        </div>
+      </div>
+
+      <h3>4.4 Customer Detail</h3>
+      <p>
+        Dipakai saat masalahnya menyentuh identitas customer, kategori akun, atau
+        temperature customer.
+      </p>
+      <ul>
+        <li>Cek kategori akun.</li>
+        <li>Cek temperature customer.</li>
+        <li>Cek lead terkait.</li>
+        <li>Pastikan tim tidak bekerja dengan konteks customer yang berbeda-beda.</li>
+      </ul>
+
+      <h3>4.5 Ops Dashboard</h3>
+      <p>
+        Dipakai untuk membaca KPI dan snapshot kesehatan operasional.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/ops_dashboard2.png" alt="Ops Dashboard Clara lanjutan" />
+        <div class="caption">
+          Tampilan Ops Dashboard Clara asli bagian lanjutan. Gunakan untuk membaca
+          masalah dari level yang lebih tinggi sebelum turun ke detail.
+        </div>
+      </div>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/ops_dashboard3.png" alt="Ops Dashboard Clara tambahan" />
+        <div class="caption">
+          Tampilan Ops Dashboard Clara bagian tambahan. Cocok untuk melihat area
+          KPI lain yang mungkin tidak terlihat dari satu blok saja.
+        </div>
+      </div>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/ops_dashboard4.png" alt="Ops Dashboard Clara bagian akhir" />
+        <div class="caption">
+          Tampilan Ops Dashboard Clara bagian akhir. Gunakan seluruh blok KPI secara
+          bersama, jangan baca satu angka secara terpisah.
+        </div>
+      </div>
+
+      <h3>4.6 Access Control</h3>
+      <p>
+        Dipakai untuk menjaga struktur akses user tetap rapi.
+      </p>
+      <ul>
+        <li>Cek role user.</li>
+        <li>Cek status aktif.</li>
+        <li>Pastikan akses sesuai kebutuhan kerja.</li>
+      </ul>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/access_control1.png" alt="Access Control Clara" />
+        <div class="caption">
+          Tampilan Access Control Clara asli. Halaman ini dipakai untuk mengelola
+          akun dan batas akses user.
+        </div>
+      </div>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/access_control2.png" alt="Access Control Clara detail" />
+        <div class="caption">
+          Tampilan Access Control Clara bagian lanjutan. Gunakan untuk membaca
+          informasi user lebih detail sebelum melakukan perubahan.
+        </div>
+      </div>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/access_control3.png" alt="Access Control Clara lanjutan" />
+        <div class="caption">
+          Tampilan Access Control Clara bagian lanjutan lainnya. Pastikan setiap
+          perubahan akses punya alasan yang jelas.
+        </div>
+      </div>
+
+      <h3>4.7 Channels</h3>
+      <p>
+        Dipakai untuk melihat sumber channel dan ingestion.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/channels.png" alt="Halaman Channels Clara" />
+        <div class="caption">
+          Tampilan Channels Clara asli. Halaman ini membantu head memahami chat
+          masuk dari mana dan channel mana yang aktif.
+        </div>
+      </div>
+
+      <h3>4.8 Knowledge Base</h3>
+      <p>
+        Dipakai untuk memeriksa landasan jawaban resmi dan knowledge sensitif.
+      </p>
+      <div class="image-block">
+        <img src="assets/manual/screenshots/knowledge_base.png" alt="Knowledge Base Clara" />
+        <div class="caption">
+          Tampilan Knowledge Base Clara asli. Halaman ini menjadi rujukan utama
+          untuk topik sensitif seperti legalitas, kebijakan, dan jawaban resmi.
+        </div>
+      </div>
+    </section>
+
+    <section class="page-break">
+      <h2>5. Tindakan Berdasarkan Kondisi</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Kondisi</th>
+            <th>Apa Artinya</th>
+            <th>Tindakan Yang Harus Dilakukan</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Ada alert aktif</td>
+            <td>Masalah operasional masih berjalan.</td>
+            <td>Pahami masalahnya lalu putuskan apakah cukup diproses atau perlu dinaikkan.</td>
+          </tr>
+          <tr>
+            <td>Ada bottleneck lintas tim</td>
+            <td>Masalah tidak berhenti di satu orang atau satu team.</td>
+            <td>Buka Chat Review Center dan cari apakah masalahnya di orang, proses, atau data.</td>
+          </tr>
+          <tr>
+            <td>KPI terasa tidak sehat</td>
+            <td>Ada tekanan operasional yang perlu diverifikasi.</td>
+            <td>Buka Ops Dashboard lalu cocokkan dengan Alert Center, Lead Management, dan review.</td>
+          </tr>
+          <tr>
+            <td>Customer profile berantakan</td>
+            <td>Tim mungkin tidak bekerja dengan konteks customer yang sama.</td>
+            <td>Buka Customer Detail, cek lead terkait, dan lihat apakah kategori akun perlu diseragamkan.</td>
+          </tr>
+          <tr>
+            <td>Akses user terasa janggal</td>
+            <td>Risiko governance atau akses kerja tidak tepat.</td>
+            <td>Buka Access Control dan pastikan role sesuai kebutuhan kerja.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>6. Checklist Cepat Head</h2>
+      <ul>
+        <li>Apakah ada alert aktif yang belum jelas pemiliknya.</li>
+        <li>Apakah ada bottleneck lintas team.</li>
+        <li>Apakah hot lead penting dijaga.</li>
+        <li>Apakah akses user masih sesuai struktur tim.</li>
+        <li>Apakah jawaban sensitif punya landasan resmi.</li>
+        <li>Apakah data customer penting tidak pecah.</li>
+      </ul>
+
+      <h2>7. Hal Yang Jangan Dilakukan Head</h2>
+      <ul>
+        <li>Jangan mengambil keputusan hanya dari satu metrik.</li>
+        <li>Jangan mengubah akses user tanpa alasan jelas.</li>
+        <li>Jangan mengabaikan alert aktif yang berulang.</li>
+        <li>Jangan membiarkan pipeline sehat hanya terlihat sehat tanpa verifikasi.</li>
+        <li>Jangan menganggap semua masalah berasal dari orang, kadang masalahnya justru di data atau proses.</li>
+      </ul>
+
+      <h2>8. Troubleshooting Singkat</h2>
+      <h3>8.1 Kenapa Alert Center kosong</h3>
+      <p>Bisa jadi memang tidak ada alert aktif sekarang atau Anda sedang melihat status selain active.</p>
+
+      <h3>8.2 Kenapa Chat Review Center kosong</h3>
+      <p>Bisa jadi memang tidak ada bottleneck review saat ini atau filter terlalu ketat.</p>
+
+      <h3>8.3 Kenapa KPI terasa buruk tapi detailnya tidak jelas</h3>
+      <p>Buka Alert Center, Lead Management, dan Chat Review Center untuk mencocokkan angka besar dengan kasus nyata.</p>
+
+      <h3>8.4 Kenapa kategori akun belum muncul</h3>
+      <p>Bisa jadi Clara belum cukup yakin membaca kategorinya atau analisis chat belum dijalankan.</p>
+
+      <div class="footer">
+        CLARA Head Manual • Disusun dari workflow head Clara yang aktif • 3 Juni 2026
+      </div>
+    </section>
+  </body>
+</html>

@@ -7,6 +7,11 @@ from app.models.user import User
 from app.db.session import get_db
 from app.schemas.dashboard_schema import (
     ChatReviewCenterResponse,
+    ChatReviewCaseItem,
+    ChatReviewCaseSuggestionResponse,
+    ChatReviewCaseUpsertRequest,
+    ChatReviewNoteCreateRequest,
+    ChatReviewerCandidateItem,
     KpiAlertHistoryResponse,
     KpiAlertResolveRequest,
     KpiCommandCenterResponse,
@@ -14,6 +19,7 @@ from app.schemas.dashboard_schema import (
     MarketingExecutionItem,
     MarketingExecutionItemCreateRequest,
     MarketingExecutionItemUpdateRequest,
+    ManagerInsightsResponse,
     MarketingInsightSnapshotResponse,
     MarketingInsightsPreview,
     OpsDatabaseOverviewResponse,
@@ -28,6 +34,14 @@ from app.schemas.dashboard_schema import (
 )
 from app.schemas.channel_schema import ChannelOverviewResponse
 from app.services.audit_service import create_audit_log
+from app.services.chat_review_service import (
+    ChatReviewError,
+    add_chat_review_note,
+    build_chat_review_case_suggestion,
+    get_reviewable_conversation_or_raise,
+    list_chat_reviewer_candidates,
+    upsert_chat_review_case,
+)
 from app.services.dashboard_service import (
     acknowledge_ops_notification,
     escalate_ops_notification,
@@ -36,6 +50,7 @@ from app.services.dashboard_service import (
     get_channel_overview,
     get_kpi_command_center,
     get_marketing_insights_preview,
+    get_manager_insights,
     get_ops_database_overview,
     get_sales_chat_review_center,
     list_ops_notifications,
@@ -65,7 +80,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("/channels", response_model=ChannelOverviewResponse)
 def channel_overview(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_channel_overview(db=db, current_user=current_user)
 
@@ -73,22 +88,37 @@ def channel_overview(
 @router.get("/sales/inbox", response_model=list[SalesInboxItem])
 def sales_inbox(
     source_channel: str | None = Query(default=None),
+    archive_scope: str = Query(default="active"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_sales_inbox(
         db=db,
         current_user=current_user,
         source_channel=source_channel,
+        archive_scope=archive_scope,
     )
 
 
 @router.get("/sales/worklist", response_model=SalesWorklistResponse)
 def sales_worklist(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_sales_worklist(db=db, current_user=current_user)
+
+
+@router.get("/manager-insights", response_model=ManagerInsightsResponse)
+def manager_insights(
+    account_category: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    return get_manager_insights(
+        db=db,
+        current_user=current_user,
+        account_category=account_category,
+    )
 
 
 @router.get("/sales/approval-queue", response_model=SalesApprovalQueueResponse)
@@ -97,7 +127,7 @@ def sales_approval_queue(
     action_mode: str | None = Query(default=None),
     age_bucket: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_sales_approval_queue(
         db=db,
@@ -115,7 +145,7 @@ def sales_chat_review_center(
     age_bucket: str | None = Query(default=None),
     source_channel: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_sales_chat_review_center(
         db=db,
@@ -127,10 +157,149 @@ def sales_chat_review_center(
     )
 
 
+@router.get(
+    "/sales/reviewer-candidates",
+    response_model=list[ChatReviewerCandidateItem],
+)
+def sales_reviewer_candidates(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    return list_chat_reviewer_candidates(db=db, current_user=current_user)
+
+
+@router.get(
+    "/sales/conversations/{conversation_id}/review-case-suggestion",
+    response_model=ChatReviewCaseSuggestionResponse,
+)
+def get_chat_review_case_suggestion_endpoint(
+    conversation_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    try:
+        conversation = get_reviewable_conversation_or_raise(
+            db=db,
+            conversation_id=conversation_id,
+            current_user=current_user,
+        )
+    except ChatReviewError as error:
+        detail = str(error)
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if "tidak ditemukan" in detail.lower()
+                else status.HTTP_400_BAD_REQUEST
+            ),
+            detail=detail,
+        ) from error
+
+    return build_chat_review_case_suggestion(conversation)
+
+
+@router.put(
+    "/sales/conversations/{conversation_id}/review-case",
+    response_model=ChatReviewCaseItem,
+)
+def upsert_chat_review_case_endpoint(
+    conversation_id: UUID,
+    payload: ChatReviewCaseUpsertRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    try:
+        conversation = get_reviewable_conversation_or_raise(
+            db=db,
+            conversation_id=conversation_id,
+            current_user=current_user,
+        )
+        review_case = upsert_chat_review_case(
+            db=db,
+            conversation=conversation,
+            payload=payload,
+            current_user=current_user,
+        )
+    except ChatReviewError as error:
+        detail = str(error)
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if "tidak ditemukan" in detail.lower()
+                else status.HTTP_400_BAD_REQUEST
+            ),
+            detail=detail,
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="chat_review_case.upsert",
+        resource_type="chat_review_case",
+        resource_id=str(review_case.id),
+        current_user=current_user,
+        request=request,
+        metadata={
+            "conversation_id": str(conversation_id),
+            "status": review_case.status,
+            "review_label": review_case.review_label,
+            "reviewer_user_id": (
+                str(review_case.reviewer_user_id)
+                if review_case.reviewer_user_id is not None
+                else None
+            ),
+        },
+    )
+    return review_case
+
+
+@router.post(
+    "/sales/review-cases/{review_case_id}/notes",
+    response_model=ChatReviewCaseItem,
+)
+def add_chat_review_note_endpoint(
+    review_case_id: UUID,
+    payload: ChatReviewNoteCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    try:
+        review_case = add_chat_review_note(
+            db=db,
+            review_case_id=review_case_id,
+            payload=payload,
+            current_user=current_user,
+        )
+    except ChatReviewError as error:
+        detail = str(error)
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if "tidak ditemukan" in detail.lower()
+                else status.HTTP_400_BAD_REQUEST
+            ),
+            detail=detail,
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="chat_review_case.note.create",
+        resource_type="chat_review_case",
+        resource_id=str(review_case.id),
+        current_user=current_user,
+        request=request,
+        metadata={
+            "note_count": len(review_case.notes),
+            "status": review_case.status,
+        },
+    )
+    return review_case
+
+
 @router.get("/notifications", response_model=OpsNotificationResponse)
 def list_ops_notifications_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return list_ops_notifications(db=db, current_user=current_user)
 
@@ -143,7 +312,7 @@ def acknowledge_ops_notification_endpoint(
     notification_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         notification = acknowledge_ops_notification(
@@ -178,7 +347,7 @@ def resolve_ops_notification_endpoint(
     payload: OpsNotificationResolveRequest | None,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         notification = resolve_ops_notification(
@@ -213,7 +382,7 @@ def reopen_ops_notification_endpoint(
     notification_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin", "owner")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         notification = reopen_ops_notification(
@@ -247,7 +416,7 @@ def escalate_ops_notification_endpoint(
     notification_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "owner")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     try:
         notification = escalate_ops_notification(
@@ -280,7 +449,7 @@ def escalate_ops_notification_endpoint(
 def sales_conversation_detail(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("marketing", "admin")),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     detail = get_sales_conversation_detail(
         db=db,
@@ -300,7 +469,7 @@ def sales_conversation_detail(
 @router.get("/marketing/insights-preview", response_model=MarketingInsightsPreview)
 def marketing_insights_preview(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     return get_marketing_insights_preview(db=db, current_user=current_user)
 
@@ -308,7 +477,7 @@ def marketing_insights_preview(
 @router.get("/marketing/execution-items", response_model=list[MarketingExecutionItem])
 def list_marketing_execution_items_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     return list_marketing_execution_items(db=db, current_user=current_user)
 
@@ -322,7 +491,7 @@ def create_marketing_execution_item_endpoint(
     payload: MarketingExecutionItemCreateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     try:
         item = create_marketing_execution_item(
@@ -357,7 +526,7 @@ def update_marketing_execution_item_endpoint(
     payload: MarketingExecutionItemUpdateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     try:
         item = update_marketing_execution_item(
@@ -392,13 +561,15 @@ def update_marketing_execution_item_endpoint(
 @router.get("/kpi/command-center", response_model=KpiCommandCenterResponse)
 def kpi_command_center(
     source_channel: str | None = Query(default=None),
+    account_category: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     return get_kpi_command_center(
         db=db,
         current_user=current_user,
         source_channel=source_channel,
+        account_category=account_category,
     )
 
 
@@ -406,13 +577,15 @@ def kpi_command_center(
 def refresh_kpi_command_center_endpoint(
     request: Request,
     source_channel: str | None = Query(default=None),
+    account_category: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     response = refresh_kpi_command_center(
         db=db,
         current_user=current_user,
         source_channel=source_channel,
+        account_category=account_category,
     )
     create_audit_log(
         db=db,
@@ -429,7 +602,7 @@ def refresh_kpi_command_center_endpoint(
 @router.get("/kpi/alerts", response_model=KpiAlertHistoryResponse)
 def list_kpi_alerts_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     return list_kpi_alert_records(db=db, current_user=current_user)
 
@@ -439,7 +612,7 @@ def acknowledge_kpi_alert_endpoint(
     alert_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     try:
         alert = acknowledge_kpi_alert(
@@ -471,7 +644,7 @@ def resolve_kpi_alert_endpoint(
     request: Request,
     payload: KpiAlertResolveRequest | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     try:
         alert = resolve_kpi_alert(
@@ -507,7 +680,7 @@ def reopen_kpi_alert_endpoint(
     alert_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     try:
         alert = reopen_kpi_alert(
@@ -536,7 +709,7 @@ def reopen_kpi_alert_endpoint(
 @router.get("/kpi/snapshots", response_model=KpiSnapshotHistoryResponse)
 def list_kpi_snapshots_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     return list_kpi_snapshots(db=db, current_user=current_user)
 
@@ -549,7 +722,7 @@ def list_kpi_snapshots_endpoint(
 def generate_marketing_snapshot_endpoint(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     snapshot = generate_marketing_snapshot(db=db, current_user=current_user)
     create_audit_log(
@@ -574,7 +747,7 @@ def generate_marketing_snapshot_endpoint(
 )
 def list_marketing_snapshots_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head", "superadmin")),
 ):
     return list_marketing_snapshots(db=db, current_user=current_user)
 
@@ -582,6 +755,6 @@ def list_marketing_snapshots_endpoint(
 @router.get("/admin/ops-overview", response_model=OpsDatabaseOverviewResponse)
 def admin_ops_overview(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     return get_ops_database_overview(db=db, current_user=current_user)

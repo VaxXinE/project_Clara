@@ -59,6 +59,7 @@ const loadEnvFile = (filePath) => {
 loadEnvFile(envFilePath)
 
 const port = Number.parseInt(process.env.PORT || "9898", 10)
+const host = process.env.HOST || "127.0.0.1"
 const openaiApiKey = process.env.OPENAI_API_KEY
 const openaiModel = process.env.OPENAI_MODEL || "gpt-5.4-mini"
 const REPLY_SUGGESTIONS_PATH = "/reply-suggestions"
@@ -250,12 +251,19 @@ const storeChatSnapshot = (chatData) => {
   }
 }
 
-const sendJson = (response, statusCode, payload) => {
+const sendJson = (request, response, statusCode, payload) => {
+  const origin = request.headers.origin || ""
+  const allowedOrigin =
+    origin.startsWith("chrome-extension://") ||
+    origin.startsWith("http://localhost") ||
+    origin.startsWith("http://127.0.0.1")
+      ? origin
+      : "http://127.0.0.1"
+
   response.writeHead(statusCode, {
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Private-Network": "true",
+    "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Max-Age": "86400",
     "Content-Type": "application/json; charset=utf-8"
   })
@@ -265,13 +273,26 @@ const sendJson = (response, statusCode, payload) => {
 
 const server = http.createServer(async (request, response) => {
   const requestPath = getRequestPath(request)
+  const requestOrigin = request.headers.origin || ""
+  const isAllowedOrigin =
+    !requestOrigin ||
+    requestOrigin.startsWith("chrome-extension://") ||
+    requestOrigin.startsWith("http://localhost") ||
+    requestOrigin.startsWith("http://127.0.0.1")
 
   console.log(
-    `[proxy] ${request.method} ${requestPath} origin=${request.headers.origin || "-"}`
+    `[proxy] ${request.method} ${requestPath} origin=${requestOrigin || "-"}`
   )
 
+  if (!isAllowedOrigin) {
+    sendJson(request, response, 403, {
+      error: "Origin tidak diizinkan."
+    })
+    return
+  }
+
   if (request.method === "GET" && (requestPath === "/" || requestPath === "/health")) {
-    sendJson(response, 200, {
+    sendJson(request, response, 200, {
       endpoints: {
         latestChatSnapshot: `http://127.0.0.1:${port}${CHAT_SNAPSHOTS_LATEST_PATH}`,
         replySuggestions: `http://127.0.0.1:${port}${REPLY_SUGGESTIONS_PATH}`,
@@ -290,7 +311,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && requestPath === REPLY_SUGGESTIONS_PATH) {
-    sendJson(response, 200, {
+    sendJson(request, response, 200, {
       endpoint: REPLY_SUGGESTIONS_PATH,
       message: "Gunakan method POST ke endpoint ini dengan body JSON berisi chatData.",
       ok: true
@@ -302,14 +323,14 @@ const server = http.createServer(async (request, response) => {
     const snapshotRecord = readChatSnapshotRecord()
 
     if (!snapshotRecord) {
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         snapshot: null
       })
       return
     }
 
-    sendJson(response, 200, {
+    sendJson(request, response, 200, {
       ok: true,
       snapshot: sanitizeSnapshotRecord(snapshotRecord)
     })
@@ -320,14 +341,14 @@ const server = http.createServer(async (request, response) => {
     const latestSnapshot = readChatSnapshotRecord()
 
     if (!latestSnapshot) {
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         ok: true,
         snapshot: null
       })
       return
     }
 
-    sendJson(response, 200, {
+    sendJson(request, response, 200, {
       ok: true,
       snapshot: sanitizeSnapshotRecord(latestSnapshot)
     })
@@ -335,7 +356,7 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (request.method === "OPTIONS") {
-    sendJson(response, 200, {
+    sendJson(request, response, 200, {
       ok: true
     })
     return
@@ -345,7 +366,7 @@ const server = http.createServer(async (request, response) => {
     request.method !== "POST" ||
     ![REPLY_SUGGESTIONS_PATH, CHAT_SNAPSHOTS_PATH].includes(requestPath)
   ) {
-    sendJson(response, 404, {
+    sendJson(request, response, 404, {
       error: "Route tidak ditemukan."
     })
     return
@@ -358,7 +379,7 @@ const server = http.createServer(async (request, response) => {
     if (requestPath === CHAT_SNAPSHOTS_PATH && chatData === null) {
       clearChatSnapshotRecord()
 
-      sendJson(response, 200, {
+      sendJson(request, response, 200, {
         cleared: true,
         ok: true,
         snapshot: null
@@ -367,7 +388,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (!isValidChatData(chatData)) {
-      sendJson(response, 400, {
+      sendJson(request, response, 400, {
         error:
           "Body wajib berisi chatData dengan capturedAt, chatTitle, chatSubtitle, dan messages[]."
       })
@@ -377,7 +398,7 @@ const server = http.createServer(async (request, response) => {
     if (requestPath === CHAT_SNAPSHOTS_PATH) {
       const { duplicate, latestSnapshot } = storeChatSnapshot(chatData)
 
-      sendJson(response, duplicate ? 200 : 201, {
+      sendJson(request, response, duplicate ? 200 : 201, {
         duplicate,
         ok: true,
         snapshot: latestSnapshot
@@ -386,14 +407,14 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (chatData.messages.length === 0) {
-      sendJson(response, 400, {
+      sendJson(request, response, 400, {
         error: "chatData.messages wajib ada dan tidak boleh kosong."
       })
       return
     }
 
     if (!openaiApiKey) {
-      sendJson(response, 503, {
+      sendJson(request, response, 503, {
         error: "OPENAI_API_KEY belum di-set. Endpoint /reply-suggestions belum bisa dipakai."
       })
       return
@@ -417,7 +438,7 @@ const server = http.createServer(async (request, response) => {
     const payload = await openaiResponse.json()
 
     if (!openaiResponse.ok) {
-      sendJson(response, openaiResponse.status, {
+      sendJson(request, response, openaiResponse.status, {
         error:
           payload?.error?.message || "OpenAI gagal memproses permintaan saran jawaban."
       })
@@ -428,18 +449,18 @@ const server = http.createServer(async (request, response) => {
     const suggestions = parseSuggestions(outputText)
 
     if (suggestions.length === 0) {
-      sendJson(response, 502, {
+      sendJson(request, response, 502, {
         error: "OpenAI tidak mengembalikan saran jawaban yang valid."
       })
       return
     }
 
-    sendJson(response, 200, {
+    sendJson(request, response, 200, {
       model: openaiModel,
       suggestions
     })
   } catch (error) {
-    sendJson(response, 500, {
+    sendJson(request, response, 500, {
       error:
         error instanceof Error
           ? error.message
@@ -461,9 +482,9 @@ server.on("error", (error) => {
   process.exit(1)
 })
 
-server.listen(port, () => {
-  console.log(`OpenAI proxy aktif di http://127.0.0.1:${port}${REPLY_SUGGESTIONS_PATH}`)
-  console.log(`API snapshot chat di http://127.0.0.1:${port}${CHAT_SNAPSHOTS_PATH}`)
+server.listen(port, host, () => {
+  console.log(`OpenAI proxy aktif di http://${host}:${port}${REPLY_SUGGESTIONS_PATH}`)
+  console.log(`API snapshot chat di http://${host}:${port}${CHAT_SNAPSHOTS_PATH}`)
   console.log(`Model default: ${openaiModel}`)
   console.log(`Sumber konfigurasi .env: ${fs.existsSync(envFilePath) ? envFilePath : "tidak ada"}`)
 })

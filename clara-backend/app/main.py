@@ -11,8 +11,10 @@ from app.api.routes_extension import router as extension_router
 from app.api.routes_integrations import router as integrations_router
 from app.api.routes_leads import router as leads_router
 from app.api.routes_reply import router as reply_router
+from app.api.routes_sales_structure import router as sales_structure_router
 from app.api.routes_sent_messages import router as sent_messages_router
 from app.api.routes_upload import router as upload_router
+from app.api.routes_webhooks import router as webhooks_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.middleware.request_logging import request_logging_middleware
@@ -41,10 +43,12 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(organizations_router)
+    app.include_router(sales_structure_router)
     app.include_router(product_knowledge_router)
     app.include_router(integrations_router)
     app.include_router(extension_router)
     app.include_router(upload_router)
+    app.include_router(webhooks_router)
     app.include_router(leads_router)
     app.include_router(customers_router)
     app.include_router(conversations_router)

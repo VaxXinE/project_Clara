@@ -86,6 +86,7 @@ export type SalesInboxItem = {
   source: string;
   source_channel: string;
   source_label: string;
+  account_category: string;
   status: string;
   started_at: string | null;
   last_message_at: string | null;
@@ -97,6 +98,8 @@ export type SalesInboxItem = {
   priority_score: number;
   latest_sent_message: DashboardSentMessageSummary | null;
   sales_user_id: string | null;
+  sales_owner_name: string | null;
+  is_archived: boolean;
 };
 
 export type SalesConversationMessage = {
@@ -107,6 +110,73 @@ export type SalesConversationMessage = {
   message_timestamp: string;
 };
 
+export type ChatReviewNoteItem = {
+  id: string;
+  author_user_id: string | null;
+  author_user_name: string | null;
+  note_type: string;
+  body: string;
+  created_at: string;
+};
+
+export type ChatReviewCaseItem = {
+  id: string;
+  conversation_id: string;
+  organization_id: string | null;
+  lead_id: string | null;
+  submitted_by_user_id: string | null;
+  submitted_by_user_name: string | null;
+  reviewer_user_id: string | null;
+  reviewer_user_name: string | null;
+  workflow_scope: string;
+  feedback_status: string;
+  status: string;
+  review_label: string;
+  review_summary: string | null;
+  coaching_focus: string | null;
+  recommended_action: string | null;
+  reviewed_at: string | null;
+  feedback_sent_at: string | null;
+  feedback_acknowledged_at: string | null;
+  feedback_resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  notes: ChatReviewNoteItem[];
+};
+
+export type KnowledgeUpdateProposalItem = {
+  id: string;
+  organization_id: string | null;
+  conversation_id: string;
+  conversation_title: string | null;
+  chat_review_case_id: string | null;
+  lead_id: string | null;
+  proposed_by_user_id: string | null;
+  proposed_by_user_name: string | null;
+  reviewed_by_user_id: string | null;
+  reviewed_by_user_name: string | null;
+  published_product_knowledge_id: string | null;
+  published_product_knowledge_title: string | null;
+  title: string;
+  category: string;
+  proposed_content: string;
+  source_type: string;
+  rationale: string | null;
+  status: string;
+  review_decision_note: string | null;
+  submitted_at: string | null;
+  reviewed_at: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChatReviewerCandidateItem = {
+  id: string;
+  name: string;
+  role: string;
+};
+
 export type SalesConversationDetail = {
   conversation_id: string;
   organization_id: string | null;
@@ -114,6 +184,7 @@ export type SalesConversationDetail = {
   source: string;
   source_channel: string;
   source_label: string;
+  account_category: string;
   status: string;
   started_at: string | null;
   last_message_at: string | null;
@@ -122,6 +193,8 @@ export type SalesConversationDetail = {
   latest_reply_suggestion: DashboardReplySuggestionSummary | null;
   sent_messages: DashboardSentMessageSummary[];
   sales_user_id: string | null;
+  chat_review_case: ChatReviewCaseItem | null;
+  knowledge_update_proposal: KnowledgeUpdateProposalItem | null;
 };
 
 export type LeadListItem = {
@@ -135,6 +208,7 @@ export type LeadListItem = {
   source: string;
   source_channel: string;
   source_label: string;
+  account_category: string;
   current_stage: string;
   lead_temperature: string;
   summary: string | null;
@@ -145,6 +219,9 @@ export type LeadListItem = {
   updated_at: string;
   conversation_count: number;
   latest_conversation_id: string | null;
+  deal_status: string | null;
+  discipline_compliance_status: string;
+  needs_deal_sync: boolean;
 };
 
 export type LeadTaskItem = {
@@ -155,6 +232,8 @@ export type LeadTaskItem = {
   assigned_user_name: string | null;
   completed_by_user_id: string | null;
   completed_by_user_name: string | null;
+  workflow_scope: string;
+  requested_by_role: string | null;
   task_type: string;
   status: string;
   title: string;
@@ -180,6 +259,33 @@ export type LeadActivityEventItem = {
   created_at: string;
 };
 
+export type LeadDisciplineLogItem = {
+  id: string;
+  lead_id: string;
+  organization_id: string | null;
+  actor_user_id: string | null;
+  actor_user_name: string | null;
+  log_date: string;
+  activity_type: string;
+  result_status: string;
+  main_objection: string | null;
+  customer_mood: string | null;
+  notes: string | null;
+  next_follow_up_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LeadDisciplineSummaryItem = {
+  latest_log_date: string | null;
+  latest_activity_type: string | null;
+  latest_result_status: string | null;
+  log_count: number;
+  logs_today_count: number;
+  days_since_latest_log: number | null;
+  compliance_status: string;
+};
+
 export type LeadDealItem = {
   id: string;
   lead_id: string;
@@ -202,6 +308,7 @@ export type CustomerRelatedLeadItem = {
   display_name: string;
   source_channel: string;
   source_label: string;
+  account_category: string;
   current_stage: string;
   lead_temperature: string;
   last_contact_at: string | null;
@@ -222,12 +329,35 @@ export type CustomerMergeCandidateItem = {
   last_contact_at: string | null;
 };
 
+export type CustomerProfileListItem = {
+  id: string;
+  assigned_user_id: string | null;
+  assigned_user_name: string | null;
+  display_name: string;
+  phone: string | null;
+  email: string | null;
+  status: string;
+  lead_count: number;
+  active_lead_count: number;
+  conversation_count: number;
+  hot_lead_count: number;
+  source_labels: string[];
+  last_contact_at: string | null;
+  identity_confidence: number;
+};
+
 export type CustomerProfileSummaryItem = {
   id: string;
   organization_id: string | null;
   assigned_user_id: string | null;
   assigned_user_name: string | null;
   display_name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  status: string;
+  temperature: string;
+  temperature_source: string;
   canonical_key: string;
   identity_confidence: number;
   match_strategy: string;
@@ -244,6 +374,16 @@ export type CustomerProfileSummaryItem = {
   related_leads: CustomerRelatedLeadItem[];
 };
 
+export type CustomerProfileUpdateRequest = {
+  display_name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  status: string;
+  account_category?: string | null;
+  temperature?: string | null;
+};
+
 export type CustomerProfileMergeRequest = {
   source_profile_id: string;
   target_profile_id: string;
@@ -256,9 +396,33 @@ export type LeadDetail = LeadListItem & {
   deal: LeadDealItem | null;
   tasks: LeadTaskItem[];
   timeline: LeadActivityEventItem[];
+  discipline_summary: LeadDisciplineSummaryItem;
+  discipline_logs: LeadDisciplineLogItem[];
+};
+
+export type LeadDisciplineLogCreateRequest = {
+  log_date?: string | null;
+  activity_type: string;
+  result_status: string;
+  main_objection?: string | null;
+  customer_mood?: string | null;
+  notes?: string | null;
+  next_follow_up_at?: string | null;
+};
+
+export type LeadDisciplineSuggestionResponse = {
+  activity_type: string;
+  result_status: string;
+  main_objection: string | null;
+  customer_mood: string | null;
+  notes: string;
+  next_follow_up_at: string | null;
+  confidence_score: number;
+  source_summary: string;
 };
 
 export type LeadUpdateRequest = {
+  account_category?: string;
   current_stage?: string;
   lead_temperature?: string;
   summary?: string | null;
@@ -333,6 +497,81 @@ export type SalesWorklistResponse = {
   open_task_count: number;
   completion_rate_today: number;
   items: SalesWorklistItem[];
+  upcoming_items: SalesWorklistItem[];
+};
+
+export type ManagerTeamDisciplineRow = {
+  team_id: string | null;
+  team_name: string;
+  unit_id: string | null;
+  unit_name: string | null;
+  manager_user_name: string | null;
+  member_count: number;
+  members: ManagerTeamMemberItem[];
+  lead_count: number;
+  missing_or_stale_logs: number;
+  overdue_follow_ups: number;
+  open_coaching_cases: number;
+  pending_knowledge_proposals: number;
+  discipline_compliance_rate: number;
+  follow_up_compliance_rate: number;
+};
+
+export type ManagerTeamMemberItem = {
+  id: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+};
+
+export type ManagerCoachingPriorityItem = {
+  review_case_id: string;
+  conversation_id: string;
+  lead_id: string | null;
+  lead_name: string;
+  conversation_title: string;
+  sales_owner_name: string | null;
+  reviewer_user_name: string | null;
+  review_status: string;
+  review_label: string;
+  risk_level: string | null;
+  latest_message_at: string | null;
+  priority_score: number;
+  recommended_action: string | null;
+};
+
+export type ManagerObjectionTrendItem = {
+  objection: string;
+  count: number;
+};
+
+export type ManagerBoundaryAlertItem = {
+  team_id: string | null;
+  team_name: string;
+  unit_id: string | null;
+  unit_name: string | null;
+  severity: string;
+  title: string;
+  description: string;
+  target_href: string | null;
+};
+
+export type ManagerInsightsResponse = {
+  generated_at: string;
+  scope_label: string;
+  scope_team_count: number;
+  scope_member_count: number;
+  total_leads: number;
+  stale_lead_ratio: number;
+  follow_up_compliance_rate: number;
+  missing_or_stale_log_count: number;
+  overdue_follow_up_count: number;
+  open_coaching_case_count: number;
+  pending_knowledge_proposal_count: number;
+  team_discipline: ManagerTeamDisciplineRow[];
+  coaching_priority: ManagerCoachingPriorityItem[];
+  objection_trends: ManagerObjectionTrendItem[];
+  boundary_alerts: ManagerBoundaryAlertItem[];
 };
 
 export type SalesApprovalQueueItem = {
@@ -360,6 +599,30 @@ export type SalesApprovalQueueResponse = {
   items: SalesApprovalQueueItem[];
 };
 
+export type ChatReviewCaseUpsertRequest = {
+  reviewer_user_id?: string | null;
+  status: string;
+  review_label: string;
+  review_summary?: string | null;
+  coaching_focus?: string | null;
+  recommended_action?: string | null;
+};
+
+export type ChatReviewCaseSuggestionResponse = {
+  status: string;
+  review_label: string;
+  review_summary: string;
+  coaching_focus: string;
+  recommended_action: string;
+  confidence_score: number;
+  source_summary: string;
+};
+
+export type ChatReviewNoteCreateRequest = {
+  note_type?: string;
+  body: string;
+};
+
 export type ChatReviewQueueItem = {
   conversation_id: string;
   lead_id: string | null;
@@ -369,6 +632,7 @@ export type ChatReviewQueueItem = {
   sales_owner_name: string | null;
   source_channel: string;
   source_label: string;
+  account_category: string;
   current_stage: string;
   lead_temperature: string;
   risk_level: string | null;
@@ -383,6 +647,10 @@ export type ChatReviewQueueItem = {
   latest_ai_extraction: DashboardAIExtractionSummary | null;
   latest_reply_suggestion: DashboardReplySuggestionSummary | null;
   latest_sent_message: DashboardSentMessageSummary | null;
+  active_review_case_id: string | null;
+  active_review_status: string | null;
+  active_review_label: string | null;
+  active_review_reviewer_name: string | null;
 };
 
 export type ChatReviewCenterResponse = {
@@ -403,6 +671,12 @@ export type OpsNotificationItem = {
   user_id: string | null;
   source_type: string;
   source_key: string;
+  workflow_scope: string;
+  owner_role: string;
+  target_role: string;
+  lead_id: string | null;
+  lead_name: string | null;
+  sales_owner_name: string | null;
   severity: string;
   title: string;
   body: string;
@@ -750,6 +1024,7 @@ export type MarketingInsightSnapshot = {
 export type UploadConversationResponse = {
   conversation_id: string;
   message_count: number;
+  appended_message_count: number;
   status: string;
 };
 
@@ -785,6 +1060,20 @@ export type ProductKnowledgeCreateRequest = {
   is_active: boolean;
 };
 
+export type KnowledgeUpdateProposalUpsertRequest = {
+  title: string;
+  category: string;
+  proposed_content: string;
+  source_type: string;
+  rationale: string | null;
+  status: string;
+};
+
+export type KnowledgeUpdateProposalReviewRequest = {
+  status: string;
+  review_decision_note: string | null;
+};
+
 export type ProductKnowledgeListFilters = {
   q?: string;
   category?: string;
@@ -800,6 +1089,10 @@ export type CurrentUser = {
   created_at: string;
   organization_id: string | null;
   organization_name: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  unit_id: string | null;
+  unit_name: string | null;
   created_by_user_id: string | null;
   created_by_user_name: string | null;
 };
@@ -816,12 +1109,68 @@ export type CreateOrganizationRequest = {
   slug: string;
 };
 
+export type UpdateOrganizationRequest = {
+  name?: string | null;
+  slug?: string | null;
+};
+
+export type SalesUnitItem = {
+  id: string;
+  organization_id: string;
+  organization_name: string | null;
+  name: string;
+  code: string;
+  created_at: string;
+  team_count: number;
+};
+
+export type CreateSalesUnitRequest = {
+  organization_id?: string | null;
+  name: string;
+  code: string;
+};
+
+export type UpdateSalesUnitRequest = {
+  name?: string | null;
+  code?: string | null;
+};
+
+export type SalesTeamItem = {
+  id: string;
+  organization_id: string;
+  organization_name: string | null;
+  unit_id: string | null;
+  unit_name: string | null;
+  manager_user_id: string | null;
+  manager_user_name: string | null;
+  name: string;
+  code: string;
+  created_at: string;
+  member_count: number;
+};
+
+export type CreateSalesTeamRequest = {
+  organization_id?: string | null;
+  unit_id?: string | null;
+  manager_user_id?: string | null;
+  name: string;
+  code: string;
+};
+
+export type UpdateSalesTeamRequest = {
+  unit_id?: string | null;
+  manager_user_id?: string | null;
+  name?: string | null;
+  code?: string | null;
+};
+
 export type CreateUserRequest = {
   name: string;
   email: string;
   password: string;
   role: string;
   organization_id: string | null;
+  team_id: string | null;
 };
 
 export type UpdateUserRequest = {
@@ -829,6 +1178,7 @@ export type UpdateUserRequest = {
   email?: string;
   role?: string;
   organization_id?: string | null;
+  team_id?: string | null;
 };
 
 export type ResetUserPasswordRequest = {

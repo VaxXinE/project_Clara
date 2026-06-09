@@ -2,41 +2,83 @@ export function normalizeWorkspaceRole(role?: string | null): string {
   const normalized = (role ?? "").trim().toLowerCase().replaceAll("-", "_");
 
   switch (normalized) {
-    case "sales":
-      return "marketing";
-    case "head":
-      return "admin";
-    case "superadmin":
-      return "owner";
+    case "marketing":
+      return "sales";
+    case "admin":
+      return "head";
+    case "owner":
+    case "super_admin":
+      return "superadmin";
     default:
       return normalized;
   }
 }
 
 export function isOwnerLike(role?: string | null): boolean {
-  const normalized = normalizeWorkspaceRole(role);
-  return normalized === "owner" || normalized === "super_admin";
+  return normalizeWorkspaceRole(role) === "superadmin";
+}
+
+export function isSuperadminRole(role?: string | null): boolean {
+  return normalizeWorkspaceRole(role) === "superadmin";
+}
+
+export function isHeadRole(role?: string | null): boolean {
+  return normalizeWorkspaceRole(role) === "head";
+}
+
+export function isManagerRole(role?: string | null): boolean {
+  return normalizeWorkspaceRole(role) === "manager";
 }
 
 export function isAdminLike(role?: string | null): boolean {
   const normalized = normalizeWorkspaceRole(role);
-  return normalized === "admin" || isOwnerLike(normalized);
+  return normalized === "head" || normalized === "superadmin";
+}
+
+export function isManagerLike(role?: string | null): boolean {
+  const normalized = normalizeWorkspaceRole(role);
+  return normalized === "manager" || isAdminLike(normalized);
+}
+
+export function canViewSalesTeam(role?: string | null): boolean {
+  return normalizeWorkspaceRole(role) === "manager";
+}
+
+export function canLeadSalesTeam(role?: string | null): boolean {
+  return canViewSalesTeam(role);
 }
 
 export function isSalesLike(role?: string | null): boolean {
-  return normalizeWorkspaceRole(role) === "marketing";
+  return normalizeWorkspaceRole(role) === "sales";
+}
+
+export function canAccessQueueAndActionCenter(role?: string | null): boolean {
+  const normalized = normalizeWorkspaceRole(role);
+  return normalized === "sales" || normalized === "superadmin";
+}
+
+export function canAccessManagerInsights(role?: string | null): boolean {
+  return isManagerLike(role);
+}
+
+export function canAccessStrategicInsights(role?: string | null): boolean {
+  return isAdminLike(role);
+}
+
+export function canAccessAdminPages(role?: string | null): boolean {
+  return isOwnerLike(role);
 }
 
 export function getRoleDisplayLabel(role?: string | null): string {
   switch (normalizeWorkspaceRole(role)) {
-    case "marketing":
+    case "sales":
       return "sales";
-    case "admin":
+    case "manager":
+      return "manager";
+    case "head":
       return "head";
-    case "owner":
+    case "superadmin":
       return "superadmin";
-    case "super_admin":
-      return "platform superadmin";
     default:
       return (role ?? "").replaceAll("_", " ");
   }

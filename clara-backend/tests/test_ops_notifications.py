@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
+from app.models.lead_deal import LeadDeal
 from app.models.lead_task import LeadTask
 from app.models.message import Message
 from app.models.reply_suggestion import ReplySuggestion
@@ -25,7 +26,7 @@ def csrf_headers(client: TestClient) -> dict[str, str]:
     return {"X-CSRF-Token": csrf_token}
 
 
-def test_admin_can_list_and_acknowledge_ops_notifications(
+def test_head_can_list_and_acknowledge_ops_notifications(
     client: TestClient,
     db_session_factory: sessionmaker,
     seeded_data: dict[str, object],
@@ -119,7 +120,7 @@ def test_admin_can_list_and_acknowledge_ops_notifications(
     )
     assert escalate_response.status_code == 200, escalate_response.text
     escalate_payload = escalate_response.json()
-    assert escalate_payload["escalation_level"] in {"team_lead", "owner"}
+    assert escalate_payload["escalation_level"] in {"team_lead", "superadmin"}
 
 
 def test_approval_queue_filters_by_risk_level(
@@ -216,3 +217,46 @@ def test_worklist_response_includes_sla_metrics(
     assert "overdue_24h_count" in payload
     assert payload["overdue_24h_count"] >= 1
     assert "completion_rate_today" in payload
+
+
+def test_notifications_include_deal_metrics_sync_warning(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    owned_lead = seeded_data["owned_lead"]
+
+    db = db_session_factory()
+    lead = db.get(type(owned_lead), owned_lead.id)
+    assert lead is not None
+    lead.assigned_user_id = marketing_a.id
+    lead.current_stage = "won"
+    db.add(lead)
+    db.flush()
+
+    db.add(
+        LeadDeal(
+            lead_id=lead.id,
+            organization_id=lead.organization_id,
+            owner_user_id=marketing_a.id,
+            status="open",
+            currency="IDR",
+            expected_value=5_000_000,
+            deposit_amount=1_000_000,
+        )
+    )
+    db.commit()
+    db.close()
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    response = client.get("/dashboard/notifications")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    matching_items = [
+        item for item in payload["items"] if item["source_type"] == "deal_metrics_sync"
+    ]
+    assert matching_items
+    assert "Deal Metrics" in matching_items[0]["body"] or "deal status" in matching_items[0]["body"]
+    assert matching_items[0]["target_href"] == f"/dashboard/crm/{lead.id}"

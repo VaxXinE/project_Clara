@@ -44,6 +44,10 @@ class ProductKnowledge(Base):
 
     organization = relationship("Organization")
     created_by_user = relationship("User")
+    source_proposals = relationship(
+        "KnowledgeUpdateProposal",
+        back_populates="published_product_knowledge",
+    )
 
     @property
     def scope_type(self) -> str:

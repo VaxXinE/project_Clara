@@ -1,17 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { isAdminLike } from "@/lib/roles";
 import type {
   ChannelOverviewResponse,
   CurrentUser,
 } from "@/types/dashboard";
 
 export default function ChannelsOverviewPage() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [overview, setOverview] = useState<ChannelOverviewResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -23,11 +26,15 @@ export default function ChannelsOverviewPage() {
       setErrorMessage("");
 
       try {
-        const [me, data] = await Promise.all([
-          apiFetch<CurrentUser>("/auth/me"),
-          apiFetch<ChannelOverviewResponse>("/dashboard/channels"),
-        ]);
+        const me = await apiFetch<CurrentUser>("/auth/me");
         setCurrentUser(me);
+
+        if (!isAdminLike(me.role)) {
+          router.replace("/dashboard");
+          return;
+        }
+
+        const data = await apiFetch<ChannelOverviewResponse>("/dashboard/channels");
         setOverview(data);
       } catch (error) {
         setErrorMessage(
@@ -39,13 +46,13 @@ export default function ChannelsOverviewPage() {
     }
 
     void loadOverview();
-  }, []);
+  }, [router]);
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Live channel maturity"
-      title="Channel Overview"
+      title="Channels"
       description="Satu tempat untuk membaca kesiapan operasional tiap channel: mana yang sudah live sync, mana yang masih import-based, dan berapa banyak lead serta conversation yang datang dari masing-masing channel."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
@@ -55,13 +62,13 @@ export default function ChannelsOverviewPage() {
             href="/dashboard/upload"
             className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
           >
-            Upload Multi-Channel
+            Buka Lead Capture
           </Link>
           <Link
             href="/dashboard/kpi"
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
           >
-            KPI Command Center
+            Ops Dashboard
           </Link>
         </>
       }
@@ -85,7 +92,7 @@ export default function ChannelsOverviewPage() {
               <MetricCard
                 label="Scope"
                 value={overview.scope_type}
-                hint="Owner membaca scope global, sedangkan admin/marketing membaca scope organization."
+                hint="Superadmin membaca scope global, sedangkan head/manager/sales membaca scope organization."
               />
               <MetricCard
                 label="Active Channels"

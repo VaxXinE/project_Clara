@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { WhatsAppUploadForm } from "@/components/dashboard/WhatsAppUploadForm";
 import { apiFetch } from "@/lib/api";
+import { isAdminLike } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 export default function UploadWhatsAppPage() {
@@ -28,23 +29,25 @@ export default function UploadWhatsAppPage() {
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Data ingestion"
-      title="Upload Chat Multi-Channel"
-      description="Masukkan export chat dalam format .txt atau paste chat langsung. Clara sekarang membaca registry channel dari backend, bisa membantu auto-detect channel untuk paste chat, lalu membuat conversation baru yang siap dianalisis."
+      title="Lead Capture"
+      description="Masukkan export chat dalam format .txt atau paste chat langsung. Ini adalah pintu masuk utama untuk membuat conversation dan lead baru yang siap dianalisis Clara."
       backHref="/dashboard/sales"
       backLabel="Kembali ke inbox"
       actions={
         <>
-          <Link
-            href="/dashboard/channels"
-            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
-          >
-            Lihat Channel Overview
-          </Link>
+          {isAdminLike(currentUser?.role) ? (
+            <Link
+              href="/dashboard/channels"
+              className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+            >
+              Buka Channels
+            </Link>
+          ) : null}
           <Link
             href="/dashboard/sales"
             className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
           >
-            Lihat Inbox
+            Buka Queue
           </Link>
         </>
       }
@@ -62,7 +65,7 @@ export default function UploadWhatsAppPage() {
             Telegram TXT yang eksplisit seperti contoh berikut.
           </p>
 
-          <pre className="mt-4 overflow-x-auto rounded-[24px] bg-[#10172d] p-4 text-sm leading-7 text-slate-100 shadow-[0_18px_34px_rgba(16,23,45,0.2)]">
+          <pre className="mt-4 overflow-x-auto rounded-3xl bg-[#10172d] p-4 text-sm leading-7 text-slate-100 shadow-[0_18px_34px_rgba(16,23,45,0.2)] font-mono">
             {`{Whatsapp}
 12/04/26, 09.12 - Customer: Kak, ini programnya legal nggak?
 12/04/26, 09.13 - Sales Ani: Legal kak, nanti saya kirim dokumen resminya.

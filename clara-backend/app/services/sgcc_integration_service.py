@@ -2,7 +2,6 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 import re
 
-from app.core.config import settings
 from app.schemas.ai_extraction_schema import AIExtractionCreate
 from app.schemas.integration_schema import (
     SGCCConversationAnalysisRequest,

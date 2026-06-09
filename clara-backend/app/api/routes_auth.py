@@ -16,6 +16,7 @@ from app.schemas.auth_schema import (
     ResetUserPasswordRequest,
     SessionResponse,
     TokenResponse,
+    UpdateSelfProfileRequest,
     UpdateUserRequest,
 )
 from app.services.audit_service import create_audit_log
@@ -25,6 +26,7 @@ from app.services.auth_service import (
     change_user_password,
     create_access_token,
     create_user,
+    delete_user,
     get_user_by_id,
     list_users,
     set_user_active_status,
@@ -32,7 +34,7 @@ from app.services.auth_service import (
     update_user,
 )
 from app.services.rate_limiter import login_rate_limiter
-from app.services.role_service import is_owner_like, normalize_role
+from app.services.role_service import is_head_like, is_superadmin_like, normalize_role
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,6 +49,10 @@ def build_user_response(user: User) -> CurrentUserResponse:
         created_at=user.created_at,
         organization_id=user.organization_id,
         organization_name=user.organization.name if user.organization else None,
+        team_id=user.team_id,
+        team_name=user.sales_team.name if user.sales_team else None,
+        unit_id=user.sales_team.unit_id if user.sales_team else None,
+        unit_name=user.sales_team.unit.name if user.sales_team and user.sales_team.unit else None,
         created_by_user_id=user.created_by_user_id,
         created_by_user_name=user.created_by_user.name if user.created_by_user else None,
     )
@@ -122,6 +128,8 @@ def login(
             detail=str(exc),
         ) from exc
 
+    session_response = SessionResponse(user=build_user_response(user))
+
     create_audit_log(
         db=db,
         action="auth.login",
@@ -135,7 +143,7 @@ def login(
     access_token = create_access_token(user)
     set_auth_cookies(response=response, access_token=access_token)
 
-    return SessionResponse(user=build_user_response(user))
+    return session_response
 
 
 @router.get("/me", response_model=CurrentUserResponse)
@@ -143,6 +151,42 @@ def get_me(
     current_user: User = Depends(get_current_user),
 ):
     return build_user_response(current_user)
+
+
+@router.patch("/me", response_model=CurrentUserResponse)
+def update_me(
+    payload: UpdateSelfProfileRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        updated_user = update_user(
+            db=db,
+            user=current_user,
+            payload=UpdateUserRequest(
+                name=payload.name,
+                email=payload.email,
+            ),
+        )
+        create_audit_log(
+            db=db,
+            action="auth.user.update_self",
+            resource_type="user",
+            resource_id=str(updated_user.id),
+            current_user=updated_user,
+            request=request,
+            metadata={
+                "email": updated_user.email,
+                "role": updated_user.role,
+            },
+        )
+        return build_user_response(updated_user)
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post("/access-token", response_model=TokenResponse)
@@ -210,22 +254,23 @@ def create_user_endpoint(
     request: Request,
     payload: CreateUserRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     payload_to_create = payload
     requested_role = normalize_role(payload.role)
+    current_role = normalize_role(current_user.role)
 
-    if current_user.role == "admin":
-        if requested_role in {"owner", "super_admin"}:
+    if is_head_like(current_role) and not is_superadmin_like(current_role):
+        if requested_role in {"head", "superadmin"}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin cannot create owner users.",
+                detail="Head cannot create head or superadmin users.",
             )
 
         if current_user.organization_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin has no organization assigned.",
+                detail="Head has no organization assigned.",
             )
 
         requested_organization_id = (
@@ -235,7 +280,7 @@ def create_user_endpoint(
         if requested_organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin can only create users in their own organization.",
+                detail="Head can only create users in their own organization.",
             )
 
         payload_to_create = payload.model_copy(
@@ -274,11 +319,11 @@ def create_user_endpoint(
 @router.get("/users", response_model=list[CurrentUserResponse])
 def list_users_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("head")),
 ):
     users = list_users(db=db)
 
-    if is_owner_like(current_user.role):
+    if is_superadmin_like(current_user.role):
         return [build_user_response(user) for user in users]
 
     if current_user.organization_id is None:
@@ -297,9 +342,10 @@ def update_user_endpoint(
     payload: UpdateUserRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     requested_role = normalize_role(payload.role) if payload.role is not None else None
+    current_role = normalize_role(current_user.role)
 
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))
@@ -315,21 +361,21 @@ def update_user_endpoint(
             detail="User not found.",
         )
 
-    if current_user.role == "admin":
+    if is_head_like(current_role) and not is_superadmin_like(current_role):
         if current_user.organization_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin has no organization assigned.",
+                detail="Head has no organization assigned.",
             )
         if target_user.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
-        if requested_role in {"owner", "super_admin"}:
+        if requested_role in {"head", "superadmin"}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin cannot promote users to owner.",
+                detail="Head cannot promote users to head or superadmin.",
             )
 
         payload = payload.model_copy(
@@ -372,7 +418,7 @@ def deactivate_user_endpoint(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))
@@ -394,21 +440,23 @@ def deactivate_user_endpoint(
             detail="You cannot deactivate your own account.",
         )
 
-    if current_user.role == "admin":
+    current_role = normalize_role(current_user.role)
+
+    if is_head_like(current_role) and not is_superadmin_like(current_role):
         if current_user.organization_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin has no organization assigned.",
+                detail="Head has no organization assigned.",
             )
         if target_user.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
-        if is_owner_like(target_user.role):
+        if is_superadmin_like(target_user.role):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin cannot deactivate owner users.",
+                detail="Head cannot deactivate superadmin users.",
             )
 
     updated_user = set_user_active_status(db=db, user=target_user, is_active=False)
@@ -429,7 +477,7 @@ def activate_user_endpoint(
     user_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))
@@ -445,21 +493,23 @@ def activate_user_endpoint(
             detail="User not found.",
         )
 
-    if current_user.role == "admin":
+    current_role = normalize_role(current_user.role)
+
+    if is_head_like(current_role) and not is_superadmin_like(current_role):
         if current_user.organization_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin has no organization assigned.",
+                detail="Head has no organization assigned.",
             )
         if target_user.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
-        if is_owner_like(target_user.role):
+        if is_superadmin_like(target_user.role):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin cannot activate owner users.",
+                detail="Head cannot activate superadmin users.",
             )
 
     updated_user = set_user_active_status(db=db, user=target_user, is_active=True)
@@ -481,7 +531,7 @@ def reset_user_password_endpoint(
     payload: ResetUserPasswordRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin")),
+    current_user: User = Depends(require_roles("superadmin")),
 ):
     try:
         target_user = get_user_by_id(db=db, user_id=UUID(user_id))
@@ -497,11 +547,13 @@ def reset_user_password_endpoint(
             detail="User not found.",
         )
 
-    if current_user.role == "admin":
+    current_role = normalize_role(current_user.role)
+
+    if is_head_like(current_role) and not is_superadmin_like(current_role):
         if current_user.organization_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin has no organization assigned.",
+                detail="Head has no organization assigned.",
             )
         if target_user.organization_id != current_user.organization_id:
             raise HTTPException(
@@ -511,7 +563,7 @@ def reset_user_password_endpoint(
         if target_user.created_by_user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin can only reset passwords for users they created.",
+                detail="Head can only reset passwords for users they created.",
             )
 
     updated_user = set_user_password(
@@ -529,3 +581,71 @@ def reset_user_password_endpoint(
         metadata={"email": updated_user.email},
     )
     return build_user_response(updated_user)
+
+
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_endpoint(
+    user_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("superadmin")),
+):
+    try:
+        target_user = get_user_by_id(db=db, user_id=UUID(user_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid user id.",
+        ) from exc
+
+    if target_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    if current_user.id == target_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot delete your own account.",
+        )
+
+    current_role = normalize_role(current_user.role)
+
+    if is_head_like(current_role) and not is_superadmin_like(current_role):
+        if current_user.organization_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Head has no organization assigned.",
+            )
+        if target_user.organization_id != current_user.organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+        if is_superadmin_like(target_user.role):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Head cannot delete superadmin users.",
+            )
+
+    deleted_user_id = str(target_user.id)
+    deleted_email = target_user.email
+
+    try:
+        delete_user(db=db, user=target_user)
+    except AuthError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    create_audit_log(
+        db=db,
+        action="auth.user.delete",
+        resource_type="user",
+        resource_id=deleted_user_id,
+        current_user=current_user,
+        request=request,
+        metadata={"email": deleted_email},
+    )

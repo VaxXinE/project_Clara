@@ -11,11 +11,39 @@ import {
   getLeadBadgeClass,
   getRiskBadgeClass,
 } from "@/lib/format";
+import {
+  canAccessQueueAndActionCenter,
+  normalizeWorkspaceRole,
+} from "@/lib/roles";
 import type {
   ChatReviewCenterResponse,
   ChatReviewQueueItem,
   CurrentUser,
 } from "@/types/dashboard";
+
+function formatAccountCategory(value: string): string {
+  switch (value) {
+    case "mini":
+      return "Mini";
+    case "reguler":
+      return "Reguler";
+    case "unknown":
+      return "Belum ditentukan";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function getAccountCategoryBadgeClass(value: string): string {
+  switch (value) {
+    case "mini":
+      return "bg-emerald-100 text-emerald-700";
+    case "reguler":
+      return "bg-amber-100 text-amber-700";
+    default:
+      return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
+  }
+}
 
 export default function ChatReviewCenterPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -137,26 +165,55 @@ export default function ChatReviewCenterPage() {
     }
   }
 
+  const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
+  const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
+  const isHeadView = normalizedRole === "head";
+  const fallbackHref = canAccessQueue
+    ? "/dashboard/sales"
+    : isHeadView
+      ? "/dashboard/notifications"
+      : "/dashboard/manager-insights";
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Review workflow"
-      title="Chat Review Center"
-      description="Satu layar untuk membaca chat yang perlu analisis ulang, butuh draft baru, menunggu approval, atau harus dinaikkan ke reviewer manusia."
-      backHref="/dashboard/sales"
-      backLabel="Kembali ke Queue"
+      eyebrow={isHeadView ? "Head follow-up" : "Review workflow"}
+      title={isHeadView ? "Follow-up ke Sales" : "Chat Review Center"}
+      description={
+        isHeadView
+          ? "Satu layar untuk membaca conversation yang berisiko, menilai bottleneck follow-up, lalu memberi arahan yang jelas ke Sales."
+          : "Satu layar untuk membaca chat yang perlu analisis ulang, butuh draft baru, menunggu approval, atau harus dinaikkan ke reviewer manusia."
+      }
+      backHref={fallbackHref}
+      backLabel={
+        canAccessQueue
+          ? "Kembali ke Queue"
+          : isHeadView
+            ? "Kembali ke Alert Center"
+            : "Kembali ke Manager Insights"
+      }
       actions={
         <Link
-          href="/dashboard/follow-up"
+          href={
+            canAccessQueue
+              ? "/dashboard/follow-up"
+              : isHeadView
+                ? "/dashboard/crm"
+                : "/dashboard/manager-insights"
+          }
           className="clara-button clara-button-primary"
         >
-          Buka Action Center
+          {canAccessQueue
+            ? "Buka Action Center"
+            : isHeadView
+              ? "Buka Lead Management"
+              : "Buka Manager Insights"}
         </Link>
       }
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="clara-empty-state text-sm text-slate-600">
+          <div className="clara-empty-state text-sm text-[#d6bb84]">
             Loading chat review center...
           </div>
         )}
@@ -167,56 +224,6 @@ export default function ChatReviewCenterPage() {
 
         {queue && !isLoading && !errorMessage && (
           <>
-            <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,#eef6ff_0%,#ffffff_42%,#f8fafc_100%)] p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                    Langkah Berikutnya
-                  </p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    {queue.items.length === 0
-                      ? "Tidak ada chat yang macet saat ini"
-                      : "Ambil item paling berisiko atau paling lama menunggu dulu"}
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    {queue.items.length === 0
-                      ? "Kalau review center kosong, lanjutkan eksekusi lewat queue dan action center."
-                      : "Halaman ini dipakai untuk triase cepat. Utamakan escalation, chat high risk, atau item stale sebelum Anda turun ke item yang lebih ringan."}
-                  </p>
-                </div>
-                <Link
-                  href={
-                    queue.items[0]
-                      ? `/dashboard/sales/conversations/${queue.items[0].conversation_id}`
-                      : "/dashboard/sales"
-                  }
-                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
-                >
-                  {queue.items[0] ? "Buka Item Teratas" : "Kembali ke Queue"}
-                </Link>
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Cara Pakai Halaman Ini
-              </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <UsageHint
-                  title="1. Kelompokkan bottleneck"
-                  description="Filter berdasarkan bucket review agar item yang perlu AI, draft, approval, atau escalation tidak tercampur."
-                />
-                <UsageHint
-                  title="2. Ambil quick action di sini"
-                  description="Untuk item yang hanya perlu analisis atau draft baru, eksekusi langsung tanpa masuk ke detail chat."
-                />
-                <UsageHint
-                  title="3. Turun ke detail saat butuh konteks"
-                  description="Buka conversation atau lead detail kalau keputusan perlu membaca timeline penuh, draft, atau histori follow-up."
-                />
-              </div>
-            </section>
-
             <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
               <QueueMetric
                 label="Total Review"
@@ -250,13 +257,13 @@ export default function ChatReviewCenterPage() {
               />
             </section>
 
-            <section className="grid gap-3 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_34px_rgba(15,23,42,0.05)] md:grid-cols-4">
-              <label className="space-y-2 text-sm font-medium text-slate-700">
+            <section className="grid gap-3 rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)] md:grid-cols-4">
+              <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                 <span>Filter bucket</span>
                 <select
                   value={reviewBucketFilter}
                   onChange={(event) => setReviewBucketFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                  className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
                 >
                   <option value="all">Semua bucket</option>
                   <option value="needs_analysis">Butuh AI analysis</option>
@@ -269,12 +276,12 @@ export default function ChatReviewCenterPage() {
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm font-medium text-slate-700">
+              <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                 <span>Filter risk</span>
                 <select
                   value={riskLevelFilter}
                   onChange={(event) => setRiskLevelFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                  className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
                 >
                   <option value="all">Semua risk</option>
                   <option value="high">High</option>
@@ -283,12 +290,12 @@ export default function ChatReviewCenterPage() {
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm font-medium text-slate-700">
+              <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                 <span>Filter age</span>
                 <select
                   value={ageBucketFilter}
                   onChange={(event) => setAgeBucketFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                  className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
                 >
                   <option value="all">Semua age</option>
                   <option value="fresh">Fresh (&lt;24 jam)</option>
@@ -297,12 +304,12 @@ export default function ChatReviewCenterPage() {
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm font-medium text-slate-700">
+              <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                 <span>Filter channel</span>
                 <select
                   value={sourceChannelFilter}
                   onChange={(event) => setSourceChannelFilter(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none ring-0"
+                  className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
                 >
                   <option value="all">Semua channel</option>
                   <option value="whatsapp">WhatsApp</option>
@@ -345,8 +352,8 @@ export default function ChatReviewCenterPage() {
 
             <section className="space-y-4">
               {queue.items.length === 0 ? (
-                <div className="clara-empty-state text-sm text-slate-500">
-                  Tidak ada item chat review yang cocok dengan filter saat ini.
+                <div className="clara-empty-state text-sm text-[#d6bb84]">
+                  Tidak ada item review yang cocok dengan filter saat ini. Halaman ini hanya memuat chat yang benar-benar perlu analisis, draft, approval, escalation, atau sudah stale.
                 </div>
               ) : (
                 queue.items.map((item) => (
@@ -400,6 +407,13 @@ function ReviewCard({
             >
               {item.lead_temperature.toUpperCase()}
             </span>
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
+                item.account_category,
+              )}`}
+            >
+              {formatAccountCategory(item.account_category)}
+            </span>
             {item.risk_level && (
               <span
                 className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
@@ -425,11 +439,11 @@ function ReviewCard({
             </span>
           </div>
 
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-[#d6bb84]">
             {item.conversation_title} &bull; {formatStatusLabel(item.current_stage)}{" "}
             &bull; {item.source_label}
           </p>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-[#b89a62]">
             Owner: {item.sales_owner_name ?? "-"} &bull; Queue since:{" "}
             {formatDateTime(item.queue_since_at)}
           </p>
@@ -437,16 +451,16 @@ function ReviewCard({
 
         <div className="flex flex-wrap gap-2">
           {item.latest_reply_suggestion && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
               {formatStatusLabel(item.latest_reply_suggestion.approval_status)}
             </span>
           )}
           {item.latest_reply_suggestion && (
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
               {formatStatusLabel(item.latest_reply_suggestion.action_mode)}
             </span>
           )}
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+          <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
             Score {item.priority_score}
           </span>
         </div>
@@ -455,10 +469,10 @@ function ReviewCard({
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="clara-card-soft rounded-2xl p-4">
           <p className="clara-kicker text-xs">Latest Customer Context</p>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#fff0c9]">
             {item.latest_message_preview ?? "Belum ada preview pesan terbaru."}
           </p>
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-[#b89a62]">
             Last message: {formatDateTime(item.latest_message_at)}
           </p>
         </div>
@@ -466,10 +480,25 @@ function ReviewCard({
         <div className="space-y-4">
           <div className="clara-card-soft rounded-2xl p-4">
             <p className="clara-kicker text-xs">Recommended Action</p>
-            <p className="mt-3 text-sm leading-7 text-slate-700">
+            <p className="mt-3 text-sm leading-7 text-[#fff0c9]">
               {item.recommended_action}
             </p>
           </div>
+
+          {item.active_review_case_id ? (
+            <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
+              <p className="clara-kicker text-xs text-[#f0cb73]">
+                Active Coaching Case
+              </p>
+              <p className="mt-3 text-sm font-semibold text-[#fff0c9]">
+                {formatStatusLabel(item.active_review_status ?? "draft")} ·{" "}
+                {(item.active_review_label ?? "unik").replaceAll("_", " ")}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
+                Reviewer: {item.active_review_reviewer_name ?? "Belum ditunjuk"}
+              </p>
+            </div>
+          ) : null}
 
           <div className="grid gap-3 sm:grid-cols-3">
             <MetaCard
@@ -535,21 +564,6 @@ function ReviewCard({
   );
 }
 
-function UsageHint({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-    </div>
-  );
-}
-
 function QueueMetric({
   label,
   value,
@@ -560,19 +574,19 @@ function QueueMetric({
   hint: string;
 }) {
   return (
-    <article className="clara-card rounded-[28px] p-6">
-      <p className="clara-kicker text-xs text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold text-slate-950">{value}</p>
-      <p className="mt-2 text-sm text-slate-600">{hint}</p>
+    <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#140f08]">{label}</p>
+      <p className="mt-3 text-3xl font-bold text-[#140f08]">{value}</p>
+      <p className="mt-2 text-sm text-[#2f210f]">{hint}</p>
     </article>
   );
 }
 
 function MetaCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-white p-4">
+    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
       <p className="clara-kicker text-[11px]">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+      <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
     </div>
   );
 }
@@ -580,29 +594,29 @@ function MetaCard({ label, value }: { label: string; value: string }) {
 function getReviewBucketBadgeClass(reviewBucket: string) {
   switch (reviewBucket) {
     case "human_escalation":
-      return "bg-red-100 text-red-700";
+      return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
     case "pending_approval":
     case "draft_review":
-      return "bg-amber-100 text-amber-700";
+      return "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]";
     case "needs_analysis":
-      return "bg-blue-100 text-blue-700";
+      return "border border-[#f0cb73]/18 bg-[#241a10] text-[#f0cb73]";
     case "needs_reply_suggestion":
     case "needs_rework":
-      return "bg-violet-100 text-violet-700";
+      return "border border-[#f0cb73]/18 bg-[#2b2013] text-[#f0cb73]";
     case "ready_to_send":
-      return "bg-green-100 text-green-700";
+      return "border border-[#f0cb73]/18 bg-[#1f170f] text-[#f0cb73]";
     default:
-      return "bg-slate-100 text-slate-700";
+      return "border border-[#f0cb73]/18 bg-[#1d150d] text-[#f0cb73]";
   }
 }
 
 function getAgeBucketBadgeClass(ageBucket: string) {
   switch (ageBucket) {
     case "stale":
-      return "bg-red-100 text-red-700";
+      return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
     case "aging":
-      return "bg-amber-100 text-amber-700";
+      return "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]";
     default:
-      return "bg-slate-100 text-slate-700";
+      return "border border-[#f0cb73]/18 bg-[#1d150d] text-[#f0cb73]";
   }
 }

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 from uuid import UUID
@@ -69,6 +69,38 @@ def test_extension_snapshot_auto_creates_linked_lead(
     assert lead is not None
     assert lead.display_name == "Leoni"
     assert lead.assigned_user_id == marketing_a.id
+
+
+def test_superadmin_can_list_cross_org_leads(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    owner = seeded_data["owner"]
+    marketing_other_org = seeded_data["marketing_other_org"]
+    org_b = seeded_data["org_b"]
+
+    db = db_session_factory()
+    db.add(
+        Lead(
+            organization_id=org_b.id,
+            assigned_user_id=marketing_other_org.id,
+            display_name="Cross Org Lead",
+            source="manual_test",
+            current_stage="qualification",
+            lead_temperature="warm",
+        )
+    )
+    db.commit()
+
+    login(client, email=owner.email, password="OwnerPass123!")
+
+    response = client.get("/leads")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert any(item["display_name"] == "Owned Customer" for item in payload)
+    assert any(item["display_name"] == "Cross Org Lead" for item in payload)
 
 
 def test_analyze_conversation_updates_linked_lead(
@@ -240,6 +272,95 @@ def test_admin_can_filter_leads_by_source_channel(
     assert len(telegram_payload) == 1
     assert telegram_payload[0]["display_name"] == "Telegram Prospect"
     assert telegram_payload[0]["source_label"] == "Telegram TXT Import"
+
+
+def test_auto_archived_conversation_is_hidden_from_active_lists(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    owned_conversation = seeded_data["owned_conversation"]
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    db = db_session_factory()
+    conversation = db.get(Conversation, owned_conversation.id)
+    assert conversation is not None
+    conversation.last_message_at = datetime.now(timezone.utc) - timedelta(days=10)
+    db.add(conversation)
+    db.commit()
+    db.close()
+
+    conversations_response = client.get("/conversations")
+    assert conversations_response.status_code == 200, conversations_response.text
+    assert all(
+        item["id"] != str(owned_conversation.id)
+        for item in conversations_response.json()
+    )
+
+    inbox_response = client.get("/dashboard/sales/inbox")
+    assert inbox_response.status_code == 200, inbox_response.text
+    assert all(
+        item["conversation_id"] != str(owned_conversation.id)
+        for item in inbox_response.json()
+    )
+
+    archived_inbox_response = client.get(
+        "/dashboard/sales/inbox?archive_scope=archived"
+    )
+    assert archived_inbox_response.status_code == 200, archived_inbox_response.text
+    archived_payload = archived_inbox_response.json()
+    assert any(
+        item["conversation_id"] == str(owned_conversation.id)
+        and item["is_archived"] is True
+        for item in archived_payload
+    )
+
+
+def test_updating_lead_to_won_clears_follow_up_and_cancels_open_task(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    owned_lead = seeded_data["owned_lead"]
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    db = db_session_factory()
+    lead = db.get(Lead, owned_lead.id)
+    assert lead is not None
+    lead.next_follow_up_at = datetime(2026, 5, 26, 10, 0, tzinfo=timezone.utc)
+    db.add(lead)
+    db.flush()
+    task = LeadTask(
+        lead_id=lead.id,
+        organization_id=lead.organization_id,
+        assigned_user_id=lead.assigned_user_id,
+        task_type="scheduled_follow_up",
+        status="open",
+        title="Follow up lead",
+        due_at=lead.next_follow_up_at,
+    )
+    db.add(task)
+    db.commit()
+    db.close()
+
+    patch_response = client.patch(
+        f"/leads/{owned_lead.id}",
+        json={"current_stage": "won"},
+        headers=csrf_headers(client),
+    )
+    assert patch_response.status_code == 200, patch_response.text
+
+    db = db_session_factory()
+    refreshed_lead = db.get(Lead, owned_lead.id)
+    assert refreshed_lead is not None
+    assert refreshed_lead.current_stage == "won"
+    assert refreshed_lead.next_follow_up_at is None
+
+    refreshed_task = db.get(LeadTask, task.id)
+    assert refreshed_task is not None
+    assert refreshed_task.status == "cancelled"
 
 
 def test_admin_can_reassign_lead_and_auto_create_follow_up_task(

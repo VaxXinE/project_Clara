@@ -1,56 +1,59 @@
+import argparse
 import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session
 
-# Add parent directory to path to resolve app module
+# Add parent directory to path to resolve app module.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import app.models  # noqa: F401
+from app.core.config import settings
 from app.db.session import SessionLocal
-# Import related models so SQLAlchemy relationship registry is fully configured.
-from app.models.ai_extraction import AIExtraction  # noqa: F401
-from app.models.approval_log import ApprovalLog  # noqa: F401
-from app.models.conversation import Conversation  # noqa: F401
-from app.models.lead import Lead  # noqa: F401
-from app.models.message import Message  # noqa: F401
-from app.models.organization import Organization  # noqa: F401
 from app.models.product_knowledge import ProductKnowledge
-from app.models.reply_suggestion import ReplySuggestion  # noqa: F401
-from app.models.sent_message import SentMessage  # noqa: F401
 from app.models.user import User
+
+
+VARIANT_DIRECTORIES = {
+    "mini": "clara_knowledge_mini",
+    "regular": "clara_knowledge_regular",
+}
+
+FILENAME_ORDER = (
+    "INSTRUCTION.md",
+    "GUARDRAIL.md",
+    "FLOW.md",
+    "PERSONALITY_MODE.md",
+    "AUTO_ADAPT.md",
+    "POSITIONING.md",
+    "OBJECTION.md",
+    "OBJECTION_EXTREME.md",
+    "CLOSING_ENGINE.md",
+    "CONVERSION_BEHAVIOR_ENGINE.md",
+    "CONVERSION_LAYER.md",
+    "KB_ADDON_BULLETPROOF_SOLID_PRIME.md",
+    "KB_ADDON_BULLETPROOF_SOLID_REGULAR.md",
+    "SALES_KNOWLEDGE_BRIDGE_MINI.md",
+    "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
+)
 
 
 @dataclass(frozen=True)
 class KnowledgeImportItem:
+    variant: str
     filename: str
     title: str
     category: str
+    source_type: str
 
 
-KNOWLEDGE_IMPORT_ITEMS = (
-    KnowledgeImportItem(
-        filename="SALES_KNOWLEDGE_BRIDGE_MINI.md",
-        title="Sales Knowledge Bridge Mini",
-        category="product_facts",
-    ),
-    KnowledgeImportItem(
-        filename="POSITIONING.md",
-        title="Solid Prime Positioning",
-        category="positioning",
-    ),
-    KnowledgeImportItem(
-        filename="OBJECTION.md",
-        title="Objection Handling",
-        category="objection_handling",
-    ),
-    KnowledgeImportItem(
-        filename="OBJECTION_EXTREME.md",
-        title="Extreme Objection Handling",
-        category="objection_handling",
-    ),
-)
+@dataclass(frozen=True)
+class KnowledgeImportResult:
+    changed: bool
+    message_lines: list[str]
 
 
 class KnowledgeImportError(RuntimeError):
@@ -61,32 +64,86 @@ def get_repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def get_knowledge_dir() -> Path:
-    custom_dir = os.getenv("CLARA_KNOWLEDGE_DIR", "").strip()
+def get_knowledge_root() -> Path:
+    custom_dir = (
+        os.getenv("CLARA_KNOWLEDGE_DIR")
+        or settings.clara_knowledge_dir
+        or ""
+    ).strip()
     if custom_dir:
         return Path(custom_dir).expanduser().resolve()
 
     return get_repo_root() / "clara_knowledge"
 
 
-def get_owner_by_email(db, email: str) -> User | None:
+def get_variant_dir(root_dir: Path, variant: str) -> Path:
+    directory_name = VARIANT_DIRECTORIES[variant]
+    candidate_dir = root_dir / directory_name
+    if candidate_dir.exists():
+        return candidate_dir
+
+    if root_dir.name == directory_name:
+        return root_dir
+
+    raise KnowledgeImportError(
+        f"Folder knowledge varian {variant} tidak ditemukan di {candidate_dir}"
+    )
+
+
+def get_owner_by_email(db: Session, email: str) -> User | None:
     normalized_email = email.strip().lower()
     return db.scalars(select(User).where(User.email == normalized_email)).first()
 
 
-def get_existing_entry(db, title: str) -> ProductKnowledge | None:
+def list_superadmins(db: Session) -> list[User]:
     return db.scalars(
-        select(ProductKnowledge).where(
-            ProductKnowledge.title == title,
-            ProductKnowledge.organization_id.is_(None),
-            ProductKnowledge.source_type == "markdown_import",
+        select(User).where(User.role == "superadmin").order_by(User.created_at.asc())
+    ).all()
+
+
+def resolve_knowledge_owner(
+    db: Session,
+    *,
+    owner_email: str,
+) -> User | None:
+    normalized_email = owner_email.strip().lower()
+    if normalized_email:
+        owner = get_owner_by_email(db=db, email=normalized_email)
+
+        if owner is None:
+            raise KnowledgeImportError(
+                "Superadmin untuk import knowledge tidak ditemukan: "
+                f"{normalized_email}"
+            )
+
+        if owner.role != "superadmin":
+            raise KnowledgeImportError(
+                f"User {owner.email} ditemukan, tapi rolenya {owner.role}, "
+                "bukan superadmin."
+            )
+
+        return owner
+
+    superadmins = list_superadmins(db)
+    if not superadmins:
+        raise KnowledgeImportError(
+            "Tidak ada user superadmin di database. "
+            "Buat superadmin dulu sebelum import knowledge."
         )
-    ).first()
+
+    if len(superadmins) == 1:
+        return superadmins[0]
+
+    available_emails = ", ".join(user.email for user in superadmins)
+    raise KnowledgeImportError(
+        "Ditemukan lebih dari satu superadmin. "
+        "Tentukan owner secara eksplisit dengan "
+        "`--owner-email` atau env `CLARA_KNOWLEDGE_OWNER_EMAIL`. "
+        f"Pilihan yang tersedia: {available_emails}"
+    )
 
 
-def load_file_content(knowledge_dir: Path, filename: str) -> str:
-    file_path = knowledge_dir / filename
-
+def load_file_content(file_path: Path) -> str:
     if not file_path.exists():
         raise KnowledgeImportError(f"File knowledge tidak ditemukan: {file_path}")
 
@@ -97,89 +154,213 @@ def load_file_content(knowledge_dir: Path, filename: str) -> str:
     return content
 
 
-def upsert_knowledge_entry(
-    db,
-    *,
-    item: KnowledgeImportItem,
-    content: str,
-    created_by_user_id,
-) -> str:
-    existing_entry = get_existing_entry(db=db, title=item.title)
+def derive_category(filename: str) -> str:
+    stem = filename.removesuffix(".md").upper()
+    if "OBJECTION" in stem:
+        return "objection_handling"
+    if "POSITIONING" in stem:
+        return "positioning"
+    if "GUARDRAIL" in stem:
+        return "guardrail"
+    if "FLOW" in stem:
+        return "workflow"
+    if "PERSONALITY" in stem:
+        return "personality_mode"
+    if "CLOSING" in stem:
+        return "closing_engine"
+    if "CONVERSION" in stem:
+        return "conversion_engine"
+    if "KB_ADDON" in stem or "SALES_KNOWLEDGE_BRIDGE" in stem:
+        return "product_facts"
+    if "AUTO_ADAPT" in stem:
+        return "auto_adapt"
+    if "INSTRUCTION" in stem:
+        return "instruction"
+    return "general"
 
-    if existing_entry is None:
-        entry = ProductKnowledge(
-            organization_id=None,
-            created_by_user_id=created_by_user_id,
-            title=item.title,
-            category=item.category,
-            content=content,
-            source_type="markdown_import",
-            is_active=True,
+
+def humanize_filename(filename: str) -> str:
+    stem = filename.removesuffix(".md").replace("_", " ").strip().title()
+    return stem.replace("Kb ", "KB ").replace("Ai ", "AI ")
+
+
+def build_import_items(knowledge_root: Path) -> list[tuple[KnowledgeImportItem, Path]]:
+    items: list[tuple[KnowledgeImportItem, Path]] = []
+    for variant in ("mini", "regular"):
+        variant_dir = get_variant_dir(knowledge_root, variant)
+        filenames = {path.name for path in variant_dir.glob("*.md")}
+        ordered = [name for name in FILENAME_ORDER if name in filenames]
+        remaining = sorted(filenames - set(ordered))
+
+        for filename in [*ordered, *remaining]:
+            source_type = f"markdown_import_{variant}"
+            item = KnowledgeImportItem(
+                variant=variant,
+                filename=filename,
+                title=f"{variant.title()} | {humanize_filename(filename)}",
+                category=derive_category(filename),
+                source_type=source_type,
+            )
+            items.append((item, variant_dir / filename))
+
+    return items
+
+
+def deactivate_legacy_imports(db: Session) -> int:
+    result = db.execute(
+        update(ProductKnowledge)
+        .where(
+            ProductKnowledge.organization_id.is_(None),
+            ProductKnowledge.source_type == "markdown_import",
+            ProductKnowledge.is_active.is_(True),
         )
-        db.add(entry)
-        return f"created: {item.title}"
+        .values(is_active=False)
+    )
+    return int(result.rowcount or 0)
 
-    existing_entry.category = item.category
-    existing_entry.content = content
-    existing_entry.is_active = True
-    if created_by_user_id is not None:
-        existing_entry.created_by_user_id = created_by_user_id
-    db.add(existing_entry)
-    return f"updated: {item.title}"
+
+def get_existing_entries(
+    db: Session,
+    items: list[tuple[KnowledgeImportItem, Path]],
+) -> dict[tuple[str, str], ProductKnowledge]:
+    if not items:
+        return {}
+
+    titles = [item.title for item, _ in items]
+    source_types = sorted({item.source_type for item, _ in items})
+    entries = db.scalars(
+        select(ProductKnowledge).where(
+            ProductKnowledge.organization_id.is_(None),
+            ProductKnowledge.title.in_(titles),
+            ProductKnowledge.source_type.in_(source_types),
+        )
+    ).all()
+    return {
+        (entry.title, entry.source_type): entry
+        for entry in entries
+    }
+
+
+def upsert_knowledge_entries(
+    db: Session,
+    *,
+    items: list[tuple[KnowledgeImportItem, Path]],
+    created_by_user_id,
+) -> list[str]:
+    existing_entries = get_existing_entries(db=db, items=items)
+    results: list[str] = []
+
+    for item, file_path in items:
+        content = load_file_content(file_path)
+        existing_entry = existing_entries.get((item.title, item.source_type))
+
+        if existing_entry is None:
+            db.add(
+                ProductKnowledge(
+                    organization_id=None,
+                    created_by_user_id=created_by_user_id,
+                    title=item.title,
+                    category=item.category,
+                    content=content,
+                    source_type=item.source_type,
+                    is_active=True,
+                )
+            )
+            results.append(f"created: {item.title}")
+            continue
+
+        existing_entry.category = item.category
+        existing_entry.content = content
+        existing_entry.is_active = True
+        if created_by_user_id is not None:
+            existing_entry.created_by_user_id = created_by_user_id
+        db.add(existing_entry)
+        results.append(f"updated: {item.title}")
+
+    return results
+
+
+def run_import(
+    db: Session | None = None,
+    *,
+    owner_email: str | None = None,
+) -> KnowledgeImportResult:
+    knowledge_root = get_knowledge_root()
+
+    if not knowledge_root.exists():
+        raise KnowledgeImportError(
+            f"Folder knowledge tidak ditemukan di {knowledge_root}"
+        )
+
+    resolved_owner_email = (
+        owner_email
+        or os.getenv("CLARA_KNOWLEDGE_OWNER_EMAIL")
+        or settings.clara_knowledge_owner_email
+        or ""
+    ).strip()
+    created_by_user_id = None
+    owns_session = db is None
+    session = db or SessionLocal()
+
+    try:
+        owner = resolve_knowledge_owner(
+            db=session,
+            owner_email=resolved_owner_email,
+        )
+        created_by_user_id = owner.id
+
+        imported_items = build_import_items(knowledge_root)
+        legacy_deactivated_count = deactivate_legacy_imports(session)
+        results = upsert_knowledge_entries(
+            session,
+            items=imported_items,
+            created_by_user_id=created_by_user_id,
+        )
+        session.commit()
+
+        message_lines = ["Import Clara knowledge selesai:"]
+        if legacy_deactivated_count:
+            message_lines.append(
+                f"- legacy markdown_import dinonaktifkan: {legacy_deactivated_count}"
+            )
+        message_lines.extend(f"- {result}" for result in results)
+
+        return KnowledgeImportResult(
+            changed=bool(legacy_deactivated_count or results),
+            message_lines=message_lines,
+        )
+    except KnowledgeImportError:
+        session.rollback()
+        raise
+    finally:
+        if owns_session:
+            session.close()
 
 
 def main() -> int:
-    knowledge_dir = get_knowledge_dir()
-
-    if not knowledge_dir.exists():
-        print(f"Import gagal: folder knowledge tidak ditemukan di {knowledge_dir}")
-        return 1
-
-    owner_email = os.getenv("CLARA_KNOWLEDGE_OWNER_EMAIL", "").strip()
-    created_by_user_id = None
-
-    db = SessionLocal()
+    parser = argparse.ArgumentParser(
+        description="Import Clara knowledge markdown ke tabel product_knowledge."
+    )
+    parser.add_argument(
+        "--owner-email",
+        help=(
+            "Email superadmin yang akan dicatat sebagai pembuat knowledge. "
+            "Kalau tidak diisi, script akan pakai env "
+            "CLARA_KNOWLEDGE_OWNER_EMAIL atau auto-detect bila hanya ada satu "
+            "superadmin di database."
+        ),
+    )
+    args = parser.parse_args()
 
     try:
-        if owner_email:
-            owner = get_owner_by_email(db=db, email=owner_email)
-
-            if owner is None:
-                raise KnowledgeImportError(
-                    f"Owner untuk import knowledge tidak ditemukan: {owner_email}"
-                )
-
-            if owner.role != "owner":
-                raise KnowledgeImportError(
-                    f"User {owner.email} ditemukan, tapi rolenya {owner.role}, bukan owner."
-                )
-
-            created_by_user_id = owner.id
-
-        results: list[str] = []
-        for item in KNOWLEDGE_IMPORT_ITEMS:
-            content = load_file_content(knowledge_dir=knowledge_dir, filename=item.filename)
-            results.append(
-                upsert_knowledge_entry(
-                    db=db,
-                    item=item,
-                    content=content,
-                    created_by_user_id=created_by_user_id,
-                )
-            )
-
-        db.commit()
-
-        print("Import Clara knowledge selesai:")
-        for result in results:
-            print(f"- {result}")
-        return 0
+        result = run_import(owner_email=args.owner_email)
     except KnowledgeImportError as exc:
-        db.rollback()
         print(f"Import gagal: {exc}")
         return 1
-    finally:
-        db.close()
+
+    for line in result.message_lines:
+        print(line)
+    return 0
 
 
 if __name__ == "__main__":

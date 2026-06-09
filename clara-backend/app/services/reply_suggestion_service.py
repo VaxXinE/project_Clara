@@ -119,9 +119,11 @@ Percakapan terakhir:
 
 
 def build_grounded_knowledge_context(conversation: Conversation, db: Session) -> str:
+    account_category = conversation.lead.account_category if conversation.lead else None
     entries = get_active_product_knowledge_for_organization(
         db=db,
         organization_id=conversation.organization_id,
+        account_category=account_category,
     )
 
     if not entries:
@@ -146,6 +148,7 @@ def call_openai_for_reply_suggestion(
     extraction: AIExtraction | AIExtractionCreate,
     action_mode: str,
     grounded_knowledge: str,
+    account_category: str | None,
 ) -> ReplySuggestionCreate:
     if not settings.openai_api_key:
         raise ReplySuggestionError("OPENAI_API_KEY is not configured.")
@@ -157,7 +160,7 @@ def call_openai_for_reply_suggestion(
         extraction=extraction,
         action_mode=action_mode,
         grounded_knowledge=grounded_knowledge,
-        response_playbook=load_clara_response_playbook(),
+        response_playbook=load_clara_response_playbook(account_category),
     )
 
     try:
@@ -220,7 +223,7 @@ def create_reply_suggestion(
     statement = (
         select(Conversation)
         .where(Conversation.id == conversation_id)
-        .options(selectinload(Conversation.messages))
+        .options(selectinload(Conversation.messages), selectinload(Conversation.lead))
     )
 
     conversation = db.scalars(statement).first()
@@ -250,6 +253,7 @@ def create_reply_suggestion(
         extraction=extraction,
         action_mode=policy_decision.action_mode,
         grounded_knowledge=grounded_knowledge,
+        account_category=conversation.lead.account_category if conversation.lead else None,
     )
 
     suggestion = ReplySuggestion(

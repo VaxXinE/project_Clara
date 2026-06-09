@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -11,6 +18,8 @@ import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
 import type {
   CurrentUser,
   LeadDealItem,
+  LeadDisciplineLogCreateRequest,
+  LeadDisciplineSuggestionResponse,
   LeadDealUpsertRequest,
   LeadDetail,
   LeadTaskCreateRequest,
@@ -32,7 +41,31 @@ const STAGE_OPTIONS = [
 ];
 
 const TEMPERATURE_OPTIONS = ["cold", "warm", "hot", "unknown"];
+const ACCOUNT_CATEGORY_OPTIONS = ["mini", "reguler", "unknown"];
 const DEAL_STATUS_OPTIONS = ["open", "won", "lost"];
+const DISCIPLINE_ACTIVITY_OPTIONS = [
+  "follow_up_call",
+  "follow_up_chat",
+  "site_visit",
+  "proposal_sent",
+  "closing_push",
+  "internal_coordination",
+];
+const DISCIPLINE_RESULT_OPTIONS = [
+  "waiting_customer",
+  "follow_up_scheduled",
+  "needs_escalation",
+  "won_progress",
+  "lost_signal",
+  "no_response",
+];
+const DISCIPLINE_MOOD_OPTIONS = [
+  "positive",
+  "neutral",
+  "cautious",
+  "resistant",
+  "unresponsive",
+];
 
 function toDateTimeLocalValue(value: string | null): string {
   if (!value) {
@@ -58,14 +91,74 @@ function formatTimelineValue(value: string | null): string {
     return "-";
   }
 
-  if (
-    value.includes("T") &&
-    (value.endsWith("Z") || value.includes("+"))
-  ) {
+  if (value.includes("T") && (value.endsWith("Z") || value.includes("+"))) {
     return formatDateTime(value);
   }
 
   return value;
+}
+
+function getTodayDateInputValue(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDisciplineStatus(value: string): string {
+  switch (value) {
+    case "logged_today":
+      return "Logged today";
+    case "missing_today_log":
+      return "Missing today log";
+    case "stale_log":
+      return "Stale log";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function formatAccountCategory(value: string): string {
+  switch (value) {
+    case "mini":
+      return "Mini";
+    case "reguler":
+      return "Reguler";
+    case "unknown":
+      return "Belum ditentukan";
+    default:
+      return value.replaceAll("_", " ");
+  }
+}
+
+function formatStageLabel(value: string): string {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function resolveDealStatusInput(
+  currentStage: string,
+  explicitDealStatus: string | null | undefined,
+): string {
+  if (explicitDealStatus && explicitDealStatus !== "open") {
+    return explicitDealStatus;
+  }
+
+  if (currentStage === "won" || currentStage === "lost") {
+    return currentStage;
+  }
+
+  return explicitDealStatus ?? "open";
+}
+
+function leadNeedsDealMetricsSync(
+  currentStage: string,
+  explicitDealStatus: string | null | undefined,
+): boolean {
+  if (currentStage !== "won" && currentStage !== "lost") {
+    return false;
+  }
+
+  return explicitDealStatus !== currentStage;
 }
 
 export default function LeadDetailPage() {
@@ -78,23 +171,44 @@ export default function LeadDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [isCreatingDisciplineLog, setIsCreatingDisciplineLog] = useState(false);
+  const [isPrefillingDisciplineLog, setIsPrefillingDisciplineLog] =
+    useState(false);
   const [isSavingDeal, setIsSavingDeal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [dealSuccessMessage, setDealSuccessMessage] = useState("");
   const [taskErrorMessage, setTaskErrorMessage] = useState("");
+  const [disciplineErrorMessage, setDisciplineErrorMessage] = useState("");
+  const [disciplineSuccessMessage, setDisciplineSuccessMessage] = useState("");
+  const [disciplineSuggestionHint, setDisciplineSuggestionHint] = useState("");
   const [dealErrorMessage, setDealErrorMessage] = useState("");
+  const [timelinePage, setTimelinePage] = useState(1);
 
   const [summaryInput, setSummaryInput] = useState("");
   const [notesInput, setNotesInput] = useState("");
   const [stageInput, setStageInput] = useState("new_lead");
   const [temperatureInput, setTemperatureInput] = useState("unknown");
+  const [accountCategoryInput, setAccountCategoryInput] = useState("unknown");
   const [followUpInput, setFollowUpInput] = useState("");
   const [assignedUserInput, setAssignedUserInput] = useState("");
 
   const [taskTitleInput, setTaskTitleInput] = useState("");
   const [taskDescriptionInput, setTaskDescriptionInput] = useState("");
   const [taskDueAtInput, setTaskDueAtInput] = useState("");
+  const [disciplineLogDateInput, setDisciplineLogDateInput] = useState(
+    getTodayDateInputValue(),
+  );
+  const [disciplineActivityTypeInput, setDisciplineActivityTypeInput] =
+    useState(DISCIPLINE_ACTIVITY_OPTIONS[0]);
+  const [disciplineResultStatusInput, setDisciplineResultStatusInput] =
+    useState(DISCIPLINE_RESULT_OPTIONS[0]);
+  const [disciplineObjectionInput, setDisciplineObjectionInput] = useState("");
+  const [disciplineMoodInput, setDisciplineMoodInput] = useState(
+    DISCIPLINE_MOOD_OPTIONS[0],
+  );
+  const [disciplineNotesInput, setDisciplineNotesInput] = useState("");
+  const [disciplineFollowUpInput, setDisciplineFollowUpInput] = useState("");
   const [dealStatusInput, setDealStatusInput] = useState("open");
   const [dealCurrencyInput, setDealCurrencyInput] = useState("IDR");
   const [expectedValueInput, setExpectedValueInput] = useState("0");
@@ -103,7 +217,11 @@ export default function LeadDetailPage() {
   const [dealClosedAtInput, setDealClosedAtInput] = useState("");
   const [dealNotesInput, setDealNotesInput] = useState("");
 
-  const canReassignLead = currentUser?.role === "admin" || currentUser?.role === "owner";
+  const canReassignLead =
+    currentUser?.role === "head" || currentUser?.role === "superadmin";
+  const dealMetricsNeedsSync = lead
+    ? leadNeedsDealMetricsSync(lead.current_stage, lead.deal?.status ?? null)
+    : false;
 
   const fetchLeadDetail = useCallback(async (): Promise<LeadDetail> => {
     return apiFetch<LeadDetail>(`/leads/${leadId}`);
@@ -120,11 +238,14 @@ export default function LeadDetailPage() {
     setErrorMessage("");
 
     try {
-      const [me, leadDetail, scopedUsers] = await Promise.all([
+      const [me, leadDetail] = await Promise.all([
         apiFetch<CurrentUser>("/auth/me"),
         fetchLeadDetail(),
-        apiFetch<CurrentUser[]>("/auth/users"),
       ]);
+      const canLoadScopedUsers = me.role === "head" || me.role === "superadmin";
+      const scopedUsers = canLoadScopedUsers
+        ? await apiFetch<CurrentUser[]>("/auth/users")
+        : [];
 
       setCurrentUser(me);
       setUsers(scopedUsers.filter((user) => user.is_active));
@@ -133,21 +254,30 @@ export default function LeadDetailPage() {
       setNotesInput(leadDetail.notes ?? "");
       setStageInput(leadDetail.current_stage);
       setTemperatureInput(leadDetail.lead_temperature);
+      setAccountCategoryInput(leadDetail.account_category);
       setFollowUpInput(toDateTimeLocalValue(leadDetail.next_follow_up_at));
       setAssignedUserInput(leadDetail.assigned_user_id ?? "");
-      setDealStatusInput(leadDetail.deal?.status ?? "open");
+      setDealStatusInput(
+        resolveDealStatusInput(
+          leadDetail.current_stage,
+          leadDetail.deal?.status ?? null,
+        ),
+      );
       setDealCurrencyInput(leadDetail.deal?.currency ?? "IDR");
       setExpectedValueInput(String(leadDetail.deal?.expected_value ?? 0));
       setDepositAmountInput(String(leadDetail.deal?.deposit_amount ?? 0));
       setExpectedCloseDateInput(leadDetail.deal?.expected_close_date ?? "");
-      setDealClosedAtInput(toDateTimeLocalValue(leadDetail.deal?.closed_at ?? null));
+      setDealClosedAtInput(
+        toDateTimeLocalValue(leadDetail.deal?.closed_at ?? null),
+      );
       setDealNotesInput(leadDetail.deal?.notes ?? "");
       setSuccessMessage("");
+      setDisciplineSuccessMessage("");
       setDealSuccessMessage("");
     } catch (error) {
       setLead(null);
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat detail lead."
+        error instanceof Error ? error.message : "Gagal memuat detail lead.",
       );
     } finally {
       setIsLoading(false);
@@ -175,10 +305,13 @@ export default function LeadDetailPage() {
         notes: dealNotesInput || null,
       };
 
-      const updatedDeal = await apiFetch<LeadDealItem>(`/leads/${lead.id}/deal`, {
-        method: "PUT",
-        body: payload,
-      });
+      const updatedDeal = await apiFetch<LeadDealItem>(
+        `/leads/${lead.id}/deal`,
+        {
+          method: "PUT",
+          body: payload,
+        },
+      );
 
       const refreshedLead = await fetchLeadDetail();
       setLead(refreshedLead);
@@ -186,6 +319,7 @@ export default function LeadDetailPage() {
       setNotesInput(refreshedLead.notes ?? "");
       setStageInput(refreshedLead.current_stage);
       setTemperatureInput(refreshedLead.lead_temperature);
+      setAccountCategoryInput(refreshedLead.account_category);
       setFollowUpInput(toDateTimeLocalValue(refreshedLead.next_follow_up_at));
       setAssignedUserInput(refreshedLead.assigned_user_id ?? "");
       setDealStatusInput(updatedDeal.status);
@@ -198,7 +332,9 @@ export default function LeadDetailPage() {
       setDealSuccessMessage("Deal metrics berhasil diperbarui.");
     } catch (error) {
       setDealErrorMessage(
-        error instanceof Error ? error.message : "Gagal menyimpan deal metrics."
+        error instanceof Error
+          ? error.message
+          : "Gagal menyimpan deal metrics.",
       );
     } finally {
       setIsSavingDeal(false);
@@ -214,9 +350,25 @@ export default function LeadDetailPage() {
   }, [loadLeadDetail]);
 
   const openTasks = useMemo(
-    () => (lead?.tasks ?? []).filter((task) => task.status === "open" || task.status === "snoozed"),
-    [lead]
+    () =>
+      (lead?.tasks ?? []).filter(
+        (task) => task.status === "open" || task.status === "snoozed",
+      ),
+    [lead],
   );
+  const timelinePageSize = 2;
+  const timelineTotalPages = lead
+    ? Math.max(1, Math.ceil(lead.timeline.length / timelinePageSize))
+    : 1;
+  const effectiveTimelinePage = Math.min(timelinePage, timelineTotalPages);
+  const visibleTimeline = useMemo(() => {
+    if (!lead) {
+      return [];
+    }
+
+    const startIndex = (effectiveTimelinePage - 1) * timelinePageSize;
+    return lead.timeline.slice(startIndex, startIndex + timelinePageSize);
+  }, [effectiveTimelinePage, lead]);
 
   async function handleSaveLead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -232,6 +384,7 @@ export default function LeadDetailPage() {
       const payload: LeadUpdateRequest = {
         summary: summaryInput || null,
         notes: notesInput || null,
+        account_category: accountCategoryInput,
         current_stage: stageInput,
         lead_temperature: temperatureInput,
         next_follow_up_at: fromDateTimeLocalValue(followUpInput),
@@ -251,12 +404,21 @@ export default function LeadDetailPage() {
       setNotesInput(updatedLead.notes ?? "");
       setStageInput(updatedLead.current_stage);
       setTemperatureInput(updatedLead.lead_temperature);
+      setAccountCategoryInput(updatedLead.account_category);
       setFollowUpInput(toDateTimeLocalValue(updatedLead.next_follow_up_at));
       setAssignedUserInput(updatedLead.assigned_user_id ?? "");
+      setDealStatusInput(
+        resolveDealStatusInput(
+          updatedLead.current_stage,
+          updatedLead.deal?.status ?? null,
+        ),
+      );
       setSuccessMessage("Lead berhasil diperbarui.");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal menyimpan perubahan lead."
+        error instanceof Error
+          ? error.message
+          : "Gagal menyimpan perubahan lead.",
       );
     } finally {
       setIsSaving(false);
@@ -292,10 +454,101 @@ export default function LeadDetailPage() {
       setTaskDueAtInput("");
     } catch (error) {
       setTaskErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat task."
+        error instanceof Error ? error.message : "Gagal membuat task.",
       );
     } finally {
       setIsCreatingTask(false);
+    }
+  }
+
+  async function handleCreateDisciplineLog(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!lead) {
+      return;
+    }
+
+    setIsCreatingDisciplineLog(true);
+    setDisciplineErrorMessage("");
+    setDisciplineSuccessMessage("");
+
+    try {
+      const payload: LeadDisciplineLogCreateRequest = {
+        log_date: disciplineLogDateInput || null,
+        activity_type: disciplineActivityTypeInput,
+        result_status: disciplineResultStatusInput,
+        main_objection: disciplineObjectionInput.trim() || null,
+        customer_mood: disciplineMoodInput || null,
+        notes: disciplineNotesInput.trim() || null,
+        next_follow_up_at: fromDateTimeLocalValue(disciplineFollowUpInput),
+      };
+
+      await apiFetch(`/leads/${lead.id}/discipline-logs`, {
+        method: "POST",
+        body: payload,
+      });
+
+      const refreshedLead = await fetchLeadDetail();
+      setLead(refreshedLead);
+      setFollowUpInput(toDateTimeLocalValue(refreshedLead.next_follow_up_at));
+      setDisciplineLogDateInput(getTodayDateInputValue());
+      setDisciplineActivityTypeInput(DISCIPLINE_ACTIVITY_OPTIONS[0]);
+      setDisciplineResultStatusInput(DISCIPLINE_RESULT_OPTIONS[0]);
+      setDisciplineObjectionInput("");
+      setDisciplineMoodInput(DISCIPLINE_MOOD_OPTIONS[0]);
+      setDisciplineNotesInput("");
+      setDisciplineFollowUpInput("");
+      setDisciplineSuccessMessage("Discipline log berhasil disimpan.");
+      setDisciplineSuggestionHint("");
+    } catch (error) {
+      setDisciplineErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal menyimpan discipline log.",
+      );
+    } finally {
+      setIsCreatingDisciplineLog(false);
+    }
+  }
+
+  async function handlePrefillDisciplineLog() {
+    if (!lead) {
+      return;
+    }
+
+    setIsPrefillingDisciplineLog(true);
+    setDisciplineErrorMessage("");
+    setDisciplineSuccessMessage("");
+
+    try {
+      const suggestion = await apiFetch<LeadDisciplineSuggestionResponse>(
+        `/leads/${lead.id}/discipline-log-suggestion`,
+      );
+      setDisciplineActivityTypeInput(suggestion.activity_type);
+      setDisciplineResultStatusInput(suggestion.result_status);
+      setDisciplineObjectionInput(suggestion.main_objection ?? "");
+      setDisciplineMoodInput(
+        suggestion.customer_mood &&
+          DISCIPLINE_MOOD_OPTIONS.includes(suggestion.customer_mood)
+          ? suggestion.customer_mood
+          : DISCIPLINE_MOOD_OPTIONS[0],
+      );
+      setDisciplineNotesInput(suggestion.notes);
+      setDisciplineFollowUpInput(
+        toDateTimeLocalValue(suggestion.next_follow_up_at),
+      );
+      setDisciplineSuggestionHint(
+        `${suggestion.source_summary} Confidence ${Math.round(
+          suggestion.confidence_score * 100,
+        )}%.`,
+      );
+    } catch (error) {
+      setDisciplineErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal mengambil prefill discipline log dari Clara.",
+      );
+    } finally {
+      setIsPrefillingDisciplineLog(false);
     }
   }
 
@@ -308,19 +561,16 @@ export default function LeadDetailPage() {
 
     try {
       const payload: LeadTaskUpdateRequest = { status };
-      await apiFetch<LeadTaskItem>(
-        `/leads/${lead.id}/tasks/${taskId}`,
-        {
-          method: "PATCH",
-            body: payload,
-        }
-      );
+      await apiFetch<LeadTaskItem>(`/leads/${lead.id}/tasks/${taskId}`, {
+        method: "PATCH",
+        body: payload,
+      });
 
       const refreshedLead = await fetchLeadDetail();
       setLead(refreshedLead);
     } catch (error) {
       setTaskErrorMessage(
-        error instanceof Error ? error.message : "Gagal mengubah status task."
+        error instanceof Error ? error.message : "Gagal mengubah status task.",
       );
     }
   }
@@ -332,7 +582,7 @@ export default function LeadDetailPage() {
       title={lead?.display_name ?? "Lead Detail"}
       description="Halaman ini dipakai untuk merapikan konteks lead, menyetel follow-up berikutnya, dan membuat task yang benar-benar persisten."
       backHref="/dashboard/crm"
-      backLabel="Kembali ke Lead Pipeline"
+      backLabel="Kembali ke Lead Management"
       actions={
         <div className="flex flex-wrap gap-3">
           {lead?.customer_profile_id ? (
@@ -372,9 +622,13 @@ export default function LeadDetailPage() {
             <section className="space-y-6">
               <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div className="flex flex-wrap items-center gap-3">
+                  <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                    Kategori akun:{" "}
+                    {formatAccountCategory(lead.account_category)}
+                  </span>
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                      lead.lead_temperature
+                      lead.lead_temperature,
                     )}`}
                   >
                     {lead.lead_temperature.toUpperCase()}
@@ -388,7 +642,14 @@ export default function LeadDetailPage() {
                 </div>
 
                 <dl className="mt-5 grid gap-4 md:grid-cols-3">
-                  <Metric label="Last contact" value={formatDateTime(lead.last_contact_at)} />
+                  <Metric
+                    label="Kategori akun"
+                    value={formatAccountCategory(lead.account_category)}
+                  />
+                  <Metric
+                    label="Last contact"
+                    value={formatDateTime(lead.last_contact_at)}
+                  />
                   <Metric
                     label="Next follow-up"
                     value={formatDateTime(lead.next_follow_up_at)}
@@ -421,32 +682,31 @@ export default function LeadDetailPage() {
                 </div>
 
                 <div className="mt-6 grid gap-5 md:grid-cols-2">
+                  <Field label="Kategori akun">
+                    <DetailSelect
+                      value={accountCategoryInput}
+                      onChange={setAccountCategoryInput}
+                      options={ACCOUNT_CATEGORY_OPTIONS}
+                      getOptionLabel={formatAccountCategory}
+                    />
+                  </Field>
+
                   <Field label="Stage">
-                    <select
+                    <DetailSelect
                       value={stageInput}
-                      onChange={(event) => setStageInput(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
-                    >
-                      {STAGE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option.replaceAll("_", " ")}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setStageInput}
+                      options={STAGE_OPTIONS}
+                      getOptionLabel={formatStageLabel}
+                    />
                   </Field>
 
                   <Field label="Lead temperature">
-                    <select
+                    <DetailSelect
                       value={temperatureInput}
-                      onChange={(event) => setTemperatureInput(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
-                    >
-                      {TEMPERATURE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option.toUpperCase()}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setTemperatureInput}
+                      options={TEMPERATURE_OPTIONS}
+                      getOptionLabel={(option) => option.toUpperCase()}
+                    />
                   </Field>
 
                   <Field label="Next follow-up">
@@ -461,7 +721,9 @@ export default function LeadDetailPage() {
                   <Field label="Assigned user">
                     <select
                       value={assignedUserInput}
-                      onChange={(event) => setAssignedUserInput(event.target.value)}
+                      onChange={(event) =>
+                        setAssignedUserInput(event.target.value)
+                      }
                       disabled={!canReassignLead}
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400 disabled:bg-slate-100"
                     >
@@ -505,6 +767,233 @@ export default function LeadDetailPage() {
                   </button>
                 </div>
               </form>
+
+              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-950">
+                      Daily Discipline Log
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Catat hasil aktivitas harian sales langsung dari halaman
+                      lead supaya manager bisa membaca ritme kerja, objection,
+                      dan follow-up tanpa menebak.
+                    </p>
+                  </div>
+                  {disciplineSuccessMessage ? (
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      {disciplineSuccessMessage}
+                    </span>
+                  ) : null}
+                </div>
+
+                {disciplineSuggestionHint ? (
+                  <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-700">
+                    {disciplineSuggestionHint}
+                  </div>
+                ) : null}
+
+                <div className="mt-5 grid gap-4 md:grid-cols-4">
+                  <Metric
+                    label="Compliance"
+                    value={formatDisciplineStatus(
+                      lead.discipline_summary.compliance_status,
+                    )}
+                  />
+                  <Metric
+                    label="Latest log"
+                    value={lead.discipline_summary.latest_log_date ?? "-"}
+                  />
+                  <Metric
+                    label="Logs today"
+                    value={String(lead.discipline_summary.logs_today_count)}
+                  />
+                  <Metric
+                    label="Total logs"
+                    value={String(lead.discipline_summary.log_count)}
+                  />
+                </div>
+
+                {disciplineErrorMessage ? (
+                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {disciplineErrorMessage}
+                  </div>
+                ) : null}
+
+                <form
+                  onSubmit={(event) => void handleCreateDisciplineLog(event)}
+                  className="mt-6 space-y-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5"
+                >
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <Field label="Log date">
+                      <input
+                        type="date"
+                        value={disciplineLogDateInput}
+                        onChange={(event) =>
+                          setDisciplineLogDateInput(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+
+                    <Field label="Activity type">
+                      <select
+                        value={disciplineActivityTypeInput}
+                        onChange={(event) =>
+                          setDisciplineActivityTypeInput(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      >
+                        {DISCIPLINE_ACTIVITY_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Result status">
+                      <select
+                        value={disciplineResultStatusInput}
+                        onChange={(event) =>
+                          setDisciplineResultStatusInput(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      >
+                        {DISCIPLINE_RESULT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    <Field label="Customer mood">
+                      <select
+                        value={disciplineMoodInput}
+                        onChange={(event) =>
+                          setDisciplineMoodInput(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      >
+                        {DISCIPLINE_MOOD_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Main objection">
+                      <input
+                        value={disciplineObjectionInput}
+                        onChange={(event) =>
+                          setDisciplineObjectionInput(event.target.value)
+                        }
+                        placeholder="Contoh: legalitas, harga, trust"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+
+                    <Field label="Next follow-up">
+                      <input
+                        type="datetime-local"
+                        value={disciplineFollowUpInput}
+                        onChange={(event) =>
+                          setDisciplineFollowUpInput(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Notes">
+                    <textarea
+                      value={disciplineNotesInput}
+                      onChange={(event) =>
+                        setDisciplineNotesInput(event.target.value)
+                      }
+                      rows={4}
+                      placeholder="Tulis hasil follow-up hari ini, sinyal customer, dan langkah berikutnya."
+                      className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
+                    />
+                  </Field>
+
+                  <div className="flex justify-end">
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void handlePrefillDisciplineLog()}
+                        disabled={isPrefillingDisciplineLog}
+                        className="inline-flex rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {isPrefillingDisciplineLog
+                          ? "Clara sedang mengisi..."
+                          : "Prefill dengan Clara"}
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isCreatingDisciplineLog}
+                        className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {isCreatingDisciplineLog
+                          ? "Menyimpan log..."
+                          : "Simpan Discipline Log"}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+
+                <div className="mt-6 space-y-3">
+                  {lead.discipline_logs.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
+                      Belum ada discipline log untuk lead ini.
+                    </div>
+                  ) : (
+                    lead.discipline_logs.slice(0, 5).map((log) => (
+                      <article
+                        key={log.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-sm font-semibold text-slate-950">
+                              {log.activity_type.replaceAll("_", " ")} ·{" "}
+                              {log.result_status.replaceAll("_", " ")}
+                            </h3>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {log.actor_user_name ?? "System"} · {log.log_date}
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                            {log.customer_mood?.replaceAll("_", " ") ??
+                              "no mood"}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                          <Metric
+                            label="Main objection"
+                            value={log.main_objection ?? "-"}
+                          />
+                          <Metric
+                            label="Next follow-up"
+                            value={formatDateTime(log.next_follow_up_at)}
+                          />
+                        </div>
+
+                        {log.notes ? (
+                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                            {log.notes}
+                          </p>
+                        ) : null}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
             </section>
 
             <aside className="space-y-6">
@@ -514,7 +1003,9 @@ export default function LeadDetailPage() {
                     Unified Customer Identity
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Clara sekarang mengikat banyak lead lintas channel ke satu profil customer agar konteks tidak pecah antara WhatsApp dan Telegram.
+                    Clara sekarang mengikat banyak lead lintas channel ke satu
+                    profil customer agar konteks tidak pecah antara WhatsApp dan
+                    Telegram.
                   </p>
                 </div>
 
@@ -527,7 +1018,9 @@ export default function LeadDetailPage() {
                             {lead.customer_profile.display_name}
                           </h3>
                           <p className="mt-1 text-sm text-slate-500">
-                            PIC customer: {lead.customer_profile.assigned_user_name ?? "Belum ada"}
+                            PIC customer:{" "}
+                            {lead.customer_profile.assigned_user_name ??
+                              "Belum ada"}
                           </p>
                         </div>
                         <Link
@@ -545,11 +1038,15 @@ export default function LeadDetailPage() {
                         />
                         <Metric
                           label="Total Conversations"
-                          value={String(lead.customer_profile.conversation_count)}
+                          value={String(
+                            lead.customer_profile.conversation_count,
+                          )}
                         />
                         <Metric
                           label="Last contact"
-                          value={formatDateTime(lead.customer_profile.last_contact_at)}
+                          value={formatDateTime(
+                            lead.customer_profile.last_contact_at,
+                          )}
                         />
                       </div>
 
@@ -566,54 +1063,61 @@ export default function LeadDetailPage() {
                     </div>
 
                     <div className="space-y-3">
-                      {lead.customer_profile.related_leads.map((relatedLead) => (
-                        <article
-                          key={relatedLead.id}
-                          className="rounded-[24px] border border-slate-200 bg-white p-4"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-sm font-semibold text-slate-950">
-                              {relatedLead.display_name}
-                            </h3>
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getLeadBadgeClass(
-                                relatedLead.lead_temperature
-                              )}`}
-                            >
-                              {relatedLead.lead_temperature.toUpperCase()}
-                            </span>
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                              {relatedLead.source_label}
-                            </span>
-                          </div>
-                          <div className="mt-3 grid gap-3 md:grid-cols-2">
-                            <Metric
-                              label="Stage"
-                              value={relatedLead.current_stage.replaceAll("_", " ")}
-                            />
-                            <Metric
-                              label="Last contact"
-                              value={formatDateTime(relatedLead.last_contact_at)}
-                            />
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <Link
-                              href={`/dashboard/crm/${relatedLead.id}`}
-                              className="inline-flex rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
-                            >
-                              Buka Lead
-                            </Link>
-                            {relatedLead.latest_conversation_id ? (
-                              <Link
-                                href={`/dashboard/sales/conversations/${relatedLead.latest_conversation_id}`}
-                                className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                      {lead.customer_profile.related_leads.map(
+                        (relatedLead) => (
+                          <article
+                            key={relatedLead.id}
+                            className="rounded-[24px] border border-slate-200 bg-white p-4"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-sm font-semibold text-slate-950">
+                                {relatedLead.display_name}
+                              </h3>
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getLeadBadgeClass(
+                                  relatedLead.lead_temperature,
+                                )}`}
                               >
-                                Buka Conversation
+                                {relatedLead.lead_temperature.toUpperCase()}
+                              </span>
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                {relatedLead.source_label}
+                              </span>
+                            </div>
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                              <Metric
+                                label="Stage"
+                                value={relatedLead.current_stage.replaceAll(
+                                  "_",
+                                  " ",
+                                )}
+                              />
+                              <Metric
+                                label="Last contact"
+                                value={formatDateTime(
+                                  relatedLead.last_contact_at,
+                                )}
+                              />
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Link
+                                href={`/dashboard/crm/${relatedLead.id}`}
+                                className="inline-flex rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                              >
+                                Buka Lead
                               </Link>
-                            ) : null}
-                          </div>
-                        </article>
-                      ))}
+                              {relatedLead.latest_conversation_id ? (
+                                <Link
+                                  href={`/dashboard/sales/conversations/${relatedLead.latest_conversation_id}`}
+                                  className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                                >
+                                  Buka Conversation
+                                </Link>
+                              ) : null}
+                            </div>
+                          </article>
+                        ),
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -630,7 +1134,8 @@ export default function LeadDetailPage() {
                       Deal Metrics
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Isi angka bisnis lead ini supaya KPI owner tidak cuma berhenti di pipeline health.
+                      Isi angka bisnis lead ini supaya KPI owner tidak cuma
+                      berhenti di pipeline health.
                     </p>
                   </div>
                   {dealSuccessMessage && (
@@ -646,6 +1151,22 @@ export default function LeadDetailPage() {
                   </div>
                 )}
 
+                {dealMetricsNeedsSync && (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    Stage lead ini sudah{" "}
+                    <span className="font-semibold uppercase">
+                      {lead.current_stage}
+                    </span>{" "}
+                    tetapi deal status di KPI masih{" "}
+                    <span className="font-semibold uppercase">
+                      {lead.deal?.status ?? "belum diisi"}
+                    </span>
+                    . Klik{" "}
+                    <span className="font-semibold">Simpan Deal Metrics</span>{" "}
+                    supaya KPI dan nilai deal ikut sinkron.
+                  </div>
+                )}
+
                 <form
                   onSubmit={(event) => void handleSaveDeal(event)}
                   className="mt-5 space-y-4"
@@ -654,7 +1175,9 @@ export default function LeadDetailPage() {
                     <Field label="Deal status">
                       <select
                         value={dealStatusInput}
-                        onChange={(event) => setDealStatusInput(event.target.value)}
+                        onChange={(event) =>
+                          setDealStatusInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       >
                         {DEAL_STATUS_OPTIONS.map((option) => (
@@ -668,7 +1191,9 @@ export default function LeadDetailPage() {
                     <Field label="Currency">
                       <input
                         value={dealCurrencyInput}
-                        onChange={(event) => setDealCurrencyInput(event.target.value.toUpperCase())}
+                        onChange={(event) =>
+                          setDealCurrencyInput(event.target.value.toUpperCase())
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -679,7 +1204,9 @@ export default function LeadDetailPage() {
                         min="0"
                         step="1000"
                         value={expectedValueInput}
-                        onChange={(event) => setExpectedValueInput(event.target.value)}
+                        onChange={(event) =>
+                          setExpectedValueInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -690,7 +1217,9 @@ export default function LeadDetailPage() {
                         min="0"
                         step="1000"
                         value={depositAmountInput}
-                        onChange={(event) => setDepositAmountInput(event.target.value)}
+                        onChange={(event) =>
+                          setDepositAmountInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -699,7 +1228,9 @@ export default function LeadDetailPage() {
                       <input
                         type="date"
                         value={expectedCloseDateInput}
-                        onChange={(event) => setExpectedCloseDateInput(event.target.value)}
+                        onChange={(event) =>
+                          setExpectedCloseDateInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -708,7 +1239,9 @@ export default function LeadDetailPage() {
                       <input
                         type="datetime-local"
                         value={dealClosedAtInput}
-                        onChange={(event) => setDealClosedAtInput(event.target.value)}
+                        onChange={(event) =>
+                          setDealClosedAtInput(event.target.value)
+                        }
                         className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                       />
                     </Field>
@@ -717,7 +1250,9 @@ export default function LeadDetailPage() {
                   <Field label="Deal notes">
                     <textarea
                       value={dealNotesInput}
-                      onChange={(event) => setDealNotesInput(event.target.value)}
+                      onChange={(event) =>
+                        setDealNotesInput(event.target.value)
+                      }
                       rows={3}
                       className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
                     />
@@ -725,9 +1260,18 @@ export default function LeadDetailPage() {
 
                   <div className="rounded-[24px] bg-slate-50 p-4">
                     <div className="grid gap-3 md:grid-cols-3">
-                      <Metric label="Expected value" value={`${dealCurrencyInput} ${Number(expectedValueInput || 0).toLocaleString("id-ID")}`} />
-                      <Metric label="Deposit" value={`${dealCurrencyInput} ${Number(depositAmountInput || 0).toLocaleString("id-ID")}`} />
-                      <Metric label="Deal status" value={dealStatusInput.toUpperCase()} />
+                      <Metric
+                        label="Expected value"
+                        value={`${dealCurrencyInput} ${Number(expectedValueInput || 0).toLocaleString("id-ID")}`}
+                      />
+                      <Metric
+                        label="Deposit"
+                        value={`${dealCurrencyInput} ${Number(depositAmountInput || 0).toLocaleString("id-ID")}`}
+                      />
+                      <Metric
+                        label="Deal status"
+                        value={dealStatusInput.toUpperCase()}
+                      />
                     </div>
                   </div>
 
@@ -737,7 +1281,9 @@ export default function LeadDetailPage() {
                       disabled={isSavingDeal}
                       className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                      {isSavingDeal ? "Menyimpan deal..." : "Simpan Deal Metrics"}
+                      {isSavingDeal
+                        ? "Menyimpan deal..."
+                        : "Simpan Deal Metrics"}
                     </button>
                   </div>
                 </form>
@@ -749,7 +1295,8 @@ export default function LeadDetailPage() {
                     Follow-up Tasks
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Task disimpan permanen, jadi worklist sales sekarang tidak hanya derived dari conversation.
+                    Task disimpan permanen, jadi worklist sales sekarang tidak
+                    hanya derived dari conversation.
                   </p>
                 </div>
 
@@ -782,7 +1329,10 @@ export default function LeadDetailPage() {
                           <select
                             value={task.status}
                             onChange={(event) =>
-                              void handleTaskStatusChange(task.id, event.target.value)
+                              void handleTaskStatusChange(
+                                task.id,
+                                event.target.value,
+                              )
                             }
                             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-400"
                           >
@@ -809,7 +1359,9 @@ export default function LeadDetailPage() {
                   <Field label="Task title">
                     <input
                       value={taskTitleInput}
-                      onChange={(event) => setTaskTitleInput(event.target.value)}
+                      onChange={(event) =>
+                        setTaskTitleInput(event.target.value)
+                      }
                       placeholder="Contoh: Follow up soal legalitas"
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                     />
@@ -818,7 +1370,9 @@ export default function LeadDetailPage() {
                   <Field label="Task description">
                     <textarea
                       value={taskDescriptionInput}
-                      onChange={(event) => setTaskDescriptionInput(event.target.value)}
+                      onChange={(event) =>
+                        setTaskDescriptionInput(event.target.value)
+                      }
                       rows={3}
                       placeholder="Tulis konteks singkat supaya sales berikutnya tidak kehilangan arah."
                       className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
@@ -829,7 +1383,9 @@ export default function LeadDetailPage() {
                     <input
                       type="datetime-local"
                       value={taskDueAtInput}
-                      onChange={(event) => setTaskDueAtInput(event.target.value)}
+                      onChange={(event) =>
+                        setTaskDueAtInput(event.target.value)
+                      }
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
                     />
                   </Field>
@@ -850,7 +1406,9 @@ export default function LeadDetailPage() {
                     Activity Timeline
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Semua perubahan penting di lead ini dicatat supaya perpindahan stage, follow-up, task, dan deal bisa diaudit dengan enak.
+                    Semua perubahan penting di lead ini dicatat supaya
+                    perpindahan stage, follow-up, task, dan deal bisa diaudit
+                    dengan enak.
                   </p>
                 </div>
 
@@ -860,45 +1418,86 @@ export default function LeadDetailPage() {
                       Belum ada aktivitas yang tercatat untuk lead ini.
                     </div>
                   ) : (
-                    lead.timeline.map((event) => (
-                      <article
-                        key={event.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <h3 className="text-sm font-semibold text-slate-950">
-                              {event.title}
-                            </h3>
-                            <p className="mt-1 text-xs text-slate-500">
-                              {event.actor_user_name ?? "System"} · {formatDateTime(event.created_at)}
-                            </p>
-                          </div>
-                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                            {event.event_type.replaceAll("_", " ")}
-                          </span>
-                        </div>
+                    <>
+                      <div className="space-y-4">
+                        {visibleTimeline.map((event) => (
+                          <article
+                            key={event.id}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <h3 className="text-sm font-semibold text-slate-950">
+                                  {event.title}
+                                </h3>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  {event.actor_user_name ?? "System"} ·{" "}
+                                  {formatDateTime(event.created_at)}
+                                </p>
+                              </div>
+                              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                {event.event_type.replaceAll("_", " ")}
+                              </span>
+                            </div>
 
-                        {event.description && (
-                          <p className="mt-3 text-sm leading-6 text-slate-600">
-                            {event.description}
+                            {event.description && (
+                              <p className="mt-3 text-sm leading-6 text-slate-600">
+                                {event.description}
+                              </p>
+                            )}
+
+                            {(event.from_value || event.to_value) && (
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <Metric
+                                  label="Dari"
+                                  value={formatTimelineValue(event.from_value)}
+                                />
+                                <Metric
+                                  label="Menjadi"
+                                  value={formatTimelineValue(event.to_value)}
+                                />
+                              </div>
+                            )}
+                          </article>
+                        ))}
+                      </div>
+
+                      {lead.timeline.length > timelinePageSize ? (
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                          <p className="text-sm text-slate-600">
+                            Halaman {effectiveTimelinePage} dari {timelineTotalPages} ·
+                            menampilkan {visibleTimeline.length} dari{" "}
+                            {lead.timeline.length} aktivitas.
                           </p>
-                        )}
-
-                        {(event.from_value || event.to_value) && (
-                          <div className="mt-3 grid gap-3 md:grid-cols-2">
-                            <Metric
-                              label="Dari"
-                              value={formatTimelineValue(event.from_value)}
-                            />
-                            <Metric
-                              label="Menjadi"
-                              value={formatTimelineValue(event.to_value)}
-                            />
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setTimelinePage((current) =>
+                                  Math.max(1, current - 1),
+                                )
+                              }
+                              disabled={effectiveTimelinePage === 1}
+                              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Sebelumnya
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setTimelinePage((current) =>
+                                  Math.min(timelineTotalPages, current + 1),
+                                )
+                              }
+                              disabled={effectiveTimelinePage === timelineTotalPages}
+                              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Berikutnya
+                            </button>
                           </div>
-                        )}
-                      </article>
-                    ))
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
               </section>
@@ -910,13 +1509,7 @@ export default function LeadDetailPage() {
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
       <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -924,6 +1517,127 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function DetailSelect({
+  value,
+  onChange,
+  options,
+  getOptionLabel,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: readonly string[];
+  getOptionLabel: (value: string) => string;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const isDropdownOpen = !disabled && isOpen;
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        aria-expanded={isDropdownOpen}
+        aria-haspopup="listbox"
+        disabled={disabled}
+        onClick={() => setIsOpen((previous) => !previous)}
+        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 outline-none transition hover:border-slate-300 focus-visible:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+      >
+        <span>{getOptionLabel(value)}</span>
+        <span
+          aria-hidden="true"
+          className={`text-slate-500 transition-transform ${
+            isDropdownOpen ? "rotate-180" : ""
+          }`}
+        >
+          <svg
+            viewBox="0 0 12 12"
+            className="h-3 w-3"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M2.25 4.5L6 8.25L9.75 4.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </button>
+
+      {isDropdownOpen ? (
+        <div className="absolute inset-x-0 z-10 mt-2 rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.99)_0%,rgba(17,12,9,0.99)_100%)] p-2 shadow-[0_18px_36px_rgba(0,0,0,0.28)]">
+          <ul
+            role="listbox"
+            aria-label="Select option"
+            className="clara-scrollbar max-h-72 space-y-1 overflow-y-auto pr-1"
+          >
+            {options.map((option) => {
+              const isSelected = option === value;
+
+              return (
+                <li key={option}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      setIsOpen(false);
+                      if (option !== value) {
+                        onChange(option);
+                      }
+                    }}
+                    className={`flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm transition ${
+                      isSelected
+                        ? "bg-[#f0cb73] text-[#1a120b]"
+                        : "text-[#fff0c9] hover:bg-[#2b2013] hover:text-[#fff8de]"
+                    }`}
+                  >
+                    <span className="capitalize">{getOptionLabel(option)}</span>
+                    {isSelected ? (
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5a3e16]">
+                        Aktif
+                      </span>
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

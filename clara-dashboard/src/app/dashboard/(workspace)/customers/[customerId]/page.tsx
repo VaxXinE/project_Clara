@@ -11,6 +11,7 @@ import type {
   CurrentUser,
   CustomerProfileMergeRequest,
   CustomerProfileSummaryItem,
+  CustomerProfileUpdateRequest,
 } from "@/types/dashboard";
 
 export default function CustomerProfilePage() {
@@ -23,6 +24,18 @@ export default function CustomerProfilePage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [mergeNotes, setMergeNotes] = useState("");
   const [mergingCandidateId, setMergingCandidateId] = useState<string | null>(null);
+  const [profileForm, setProfileForm] = useState({
+    display_name: "",
+    phone: "",
+    email: "",
+    address: "",
+    status: "active",
+    temperature: "unknown",
+    account_category: "unknown",
+  });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [activePanel, setActivePanel] = useState<"leads" | "profile" | "merge">("profile");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -33,6 +46,15 @@ export default function CustomerProfilePage() {
         ]);
         setCurrentUser(me);
         setProfile(data);
+        setProfileForm({
+          display_name: data.display_name,
+          phone: data.phone ?? "",
+          email: data.email ?? "",
+          address: data.address ?? "",
+          status: data.status,
+          temperature: data.temperature,
+          account_category: deriveEditableAccountCategory(data.related_leads),
+        });
       } catch (error) {
         setErrorMessage(
           error instanceof Error ? error.message : "Gagal memuat customer profile."
@@ -76,6 +98,86 @@ export default function CustomerProfilePage() {
     }
   }
 
+  async function handleProfileSave() {
+    if (!profile) {
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setErrorMessage("");
+
+    try {
+      const payload: CustomerProfileUpdateRequest = {
+        display_name: profileForm.display_name.trim(),
+        phone: profileForm.phone.trim() || null,
+        email: profileForm.email.trim() || null,
+        address: profileForm.address.trim() || null,
+        status: profileForm.status,
+        temperature: profileForm.temperature,
+        account_category: profileForm.account_category,
+      };
+      const updated = await apiFetch<CustomerProfileSummaryItem>(`/customers/${profile.id}`, {
+        method: "PATCH",
+        body: payload,
+      });
+      setProfile(updated);
+      setProfileForm({
+        display_name: updated.display_name,
+        phone: updated.phone ?? "",
+        email: updated.email ?? "",
+        address: updated.address ?? "",
+        status: updated.status,
+        temperature: updated.temperature,
+        account_category: deriveEditableAccountCategory(updated.related_leads),
+      });
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal menyimpan data customer."
+      );
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
+  const relatedLeads = profile?.related_leads ?? [];
+  const hotLeadCount = relatedLeads.filter((lead) => lead.lead_temperature === "hot").length;
+  const warmLeadCount = relatedLeads.filter((lead) => lead.lead_temperature === "warm").length;
+  const activeLeadCount = relatedLeads.filter(
+    (lead) => !["won", "lost", "archived"].includes(lead.current_stage)
+  ).length;
+  const topPriorityLead = [...relatedLeads].sort(compareCustomerLeadPriority)[0] ?? null;
+  const latestLead = [...relatedLeads]
+    .sort(
+      (left, right) =>
+        new Date(right.last_contact_at ?? 0).getTime() -
+        new Date(left.last_contact_at ?? 0).getTime()
+    )[0] ?? null;
+  const dominantSourceLabel =
+    profile?.source_labels.length === 1
+      ? profile.source_labels[0]
+      : profile?.source_labels.length
+        ? `${profile.source_labels.length} channel`
+        : "Belum ada channel";
+  const accountCategorySummary = buildAccountCategorySummary(relatedLeads);
+  const identityConfidenceLabel = profile
+    ? describeIdentityConfidence(profile.identity_confidence)
+    : "";
+  const overviewSummary = buildCustomerOverview({
+    profile,
+    activeLeadCount,
+    hotLeadCount,
+    warmLeadCount,
+    dominantSourceLabel,
+  });
+  const actionSummary = buildCustomerActionSummary({
+    topPriorityLead,
+    latestLead,
+    hotLeadCount,
+    profile,
+  });
+  const canMergeProfiles = ["head", "superadmin"].includes(currentUser?.role ?? "");
+  const mergeCandidateCount = profile?.merge_candidates.length ?? 0;
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
@@ -83,24 +185,115 @@ export default function CustomerProfilePage() {
       title={profile?.display_name ?? "Customer Profile"}
       description="Satu profil customer ini menggabungkan konteks lead dan channel, supaya tim tidak lagi melihat orang yang sama sebagai entitas terpisah."
       backHref="/dashboard/crm"
-      backLabel="Kembali ke Lead Pipeline"
+      backLabel="Kembali ke Lead Management"
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div className="rounded-[26px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-8 text-center text-sm text-[#d6bb84]">
             Loading customer profile...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div className="rounded-[26px] border border-[#e17c54]/28 bg-[linear-gradient(180deg,rgba(66,33,21,0.96)_0%,rgba(36,18,12,0.98)_100%)] p-5 text-sm text-[#f0bf9f]">
             {errorMessage}
           </div>
         )}
 
         {profile && !isLoading && !errorMessage ? (
           <>
-            <section className="grid gap-4 md:grid-cols-4">
+            <section className="overflow-hidden rounded-[34px] border border-slate-200 bg-white p-7 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_380px] xl:items-start">
+                <div className="max-w-4xl">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">
+                    Ringkasan Customer
+                  </p>
+                  <h2 className="mt-4 max-w-4xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-slate-950">
+                    {profile.display_name} itu satu customer yang sedang dibaca dari banyak lead dan channel.
+                  </h2>
+                  <p className="mt-4 max-w-3xl text-[15px] leading-8 text-slate-700">
+                    {overviewSummary}
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <HeroPill
+                      label="Kategori akun"
+                      value={accountCategorySummary}
+                      accent="amber"
+                    />
+                    <HeroPill
+                      label="Channel dominan"
+                      value={dominantSourceLabel}
+                      accent="slate"
+                    />
+                    <HeroPill
+                      label="Identity confidence"
+                      value={`${Math.round(profile.identity_confidence * 100)}%`}
+                      accent="emerald"
+                    />
+                  </div>
+                </div>
+                <div className="rounded-[30px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_18px_38px_rgba(15,23,42,0.18)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">
+                    Apa Yang Harus Dilakukan
+                  </p>
+                  <p className="mt-4 text-[15px] leading-8 text-slate-100">
+                    {actionSummary}
+                  </p>
+                  {topPriorityLead ? (
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <Link
+                        href={`/dashboard/crm/${topPriorityLead.id}`}
+                        className="inline-flex rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-[0_10px_24px_rgba(15,23,42,0.22)] ring-1 ring-white/80"
+                      >
+                        Buka Lead Prioritas
+                      </Link>
+                      {topPriorityLead.latest_conversation_id ? (
+                        <Link
+                          href={`/dashboard/sales/conversations/${topPriorityLead.latest_conversation_id}`}
+                          className="inline-flex rounded-full border border-white/30 px-4 py-2.5 text-sm font-semibold text-white"
+                        >
+                          Buka Chat Terbaru
+                        </Link>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+              <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                <div className="max-w-3xl">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+                    Mulai Dari Sini
+                  </p>
+                  <p className="mt-3 text-[15px] leading-8 text-slate-700">
+                    Mulai dari profil customer dulu untuk memastikan identitas dan kategori akunnya benar. Setelah itu baru turun ke lead terkait kalau tujuan Anda adalah kerja operasional. Buka merge hanya kalau data customer terasa pecah.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 rounded-[22px] border border-slate-200 bg-slate-50 p-2">
+                  <PanelChip
+                    active={activePanel === "profile"}
+                    label="Profil customer"
+                    onClick={() => setActivePanel("profile")}
+                  />
+                  <PanelChip
+                    active={activePanel === "leads"}
+                    label={`Lead terkait (${profile.related_leads.length})`}
+                    onClick={() => setActivePanel("leads")}
+                  />
+                  {canMergeProfiles ? (
+                    <PanelChip
+                      active={activePanel === "merge"}
+                      label={`Merge candidates (${mergeCandidateCount})`}
+                      onClick={() => setActivePanel("merge")}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <Metric label="Lead Count" value={String(profile.lead_count)} />
               <Metric label="Conversation Count" value={String(profile.conversation_count)} />
               <Metric label="Last Contact" value={formatDateTime(profile.last_contact_at)} />
@@ -110,164 +303,446 @@ export default function CustomerProfilePage() {
             <section className="grid gap-4 md:grid-cols-3">
               <Metric
                 label="Identity Confidence"
-                value={`${Math.round(profile.identity_confidence * 100)}%`}
+                value={`${Math.round(profile.identity_confidence * 100)}% • ${identityConfidenceLabel}`}
               />
-              <Metric label="Match Strategy" value={profile.match_strategy} />
+              <Metric label="Active Leads" value={String(activeLeadCount)} />
               <Metric
-                label="Merge Status"
-                value={profile.merged_into_profile_id ? "Merged" : "Active"}
+                label="High Intent"
+                value={`${hotLeadCount} hot • ${warmLeadCount} warm`}
               />
             </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <h2 className="text-xl font-semibold text-slate-950">Channel Coverage</h2>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {profile.source_labels.map((label) => (
-                  <span
-                    key={label}
-                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+            <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+              <article className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-950">Profil Customer</h2>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      Bagian ini menjelaskan identitas customer dalam bentuk yang ringkas. Gunakan ini untuk memastikan customer-nya benar, bukan untuk membaca semua histori sekaligus.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivePanel("profile");
+                      setIsEditingProfile((prev) => !prev);
+                    }}
+                    className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
                   >
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </section>
+                    {isEditingProfile ? "Tutup Edit Data" : "Edit Data Customer"}
+                  </button>
+                </div>
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-950">
-                    Merge Candidates
-                  </h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Clara menampilkan kandidat profil customer lain yang kemungkinan adalah orang yang sama. Admin atau owner bisa merge manual kalau identity otomatis masih pecah.
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <CompactInfoRow label="Nama customer" value={profile.display_name} />
+                  <CompactInfoRow
+                    label="Status profil"
+                    value={profile.merged_into_profile_id ? "Sudah digabung" : "Masih aktif"}
+                  />
+                  <CompactInfoRow label="Telepon" value={profile.phone ?? "Belum diisi"} />
+                  <CompactInfoRow label="Email" value={profile.email ?? "Belum diisi"} />
+                  <CompactInfoRow label="Status customer" value={formatCustomerStatus(profile.status)} />
+                  <CompactInfoRow
+                    label="Temperature customer"
+                    value={`${formatTemperatureLabel(profile.temperature)} • ${formatTemperatureSourceLabel(profile.temperature_source)}`}
+                  />
+                  <CompactInfoRow label="Kategori akun" value={accountCategorySummary} />
+                  <CompactInfoRow
+                    label="Kekuatan identitas"
+                    value={`${Math.round(profile.identity_confidence * 100)}% • ${identityConfidenceLabel}`}
+                  />
+                </div>
+
+                <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Alamat
+                  </p>
+                  <p className="mt-3 text-base leading-7 text-slate-900">
+                    {profile.address ?? "Belum diisi"}
                   </p>
                 </div>
-                <textarea
-                  value={mergeNotes}
-                  onChange={(event) => {
-                    setMergeNotes(event.target.value);
-                  }}
-                  placeholder="Catatan merge opsional..."
-                  className="min-h-[88px] w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm text-slate-900 lg:w-80"
-                />
-              </div>
 
-              <div className="mt-5 space-y-4">
-                {profile.merge_candidates.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
-                    Belum ada kandidat merge yang cukup kuat untuk profil ini.
+                <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Channel Coverage
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {profile.source_labels.map((label) => (
+                      <span
+                        key={label}
+                        className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm"
+                      >
+                        {label}
+                      </span>
+                    ))}
                   </div>
-                ) : (
-                  profile.merge_candidates.map((candidate) => (
+                  <p className="mt-4 text-sm leading-7 text-slate-600">
+                    Bagian ini membantu tim melihat customer ini datang dari channel apa saja. Kalau channel-nya banyak, pastikan tim tidak membaca orang yang sama sebagai beberapa customer berbeda.
+                  </p>
+                </div>
+              </article>
+
+              <article className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <h2 className="text-xl font-semibold text-slate-950">Yang Perlu Dicek Dulu</h2>
+                <div className="mt-5 space-y-3">
+                  <ActionHint
+                    title="1. Cek lead yang paling panas atau paling baru"
+                    description={
+                      topPriorityLead
+                        ? `${topPriorityLead.display_name} adalah lead paling layak dibuka dulu dari profil customer ini.`
+                        : "Belum ada lead yang cukup kuat untuk diprioritaskan."
+                    }
+                  />
+                  <ActionHint
+                    title="2. Pastikan chat terbaru masih nyambung"
+                    description={
+                      latestLead
+                        ? `Kontak terakhir tercatat di lead ${latestLead.display_name} pada ${formatDateTime(
+                            latestLead.last_contact_at
+                          )}.`
+                        : "Belum ada histori kontak terakhir yang jelas."
+                    }
+                  />
+                  <ActionHint
+                    title="3. Kalau data terasa pecah, cek kandidat merge"
+                    description="Kalau ada nama atau channel yang mirip, gunakan merge candidates untuk memastikan satu customer tidak tersebar ke beberapa profil."
+                  />
+                </div>
+              </article>
+            </section>
+
+            {activePanel === "profile" || isEditingProfile ? (
+              <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-2xl">
+                    <h2 className="text-xl font-semibold text-slate-950">Data Customer</h2>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      Bagian ini dipakai untuk mengisi identitas customer yang lebih rapi seperti yang biasanya ada di sistem CRM klasik. Isi seperlunya, tapi pastikan nama, telepon, dan statusnya tidak ngawur karena data ini bisa dipakai tim lain juga.
+                    </p>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      Kategori akun dibaca otomatis dari lead terkait customer ini. Kalau customer punya lebih dari satu lead, kategorinya bisa terlihat campuran di ringkasan profil.
+                    </p>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      Kalau Anda yakin kategori akun customer ini memang harus mini atau reguler, Anda bisa set manual di form ini untuk menyelaraskan lead terkait.
+                    </p>
+                  </div>
+                  <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 lg:max-w-sm">
+                    Jangan isi data palsu. Kalau Anda belum yakin nomor, email, atau alamatnya benar, lebih baik kosongkan dulu daripada membuat tim salah membaca customer.
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Nama Customer</span>
+                    <input
+                      value={profileForm.display_name}
+                      onChange={(event) => {
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          display_name: event.target.value,
+                        }));
+                      }}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                      placeholder="Masukkan nama customer"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Telepon</span>
+                    <input
+                      value={profileForm.phone}
+                      onChange={(event) => {
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          phone: event.target.value,
+                        }));
+                      }}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                      placeholder="08xxxx atau +62xxxx"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Email</span>
+                    <input
+                      type="email"
+                      value={profileForm.email}
+                      onChange={(event) => {
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          email: event.target.value,
+                        }));
+                      }}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                      placeholder="customer@email.com"
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Status Customer</span>
+                    <select
+                      value={profileForm.status}
+                      onChange={(event) => {
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          status: event.target.value,
+                        }));
+                      }}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                    >
+                      <option value="active">Aktif</option>
+                      <option value="inactive">Tidak aktif</option>
+                    </select>
+                  </label>
+                  <label className="space-y-2 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Temperature Customer</span>
+                    <select
+                      value={profileForm.temperature}
+                      onChange={(event) => {
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          temperature: event.target.value,
+                        }));
+                      }}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                    >
+                      <option value="unknown">Belum ditentukan</option>
+                      <option value="cold">Cold</option>
+                      <option value="warm">Warm</option>
+                      <option value="hot">Hot</option>
+                    </select>
+                  </label>
+                  <label className="space-y-2 text-sm text-slate-700">
+                    <span className="font-semibold text-slate-900">Kategori Akun</span>
+                    <select
+                      value={profileForm.account_category}
+                      onChange={(event) => {
+                        setProfileForm((prev) => ({
+                          ...prev,
+                          account_category: event.target.value,
+                        }));
+                      }}
+                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                    >
+                      <option value="unknown">Belum ditentukan</option>
+                      <option value="mini">Mini</option>
+                      <option value="reguler">Reguler</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label className="mt-4 block space-y-2 text-sm text-slate-700">
+                  <span className="font-semibold text-slate-900">Alamat</span>
+                  <textarea
+                    value={profileForm.address}
+                    onChange={(event) => {
+                      setProfileForm((prev) => ({
+                        ...prev,
+                        address: event.target.value,
+                      }));
+                    }}
+                    rows={4}
+                    className="w-full rounded-[24px] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                    placeholder="Isi alamat customer jika memang sudah diketahui"
+                  />
+                </label>
+
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={isSavingProfile || !profileForm.display_name.trim()}
+                    onClick={() => {
+                      void handleProfileSave();
+                    }}
+                    className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isSavingProfile ? "Menyimpan..." : "Simpan Data Customer"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileForm({
+                        display_name: profile.display_name,
+                        phone: profile.phone ?? "",
+                        email: profile.email ?? "",
+                        address: profile.address ?? "",
+                        status: profile.status,
+                        temperature: profile.temperature,
+                        account_category: deriveEditableAccountCategory(profile.related_leads),
+                      });
+                      setIsEditingProfile(false);
+                    }}
+                    className="inline-flex rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
+                  >
+                    Reset Form
+                  </button>
+                </div>
+              </section>
+            ) : null}
+
+            {canMergeProfiles && activePanel === "merge" ? (
+              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-950">
+                      Merge Candidates
+                    </h2>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      Clara menampilkan kandidat profil customer lain yang kemungkinan adalah orang yang sama. Head atau superadmin bisa merge manual kalau identity otomatis masih pecah.
+                    </p>
+                  </div>
+                  <textarea
+                    value={mergeNotes}
+                    onChange={(event) => {
+                      setMergeNotes(event.target.value);
+                    }}
+                    placeholder="Catatan merge opsional..."
+                    className="min-h-[88px] w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm text-slate-900 lg:w-80"
+                  />
+                </div>
+
+                <div className="mt-5 space-y-4">
+                  {profile.merge_candidates.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+                      Belum ada kandidat merge yang cukup kuat untuk profil ini.
+                    </div>
+                  ) : (
+                    profile.merge_candidates.map((candidate) => (
+                      <article
+                        key={candidate.id}
+                        className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-semibold text-slate-950">
+                            {candidate.display_name}
+                          </h3>
+                          <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                            Match {Math.round(candidate.match_score * 100)}%
+                          </span>
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            Confidence {Math.round(candidate.identity_confidence * 100)}%
+                          </span>
+                        </div>
+                        <p className="mt-3 text-sm leading-7 text-slate-600">
+                          {candidate.overlap_reason}
+                        </p>
+                        <div className="mt-4 grid gap-3 md:grid-cols-3">
+                          <Metric label="Lead Count" value={String(candidate.lead_count)} />
+                          <Metric
+                            label="Conversation Count"
+                            value={String(candidate.conversation_count)}
+                          />
+                          <Metric
+                            label="Last Contact"
+                            value={formatDateTime(candidate.last_contact_at)}
+                          />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {candidate.source_labels.map((label) => (
+                            <span
+                              key={label}
+                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                        {["head", "superadmin"].includes(currentUser?.role ?? "") ? (
+                          <div className="mt-4">
+                            <button
+                              type="button"
+                              disabled={mergingCandidateId === candidate.id}
+                              onClick={() => {
+                                void handleMerge(candidate.id);
+                              }}
+                              className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {mergingCandidateId === candidate.id
+                                ? "Merging..."
+                                : "Merge ke Profile Ini"}
+                            </button>
+                          </div>
+                        ) : null}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+            ) : null}
+
+            {activePanel === "leads" ? (
+              <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-950">Lead Terkait</h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-7 text-[#5a421f]">
+                      Bagian ini menunjukkan semua lead yang masih dianggap milik customer yang sama. Jangan buka semuanya sekaligus. Baca yang paling prioritas dulu, lalu baru turun ke lead lain kalau memang perlu.
+                    </p>
+                  </div>
+                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    Prioritas baca:
+                    <span className="ml-2 font-semibold text-slate-950">
+                      hot &gt; warm &gt; kontak terbaru
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-5 space-y-4">
+                  {[...profile.related_leads].sort(compareCustomerLeadPriority).map((lead, index) => (
                     <article
-                      key={candidate.id}
-                      className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                      key={lead.id}
+                      className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-semibold text-slate-950">
-                          {candidate.display_name}
-                        </h3>
-                        <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
-                          Match {Math.round(candidate.match_score * 100)}%
+                        <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-semibold text-white">
+                          Prioritas {index + 1}
+                        </span>
+                        <h3 className="text-base font-semibold text-slate-950">{lead.display_name}</h3>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
+                            lead.lead_temperature
+                          )}`}
+                        >
+                          {formatTemperatureLabel(lead.lead_temperature)}
+                        </span>
+                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                          {formatStageLabel(lead.current_stage)}
+                        </span>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
+                            lead.account_category
+                          )}`}
+                        >
+                          {formatAccountCategory(lead.account_category)}
                         </span>
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                          Confidence {Math.round(candidate.identity_confidence * 100)}%
+                          {lead.source_label}
                         </span>
                       </div>
                       <p className="mt-3 text-sm leading-7 text-slate-600">
-                        {candidate.overlap_reason}
+                        {buildLeadReadingHint(lead)}
                       </p>
-                      <div className="mt-4 grid gap-3 md:grid-cols-3">
-                        <Metric label="Lead Count" value={String(candidate.lead_count)} />
-                        <Metric
-                          label="Conversation Count"
-                          value={String(candidate.conversation_count)}
-                        />
-                        <Metric
-                          label="Last Contact"
-                          value={formatDateTime(candidate.last_contact_at)}
-                        />
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <InlineMetric label="Stage" value={formatStageLabel(lead.current_stage)} />
+                        <InlineMetric label="Last Contact" value={formatDateTime(lead.last_contact_at)} />
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {candidate.source_labels.map((label) => (
-                          <span
-                            key={label}
-                            className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
-                          >
-                            {label}
-                          </span>
-                        ))}
-                      </div>
-                      {["admin", "owner"].includes(currentUser?.role ?? "") ? (
-                        <div className="mt-4">
-                          <button
-                            type="button"
-                            disabled={mergingCandidateId === candidate.id}
-                            onClick={() => {
-                              void handleMerge(candidate.id);
-                            }}
-                            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {mergingCandidateId === candidate.id
-                              ? "Merging..."
-                              : "Merge ke Profile Ini"}
-                          </button>
-                        </div>
-                      ) : null}
-                    </article>
-                  ))
-                )}
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-              <h2 className="text-xl font-semibold text-slate-950">Related Leads</h2>
-              <div className="mt-5 space-y-4">
-                {profile.related_leads.map((lead) => (
-                  <article
-                    key={lead.id}
-                    className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-semibold text-slate-950">
-                        {lead.display_name}
-                      </h3>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                          lead.lead_temperature
-                        )}`}
-                      >
-                        {lead.lead_temperature.toUpperCase()}
-                      </span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                        {lead.source_label}
-                      </span>
-                    </div>
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <Metric label="Stage" value={lead.current_stage.replaceAll("_", " ")} />
-                      <Metric label="Last Contact" value={formatDateTime(lead.last_contact_at)} />
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Link
-                        href={`/dashboard/crm/${lead.id}`}
-                        className="inline-flex rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
-                      >
-                        Buka Lead
-                      </Link>
-                      {lead.latest_conversation_id ? (
                         <Link
-                          href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
-                          className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                          href={`/dashboard/crm/${lead.id}`}
+                          className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
                         >
-                          Buka Conversation
+                          Buka Lead
                         </Link>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
+                        {lead.latest_conversation_id ? (
+                          <Link
+                            href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
+                            className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                          >
+                            Buka Conversation
+                          </Link>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -277,11 +752,285 @@ export default function CustomerProfilePage() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+    <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+        {label}
+      </p>
+      <p className="mt-3 text-lg font-semibold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function ActionHint({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+      <p className="text-sm font-semibold text-slate-950">{title}</p>
+      <p className="mt-2 text-sm leading-7 text-slate-600">{description}</p>
+    </div>
+  );
+}
+
+function PanelChip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+        active
+          ? "bg-slate-950 text-white"
+          : "border border-slate-300 bg-white text-slate-700"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function CompactInfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-base font-semibold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function HeroPill({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: "amber" | "slate" | "emerald";
+}) {
+  const toneClass =
+    accent === "amber"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : accent === "emerald"
+        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+        : "border-slate-200 bg-slate-100 text-slate-700";
+
+  return (
+    <div className={`rounded-full border px-4 py-2 shadow-sm ${toneClass}`}>
+      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-80">
+        {label}
+      </span>
+      <span className="ml-2 text-sm font-bold">{value}</span>
+    </div>
+  );
+}
+
+function InlineMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
         {label}
       </p>
-      <p className="mt-3 text-base font-semibold text-slate-950">{value}</p>
+      <p className="mt-3 text-xl font-semibold text-slate-950">{value}</p>
     </div>
   );
+}
+
+function compareCustomerLeadPriority(
+  left: CustomerProfileSummaryItem["related_leads"][number],
+  right: CustomerProfileSummaryItem["related_leads"][number]
+) {
+  return (
+    getLeadPriorityScore(right) - getLeadPriorityScore(left) ||
+    new Date(right.last_contact_at ?? 0).getTime() -
+      new Date(left.last_contact_at ?? 0).getTime()
+  );
+}
+
+function getLeadPriorityScore(lead: CustomerProfileSummaryItem["related_leads"][number]) {
+  const temperatureScore =
+    lead.lead_temperature === "hot" ? 30 : lead.lead_temperature === "warm" ? 20 : 10;
+  const stageScore =
+    lead.current_stage === "closing"
+      ? 18
+      : lead.current_stage === "negotiation"
+        ? 15
+        : lead.current_stage === "objection"
+          ? 12
+          : lead.current_stage === "qualification"
+            ? 10
+            : lead.current_stage === "won"
+              ? 4
+              : 6;
+  return temperatureScore + stageScore;
+}
+
+function formatStageLabel(value: string) {
+  const labels: Record<string, string> = {
+    new_lead: "Lead baru",
+    qualification: "Kualifikasi",
+    objection: "Keberatan",
+    negotiation: "Negosiasi",
+    closing: "Closing",
+    won: "Menang",
+    lost: "Tidak jadi",
+    archived: "Arsip",
+  };
+
+  return labels[value] ?? value.replaceAll("_", " ");
+}
+
+function formatTemperatureLabel(value: string) {
+  const labels: Record<string, string> = {
+    hot: "HOT",
+    warm: "WARM",
+    cold: "COLD",
+    unknown: "BELUM JELAS",
+  };
+
+  return labels[value] ?? value.toUpperCase();
+}
+
+function formatAccountCategory(value: string) {
+  const labels: Record<string, string> = {
+    mini: "Mini",
+    reguler: "Reguler",
+    unknown: "Belum ditentukan",
+  };
+
+  return labels[value] ?? value.replaceAll("_", " ");
+}
+
+function getAccountCategoryBadgeClass(value: string) {
+  if (value === "mini") {
+    return "bg-emerald-100 text-emerald-700";
+  }
+  if (value === "reguler") {
+    return "bg-amber-100 text-amber-700";
+  }
+  return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
+}
+
+function formatCustomerStatus(value: string) {
+  return value === "inactive" ? "Tidak aktif" : "Aktif";
+}
+
+function formatTemperatureSourceLabel(value: string) {
+  return value === "manual" ? "manual" : "otomatis dari Clara";
+}
+
+function describeIdentityConfidence(value: number) {
+  if (value >= 0.9) {
+    return "sangat yakin";
+  }
+  if (value >= 0.75) {
+    return "cukup yakin";
+  }
+  return "perlu dicek lagi";
+}
+
+function buildAccountCategorySummary(
+  relatedLeads: CustomerProfileSummaryItem["related_leads"]
+) {
+  const normalizedCategories = Array.from(
+    new Set(relatedLeads.map((lead) => lead.account_category))
+  );
+
+  if (normalizedCategories.length === 0) {
+    return "Belum terbaca";
+  }
+
+  const knownCategories = normalizedCategories.filter(
+    (category) => category !== "unknown"
+  );
+
+  if (knownCategories.length === 0) {
+    return "Belum ditentukan";
+  }
+
+  if (knownCategories.length === 1) {
+    return formatAccountCategory(knownCategories[0]);
+  }
+
+  return knownCategories.map(formatAccountCategory).join(" + ");
+}
+
+function deriveEditableAccountCategory(
+  relatedLeads: CustomerProfileSummaryItem["related_leads"]
+) {
+  const normalizedCategories = Array.from(
+    new Set(relatedLeads.map((lead) => lead.account_category))
+  ).filter((category) => category !== "unknown");
+
+  if (normalizedCategories.length === 1) {
+    return normalizedCategories[0];
+  }
+
+  return "unknown";
+}
+
+function buildCustomerOverview({
+  profile,
+  activeLeadCount,
+  hotLeadCount,
+  warmLeadCount,
+  dominantSourceLabel,
+}: {
+  profile: CustomerProfileSummaryItem | null;
+  activeLeadCount: number;
+  hotLeadCount: number;
+  warmLeadCount: number;
+  dominantSourceLabel: string;
+}) {
+  if (!profile) {
+    return "";
+  }
+
+  return `${profile.display_name} saat ini tercatat punya ${profile.lead_count} lead dan ${profile.conversation_count} conversation. ${activeLeadCount} lead masih aktif dibaca tim. Channel yang terlihat paling dominan: ${dominantSourceLabel}. Sinyal minat saat ini: ${hotLeadCount} hot lead dan ${warmLeadCount} warm lead.`;
+}
+
+function buildCustomerActionSummary({
+  topPriorityLead,
+  latestLead,
+  hotLeadCount,
+  profile,
+}: {
+  topPriorityLead: CustomerProfileSummaryItem["related_leads"][number] | null;
+  latestLead: CustomerProfileSummaryItem["related_leads"][number] | null;
+  hotLeadCount: number;
+  profile: CustomerProfileSummaryItem | null;
+}) {
+  if (!profile) {
+    return "";
+  }
+
+  if (topPriorityLead) {
+    return `Mulai dari lead ${topPriorityLead.display_name}. Lead ini paling layak dibaca dulu karena stage-nya ${formatStageLabel(
+      topPriorityLead.current_stage
+    ).toLowerCase()} dan temperaturnya ${formatTemperatureLabel(
+      topPriorityLead.lead_temperature
+    ).toLowerCase()}. ${
+      hotLeadCount > 0
+        ? "Karena ada hot lead, jangan terlalu lama membaca lead yang lain."
+        : latestLead
+          ? `Kalau konteksnya belum jelas, cocokkan lagi dengan kontak terakhir di ${latestLead.display_name}.`
+          : "Kalau konteksnya belum jelas, cek histori lead dan chat terakhir."
+    }`;
+  }
+
+  return "Belum ada lead yang terlihat dominan. Mulai dari kontak paling baru, lalu cek apakah ada lead yang perlu dirapikan atau digabung.";
+}
+
+function buildLeadReadingHint(
+  lead: CustomerProfileSummaryItem["related_leads"][number]
+) {
+  const temperature = formatTemperatureLabel(lead.lead_temperature).toLowerCase();
+  const stage = formatStageLabel(lead.current_stage).toLowerCase();
+  return `Lead ini sedang ada di tahap ${stage} dengan suhu ${temperature}. Buka lead ini kalau Anda ingin memahami konteks customer dari jalur ${lead.source_label} dan memastikan langkah berikutnya tidak salah arah.`;
 }

@@ -24,6 +24,12 @@ class CustomerProfile(Base):
     )
 
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    temperature: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown")
+    temperature_source: Mapped[str] = mapped_column(String(20), nullable=False, default="auto")
     canonical_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     identity_confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.92)
     match_strategy: Mapped[str] = mapped_column(String(50), nullable=False, default="name_exact")

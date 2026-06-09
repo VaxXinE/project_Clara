@@ -20,6 +20,12 @@ class Message(Base):
 
     sender_name: Mapped[str] = mapped_column(String(255), nullable=False)
     sender_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    external_message_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+        unique=True,
+    )
     message_text: Mapped[str] = mapped_column(Text, nullable=False)
     message_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

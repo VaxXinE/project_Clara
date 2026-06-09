@@ -18,7 +18,11 @@ from app.schemas.lead_schema import (
     LeadTaskItem,
     LeadTaskUpdateRequest,
 )
-from app.services.access_control_service import can_access_all_conversations
+from app.services.access_control_service import (
+    can_access_all_conversations,
+    get_accessible_sales_user_ids,
+)
+from app.services.role_service import is_superadmin_like, normalize_role
 from app.services.lead_activity_service import create_lead_activity_event
 
 VALID_TASK_TYPES = {"manual_follow_up", "scheduled_follow_up", "approval_follow_up"}
@@ -73,6 +77,8 @@ def build_task_item(task: LeadTask) -> LeadTaskItem:
         completed_by_user_name=(
             task.completed_by_user.name if task.completed_by_user else None
         ),
+        workflow_scope=task.workflow_scope,
+        requested_by_role=task.requested_by_role,
         task_type=task.task_type,
         status=task.status,
         title=task.title,
@@ -128,6 +134,16 @@ def create_task_event(
     return event
 
 
+def resolve_task_workflow_scope(task_type: str, requested_by_role: str | None) -> str:
+    normalized_role = normalize_role(requested_by_role)
+
+    if normalized_role in {"head", "superadmin"}:
+        return "head_follow_up"
+    if normalized_role == "manager" or task_type == "approval_follow_up":
+        return "admin_feedback"
+    return "cs_follow_up"
+
+
 def get_accessible_lead(
     db: Session,
     *,
@@ -152,13 +168,23 @@ def get_accessible_lead(
             detail="Lead not found.",
         )
 
-    if current_user.organization_id is None or lead.organization_id != current_user.organization_id:
+    if (
+        not is_superadmin_like(current_user.role)
+        and (
+            current_user.organization_id is None
+            or lead.organization_id != current_user.organization_id
+        )
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lead not found.",
         )
 
-    if not can_access_all_conversations(current_user) and lead.assigned_user_id != current_user.id:
+    accessible_user_ids = get_accessible_sales_user_ids(
+        db=db,
+        current_user=current_user,
+    )
+    if accessible_user_ids is not None and lead.assigned_user_id not in accessible_user_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lead not found.",
@@ -237,6 +263,11 @@ def create_lead_task_for_user(
         organization_id=lead.organization_id,
         assigned_user_id=assignee.id if assignee else None,
         completed_by_user_id=None,
+        workflow_scope=resolve_task_workflow_scope(
+            payload.task_type,
+            current_user.role,
+        ),
+        requested_by_role=normalize_role(current_user.role),
         task_type=payload.task_type,
         status="open",
         title=payload.title.strip(),
@@ -330,7 +361,7 @@ def update_lead_task_for_user(
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admin can reassign tasks.",
+                detail="Only head can reassign tasks.",
             )
 
         assignee = validate_assignee_for_lead(
@@ -525,6 +556,8 @@ def upsert_follow_up_task_for_lead(
         organization_id=lead.organization_id,
         assigned_user_id=lead.assigned_user_id,
         completed_by_user_id=None,
+        workflow_scope="cs_follow_up",
+        requested_by_role="system",
         task_type="scheduled_follow_up",
         status="open",
         title="Follow up lead",
@@ -578,6 +611,8 @@ def ensure_queue_task_for_lead(
         organization_id=lead.organization_id,
         assigned_user_id=lead.assigned_user_id,
         completed_by_user_id=None,
+        workflow_scope="cs_follow_up",
+        requested_by_role="system",
         task_type="scheduled_follow_up",
         status="open",
         title="Queue follow up",

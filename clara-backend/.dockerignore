@@ -1,0 +1,14 @@
+__pycache__/
+*.py[oc]
+.venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+wheels/
+*.egg-info/
+uvicorn.stdout.log
+uvicorn.stderr.log

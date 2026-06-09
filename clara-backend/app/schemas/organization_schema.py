@@ -9,6 +9,11 @@ class CreateOrganizationRequest(BaseModel):
     slug: str = Field(min_length=2, max_length=100)
 
 
+class UpdateOrganizationRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    slug: str | None = Field(default=None, min_length=2, max_length=100)
+
+
 class OrganizationResponse(BaseModel):
     id: UUID
     name: str

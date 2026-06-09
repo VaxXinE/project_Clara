@@ -13,14 +13,14 @@ from app.services.organization_service import OrganizationError, create_organiza
 
 
 def main() -> None:
-    print("Create Clara organization + owner user")
+    print("Create Clara organization + superadmin user")
 
     organization_name = input("Organization name: ").strip()
     organization_slug = input("Organization slug (example: clara-demo): ").strip().lower()
 
-    name = input("Owner name: ").strip()
-    email = input("Owner email: ").strip().lower()
-    password = getpass.getpass("Owner password: ")
+    name = input("Superadmin name: ").strip()
+    email = input("Superadmin email: ").strip().lower()
+    password = getpass.getpass("Superadmin password: ")
 
     db = SessionLocal()
 
@@ -39,13 +39,13 @@ def main() -> None:
                 name=name,
                 email=email,
                 password=password,
-                role="owner",
+                role="superadmin",
                 organization_id=organization.id,
             ),
         )
 
         print(f"Organization created: {organization.name} ({organization.slug})")
-        print(f"Owner created: {user.email} ({user.role})")
+        print(f"Superadmin created: {user.email} ({user.role})")
     except (AuthError, OrganizationError) as exc:
         print(f"Failed: {exc}")
     finally:

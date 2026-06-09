@@ -7,8 +7,8 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
+from app.models.lead import Lead
 from app.models.lead_task import LeadTask
 from app.models.message import Message
 
@@ -144,3 +144,95 @@ def test_worklist_prefers_persisted_snoozed_task_over_derived_signal(
     assert payload["items"][0]["task_type"] == "snoozed_follow_up"
     assert payload["items"][0]["task_id"] is not None
     assert payload["items"][0]["task_status"] == "snoozed"
+
+
+def test_worklist_moves_future_open_follow_up_to_upcoming_bucket(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    marketing_a = seeded_data["marketing_a"]
+
+    db = db_session_factory()
+    lead = Lead(
+        organization_id=marketing_a.organization_id,
+        assigned_user_id=marketing_a.id,
+        display_name="Future Follow Up Lead",
+        source="manual_test",
+        current_stage="qualification",
+        lead_temperature="warm",
+    )
+    db.add(lead)
+    db.flush()
+    db.add(
+        LeadTask(
+            lead_id=lead.id,
+            organization_id=lead.organization_id,
+            assigned_user_id=lead.assigned_user_id,
+            task_type="scheduled_follow_up",
+            status="open",
+            title="Follow up besok sore",
+            description="Task ini belum actionable hari ini.",
+            due_at=datetime.now(timezone.utc) + timedelta(days=1, hours=2),
+        )
+    )
+    db.commit()
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    response = client.get("/dashboard/sales/worklist")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert payload["open_task_count"] == 1
+    assert payload["due_today_count"] == 0
+    assert all(
+        not (
+            item["lead_id"] == str(lead.id)
+            and item["task_id"] is not None
+        )
+        for item in payload["items"]
+    )
+    assert any(
+        item["lead_id"] == str(lead.id)
+        and item["task_id"] is not None
+        for item in payload["upcoming_items"]
+    )
+
+
+def test_worklist_hides_follow_up_for_won_lead(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    owned_lead = seeded_data["owned_lead"]
+
+    db = db_session_factory()
+    lead = db.get(type(owned_lead), owned_lead.id)
+    assert lead is not None
+    lead.current_stage = "won"
+    lead.next_follow_up_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    db.add(
+        LeadTask(
+            lead_id=lead.id,
+            organization_id=lead.organization_id,
+            assigned_user_id=lead.assigned_user_id,
+            task_type="scheduled_follow_up",
+            status="open",
+            title="Follow up lama",
+            description="Seharusnya tidak tampil karena lead sudah won.",
+            due_at=datetime.now(timezone.utc) - timedelta(hours=2),
+        )
+    )
+    db.commit()
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    response = client.get("/dashboard/sales/worklist")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    assert all(item["lead_id"] != str(lead.id) for item in payload["items"])
+    assert all(item["lead_id"] != str(lead.id) for item in payload["upcoming_items"])

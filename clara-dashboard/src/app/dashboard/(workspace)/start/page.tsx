@@ -6,6 +6,12 @@ import { useEffect, useState } from "react";
 import { RoleBasedStartGuide } from "@/components/dashboard/RoleBasedStartGuide";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
+import {
+  canAccessQueueAndActionCenter,
+  isHeadRole,
+  isManagerRole,
+  isSuperadminRole,
+} from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 export default function StartHerePage() {
@@ -31,24 +37,63 @@ export default function StartHerePage() {
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Onboarding flow"
-      title="Mulai dari Sini"
-      description="Halaman ini tetap tersedia sebagai panduan terpisah, tapi inti alur role-based Clara sekarang juga muncul langsung di halaman dashboard utama setelah login."
+      title="Workflow Guide"
+      description="Panduan singkat alur Sales, Manager, dan Head."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
         <>
-          <Link
-            href="/dashboard"
-            className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
-          >
-            Kembali ke Dashboard
-          </Link>
-          <Link
-            href="/dashboard/upload"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
-          >
-            Import Chat
-          </Link>
+          {(() => {
+            const cannotUseQueue =
+              currentUser && !canAccessQueueAndActionCenter(currentUser.role);
+            const href = isSuperadminRole(currentUser?.role)
+              ? "/dashboard/kpi"
+              : isHeadRole(currentUser?.role)
+                ? "/dashboard/manager-insights"
+                : cannotUseQueue
+                  ? "/dashboard/manager-insights"
+                  : "/dashboard/follow-up";
+            const label = isSuperadminRole(currentUser?.role)
+              ? "Buka Ops Dashboard"
+              : isHeadRole(currentUser?.role)
+                ? "Buka Head Insights"
+                : currentUser &&
+                    isManagerRole(currentUser.role) &&
+                    !canAccessQueueAndActionCenter(currentUser.role)
+                  ? "Lihat Progress Prospect"
+                  : "Buka Action Center";
+            const secondaryHref = isSuperadminRole(currentUser?.role)
+              ? "/dashboard/marketing"
+              : isHeadRole(currentUser?.role)
+                ? "/dashboard/approvals"
+                : isManagerRole(currentUser?.role)
+                  ? "/dashboard/approvals"
+                  : "/dashboard/upload";
+            const secondaryLabel = isSuperadminRole(currentUser?.role)
+              ? "Buka Chat Insight"
+              : isHeadRole(currentUser?.role)
+                ? "Buka Chat Review Center"
+                : isManagerRole(currentUser?.role)
+                  ? "Buka Chat Review Center"
+                  : "Buka Lead Capture";
+
+            return (
+              <>
+                <Link
+                  href={href}
+                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                >
+                  {label}
+                </Link>
+                <Link
+                  href={secondaryHref}
+                  className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                >
+                  {secondaryLabel}
+                </Link>
+              </>
+            );
+          })()}
         </>
       }
     >
