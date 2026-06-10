@@ -6,6 +6,22 @@ const DEFAULT_CLARA_API_BASE_URL = "http://127.0.0.1:8000"
 const DEFAULT_CLARA_DASHBOARD_URL = "http://localhost:3000"
 const DEFAULT_AUTH_COOKIE_NAME = "clara_access_token"
 
+const buildClaraApiUrl = (apiBaseUrl: string, routePath: string) => {
+  const normalizedBaseUrl = (apiBaseUrl || DEFAULT_CLARA_API_BASE_URL).trim()
+  const normalizedRoutePath = routePath.startsWith("/")
+    ? routePath
+    : `/${routePath}`
+
+  const url = new URL(normalizedBaseUrl)
+  const basePath = url.pathname.replace(/\/+$/, "")
+
+  url.pathname = `${basePath}${normalizedRoutePath}` || normalizedRoutePath
+  url.search = ""
+  url.hash = ""
+
+  return url.toString()
+}
+
 export const getConfiguredProxyUrl = () =>
   (process.env.PLASMO_PUBLIC_OPENAI_PROXY_URL || DEFAULT_PROXY_URL).trim()
 
@@ -80,12 +96,7 @@ export const getClaraSnapshotSyncUrl = (
   }
 
   try {
-    const url = new URL(apiBaseUrl.trim() || DEFAULT_CLARA_API_BASE_URL)
-    url.pathname = "/extension/whatsapp/snapshots"
-    url.search = ""
-    url.hash = ""
-
-    return url.toString()
+    return buildClaraApiUrl(apiBaseUrl, "/extension/whatsapp/snapshots")
   } catch (_error) {
     return ""
   }
@@ -99,12 +110,7 @@ export const getClaraReplySuggestionsUrl = (
   }
 
   try {
-    const url = new URL(apiBaseUrl.trim() || DEFAULT_CLARA_API_BASE_URL)
-    url.pathname = "/extension/whatsapp/reply-suggestions"
-    url.search = ""
-    url.hash = ""
-
-    return url.toString()
+    return buildClaraApiUrl(apiBaseUrl, "/extension/whatsapp/reply-suggestions")
   } catch (_error) {
     return ""
   }
@@ -119,12 +125,10 @@ export const getClaraSendReplyUrl = (
   }
 
   try {
-    const url = new URL(apiBaseUrl.trim() || DEFAULT_CLARA_API_BASE_URL)
-    url.pathname = `/extension/whatsapp/reply-suggestions/${replySuggestionId.trim()}/send`
-    url.search = ""
-    url.hash = ""
-
-    return url.toString()
+    return buildClaraApiUrl(
+      apiBaseUrl,
+      `/extension/whatsapp/reply-suggestions/${replySuggestionId.trim()}/send`
+    )
   } catch (_error) {
     return ""
   }
@@ -216,7 +220,7 @@ export const getCurrentClaraSessionUser =
       return null
     }
 
-    const meUrl = new URL("/auth/me", apiBaseUrl).toString()
+    const meUrl = buildClaraApiUrl(apiBaseUrl, "/auth/me")
     const response = await fetch(meUrl, {
       headers
     })

@@ -42,6 +42,9 @@ Kalau kamu butuh panduan untuk **user akhir**, lihat manual ini:
   - [docs/CLARA_HEAD_TUTORIAL.md](docs/CLARA_HEAD_TUTORIAL.md)
   - [docs/CLARA_MANAGER_TUTORIAL.md](docs/CLARA_MANAGER_TUTORIAL.md)
   - [docs/CLARA_SALES_TUTORIAL.md](docs/CLARA_SALES_TUTORIAL.md)
+- Tutorial deploy:
+  - [docs/CLARA_DEPLOY_SERVER_TUTORIAL.md](docs/CLARA_DEPLOY_SERVER_TUTORIAL.md)
+  - [docs/CLARA_DOCKER_PRODUCTION.md](docs/CLARA_DOCKER_PRODUCTION.md)
 - Flowchart arsitektur dan operasional:
   - [docs/CLARA_PROJECT_FLOWCHART.md](docs/CLARA_PROJECT_FLOWCHART.md)
 - Manual test:
@@ -420,7 +423,7 @@ Sebelum menjalankan Clara, siapkan:
 - npm
 - Python `>= 3.14`
 - `uv`
-- Docker dan Docker Compose
+- Docker dan Docker Compose untuk infra lokal
 
 Kalau mau development yang stabil:
 
@@ -447,6 +450,13 @@ Default credential lokal:
 - database: `clara_db`
 - user: `clara_user`
 - password: `clara_password_dev_only`
+
+Catatan:
+
+- compose di `infra/docker-compose.yml` fokus untuk local/dev workflow
+- untuk deploy server/testing bersama, lihat:
+  - [docs/CLARA_DEPLOY_SERVER_TUTORIAL.md](docs/CLARA_DEPLOY_SERVER_TUTORIAL.md)
+  - [docs/CLARA_DOCKER_PRODUCTION.md](docs/CLARA_DOCKER_PRODUCTION.md)
 
 ### 2. Setup Backend
 
@@ -486,6 +496,12 @@ npm run dev
 ```
 
 Mode dev extension juga menjalankan local proxy untuk AI suggestion.
+
+Catatan:
+
+- extension tidak dijalankan sebagai service server seperti backend/dashboard
+- extension dibuild terpisah lalu dipasang ke browser user
+- kalau Clara dijalankan di VPS/IP/domain lain, env extension dan `host_permissions` perlu disesuaikan sebelum build/package
 
 ### 5. Jalankan dari Root Repo
 
@@ -569,31 +585,28 @@ PORT=9898
 PLASMO_PUBLIC_OPENAI_PROXY_URL=http://127.0.0.1:9898/reply-suggestions
 PLASMO_PUBLIC_CLARA_API_BASE_URL=http://127.0.0.1:8000
 PLASMO_PUBLIC_CLARA_DASHBOARD_URL=http://localhost:3000
+PLASMO_PUBLIC_CLARA_AUTH_COOKIE_NAME=clara_access_token
 ```
+
+Catatan penting:
+
+- untuk testing via VPS/IP:
+  - `PLASMO_PUBLIC_CLARA_API_BASE_URL=http://IP_SERVER/api`
+  - `PLASMO_PUBLIC_CLARA_DASHBOARD_URL=http://IP_SERVER`
+- untuk production domain:
+  - `PLASMO_PUBLIC_CLARA_API_BASE_URL=https://domain-kamu/api`
+  - `PLASMO_PUBLIC_CLARA_DASHBOARD_URL=https://domain-kamu`
+- extension sekarang memakai session cookie Clara, jadi origin dashboard dan API harus benar
 
 ## Database Migration
 
-### Penting: gunakan `heads`, bukan `head`
+### Penting: cek state Alembic head sebelum migrasi manual
 
-Repo ini saat ini bisa punya lebih dari satu Alembic head.
+Repo ini sempat punya riwayat multi-head Alembic. Karena itu:
 
-Jadi pakai:
-
-```bash
-uv run alembic upgrade heads
-```
-
-Bukan:
-
-```bash
-uv run alembic upgrade head
-```
-
-Kalau pakai `head`, Alembic bisa error seperti ini:
-
-```text
-Multiple head revisions are present for given argument 'head'
-```
+- untuk setup lokal paling aman, pakai `scripts/setup_local_environment.py`
+- untuk migrasi manual, cek dulu hasil `uv run alembic heads`
+- kalau muncul error multi-head, gunakan `uv run alembic upgrade heads`
 
 Command yang berguna:
 
@@ -817,6 +830,27 @@ Cek:
 - proxy extension hidup di port yang benar
 - `PLASMO_PUBLIC_OPENAI_PROXY_URL` benar
 - `PLASMO_PUBLIC_CLARA_API_BASE_URL` benar
+- `PLASMO_PUBLIC_CLARA_DASHBOARD_URL` benar
+- `PLASMO_PUBLIC_CLARA_AUTH_COOKIE_NAME` benar
+- `host_permissions` extension mengizinkan IP/domain Clara yang sedang dipakai
+
+### 7. Clara jalan di server, tapi browser luar tidak bisa akses
+
+Cek:
+
+- Nginx listen di `0.0.0.0:80`
+- backend dan dashboard sehat dari `127.0.0.1`
+- IP yang dipakai benar-benar IP public, bukan `192.168.x.x`
+- firewall VPS / security group provider membuka port `80` atau `443`
+
+### 8. Docker production backend unhealthy
+
+Cek:
+
+- `docker compose -f infra/docker-compose.prod.yml logs backend`
+- password PostgreSQL di `infra/.env`
+- kalau password DB mengandung `@` atau `#`, pastikan `DATABASE_URL` dibentuk dengan benar
+- sinkronkan password asli PostgreSQL dan password yang dipakai backend container
 
 ## Known Issues Saat Ini
 
@@ -866,3 +900,8 @@ Repo ini sudah berkembang cukup besar, jadi README ini sengaja dibuat detail sup
 - paham modul utamanya
 - tahu command harian yang benar
 - tidak salah langkah di migration, role access, dan workflow operasional
+
+Kalau targetmu sudah bergeser dari local dev ke server/testing bersama, lanjut ke:
+
+- [docs/CLARA_DEPLOY_SERVER_TUTORIAL.md](docs/CLARA_DEPLOY_SERVER_TUTORIAL.md) untuk jalur non-Docker
+- [docs/CLARA_DOCKER_PRODUCTION.md](docs/CLARA_DOCKER_PRODUCTION.md) untuk jalur Docker production
