@@ -161,10 +161,7 @@ export const getReplySuggestionCandidates = () => {
   const claraReplySuggestionsUrl = getClaraReplySuggestionsUrl()
 
   if (claraReplySuggestionsUrl) {
-    return [
-      ...getProxyCandidates(claraReplySuggestionsUrl),
-      ...getProxyCandidates(getConfiguredProxyUrl())
-    ]
+    return getProxyCandidates(claraReplySuggestionsUrl)
   }
 
   return getProxyCandidates(getConfiguredProxyUrl())
