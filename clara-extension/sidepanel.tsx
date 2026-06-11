@@ -1213,6 +1213,27 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
       return "outgoing"
     }
 
+    const parentElement = container.parentElement
+    const computedParentStyle = parentElement
+      ? window.getComputedStyle(parentElement)
+      : null
+
+    if (computedParentStyle?.justifyContent === "flex-end") {
+      return "outgoing"
+    }
+
+    if (computedParentStyle?.justifyContent === "flex-start") {
+      return "incoming"
+    }
+
+    if (parentElement?.classList.contains("xuk3077")) {
+      return "outgoing"
+    }
+
+    if (parentElement?.classList.contains("x1cy8zhl")) {
+      return "incoming"
+    }
+
     return "incoming"
   }
 
