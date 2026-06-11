@@ -347,9 +347,81 @@ export const insertReplyIntoComposeBox = (
   }
 }
 
-export const sendReplyThroughComposeBox = (
+const wait = (ms: number) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+
+const normalizeMessageText = (value: string) =>
+  value.replace(/\s+/g, " ").trim().toLowerCase()
+
+const getMessageContainers = () => {
+  const chatRoot = getChatRoot()
+
+  if (!chatRoot) {
+    return []
+  }
+
+  return Array.from(
+    chatRoot.querySelectorAll<HTMLElement>(
+      '[data-testid="conversation-panel-messages"] [data-testid="msg-container"], [data-testid="msg-container"]'
+    )
+  )
+}
+
+const getLatestOutgoingMessageSnapshot = () => {
+  const outgoingMessages = getMessageContainers()
+    .map((container, index) => ({
+      direction: getMessageDirection(container),
+      index,
+      text: getMessageText(container)
+    }))
+    .filter((message) => message.direction === "outgoing" && message.text.trim())
+
+  const latestOutgoingMessage = outgoingMessages[outgoingMessages.length - 1]
+
+  return {
+    count: outgoingMessages.length,
+    text: latestOutgoingMessage?.text.trim() || ""
+  }
+}
+
+const waitForOutgoingMessageConfirmation = async (expectedText: string) => {
+  const normalizedExpected = normalizeMessageText(expectedText)
+  const beforeSendSnapshot = getLatestOutgoingMessageSnapshot()
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await wait(250)
+
+    const composeBox = getComposeBox()
+    const composeText = composeBox ? getComposeText(composeBox) : ""
+    const afterSendSnapshot = getLatestOutgoingMessageSnapshot()
+    const normalizedLatestOutgoing = normalizeMessageText(afterSendSnapshot.text)
+
+    const outgoingMessageAppended =
+      afterSendSnapshot.count > beforeSendSnapshot.count &&
+      normalizedLatestOutgoing === normalizedExpected
+
+    const latestOutgoingReplaced =
+      afterSendSnapshot.count === beforeSendSnapshot.count &&
+      afterSendSnapshot.text !== beforeSendSnapshot.text &&
+      normalizedLatestOutgoing === normalizedExpected
+
+    if (outgoingMessageAppended || latestOutgoingReplaced) {
+      return true
+    }
+
+    if (!composeText.trim() && normalizedLatestOutgoing === normalizedExpected) {
+      return true
+    }
+  }
+
+  return false
+}
+
+export const sendReplyThroughComposeBox = async (
   text: string
-): WhatsAppActionResponse => {
+): Promise<WhatsAppActionResponse> => {
   const insertResult = insertReplyIntoComposeBox(text)
 
   if (!insertResult.ok) {
@@ -372,6 +444,16 @@ export const sendReplyThroughComposeBox = (
 
     if (button && !button.hasAttribute("disabled")) {
       button.click()
+
+      const isConfirmed = await waitForOutgoingMessageConfirmation(text)
+
+      if (!isConfirmed) {
+        return {
+          error:
+            "Tombol kirim sudah ditekan, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
+          ok: false
+        }
+      }
 
       return {
         ok: true
@@ -405,6 +487,16 @@ export const sendReplyThroughComposeBox = (
       code: "Enter"
     })
   )
+
+  const isConfirmed = await waitForOutgoingMessageConfirmation(text)
+
+  if (!isConfirmed) {
+    return {
+      error:
+        "Enter sudah dipicu, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
+      ok: false
+    }
+  }
 
   return {
     ok: true

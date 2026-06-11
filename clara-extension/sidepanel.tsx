@@ -978,7 +978,79 @@ const insertReplyIntoPage = (text: string): WhatsAppActionResponse => {
   }
 }
 
-const sendReplyFromPanel = (text: string): WhatsAppActionResponse => {
+const sendReplyFromPanel = async (
+  text: string
+): Promise<WhatsAppActionResponse> => {
+  const wait = (ms: number) =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, ms)
+    })
+
+  const normalizeMessageText = (value: string) =>
+    value.replace(/\s+/g, " ").trim().toLowerCase()
+
+  const getMessageContainers = () =>
+    Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '[data-testid="conversation-panel-messages"] [data-testid="msg-container"], [data-testid="msg-container"]'
+      )
+    )
+
+  const getLatestOutgoingMessageSnapshot = () => {
+    const outgoingMessages = getMessageContainers()
+      .map((container, index) => ({
+        direction: getMessageDirection(container),
+        index,
+        text: getMessageText(container)
+      }))
+      .filter((message) => message.direction === "outgoing" && message.text.trim())
+
+    const latestOutgoingMessage = outgoingMessages[outgoingMessages.length - 1]
+
+    return {
+      count: outgoingMessages.length,
+      text: latestOutgoingMessage?.text.trim() || ""
+    }
+  }
+
+  const waitForOutgoingMessageConfirmation = async (expectedText: string) => {
+    const normalizedExpected = normalizeMessageText(expectedText)
+    const beforeSendSnapshot = getLatestOutgoingMessageSnapshot()
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await wait(250)
+
+      const composeBox = document.querySelector<HTMLElement>(
+        '[data-testid="conversation-compose-box-input"][contenteditable="true"], [contenteditable="true"][data-lexical-editor="true"], footer [contenteditable="true"][role="textbox"]'
+      )
+      const composeText =
+        composeBox?.innerText.replace(/\s+/g, " ").trim() || ""
+      const afterSendSnapshot = getLatestOutgoingMessageSnapshot()
+      const normalizedLatestOutgoing = normalizeMessageText(
+        afterSendSnapshot.text
+      )
+
+      const outgoingMessageAppended =
+        afterSendSnapshot.count > beforeSendSnapshot.count &&
+        normalizedLatestOutgoing === normalizedExpected
+
+      const latestOutgoingReplaced =
+        afterSendSnapshot.count === beforeSendSnapshot.count &&
+        afterSendSnapshot.text !== beforeSendSnapshot.text &&
+        normalizedLatestOutgoing === normalizedExpected
+
+      if (outgoingMessageAppended || latestOutgoingReplaced) {
+        return true
+      }
+
+      if (!composeText.trim() && normalizedLatestOutgoing === normalizedExpected) {
+        return true
+      }
+    }
+
+    return false
+  }
+
   const insertResult = insertReplyIntoPage(text)
 
   if (!insertResult.ok) {
@@ -1001,6 +1073,16 @@ const sendReplyFromPanel = (text: string): WhatsAppActionResponse => {
 
     if (button && !button.hasAttribute("disabled")) {
       button.click()
+
+      const isConfirmed = await waitForOutgoingMessageConfirmation(text)
+
+      if (!isConfirmed) {
+        return {
+          error:
+            "Tombol kirim sudah ditekan, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
+          ok: false
+        }
+      }
 
       return {
         ok: true
@@ -1036,6 +1118,16 @@ const sendReplyFromPanel = (text: string): WhatsAppActionResponse => {
       code: "Enter"
     })
   )
+
+  const isConfirmed = await waitForOutgoingMessageConfirmation(text)
+
+  if (!isConfirmed) {
+    return {
+      error:
+        "Enter sudah dipicu, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
+      ok: false
+    }
+  }
 
   return {
     ok: true
