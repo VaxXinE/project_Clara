@@ -98,6 +98,16 @@ function getLatestConversationMessage(detail: SalesConversationDetail) {
   )[detail.messages.length - 1] ?? null;
 }
 
+function isSalesConversationMessage(
+  message: SalesConversationDetail["messages"][number],
+): boolean {
+  const normalizedSenderType = message.sender_type.trim().toLowerCase();
+
+  return ["sales", "outgoing", "agent", "admin"].includes(
+    normalizedSenderType,
+  );
+}
+
 function getLatestSentMessage(detail: SalesConversationDetail) {
   return [...detail.sent_messages].sort((left, right) =>
     left.sent_at.localeCompare(right.sent_at),
@@ -1019,7 +1029,7 @@ function ConversationDetailContent({
           ) : null}
 
           {visibleMessages.map((message) => {
-            const isSales = message.sender_type === "sales";
+            const isSales = isSalesConversationMessage(message);
 
             return (
               <div
