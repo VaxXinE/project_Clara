@@ -76,9 +76,19 @@ const getConversationSubtitle = (chatRoot: HTMLElement) => {
 }
 
 const getMessageDirection = (container: HTMLElement): WhatsAppMessageDirection => {
-  const bubble = container.closest(".message-out, .message-in")
+  const directionNode =
+    container.matches(".message-out, .message-in")
+      ? container
+      : container.querySelector<HTMLElement>(".message-out, .message-in") ||
+        container.closest<HTMLElement>(".message-out, .message-in") ||
+        container.parentElement?.closest<HTMLElement>(".message-out, .message-in") ||
+        null
 
-  return bubble?.classList.contains("message-out") ? "outgoing" : "incoming"
+  if (directionNode?.classList.contains("message-out")) {
+    return "outgoing"
+  }
+
+  return "incoming"
 }
 
 const getLeafTextCandidates = (nodes: HTMLElement[]) => {
