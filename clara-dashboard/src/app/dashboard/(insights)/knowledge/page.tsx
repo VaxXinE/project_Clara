@@ -700,10 +700,11 @@ export default function ProductKnowledgePage() {
             )}
 
             {!isLoading && items.length > 0 && (
-              <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+              <section className="grid gap-4 xl:grid-cols-[0.78fr_1.22fr]">
                 <div className="space-y-3 xl:max-h-[78vh] xl:overflow-y-auto xl:pr-1 clara-scrollbar">
                   {items.map((item) => {
                     const isSelected = item.id === selectedKnowledge?.id;
+                    const contentStats = buildKnowledgeContentStats(item.content);
 
                     return (
                       <button
@@ -747,12 +748,35 @@ export default function ProductKnowledgePage() {
                             {item.is_active ? "active" : "inactive"}
                           </span>
                         </div>
+                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]">
+                          <span
+                            className={
+                              isSelected ? "text-slate-300" : "text-slate-500"
+                            }
+                          >
+                            {contentStats.sectionCount} blok
+                          </span>
+                          <span
+                            className={
+                              isSelected ? "text-slate-400" : "text-slate-400"
+                            }
+                          >
+                            •
+                          </span>
+                          <span
+                            className={
+                              isSelected ? "text-slate-300" : "text-slate-500"
+                            }
+                          >
+                            {contentStats.lineCount} baris
+                          </span>
+                        </div>
                         <p
                           className={`mt-3 text-sm leading-6 ${
                             isSelected ? "text-slate-200" : "text-slate-600"
                           }`}
                         >
-                          {buildPreviewText(item.content, 150)}
+                          {buildPreviewText(item.content, 175)}
                         </p>
                         <div
                           className={`mt-3 flex flex-wrap gap-2 text-xs ${
@@ -801,9 +825,9 @@ export default function ProductKnowledgePage() {
                           </span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-600">
-                          Detail lengkap knowledge yang sedang dipilih. Pakai
-                          panel ini saat benar-benar ingin membaca isi penuh
-                          atau melakukan edit.
+                          Panel kanan ini dibuat untuk mode baca. Jadi isi
+                          knowledge dibagi per blok supaya lebih gampang scan,
+                          bukan kayak baca satu tembok teks panjang.
                         </p>
                       </div>
 
@@ -832,7 +856,7 @@ export default function ProductKnowledgePage() {
                       ) : null}
                     </div>
 
-                    <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    <div className="mt-5 grid gap-3 md:grid-cols-4">
                       <MetaPill
                         label="Source"
                         value={selectedKnowledge.source_type}
@@ -845,14 +869,26 @@ export default function ProductKnowledgePage() {
                         label="Updated"
                         value={formatDateTime(selectedKnowledge.updated_at)}
                       />
+                      <MetaPill
+                        label="Reading Map"
+                        value={buildKnowledgeContentStats(selectedKnowledge.content).label}
+                      />
                     </div>
 
                     <div className="mt-5 rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                        Isi Knowledge
-                      </p>
-                      <div className="clara-scrollbar mt-4 max-h-[52vh] overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-slate-700">
-                        {selectedKnowledge.content}
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                          Isi Knowledge
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Tip: scan judul blok dulu, baru baca detail yang
+                          memang relevan.
+                        </p>
+                      </div>
+                      <div className="clara-scrollbar mt-4 max-h-[60vh] overflow-y-auto pr-1">
+                        <div className="space-y-4">
+                          {renderKnowledgeContent(selectedKnowledge.content)}
+                        </div>
                       </div>
                     </div>
                   </article>
@@ -895,6 +931,78 @@ function MetaPill({ label, value }: { label: string; value: string }) {
       <p className="mt-2 text-sm font-semibold text-slate-950">{value}</p>
     </div>
   );
+}
+
+function renderKnowledgeContent(content: string) {
+  const blocks = content
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return blocks.map((block, blockIndex) => {
+    const lines = block
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const title = lines[0] ?? "";
+    const bodyLines = lines.slice(1);
+    const hasBulletList = bodyLines.some((line) => /^[-*•]\s+/.test(line));
+
+    return (
+      <section
+        key={`${blockIndex}-${title}`}
+        className="rounded-[20px] border border-slate-200 bg-white/80 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+      >
+        <p className="text-sm font-semibold leading-6 text-slate-950">
+          {title}
+        </p>
+        {bodyLines.length > 0 ? (
+          hasBulletList ? (
+            <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-700">
+              {bodyLines.map((line, lineIndex) => (
+                <li key={`${blockIndex}-${lineIndex}`} className="flex gap-3">
+                  <span className="mt-[10px] h-1.5 w-1.5 rounded-full bg-slate-400" />
+                  <span>{line.replace(/^[-*•]\s+/, "")}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="mt-3 space-y-3 text-sm leading-7 text-slate-700">
+              {bodyLines.map((line, lineIndex) => (
+                <p key={`${blockIndex}-${lineIndex}`}>{line}</p>
+              ))}
+            </div>
+          )
+        ) : null}
+      </section>
+    );
+  });
+}
+
+function buildKnowledgeContentStats(content: string) {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return {
+      sectionCount: 0,
+      lineCount: 0,
+      label: "0 blok • 0 baris",
+    };
+  }
+
+  const sectionCount = trimmed
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean).length;
+  const lineCount = trimmed
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean).length;
+
+  return {
+    sectionCount,
+    lineCount,
+    label: `${sectionCount} blok • ${lineCount} baris`,
+  };
 }
 
 function buildPreviewText(value: string, maxLength: number) {

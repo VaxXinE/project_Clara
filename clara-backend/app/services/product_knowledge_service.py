@@ -201,6 +201,7 @@ def get_active_product_knowledge_for_organization(
     organization_id: UUID | None,
     account_category: str | None = None,
     limit: int = 20,
+    include_all_variants: bool = False,
 ) -> list[ProductKnowledge]:
     statement = (
         select(ProductKnowledge)
@@ -216,6 +217,9 @@ def get_active_product_knowledge_for_organization(
     entries = list(db.scalars(statement).all())
     normalized_category = normalize_account_category(account_category)
 
+    if include_all_variants:
+        return entries[:limit]
+
     if normalized_category == "mini":
         entries = [
             entry
@@ -229,13 +233,6 @@ def get_active_product_knowledge_for_organization(
             for entry in entries
             if entry.source_type != "markdown_import_mini"
             and entry.source_type != "markdown_import"
-        ]
-    else:
-        entries = [
-            entry
-            for entry in entries
-            if not entry.source_type.startswith("markdown_import_")
-            or entry.source_type == "markdown_import_regular"
         ]
 
     return entries[:limit]
