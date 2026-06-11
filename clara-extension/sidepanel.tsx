@@ -858,8 +858,66 @@ const insertReplyIntoPage = (text: string): WhatsAppActionResponse => {
     return null
   }
 
-  const getComposeText = (composeBox: HTMLElement) =>
-    composeBox.innerText.replace(/\s+/g, " ").trim()
+const getComposeText = (composeBox: HTMLElement) =>
+  composeBox.innerText.replace(/\s+/g, " ").trim()
+
+const getComposeFooter = () => getComposeBox()?.closest("footer") || document
+
+const clickElement = (node: HTMLElement) => {
+  node.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+      view: window
+    })
+  )
+  node.dispatchEvent(
+    new MouseEvent("mouseup", {
+      bubbles: true,
+      cancelable: true,
+      view: window
+    })
+  )
+  node.click()
+}
+
+const getSendButtonTarget = (): HTMLElement | null => {
+  const searchRoot = getComposeFooter()
+  const selectors = [
+    '[data-testid="compose-btn-send"]',
+    'button[aria-label="Send"]',
+    'button[aria-label="Kirim"]',
+    '[aria-label="Send"]',
+    '[aria-label="Kirim"]',
+    '[data-icon="send"]'
+  ]
+
+  for (const selector of selectors) {
+    const node = searchRoot.querySelector<HTMLElement>(selector)
+
+    if (!node) {
+      continue
+    }
+
+    const clickableTarget =
+      node.tagName === "BUTTON"
+        ? node
+        : node.closest<HTMLElement>('button, [role="button"], [tabindex]')
+
+    const target = clickableTarget || node
+
+    if (
+      target instanceof HTMLButtonElement &&
+      (target.disabled || target.hasAttribute("disabled"))
+    ) {
+      continue
+    }
+
+    return target
+  }
+
+  return null
+}
 
   const chatRoot = getChatRoot()
 
@@ -1057,36 +1115,23 @@ const sendReplyFromPanel = async (
     return insertResult
   }
 
-  const selectors = [
-    '[data-testid="compose-btn-send"]',
-    'button[aria-label="Send"]',
-    'button[aria-label="Kirim"]',
-    'span[data-icon="send"]'
-  ]
+  const sendButtonTarget = getSendButtonTarget()
 
-  for (const selector of selectors) {
-    const node = document.querySelector<HTMLElement>(selector)
-    const button =
-      node?.tagName === "BUTTON"
-        ? (node as HTMLButtonElement)
-        : node?.closest("button")
+  if (sendButtonTarget) {
+    clickElement(sendButtonTarget)
 
-    if (button && !button.hasAttribute("disabled")) {
-      button.click()
+    const isConfirmed = await waitForOutgoingMessageConfirmation(text)
 
-      const isConfirmed = await waitForOutgoingMessageConfirmation(text)
-
-      if (!isConfirmed) {
-        return {
-          error:
-            "Tombol kirim sudah ditekan, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
-          ok: false
-        }
-      }
-
+    if (!isConfirmed) {
       return {
-        ok: true
+        error:
+          "Tombol kirim sudah ditekan, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
+        ok: false
       }
+    }
+
+    return {
+      ok: true
     }
   }
 
