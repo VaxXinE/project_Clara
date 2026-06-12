@@ -20,6 +20,8 @@ const parsePrePlainText = (value: string) => {
   }
 }
 
+const SELF_AUTHOR_PATTERN = /^(you|anda|me|saya)$/i
+
 const getChatRoot = () => {
   const selectors = [
     '#main[data-testid="conversation-panel-wrapper"]',
@@ -76,7 +78,12 @@ const getConversationSubtitle = (chatRoot: HTMLElement) => {
 }
 
 const getMessageDirection = (container: HTMLElement): WhatsAppMessageDirection => {
-  const directionNode =
+  const metaSource =
+    container
+      .querySelector<HTMLElement>("[data-pre-plain-text]")
+      ?.getAttribute("data-pre-plain-text") || ""
+  const parsedMeta = parsePrePlainText(metaSource)
+    const directionNode =
     container.matches(".message-out, .message-in")
       ? container
       : container.querySelector<HTMLElement>(".message-out, .message-in") ||
@@ -88,25 +95,55 @@ const getMessageDirection = (container: HTMLElement): WhatsAppMessageDirection =
     return "outgoing"
   }
 
-  const parentElement = container.parentElement
-  const computedParentStyle = parentElement
-    ? window.getComputedStyle(parentElement)
-    : null
-
-  if (computedParentStyle?.justifyContent === "flex-end") {
-    return "outgoing"
-  }
-
-  if (computedParentStyle?.justifyContent === "flex-start") {
+  if (directionNode?.classList.contains("message-in")) {
     return "incoming"
   }
 
-  if (parentElement?.classList.contains("xuk3077")) {
+  if (
+    container.querySelector(
+      '[data-icon="msg-check"], [data-icon="msg-dblcheck"], [data-icon="status-dblcheck"], [data-icon="msg-time"]'
+    ) &&
+    SELF_AUTHOR_PATTERN.test(parsedMeta.author)
+  ) {
     return "outgoing"
   }
 
-  if (parentElement?.classList.contains("x1cy8zhl")) {
-    return "incoming"
+  if (SELF_AUTHOR_PATTERN.test(parsedMeta.author)) {
+    return "outgoing"
+  }
+
+  const alignmentNodes = [
+    container,
+    container.parentElement,
+    container.parentElement?.parentElement
+  ].filter((node): node is HTMLElement => Boolean(node))
+
+  for (const node of alignmentNodes) {
+    const computedStyle = window.getComputedStyle(node)
+
+    if (computedStyle.justifyContent === "flex-end") {
+      return "outgoing"
+    }
+
+    if (computedStyle.justifyContent === "flex-start") {
+      return "incoming"
+    }
+
+    if (node.classList.contains("xuk3077")) {
+      return "outgoing"
+    }
+
+    if (node.classList.contains("x1cy8zhl")) {
+      return "incoming"
+    }
+  }
+
+  const rect = container.getBoundingClientRect()
+  const leftSpace = rect.left
+  const rightSpace = window.innerWidth - rect.right
+
+  if (rightSpace < leftSpace) {
+    return "outgoing"
   }
 
   return "incoming"

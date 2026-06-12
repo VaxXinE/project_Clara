@@ -42,8 +42,9 @@ def get_clara_knowledge_variant_dirs(
     include_all_variants: bool = False,
 ) -> list[Path]:
     root_dir = get_clara_knowledge_root_dir()
+    normalized_category = normalize_account_category(account_category)
 
-    if include_all_variants:
+    if include_all_variants or normalized_category == "unknown":
         return [
             root_dir / "clara_knowledge_mini",
             root_dir / "clara_knowledge_regular",
