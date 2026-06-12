@@ -12,7 +12,7 @@ class SuggestedReply(BaseModel):
 
 
 class ReplySuggestionCreate(BaseModel):
-    suggested_replies: list[SuggestedReply] = Field(min_length=3, max_length=3)
+    suggested_replies: list[SuggestedReply] = Field(min_length=1, max_length=3)
 
 
 class ReplySuggestionResponse(BaseModel):

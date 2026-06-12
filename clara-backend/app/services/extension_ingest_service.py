@@ -437,12 +437,12 @@ def build_extension_reply_suggestions_response(
         conversation_id=snapshot_result.conversation_id,
         reply_suggestion_id=suggestion.id,
         message_count=snapshot_result.message_count,
-        suggestions=[item.text for item in suggestion_details[:3]],
-        suggestion_details=suggestion_details[:3],
-        risk_level=suggestion.risk_level,
-        action_mode=suggestion.action_mode,
-        next_best_action=extraction.next_best_action,
-        customer_summary=extraction.customer_summary,
+        suggestions=[item.text for item in suggestion_details[:1]],
+        suggestion_details=suggestion_details[:1],
+        risk_level=None,
+        action_mode=None,
+        next_best_action=None,
+        customer_summary=None,
     )
 
 
@@ -498,6 +498,7 @@ def generate_extension_reply_suggestions(
     suggestion = create_reply_suggestion(
         db=db,
         conversation_id=snapshot_result.conversation_id,
+        desired_count=1,
     )
 
     return build_extension_reply_suggestions_response(

@@ -7,7 +7,6 @@ import type {
   WhatsAppMessage,
   WhatsAppMessageDirection,
   WhatsAppReadResponse,
-  WhatsAppSuggestionDetail,
   WhatsAppSuggestionResult
 } from "~/types/whatsapp"
 import {
@@ -22,7 +21,6 @@ import {
   getConfiguredProxyUrl,
   getCurrentClaraSessionUser,
   getProxyCandidates,
-  getReplySuggestionCandidates,
   getSnapshotSyncCandidates
 } from "~/utils/proxy"
 
@@ -32,7 +30,6 @@ const OPENAI_PROXY_URL = getConfiguredProxyUrl()
 const CHAT_SNAPSHOT_PROXY_URL = getChatSnapshotProxyUrl(OPENAI_PROXY_URL)
 const INSERT_LOCK_KEY = "__sgExtensionSidePanelInsertLock__"
 const AUTO_REFRESH_INTERVAL_MS = 2500
-const SUGGESTION_TONE_LABELS = ["Friendly", "Casual", "Profesional"] as const
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
@@ -238,6 +235,12 @@ const panelCss = `
     margin-top: 4px;
   }
 
+  .clara-pane__actions {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .clara-chip {
     align-items: center;
     border-radius: 999px;
@@ -306,6 +309,10 @@ const panelCss = `
 
   .clara-button--block {
     width: 100%;
+  }
+
+  .clara-button--compact {
+    min-height: 40px;
   }
 
   .clara-button--primary {
@@ -1187,29 +1194,6 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
       )
     : []
 
-  const suggestionDetails = Array.isArray(payload?.suggestion_details)
-    ? payload.suggestion_details
-        .filter(
-          (item: unknown): item is WhatsAppSuggestionDetail =>
-            Boolean(item) &&
-            typeof item === "object" &&
-            typeof (item as { text?: unknown }).text === "string" &&
-            (item as { text: string }).text.trim().length > 0
-        )
-        .map((item) => ({
-          reasoning:
-            typeof item.reasoning === "string" &&
-            item.reasoning.trim().length > 0
-              ? item.reasoning
-              : undefined,
-          text: item.text,
-          tone:
-            typeof item.tone === "string" && item.tone.trim().length > 0
-              ? item.tone
-              : undefined
-        }))
-    : []
-
   return {
     actionMode:
       typeof payload?.actionMode === "string"
@@ -1249,8 +1233,7 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
         : typeof payload?.risk_level === "string"
           ? payload.risk_level
           : undefined,
-    suggestionDetails,
-    suggestions: suggestions.slice(0, 3)
+    suggestions: suggestions.slice(0, 1)
   }
 }
 
@@ -1477,52 +1460,6 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
   }
 }
 
-const fetchSuggestionsFromProxyDirectly = async (
-  chatData: WhatsAppChatSnapshot
-) => {
-  let lastFetchError = ""
-
-  for (const proxyUrl of getReplySuggestionCandidates()) {
-    try {
-      const response = await fetch(proxyUrl, {
-        body: JSON.stringify({
-          chatData
-        }),
-        headers: {
-          "Content-Type": "application/json",
-          ...(await getClaraAuthHeaders())
-        },
-        method: "POST"
-      })
-
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(
-          payload?.error ||
-            `API Clara/proxy gagal memproses permintaan saran jawaban di ${proxyUrl}.`
-        )
-      }
-
-      const normalized = normalizeSuggestionPayload(payload)
-      const suggestions = normalized.suggestions
-
-      if (suggestions.length === 0) {
-        throw new Error("Proxy tidak mengembalikan saran jawaban.")
-      }
-
-      return normalized
-    } catch (error) {
-      lastFetchError =
-        error instanceof Error ? error.message : "Failed to fetch"
-    }
-  }
-
-  throw new Error(
-    `Gagal menghubungi Clara/proxy reply di ${OPENAI_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
-  )
-}
-
 const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
   let lastFetchError = ""
 
@@ -1605,9 +1542,6 @@ const clearChatSnapshotInProxy = async () => {
   )
 }
 
-const hasClaraInsight = (result: Partial<WhatsAppSuggestionResult>) =>
-  Boolean(result.customerSummary || result.nextBestAction || result.riskLevel)
-
 const fetchSuggestionsFromClaraBackendOnly = async (
   chatData: WhatsAppChatSnapshot
 ) => {
@@ -1656,7 +1590,7 @@ const fetchSuggestionsFromClaraBackendOnly = async (
   }
 
   throw new Error(
-    `Gagal menghubungi backend Clara untuk mengambil insight. Detail: ${lastFetchError || "Failed to fetch"}`
+    `Gagal menghubungi backend Clara untuk mengambil jawaban terbaik. Detail: ${lastFetchError || "Failed to fetch"}`
   )
 }
 
@@ -1666,44 +1600,6 @@ const shouldClearSnapshotForError = (message: string) =>
     "Buka WhatsApp Web dulu di tab aktif.",
     "Panel chat WhatsApp Web belum ditemukan."
   ].some((pattern) => message.includes(pattern))
-
-const requestSuggestionCandidates = async (chatData: WhatsAppChatSnapshot) => {
-  try {
-    const response = (await chrome.runtime.sendMessage({
-      chatData,
-      type: "GENERATE_REPLY_SUGGESTIONS"
-    })) as
-      | {
-          actionMode?: string
-          cached?: boolean
-          customerSummary?: string
-          error?: string
-          nextBestAction?: string
-          ok: boolean
-          riskLevel?: string
-          suggestionDetails?: WhatsAppSuggestionDetail[]
-          suggestions?: string[]
-        }
-      | undefined
-
-    if (!response?.ok || !response.suggestions) {
-      throw new Error(
-        response?.error ||
-          "Background worker gagal mengambil saran jawaban dari Clara/proxy."
-      )
-    }
-
-    return normalizeSuggestionPayload(response)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-
-    if (!message.includes("Receiving end does not exist")) {
-      throw error
-    }
-
-    return fetchSuggestionsFromProxyDirectly(chatData)
-  }
-}
 
 function ClaraSidePanel() {
   const [chatData, setChatData] = useState<WhatsAppChatSnapshot | null>(null)
@@ -1721,16 +1617,9 @@ function ClaraSidePanel() {
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [draftSuggestions, setDraftSuggestions] = useState<string[]>([])
-  const [suggestionDetails, setSuggestionDetails] = useState<
-    WhatsAppSuggestionDetail[]
-  >([])
   const [editingSuggestionIndex, setEditingSuggestionIndex] = useState<
     number | null
   >(null)
-  const [customerSummary, setCustomerSummary] = useState("")
-  const [nextBestAction, setNextBestAction] = useState("")
-  const [riskLevel, setRiskLevel] = useState("")
-  const [actionMode, setActionMode] = useState("")
   const [replySuggestionId, setReplySuggestionId] = useState("")
   const [tabUrl, setTabUrl] = useState("")
 
@@ -1743,6 +1632,8 @@ function ClaraSidePanel() {
         : null,
     [chatData]
   )
+  const primarySuggestion = suggestions[0] || ""
+  const primaryDraftSuggestion = draftSuggestions[0] || primarySuggestion
 
   const chatSignature = useMemo(
     () =>
@@ -1957,11 +1848,9 @@ function ClaraSidePanel() {
     setError("")
     setFeedback("")
     setSuggestions([])
-    setSuggestionDetails([])
-    setCustomerSummary("")
-    setNextBestAction("")
-    setRiskLevel("")
-    setActionMode("")
+    setDraftSuggestions([])
+    setEditingSuggestionIndex(null)
+    setReplySuggestionId("")
 
     try {
       const data = await readChatFromActiveTab()
@@ -2084,54 +1973,34 @@ function ClaraSidePanel() {
     setFeedback("")
 
     try {
-      let currentChatData: WhatsAppChatSnapshot
-
-      try {
-        // Always re-read the active chat before generating suggestions so
-        // customer replies that just arrived are included in the latest insight.
-        currentChatData = await readChatFromActiveTab()
-      } catch (readError) {
-        if (chatData && chatData.messages.length > 0) {
-          currentChatData = chatData
-        } else {
-          throw readError
-        }
-      }
+      const currentChatData =
+        chatData && chatData.messages.length > 0
+          ? chatData
+          : await readChatFromActiveTab()
 
       if (currentChatData.messages.length === 0) {
         throw new Error(
-          "Chat aktif belum punya pesan teks yang bisa dipakai untuk saran."
+          "Chat aktif belum punya pesan teks yang bisa dipakai untuk generate jawaban."
         )
       }
 
       setChatData(currentChatData)
+      const suggestionResult =
+        await fetchSuggestionsFromClaraBackendOnly(currentChatData)
+      const bestSuggestion = suggestionResult?.suggestions[0]?.trim()
 
-      syncChatSnapshotToProxy(currentChatData).catch(() => {
-        // Suggestion flow should continue even when snapshot sync is unavailable.
-      })
+      if (!bestSuggestion) {
+        throw new Error("Clara belum mengembalikan jawaban terbaik.")
+      }
 
-      const nextSuggestionResult =
-        await requestSuggestionCandidates(currentChatData)
-      const hydratedSuggestionResult =
-        hasClaraInsight(nextSuggestionResult) &&
-        nextSuggestionResult.replySuggestionId
-          ? nextSuggestionResult
-          : (await fetchSuggestionsFromClaraBackendOnly(currentChatData).catch(
-              () => null
-            )) || nextSuggestionResult
-
-      setSuggestions(hydratedSuggestionResult.suggestions)
-      setDraftSuggestions(hydratedSuggestionResult.suggestions)
-      setSuggestionDetails(hydratedSuggestionResult.suggestionDetails || [])
-      setCustomerSummary(hydratedSuggestionResult.customerSummary || "")
-      setNextBestAction(hydratedSuggestionResult.nextBestAction || "")
-      setRiskLevel(hydratedSuggestionResult.riskLevel || "")
-      setActionMode(hydratedSuggestionResult.actionMode || "")
-      setReplySuggestionId(hydratedSuggestionResult.replySuggestionId || "")
+      setSuggestions([bestSuggestion])
+      setDraftSuggestions([bestSuggestion])
+      setEditingSuggestionIndex(null)
+      setReplySuggestionId(suggestionResult.replySuggestionId || "")
       setFeedback(
-        hydratedSuggestionResult.cached
-          ? "Saran balasan Clara tetap sama karena snapshot chat belum berubah."
-          : "Saran balasan Clara sudah diperbarui dari chat terbaru."
+        suggestionResult.cached
+          ? "Jawaban terbaik tetap sama karena isi chat belum berubah."
+          : "Jawaban terbaik Clara sudah siap dipakai."
       )
     } catch (err) {
       const message =
@@ -2141,11 +2010,7 @@ function ClaraSidePanel() {
 
       setSuggestions([])
       setDraftSuggestions([])
-      setSuggestionDetails([])
-      setCustomerSummary("")
-      setNextBestAction("")
-      setRiskLevel("")
-      setActionMode("")
+      setEditingSuggestionIndex(null)
       setReplySuggestionId("")
       setError(message)
     } finally {
@@ -2406,10 +2271,10 @@ function ClaraSidePanel() {
     .filter(Boolean)
     .join(" | ")
   const draftStatusLabel = suggestions.length
-    ? `${suggestions.length} draft siap`
+    ? "Jawaban terbaik siap"
     : isSuggesting
-      ? "Sedang menyusun draft"
-      : "Belum ada draft"
+      ? "Sedang menyusun jawaban"
+      : "Belum ada jawaban"
 
   return (
     <div className="clara-panel">
@@ -2481,16 +2346,24 @@ function ClaraSidePanel() {
                 </div>
               </div>
 
-              <button
-                className="clara-button clara-button--primary clara-button--block"
-                disabled={isLoading}
-                onClick={handleReadChat}>
-                {isLoading
-                  ? "Membaca chat..."
-                  : chatData
-                    ? "Perbarui Isi Chat"
-                    : "Baca Chat Aktif"}
-              </button>
+              <div className="clara-pane__actions">
+                <button
+                  className="clara-button clara-button--ghost clara-button--block clara-button--compact"
+                  disabled={isLoading}
+                  onClick={handleReadChat}>
+                  {isLoading
+                    ? "Membaca chat..."
+                    : chatData
+                      ? "Refresh Chat"
+                      : "Baca Chat Aktif"}
+                </button>
+                <button
+                  className="clara-button clara-button--primary clara-button--block clara-button--compact"
+                  disabled={isSuggesting || isLoading || !chatData}
+                  onClick={handleSuggestReplies}>
+                  {isSuggesting ? "Generate..." : "Generate Jawaban"}
+                </button>
+              </div>
 
               {!isWhatsAppTab && !chatData && (
                 <div className="clara-note clara-note--warn">
@@ -2566,7 +2439,8 @@ function ClaraSidePanel() {
                   <div className="clara-empty__meta">
                     Buka dulu chat di WhatsApp Web, lalu klik{" "}
                     <strong>Baca Chat Aktif</strong>. Setelah itu isi percakapan
-                    akan muncul di area ini seperti tampilan chat.
+                    akan muncul di area ini dan tombol generate bisa langsung
+                    dipakai di sebelahnya.
                   </div>
                 </div>
               )}
@@ -2577,10 +2451,10 @@ function ClaraSidePanel() {
                 <div>
                   <div className="clara-pane__eyebrow">Balasan AI</div>
                   <div className="clara-pane__title">
-                    Pilih jawaban yang paling nyaman dipakai
+                    Satu jawaban terbaik yang siap dipakai
                   </div>
                   <p className="clara-pane__copy">
-                    Clara menyiapkan beberapa versi balasan untuk dipilih.
+                    Clara fokus kasih satu hasil generate terbaik biar lebih cepat dan praktis.
                   </p>
                 </div>
 
@@ -2589,157 +2463,95 @@ function ClaraSidePanel() {
                 </div>
               </div>
 
-              <button
-                className="clara-button clara-button--ghost clara-button--block"
-                disabled={isSuggesting || isLoading}
-                onClick={handleSuggestReplies}>
-                {isSuggesting ? "Menyusun balasan..." : "Buat Saran Jawaban"}
-              </button>
-
-              {suggestions.length > 0 ? (
+              {primarySuggestion ? (
                 <>
-                  <div className="clara-brief">
-                    <div className="clara-brief__title">Insight Clara</div>
-
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {riskLevel ? (
-                        <div className="clara-chip clara-chip--warn">
-                          Risk: {riskLevel}
-                        </div>
-                      ) : null}
-                      {actionMode ? (
-                        <div className="clara-chip clara-chip--good">
-                          {actionMode}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    {customerSummary || nextBestAction || riskLevel ? (
-                      <div className="clara-brief__grid">
-                        {customerSummary && (
-                          <div className="clara-brief__text">
-                            <strong>Ringkasan customer:</strong>{" "}
-                            {customerSummary}
-                          </div>
-                        )}
-                        {nextBestAction && (
-                          <div className="clara-brief__text">
-                            <strong>Aksi berikutnya:</strong> {nextBestAction}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="clara-brief__text">
-                        Insight Clara belum tersedia untuk percakapan ini, tapi
-                        draft balasan tetap berhasil dibuat.
-                      </div>
-                    )}
-                  </div>
-
                   <div className="clara-draft-list">
-                    {suggestions.map((suggestion, index) => (
-                      <article
-                        className="clara-draft"
-                        key={`${suggestion}-${index}`}>
-                        <div className="clara-draft__head">
-                          <div>
-                            <div className="clara-draft__number">
-                              Draft {String(index + 1).padStart(2, "0")}
-                            </div>
-                            <div className="clara-draft__tone">
-                              {SUGGESTION_TONE_LABELS[index] ||
-                                `Saran ${index + 1}`}
-                            </div>
+                    <article className="clara-draft">
+                      <div className="clara-draft__head">
+                        <div>
+                          <div className="clara-draft__number">
+                            Jawaban Terbaik
                           </div>
+                          <div className="clara-draft__tone">
+                            Siap dipakai langsung
+                          </div>
+                        </div>
 
                         <div className="clara-draft__hint">
-                          Bisa dipakai langsung
+                          Hasil tercepat Clara
                         </div>
                       </div>
 
-                        {editingSuggestionIndex === index ? (
+                      {editingSuggestionIndex === 0 ? (
                           <div className="clara-draft__editor">
                             <textarea
                               className="clara-input clara-input--textarea"
                               onChange={(event) =>
-                                handleDraftSuggestionChange(
-                                  index,
-                                  event.target.value
-                                )
+                                handleDraftSuggestionChange(0, event.target.value)
                               }
                               rows={6}
-                              value={draftSuggestions[index] ?? suggestion}
+                              value={primaryDraftSuggestion}
                             />
                             <div className="clara-draft__actions">
                               <button
                                 className="clara-button clara-button--ghost"
-                                onClick={() =>
-                                  handleCancelEditingSuggestion(index)
-                                }>
+                                onClick={() => handleCancelEditingSuggestion(0)}>
                                 Batal
                               </button>
                               <button
                                 className="clara-button clara-button--insert"
-                                onClick={() => handleSaveEditedSuggestion(index)}>
+                                onClick={() => handleSaveEditedSuggestion(0)}>
                                 Simpan
                               </button>
                             </div>
                           </div>
                         ) : (
-                          <div className="clara-draft__text">{suggestion}</div>
+                        <div className="clara-draft__text">
+                          {primarySuggestion}
+                        </div>
                         )}
 
-                        {suggestionDetails[index]?.reasoning && (
-                          <div className="clara-draft__reason">
-                            <strong>Kenapa draft ini:</strong>{" "}
-                            {suggestionDetails[index]?.reasoning}
-                          </div>
-                        )}
-
-                        {editingSuggestionIndex !== index ? (
+                      {editingSuggestionIndex !== 0 ? (
                           <div className="clara-draft__actions">
                             <button
                               className="clara-button clara-button--ghost"
-                              onClick={() =>
-                                handleStartEditingSuggestion(index)
-                              }>
+                              onClick={() => handleStartEditingSuggestion(0)}>
                               Edit
                             </button>
                             <button
                               className="clara-button clara-button--insert"
-                              disabled={isInsertingIndex === index}
+                              disabled={isInsertingIndex === 0}
                               onClick={() =>
-                                handleInsertSuggestion(suggestion, index)
+                                handleInsertSuggestion(primarySuggestion, 0)
                               }>
-                              {isInsertingIndex === index
+                              {isInsertingIndex === 0
                                 ? "Memasukkan..."
                                 : "Masukkan ke Chat"}
                             </button>
                             <button
                               className="clara-button clara-button--send"
-                              disabled={isInsertingIndex === index}
+                              disabled={isInsertingIndex === 0}
                               onClick={() =>
-                                handleSendSuggestion(suggestion, index)
+                                handleSendSuggestion(primarySuggestion, 0)
                               }>
-                              {isInsertingIndex === index
+                              {isInsertingIndex === 0
                                 ? "Mengirim..."
                                 : "Kirim Sekarang"}
                             </button>
                           </div>
                         ) : null}
-                      </article>
-                    ))}
+                    </article>
                   </div>
                 </>
               ) : (
                 <div className="clara-empty">
                   <div className="clara-empty__title">
-                    Belum ada draft balasan
+                    Belum ada jawaban terbaik
                   </div>
                   <div className="clara-empty__meta">
                     Setelah isi chat berhasil dibaca, klik{" "}
-                    <strong>Buat Saran Jawaban</strong> supaya Clara menyiapkan
-                    beberapa opsi yang bisa langsung kamu pakai.
+                    <strong>Generate Jawaban</strong> supaya Clara menyiapkan
+                    satu balasan terbaik yang bisa langsung kamu pakai.
                   </div>
                 </div>
               )}

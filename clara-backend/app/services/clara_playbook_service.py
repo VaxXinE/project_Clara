@@ -36,6 +36,22 @@ def get_clara_knowledge_variant_dir(account_category: str | None) -> Path:
     return root_dir / "clara_knowledge_regular"
 
 
+def get_clara_knowledge_variant_dirs(
+    account_category: str | None,
+    *,
+    include_all_variants: bool = False,
+) -> list[Path]:
+    root_dir = get_clara_knowledge_root_dir()
+
+    if include_all_variants:
+        return [
+            root_dir / "clara_knowledge_mini",
+            root_dir / "clara_knowledge_regular",
+        ]
+
+    return [get_clara_knowledge_variant_dir(account_category)]
+
+
 def read_markdown_file(path: Path) -> str:
     if not path.exists():
         return ""
@@ -43,26 +59,35 @@ def read_markdown_file(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
-@lru_cache(maxsize=4)
-def load_clara_response_playbook(account_category: str | None = None) -> str:
-    knowledge_dir = get_clara_knowledge_variant_dir(account_category)
+@lru_cache(maxsize=8)
+def load_clara_response_playbook(
+    account_category: str | None = None,
+    include_all_variants: bool = False,
+) -> str:
     sections: list[str] = []
+    knowledge_dirs = get_clara_knowledge_variant_dirs(
+        account_category,
+        include_all_variants=include_all_variants,
+    )
 
-    ordered_files = []
-    available_filenames = {path.name for path in knowledge_dir.glob("*.md")}
-    for filename in PLAYBOOK_FILES:
-        if filename in available_filenames:
-            ordered_files.append(filename)
+    for knowledge_dir in knowledge_dirs:
+        ordered_files = []
+        available_filenames = {path.name for path in knowledge_dir.glob("*.md")}
+        for filename in PLAYBOOK_FILES:
+            if filename in available_filenames:
+                ordered_files.append(filename)
 
-    remaining_files = sorted(available_filenames - set(ordered_files))
+        remaining_files = sorted(available_filenames - set(ordered_files))
 
-    for filename in [*ordered_files, *remaining_files]:
-        file_path = knowledge_dir / filename
-        content = read_markdown_file(file_path)
+        for filename in [*ordered_files, *remaining_files]:
+            file_path = knowledge_dir / filename
+            content = read_markdown_file(file_path)
 
-        if not content:
-            continue
+            if not content:
+                continue
 
-        sections.append(f"## {filename}\n{content}")
+            sections.append(
+                f"## {knowledge_dir.name}/{filename}\n{content}"
+            )
 
     return "\n\n".join(sections).strip()
