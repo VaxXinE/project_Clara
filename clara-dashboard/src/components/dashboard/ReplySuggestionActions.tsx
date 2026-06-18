@@ -107,7 +107,7 @@ export function ReplySuggestionActions({
     return (
       <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(24,17,12,0.98)_100%)] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
         <p className="text-sm font-semibold text-[#fff0c9]">
-          Reply sudah ditandai terkirim.
+          Jawaban ini sudah ditandai terkirim.
         </p>
         <p className="mt-1 text-sm leading-6 text-[#d6bb84]">
           Untuk MVP ini, status terkirim masih simulasi manual. Nanti bisa
@@ -137,13 +137,12 @@ export function ReplySuggestionActions({
     return (
       <div className="clara-card space-y-4 rounded-[30px] p-5">
         <div>
-          <p className="clara-kicker">Reply Approved</p>
+          <p className="clara-kicker">Jawaban siap kirim</p>
           <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-            Reply Approved
+            Jawaban sudah siap dipakai
           </h3>
           <p className="mt-2 text-sm text-slate-600">
-            Balasan sudah approved. Setelah sales mengirimnya ke WhatsApp,
-            tandai sebagai sent.
+            Jawaban ini sudah final. Setelah benar-benar dikirim ke WhatsApp, tandai sebagai terkirim.
           </p>
         </div>
 
@@ -157,7 +156,7 @@ export function ReplySuggestionActions({
           disabled={isMarkingSent}
           className="clara-button clara-button-success"
         >
-          {isMarkingSent ? "Marking..." : "Mark as Sent"}
+          {isMarkingSent ? "Menandai..." : "Tandai Sudah Terkirim"}
         </button>
       </div>
     );
@@ -166,12 +165,12 @@ export function ReplySuggestionActions({
   return (
     <div className="clara-card space-y-5 rounded-[30px] p-5">
       <div>
-        <p className="clara-kicker">Reply Review</p>
+        <p className="clara-kicker">Jawaban Clara</p>
         <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-          Review Draft Balasan
+          Pilih jawaban yang paling pas
         </h3>
         <p className="mt-2 text-sm text-slate-600">
-          Pilih salah satu draft, edit kalau perlu, lalu approve atau reject.
+          Pilih jawaban yang paling cocok, edit kalau perlu, lalu simpan sebagai jawaban final.
         </p>
         {isStale ? (
           <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
@@ -219,7 +218,7 @@ export function ReplySuggestionActions({
           htmlFor="finalReply"
           className="clara-label"
         >
-          Final reply
+          Jawaban final
         </label>
         <textarea
           id="finalReply"
@@ -235,7 +234,7 @@ export function ReplySuggestionActions({
           htmlFor="rejectReason"
           className="clara-label"
         >
-          Reject reason
+          Alasan tidak dipakai
         </label>
         <input
           id="rejectReason"
@@ -257,7 +256,7 @@ export function ReplySuggestionActions({
           disabled={isSubmitting || finalText.trim().length === 0}
           className="clara-button clara-button-primary"
         >
-          Approve Reply
+          Pilih Jawaban Ini
         </button>
 
         <button
@@ -266,7 +265,7 @@ export function ReplySuggestionActions({
           disabled={isSubmitting}
           className="clara-button clara-button-ghost"
         >
-          Reject
+          Jangan Pakai
         </button>
       </div>
     </div>

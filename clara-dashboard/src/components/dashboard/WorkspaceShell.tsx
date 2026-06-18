@@ -68,27 +68,46 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   const isManagerScopedRole = normalizedRole === "manager";
   const isHeadScopedRole = normalizedRole === "head";
   const isSuperadminScopedRole = normalizedRole === "superadmin";
+  const isManagerMonitorRole =
+    isManagerScopedRole && !canAccessQueueAndActionCenter(currentUser?.role);
+  const isHeadMonitorRole =
+    isHeadScopedRole && !canAccessQueueAndActionCenter(currentUser?.role);
 
   const workspaceItems: NavItem[] = [
     {
       href: "/workspace",
       label: "Beranda",
       icon: faGaugeHigh,
-      description: "Ringkasan kerja",
+      description: isSalesRole ? "Prioritas kerja hari ini" : "Ringkasan kerja",
     },
     {
       href: "/crm",
-      label: "Lead Management",
+      label: isSalesRole
+        ? "Leads"
+        : isHeadMonitorRole
+          ? "Lead Tim"
+        : isManagerMonitorRole
+          ? "Lead Tim"
+          : "Lead Management",
       icon: faBriefcase,
-      description: "Status dan progres lead",
-    },
-    {
-      href: "/customers",
-      label: "Customer List",
-      icon: faBuildingShield,
-      description: "Data customer",
+      description: isSalesRole
+        ? "Progres prospect yang sedang ditangani"
+        : isHeadMonitorRole
+          ? "Status dan progres lead lintas tim"
+        : isManagerMonitorRole
+          ? "Status dan progres lead tim"
+        : "Status dan progres lead",
     },
   ];
+
+  if (isSalesRole || isSuperadminScopedRole) {
+    workspaceItems.push({
+      href: "/customers",
+      label: isSalesRole ? "Daftar Customer" : "Customer List",
+      icon: faBuildingShield,
+      description: isSalesRole ? "Ringkasan customer aktif" : "Data customer",
+    });
+  }
 
   if (currentUser && canAccessQueueAndActionCenter(currentUser.role)) {
     workspaceItems.splice(
@@ -96,15 +115,17 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       0,
       {
         href: "/sales",
-        label: "Queue",
+        label: isSalesRole ? "Chat Masuk" : "Queue",
         icon: faComments,
-        description: "Chat masuk Sales",
+        description: isSalesRole ? "Tempat mulai balas chat" : "Chat masuk Sales",
       },
       {
         href: "/follow-up",
-        label: "Action Center",
+        label: isSalesRole ? "Tindak Lanjut" : "Action Center",
         icon: faCalendarCheck,
-        description: "Prioritas follow-up",
+        description: isSalesRole
+          ? "Pekerjaan follow-up yang belum selesai"
+          : "Prioritas follow-up",
       },
     );
   }
@@ -112,22 +133,13 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   const insightItems: NavItem[] = [];
   const adminItems: NavItem[] = [];
 
-  if (currentUser && isSalesRole) {
-    workspaceItems.push({
-      href: "/upload",
-      label: "Lead Capture",
-      icon: faCloudArrowUp,
-      description: "Input chat baru",
-    });
-  }
-
   if (currentUser && (isHeadScopedRole || isSuperadminScopedRole)) {
     workspaceItems.push({
       href: "/notifications",
-      label: "Alert Center",
+      label: isHeadMonitorRole ? "Alert Tim" : "Alert Center",
       icon: faTriangleExclamation,
       description: isHeadScopedRole
-        ? "Alert follow-up tim"
+        ? "Sinyal follow-up tim yang perlu perhatian"
         : "Alert operasional",
     });
   }
@@ -147,18 +159,34 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   ) {
     workspaceItems.push({
       href: "/approvals",
-      label: isHeadScopedRole ? "Follow-up Center" : "Chat Review Center",
+      label: isHeadScopedRole
+        ? isHeadMonitorRole
+          ? "Arahan Tim"
+          : "Follow-up Center"
+        : isManagerMonitorRole
+          ? "Review Sales"
+          : "Chat Review Center",
       icon: faWandSparkles,
       description: isHeadScopedRole
-        ? "Arahan dan follow-up Sales"
+        ? "Keputusan dan arahan tindak lanjut tim"
+        : isManagerMonitorRole
+          ? "Cek balasan dan arahkan Sales"
         : "Review jawaban Sales",
     });
     insightItems.push({
       href: "/manager-insights",
-      label: isHeadScopedRole ? "Head Insights" : "Manager Insights",
+      label: isHeadScopedRole
+        ? isHeadMonitorRole
+          ? "Monitor Tim"
+          : "Head Insights"
+        : isManagerMonitorRole
+          ? "Monitor Tim"
+          : "Manager Insights",
       icon: faChartLine,
       description: isHeadScopedRole
-        ? "Analisis prospect tim"
+        ? "Pantau progres, risiko, dan hambatan tim"
+        : isManagerMonitorRole
+          ? "Pantau progres dan hambatan tim"
         : "Progres prospect Sales",
     });
   }
@@ -173,9 +201,11 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       },
       {
         href: "/marketing",
-        label: "Marketing Insights",
+        label: isHeadMonitorRole ? "Insight Pasar" : "Marketing Insights",
         icon: faBullhorn,
-        description: "Analisis sinyal marketing",
+        description: isHeadMonitorRole
+          ? "Pola objection dan sinyal dari lapangan"
+          : "Analisis sinyal marketing",
       },
       {
         href: "/kpi",
@@ -206,8 +236,21 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
 
   const groups: NavGroup[] = [{ title: "Workspace", items: workspaceItems }];
 
+  if (currentUser && isSalesRole) {
+    workspaceItems.push({
+      href: "/upload",
+      label: "Input Chat",
+      icon: faCloudArrowUp,
+      description: "Masukkan chat baru ke Clara",
+    });
+    return groups;
+  }
+
   if (insightItems.length > 0) {
-    groups.push({ title: "Insights", items: insightItems });
+    groups.push({
+      title: isManagerMonitorRole || isHeadMonitorRole ? "Monitoring" : "Insights",
+      items: insightItems,
+    });
   }
 
   if (adminItems.length > 0) {

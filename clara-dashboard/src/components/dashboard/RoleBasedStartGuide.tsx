@@ -52,60 +52,60 @@ const SALES_WORKFLOW_STEPS = [
 const HEAD_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Analisis Prospect Sales",
-    description: "Lihat performa, peluang, risiko, dan konversi tim.",
+    title: "Pantau Kondisi Tim",
+    description: "Buka Monitor Tim untuk lihat progres, risiko, dan hambatan.",
     href: "/dashboard/manager-insights",
-    cta: "Buka Head Insights",
+    cta: "Buka Monitor Tim",
   },
   {
     step: "2",
-    title: "Identifikasi Lead Berisiko",
-    description: "Pilih prospect yang kurang rapi atau butuh intervensi.",
+    title: "Cek Area Yang Mulai Bocor",
+    description: "Pilih lead atau area tim yang butuh perhatian lebih dulu.",
     href: "/dashboard/crm",
-    cta: "Buka Lead Management",
+    cta: "Buka Lead Tim",
   },
   {
     step: "3",
-    title: "Follow-up ke Sales",
-    description: "Tekan item yang macet atau perlu klarifikasi.",
+    title: "Buka Arahan Tim",
+    description: "Masuk ke item yang macet atau perlu keputusan lanjut.",
     href: "/dashboard/approvals",
-    cta: "Buka Chat Review Center",
+    cta: "Buka Arahan Tim",
   },
   {
     step: "4",
     title: "Beri Arahan Perbaikan",
     description: "Kirim rekomendasi dan next action ke tim.",
     href: "/dashboard/notifications",
-    cta: "Kembali ke Alert Center",
+    cta: "Kembali ke Alert Tim",
   },
 ] as const;
 
 const MANAGER_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Lihat Progress Prospect Sales",
-    description: "Buka Manager Insights untuk lihat progres.",
+    title: "Pantau Tim Dulu",
+    description: "Buka Monitor Tim untuk lihat progres dan hambatan.",
     href: "/dashboard/manager-insights",
-    cta: "Buka Manager Insights",
+    cta: "Buka Monitor Tim",
   },
   {
     step: "2",
-    title: "Lihat Jawaban Sales",
-    description: "Buka Chat Review Center.",
+    title: "Cek Balasan Sales",
+    description: "Buka Review Sales.",
     href: "/dashboard/approvals",
-    cta: "Buka Chat Review Center",
+    cta: "Buka Review Sales",
   },
   {
     step: "3",
-    title: "Analisis Kualitas Jawaban",
-    description: "Cek akurasi, tone, dan kepatuhan.",
+    title: "Tentukan Arah Perbaikan",
+    description: "Cek apakah balasan sudah aman, jelas, dan layak lanjut.",
     href: "/dashboard/approvals",
     cta: "Review Jawaban Sales",
   },
   {
     step: "4",
-    title: "Kirim Feedback ke Sales",
-    description: "Kirim feedback jika belum sesuai.",
+    title: "Kirim Arahan ke Sales",
+    description: "Kirim feedback kalau masih perlu revisi atau tindak lanjut.",
     href: "/dashboard/approvals",
     cta: "Kirim Feedback",
   },
@@ -162,13 +162,13 @@ const ROLE_FEATURE_SETS: readonly RoleFeatureSet[] = [
   {
     roleKey: "manager",
     label: "Manager",
-    title: "Cek kualitas jawaban Sales",
-    summary: "Fokus pada progres, review, dan feedback.",
+    title: "Pantau tim dan arahkan Sales",
+    summary: "Fokus pada progres tim, review balasan, dan arahan.",
     items: [
-      "Lihat progres prospect Sales.",
-      "Lihat jawaban Sales.",
-      "Review kualitas jawaban.",
-      "Kirim feedback ke Sales.",
+      "Lihat progres lead tim.",
+      "Cek balasan Sales yang perlu ditinjau.",
+      "Tentukan apakah perlu revisi atau lanjut.",
+      "Kirim arahan yang jelas ke Sales.",
     ],
   },
   {
@@ -228,17 +228,17 @@ function buildRoleTasks(role?: string) {
     return [
       {
         title: "Saya mau analisis prospect tim",
-        description: "Buka Head Insights.",
+        description: "Buka Monitor Tim.",
         href: "/dashboard/manager-insights",
       },
       {
         title: "Saya mau lihat lead yang paling riskan",
-        description: "Lihat lead yang perlu intervensi.",
+        description: "Lihat lead tim yang perlu intervensi.",
         href: "/dashboard/crm",
       },
       {
         title: "Saya mau follow-up ke Sales",
-        description: "Buka Chat Review Center.",
+        description: "Buka Arahan Tim.",
         href: "/dashboard/approvals",
       },
     ];
@@ -247,18 +247,18 @@ function buildRoleTasks(role?: string) {
   if (isManagerRole(role)) {
     return [
       {
-        title: "Saya mau lihat progress prospect Sales",
-        description: "Buka Manager Insights.",
+        title: "Saya mau pantau progres tim",
+        description: "Buka Monitor Tim.",
         href: "/dashboard/manager-insights",
       },
       {
         title: "Saya mau cek jawaban Sales",
-        description: "Buka Chat Review Center.",
+        description: "Buka Review Sales.",
         href: "/dashboard/approvals",
       },
       {
-        title: "Saya mau kirim feedback ke Sales",
-        description: "Tulis feedback atau coaching note.",
+        title: "Saya mau kasih arahan ke Sales",
+        description: "Tulis feedback atau coaching note yang jelas.",
         href: "/dashboard/approvals",
       },
     ];
@@ -318,26 +318,26 @@ function buildRoleStartCopy(role?: string) {
   if (isHeadRole(role)) {
     return {
       eyebrow: "Head flow",
-      title: "Mulai dari analisis prospect tim",
+      title: "Mulai dari monitor tim dulu",
       description:
-        "Analisis prospect, pilih lead berisiko, lalu follow-up ke Sales.",
+        "Pantau tim, cek area berisiko, lalu beri arahan tindak lanjut.",
       primaryHref: "/dashboard/manager-insights",
-      primaryLabel: "Buka Head Insights",
+      primaryLabel: "Buka Monitor Tim",
       secondaryHref: "/dashboard/approvals",
-      secondaryLabel: "Buka Chat Review Center",
+      secondaryLabel: "Buka Arahan Tim",
     };
   }
 
   if (isManagerRole(role)) {
     return {
       eyebrow: "Manager flow",
-      title: "Mulai dari progress prospect Sales",
+      title: "Mulai dari monitor tim dulu",
       description:
-        "Lihat progres, cek jawaban, lalu kirim feedback.",
+        "Pantau tim, cek balasan Sales, lalu kirim arahan.",
       primaryHref: "/dashboard/manager-insights",
-      primaryLabel: "Buka Manager Insights",
-      secondaryHref: "/dashboard/manager-insights",
-      secondaryLabel: "Lihat Progress Prospect",
+      primaryLabel: "Buka Monitor Tim",
+      secondaryHref: "/dashboard/approvals",
+      secondaryLabel: "Buka Review Sales",
     };
   }
 
@@ -531,8 +531,8 @@ export function RoleBasedStartGuide({
                 follow-up harian.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Chat Review Center</span>:
-                review jawaban dan feedback.
+                <span className="font-semibold text-slate-950">Review Sales</span>:
+                review jawaban dan arahan ke Sales.
               </p>
               <p>
                 <span className="font-semibold text-slate-950">Alert Center</span>:

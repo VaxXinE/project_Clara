@@ -557,7 +557,7 @@ export default function SalesConversationDetailPage() {
       }
       backLabel={
         currentUser && !canAccessQueueAndActionCenter(currentUser.role)
-          ? "Kembali ke review center"
+          ? "Kembali ke review sales"
           : "Kembali ke inbox"
       }
       actions={
@@ -582,8 +582,8 @@ export default function SalesConversationDetailPage() {
           >
             {currentUser && !canAccessQueueAndActionCenter(currentUser.role)
               ? normalizeWorkspaceRole(currentUser.role) === "head"
-                ? "Buka Alert Center"
-                : "Buka Manager Insights"
+                ? "Buka Alert Tim"
+                : "Buka Monitor Tim"
               : "Buka Worklist"}
           </Link>
         </>
@@ -608,7 +608,7 @@ export default function SalesConversationDetailPage() {
               className="font-semibold underline"
             >
               {currentUser && !canAccessQueueAndActionCenter(currentUser.role)
-                ? "chat review center"
+                ? "review sales"
                 : "sales inbox"}
             </Link>
             .
@@ -976,6 +976,7 @@ function ConversationDetailContent({
 }) {
   const extraction = detail.latest_ai_extraction;
   const suggestion = detail.latest_reply_suggestion;
+  const isSalesWorkspace = currentUser?.role === "sales";
   const canManage = canManageReviewCase(currentUser?.role);
   const canReviewProposal = canReviewKnowledgeProposal(currentUser?.role);
   const reviewCase = detail.chat_review_case;
@@ -1083,8 +1084,167 @@ function ConversationDetailContent({
 
   return (
     <section className="space-y-6">
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)] xl:items-start">
-        <section className="clara-card rounded-[30px] p-5">
+      <section
+        className={`grid gap-6 xl:items-start ${
+          isSalesWorkspace
+            ? "xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]"
+            : "xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)]"
+        }`}
+      >
+        {isSalesWorkspace ? (
+          <>
+            <div>{chatTimeline}</div>
+
+            <section className="clara-card rounded-[30px] p-5 xl:sticky xl:top-28">
+              <div>
+                <p className="clara-kicker">Area kerja sales</p>
+                <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                  Baca konteks lalu pilih aksi
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Fokus ke timeline chat, hasil baca Clara, lalu lanjut pilih jawaban atau cek riwayat kirim.
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <PanelTab
+                  label="AI & Jawaban"
+                  isActive={activePanel === "ai_reply"}
+                  onClick={() => setActivePanel("ai_reply")}
+                />
+                <PanelTab
+                  label="Riwayat Kirim"
+                  isActive={activePanel === "sent_logs"}
+                  onClick={() => setActivePanel("sent_logs")}
+                />
+              </div>
+
+              <div className="mt-5">
+                {activePanel === "ai_reply" ? (
+                  <div className="space-y-6">
+                    <ConversationAiActions
+                      conversationId={detail.conversation_id}
+                      hasAiExtraction={Boolean(extraction)}
+                      hasReplySuggestion={Boolean(suggestion)}
+                      analysisNeedsRefresh={analysisStale}
+                      replyNeedsRefresh={suggestionStale}
+                      onUpdated={onUpdated}
+                    />
+
+                    <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+                      <p className="clara-kicker">Ringkasan Clara</p>
+                      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                        Hasil baca percakapan
+                      </h2>
+
+                      {extraction ? (
+                        <div className="mt-4 space-y-3 text-sm">
+                          <InfoBlock
+                            label="Tahap customer"
+                            value={formatStatusLabel(extraction.pipeline_stage)}
+                          />
+                          <InfoBlock
+                            label="Sentimen"
+                            value={formatStatusLabel(extraction.sentiment)}
+                          />
+                          <div className="clara-card-soft rounded-[22px] p-4">
+                            <p className="clara-kicker text-[11px]">
+                              Objection utama
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {extraction.main_objections.length > 0 ? (
+                                extraction.main_objections.map((objection) => (
+                                  <span
+                                    key={objection}
+                                    className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                                  >
+                                    {objection}
+                                  </span>
+                                ))
+                              ) : (
+                                <p className="text-slate-600">
+                                  Belum ada objection utama yang menonjol.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <InfoBlock
+                            label="Langkah berikutnya"
+                            value={extraction.next_best_action}
+                          />
+                        </div>
+                      ) : (
+                        <div className="clara-card-outline mt-4 rounded-[24px] p-4 text-sm text-slate-600">
+                          Percakapan ini belum dibaca AI. Jalankan analisis dulu supaya Clara bisa bantu menyiapkan arah balasan.
+                        </div>
+                      )}
+                    </div>
+
+                    {suggestion ? (
+                      <ReplySuggestionActions
+                        replySuggestionId={suggestion.id}
+                        suggestedReplies={suggestion.suggested_replies}
+                        approvalStatus={suggestion.approval_status}
+                        hasBeenSent={detail.sent_messages.some(
+                          (sentMessage) =>
+                            sentMessage.reply_suggestion_id === suggestion.id,
+                        )}
+                        isStale={suggestionStale}
+                        onUpdated={onUpdated}
+                      />
+                    ) : (
+                      <div className="clara-card-outline rounded-[30px] p-5">
+                        <h2 className="text-lg font-semibold text-slate-950">
+                          Belum ada jawaban terbaik
+                        </h2>
+                        <p className="mt-2 text-sm text-slate-600">
+                          Setelah chat dibaca AI, lanjut buat jawaban terbaik supaya kamu tinggal review dan pakai.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {activePanel === "sent_logs" ? (
+                  <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+                    <p className="clara-kicker">Riwayat kirim</p>
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                      Balasan yang sudah ditandai terkirim
+                    </h2>
+
+                    {detail.sent_messages.length > 0 ? (
+                      <div className="mt-4 space-y-3">
+                        {detail.sent_messages.map((sentMessage) => (
+                          <div
+                            key={sentMessage.id}
+                            className="rounded-[22px] border border-green-200/80 bg-green-50/88 p-4 text-sm text-green-900"
+                          >
+                            <p className="font-semibold">
+                              Dikirim oleh {sentMessage.sent_by_name}
+                            </p>
+                            <p className="mt-1 text-xs text-green-700">
+                              {formatDateTime(sentMessage.sent_at)} &bull;{" "}
+                              {sentMessage.send_mode}
+                            </p>
+                            <p className="mt-3 whitespace-pre-wrap leading-6">
+                              {sentMessage.message_text}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-600">
+                        Belum ada balasan yang ditandai terkirim untuk percakapan ini.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          </>
+        ) : (
+          <>
+            <section className="clara-card rounded-[30px] p-5">
           <div>
             <p className="clara-kicker">Workspace Panel</p>
             <h3 className="mt-2 text-lg font-semibold text-slate-950">
@@ -1742,7 +1902,9 @@ function ConversationDetailContent({
           </div>
         </section>
 
-        <div className="xl:sticky xl:top-28">{chatTimeline}</div>
+            <div className="xl:sticky xl:top-28">{chatTimeline}</div>
+          </>
+        )}
       </section>
     </section>
   );

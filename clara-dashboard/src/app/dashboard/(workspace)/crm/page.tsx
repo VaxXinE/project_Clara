@@ -26,7 +26,11 @@ import {
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
-import { canAccessQueueAndActionCenter } from "@/lib/roles";
+import {
+  canAccessQueueAndActionCenter,
+  isHeadRole,
+  isManagerRole,
+} from "@/lib/roles";
 import type {
   CurrentUser,
   LeadListItem,
@@ -231,6 +235,27 @@ function matchesQuickFilter(lead: LeadListItem, quickFilter: string) {
   }
 }
 
+function getLeadPriorityTone(priorityScore: number) {
+  if (priorityScore >= 70) {
+    return {
+      label: "Urgent",
+      className: "border-[#ffb37a]/22 bg-[#4a2413] text-[#ffd7aa]",
+    };
+  }
+
+  if (priorityScore >= 35) {
+    return {
+      label: "Perlu dicek",
+      className: "border-[#f0cb73]/18 bg-[#3a2a17] text-[#f0cb73]",
+    };
+  }
+
+  return {
+    label: "Stabil",
+    className: "border-[#dcc086]/14 bg-[#22190f] text-[#d7c18e]",
+  };
+}
+
 export default function CrmPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
@@ -270,7 +295,7 @@ export default function CrmPage() {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal memuat Lead Management.",
+          : "Gagal memuat daftar leads.",
       );
     } finally {
       setIsLoading(false);
@@ -433,6 +458,67 @@ export default function CrmPage() {
       won: leads.filter((lead) => lead.current_stage === "won").length,
     };
   }, [leads]);
+  const isSalesWorkspace = currentUser?.role === "sales";
+  const isManagerWorkspace = isManagerRole(currentUser?.role);
+  const isHeadWorkspace = isHeadRole(currentUser?.role);
+  const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;
+  const topPriorityLead = useMemo(() => {
+    if (!filteredLeads.length) return null;
+    return [...filteredLeads].sort(
+      (left, right) => calculateLeadPriority(right) - calculateLeadPriority(left),
+    )[0] ?? null;
+  }, [filteredLeads]);
+  const salesLeadSummary =
+    summary.needsAction > 0
+      ? `Ada ${summary.needsAction} lead yang masih perlu tindakan, termasuk ${summary.overdue} yang sudah overdue.`
+      : summary.hot > 0
+        ? `Tidak ada tekanan follow-up besar, tapi masih ada ${summary.hot} lead hot yang perlu dijaga ritmenya.`
+        : "Lead aktif relatif aman. Kamu bisa fokus rapikan follow-up dan update stage.";
+  const leadershipLeadSummary = isHeadWorkspace
+    ? summary.needsAction > 0
+      ? `Head cukup mulai dari ${summary.needsAction} lead yang mulai butuh perhatian. Fokus utamanya ${summary.overdue} overdue, ${summary.needsSync} perlu sync, dan lead hot yang paling dekat ke keputusan tim.`
+      : summary.won > 0
+        ? "Lead aktif relatif aman. Pakai halaman ini untuk audit owner, kualitas update stage, dan ritme follow-up lintas tim."
+        : "Belum ada tekanan besar. Head bisa pakai halaman ini untuk membaca ritme tim tanpa turun terlalu detail."
+    : summary.needsAction > 0
+      ? `Manager cukup mulai dari ${summary.needsAction} lead yang masih perlu tindakan. Prioritas utamanya ${summary.overdue} overdue, ${summary.needsSync} perlu sync, dan lead hot yang paling dekat ke closing.`
+      : summary.won > 0
+        ? "Lead aktif relatif aman. Pakai halaman ini untuk cek lead won, kualitas update stage, dan ritme follow-up tim."
+        : "Belum ada tekanan besar. Manager bisa pakai halaman ini untuk audit ritme kerja tim dan melihat lead yang mulai naik prioritasnya.";
+  const pageTitle = isHeadWorkspace
+    ? "Lead Tim"
+    : isManagerWorkspace
+      ? "Lead Management"
+      : "Leads";
+  const pageDescription = isHeadWorkspace
+    ? "Halaman head untuk membaca lead lintas tim yang mulai berisiko, cek owner dan stage, lalu turun ke detail hanya saat memang perlu keputusan."
+    : isManagerWorkspace
+      ? "Halaman manager untuk melihat lead tim yang paling butuh perhatian, lalu turun ke detail lead atau percakapan saat memang perlu."
+      : "Tempat paling cepat untuk lihat lead yang masih perlu disentuh, update stage, lalu lanjut ke percakapan.";
+  const heroTitle = isHeadWorkspace
+    ? "Mulai dari lead tim yang paling dekat ke risiko, eskalasi, atau keputusan"
+    : isManagerWorkspace
+      ? "Mulai dari lead tim yang paling dekat ke risiko atau aksi"
+      : "Fokus ke lead yang paling dekat ke aksi berikutnya";
+  const heroSummary = isLeadershipWorkspace
+    ? leadershipLeadSummary
+    : salesLeadSummary;
+  const leadListTitle = isHeadWorkspace
+    ? "Daftar lead tim yang perlu dibaca cepat"
+    : isManagerWorkspace
+      ? "Daftar prioritas lead tim"
+      : "Daftar lead yang sedang kamu pegang";
+  const leadListDescription = isHeadWorkspace
+    ? "Head tidak perlu baca semua lead satu per satu. Pilih dulu lead yang paling butuh keputusan, overdue, atau sinkronisasi tim."
+    : isManagerWorkspace
+      ? "Manager tidak perlu baca semua lead sekaligus. Pilih dulu lead yang paling butuh keputusan, overdue, atau sinkronisasi."
+      : "Pilih lead yang paling perlu diproses, lalu lanjut ke detail atau percakapan.";
+  const previewTitle = isLeadershipWorkspace
+    ? "Lead preview"
+    : "Ringkasan lead";
+  const previewEmpty = isLeadershipWorkspace
+    ? "Pilih satu lead dari panel kiri untuk melihat ringkasan cepat sebelum turun ke detail penuh."
+    : "Pilih satu lead dari panel kiri untuk melihat preview cepatnya.";
 
   const activeBucketLabel =
     BUCKET_OPTIONS.find((option) => option.value === bucketFilter)?.label ??
@@ -459,6 +545,54 @@ export default function CrmPage() {
       : paginatedVisibleLeads[0]?.id ?? null;
   const selectedLead =
     paginatedVisibleLeads.find((lead) => lead.id === effectiveSelectedLeadId) ?? null;
+  const selectedLeadPriorityScore = selectedLead
+    ? calculateLeadPriority(selectedLead)
+    : 0;
+  const selectedLeadPriorityTone = getLeadPriorityTone(
+    selectedLeadPriorityScore,
+  );
+  const selectedLeadLeadershipFocus = selectedLead
+    ? selectedLead.needs_deal_sync
+      ? isHeadWorkspace
+        ? "Deal di lead ini belum sinkron. Head perlu memastikan pembacaan KPI, status deal, dan arah next step tim tetap selaras sebelum issue ini melebar."
+        : "Deal di lead ini belum sinkron. Manager sebaiknya cek data KPI dan pastikan status deal-nya tidak tertinggal."
+      : isOverdueLead(selectedLead)
+        ? isHeadWorkspace
+          ? "Lead ini sudah lewat jadwal follow-up. Head cukup cek apakah bottleneck-nya ada di owner, ritme tim, atau butuh arahan lintas tim."
+          : "Lead ini sudah lewat jadwal follow-up. Cek apakah sales sudah bergerak dan apakah perlu arahan cepat."
+        : selectedLead.discipline_compliance_status !== "logged_today"
+          ? isHeadWorkspace
+            ? "Log follow-up hari ini belum rapi. Head bisa pakai sinyal ini untuk melihat apakah masalahnya ada di disiplin eksekusi atau hanya keterlambatan pencatatan."
+            : "Catatan follow-up hari ini belum rapi. Cek apakah eksekusi sales sudah jalan tapi belum tercatat."
+          : selectedLead.current_stage === "closing"
+            ? isHeadWorkspace
+              ? "Lead ini sudah dekat closing. Head cukup menjaga supaya owner, stage, dan dukungan tim tetap rapi tanpa turun terlalu detail."
+              : "Lead ini sudah dekat ke tahap closing. Manager cukup jaga ritme follow-up dan pastikan tidak ada blocker."
+            : isHeadWorkspace
+              ? "Lead ini relatif aman. Pakai preview ini untuk validasi owner, stage, dan apakah perlu intervensi head sebelum membuka detail penuh."
+              : "Lead ini relatif aman. Pakai preview ini untuk validasi owner, stage, dan langkah berikutnya sebelum membuka detail."
+    : "";
+  const selectedLeadNextAction = selectedLead
+    ? selectedLead.needs_deal_sync
+      ? isHeadWorkspace
+        ? "Buka detail lead lalu pastikan stage, owner, dan KPI/deal sync sudah satu bacaan."
+        : "Buka detail lead lalu rapikan KPI/deal sync."
+      : isOverdueLead(selectedLead)
+        ? isHeadWorkspace
+          ? "Cek detail lead untuk memastikan apakah cukup diarahkan ke manager/sales atau perlu eskalasi lebih lanjut."
+          : "Buka percakapan atau follow-up untuk cek tindakan terbaru sales."
+        : selectedLead.discipline_compliance_status !== "logged_today"
+          ? isHeadWorkspace
+            ? "Validasi dulu apakah ini masalah disiplin tim atau hanya keterlambatan update log."
+            : "Minta sales rapikan log follow-up hari ini."
+          : selectedLead.current_stage === "closing"
+            ? isHeadWorkspace
+              ? "Pantau ritme closing dan cek apakah ada keputusan Head yang perlu diberikan."
+              : "Pantau ritme closing dan cek kebutuhan eskalasi."
+            : isHeadWorkspace
+              ? "Belum ada intervensi besar. Cukup monitor owner, stage, dan suhu lead."
+              : "Tidak ada tindakan mendesak. Cukup monitor ritmenya."
+    : "";
 
   function resetFilters() {
     setSearchQuery("");
@@ -495,32 +629,50 @@ export default function CrmPage() {
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="CRM workspace"
-      title="Lead Management"
-      description="Halaman ini difokuskan untuk scanning cepat, update CRM, dan melihat health lead tanpa tenggelam di daftar panjang. Queue tetap dipakai untuk kerja chat, sedangkan Lead Management dipakai untuk membaca status, sinkronisasi, dan follow-up."
+      title={pageTitle}
+      description={pageDescription}
       backHref="/dashboard"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
         <>
-          {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
+          {isHeadWorkspace ? (
+            <Link
+              href="/dashboard/notifications"
+              className="clara-button clara-button-ghost"
+            >
+              Buka Alert Tim
+            </Link>
+          ) : isManagerWorkspace ? (
+            <Link
+              href="/dashboard/manager-insights"
+              className="clara-button clara-button-ghost"
+            >
+              Monitor Tim
+            </Link>
+          ) : currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
             <Link
               href="/dashboard/sales"
               className="clara-button clara-button-ghost"
             >
-              Queue
+              Chat Masuk
             </Link>
           ) : (
             <Link
               href="/dashboard/approvals"
               className="clara-button clara-button-ghost"
             >
-              Chat Review Center
+              Review Sales
             </Link>
           )}
           <Link
-            href="/dashboard/upload"
+            href={
+              isHeadWorkspace
+                ? "/dashboard/approvals"
+                : "/dashboard/upload"
+            }
             className="clara-button clara-button-primary"
           >
-            Lead Capture
+            {isHeadWorkspace ? "Buka Arahan Tim" : "Lead Capture"}
           </Link>
         </>
       }
@@ -528,7 +680,7 @@ export default function CrmPage() {
       <div className="space-y-6">
         {isLoading && (
           <div className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
-            Loading Lead Management...
+            Loading leads...
           </div>
         )}
 
@@ -540,15 +692,79 @@ export default function CrmPage() {
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+            <section className="clara-card rounded-[30px] p-6">
+              <p className="clara-kicker text-xs">Ringkasan leads</p>
+              <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-3xl">
+                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                    {heroTitle}
+                  </h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    {heroSummary}
+                  </p>
+                  {isLeadershipWorkspace && topPriorityLead ? (
+                    <p className="mt-3 text-sm font-medium text-[#f0cb73]">
+                      Prioritas sekarang: {topPriorityLead.display_name} •{" "}
+                      {STAGE_LABELS[topPriorityLead.current_stage] ??
+                        topPriorityLead.current_stage}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {isHeadWorkspace ? (
+                    <>
+                      <Link
+                        href="/dashboard/notifications"
+                        className="clara-button clara-button-primary justify-center"
+                      >
+                        Buka Alert Tim
+                      </Link>
+                      <Link
+                        href="/dashboard/approvals"
+                        className="clara-button clara-button-ghost justify-center"
+                      >
+                        Buka Arahan Tim
+                      </Link>
+                    </>
+                  ) : isManagerWorkspace ? (
+                    <>
+                      <Link
+                        href="/dashboard/approvals"
+                        className="clara-button clara-button-primary justify-center"
+                      >
+                        Buka Review Sales
+                      </Link>
+                      <Link
+                        href="/dashboard/manager-insights"
+                        className="clara-button clara-button-ghost justify-center"
+                      >
+                        Lihat Monitor Tim
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        href="/dashboard/sales"
+                        className="clara-button clara-button-ghost justify-center"
+                      >
+                        Buka Chat Masuk
+                      </Link>
+                      <Link
+                        href="/dashboard/follow-up"
+                        className="clara-button clara-button-primary justify-center"
+                      >
+                        Buka Tindak Lanjut
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <BoardMetric
-                label="Total lead"
-                value={String(summary.total)}
-                icon={faUsers}
-                accentClass="from-[#f0cb73]/18 to-transparent text-[#f0cb73]"
-              />
-              <BoardMetric
-                label="Perlu tindakan"
+                label={isLeadershipWorkspace ? "Butuh perhatian" : "Perlu tindakan"}
                 value={String(summary.needsAction)}
                 icon={faBullseye}
                 accentClass="from-[#f59e0b]/18 to-transparent text-[#f5c15d]"
@@ -560,75 +776,148 @@ export default function CrmPage() {
                 accentClass="from-[#fb923c]/18 to-transparent text-[#f4b164]"
               />
               <BoardMetric
-                label="Need sync"
-                value={String(summary.needsSync)}
-                icon={faLink}
-                accentClass="from-[#60a5fa]/18 to-transparent text-[#8fc0ff]"
-              />
-              <BoardMetric
                 label="Hot"
                 value={String(summary.hot)}
                 icon={faFire}
                 accentClass="from-[#ef4444]/18 to-transparent text-[#ff9d7a]"
               />
               <BoardMetric
-                label="Won"
-                value={String(summary.won)}
-                icon={faTrophy}
-                accentClass="from-[#fde68a]/18 to-transparent text-[#ffe8a3]"
+                label="Perlu sync"
+                value={String(summary.needsSync)}
+                icon={faLink}
+                accentClass="from-[#60a5fa]/18 to-transparent text-[#8fc0ff]"
               />
+              {isLeadershipWorkspace ? (
+                <BoardMetric
+                  label="Lead dimonitor"
+                  value={String(summary.total)}
+                  icon={faUsers}
+                  accentClass="from-[#f0cb73]/18 to-transparent text-[#f0cb73]"
+                />
+              ) : (
+                <BoardMetric
+                  label="Total lead aktif"
+                  value={String(summary.total)}
+                  icon={faUsers}
+                  accentClass="from-[#f0cb73]/18 to-transparent text-[#f0cb73]"
+                />
+              )}
             </section>
 
-            <section className="rounded-[26px] border border-[#f0cb73]/18 bg-[radial-gradient(circle_at_top_right,rgba(240,203,115,0.14),transparent_34%),linear-gradient(180deg,rgba(28,21,15,0.97)_0%,rgba(16,12,9,0.97)_100%)] p-4 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsFilterModalOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-5 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-                    >
-                      <FontAwesomeIcon
-                        icon={faFilter}
-                        className="h-3.5 w-3.5"
-                      />
-                      Filter
-                      {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className="inline-flex items-center gap-2 rounded-full border border-[#3c2c16] bg-[#22190f] px-5 py-2.5 text-sm font-semibold text-[#e1c27c] transition hover:border-[#f0cb73]/28 hover:bg-[#2a1e12]"
-                    >
-                      <FontAwesomeIcon
-                        icon={faRotateLeft}
-                        className="h-3.5 w-3.5"
-                      />
-                      Reset
-                    </button>
-                  </div>
+            <section className="clara-card rounded-[30px] p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-2xl">
+                  <p className="clara-kicker text-xs">Filter lead</p>
+                  <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                    {isHeadWorkspace
+                      ? "Saring lead tim untuk cepat melihat yang butuh keputusan"
+                      : isManagerWorkspace
+                        ? "Saring lead tim tanpa tenggelam di semua data"
+                        : "Cari lead dan rapikan daftar kerja"}
+                  </h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    {isHeadWorkspace
+                      ? "Head cukup pakai filter sederhana untuk menemukan lead yang mulai butuh intervensi, overdue, atau tidak sinkron antar tim."
+                      : isManagerWorkspace
+                        ? "Manager cukup pakai filter sederhana untuk menemukan lead yang butuh keputusan, overdue, atau sinkronisasi."
+                        : "Pakai pencarian dan filter sederhana supaya cepat ketemu lead yang perlu diproses dulu."}
+                  </p>
                 </div>
 
-                <div className="flex flex-wrap justify-start gap-2 xl:max-w-[520px] xl:justify-end">
-                  <LeadMetaPill
-                    label="Channel"
-                    value={activeChannelLabel}
-                    icon={faLink}
-                  />
-                  <LeadMetaPill
-                    label="Bucket"
-                    value={activeBucketLabel}
-                    icon={faLayerGroup}
-                  />
-                  <LeadMetaPill
-                    label="Sort"
-                    value={
-                      SORT_OPTIONS.find((option) => option.value === sortBy)
-                        ?.label ?? "Terbaru"
-                    }
-                    icon={faArrowDownWideShort}
-                  />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsFilterModalOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-5 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+                  >
+                    <FontAwesomeIcon
+                      icon={faFilter}
+                      className="h-3.5 w-3.5"
+                    />
+                    Filter
+                    {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetFilters}
+                    className="inline-flex items-center gap-2 rounded-full border border-[#3c2c16] bg-[#22190f] px-5 py-2.5 text-sm font-semibold text-[#e1c27c] transition hover:border-[#f0cb73]/28 hover:bg-[#2a1e12]"
+                  >
+                    <FontAwesomeIcon
+                      icon={faRotateLeft}
+                      className="h-3.5 w-3.5"
+                    />
+                    Reset
+                  </button>
                 </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                  <span>Cari lead</span>
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => {
+                      setSearchQuery(event.target.value);
+                      setLeadPage(1);
+                    }}
+                    placeholder="Cari nama lead atau summary..."
+                    className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
+                  />
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                  <span>Bucket</span>
+                  <select
+                    value={bucketFilter}
+                    onChange={(event) => {
+                      setBucketFilter(event.target.value);
+                      setLeadPage(1);
+                    }}
+                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                  >
+                    {BUCKET_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                  <span>Quick filter</span>
+                  <select
+                    value={quickFilter}
+                    onChange={(event) => {
+                      setQuickFilter(event.target.value);
+                      setLeadPage(1);
+                    }}
+                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                  >
+                    {QUICK_FILTER_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                  <span>Urutkan</span>
+                  <select
+                    value={sortBy}
+                    onChange={(event) => {
+                      setSortBy(event.target.value);
+                      setLeadPage(1);
+                    }}
+                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                  >
+                    {SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
             </section>
 
@@ -819,8 +1108,11 @@ export default function CrmPage() {
                     Lead List
                   </p>
                   <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                    Scan cepat dengan bucket operasional
+                    {leadListTitle}
                   </h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#c8ad75]">
+                    {leadListDescription}
+                  </p>
                 </div>
                 <p className="text-sm text-[#c8ad75]">
                   {paginatedVisibleLeads.length} / {visibleLeads.length} lead
@@ -828,7 +1120,7 @@ export default function CrmPage() {
                 </p>
               </div>
 
-              <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+              <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.88fr)]">
                 {paginatedVisibleLeads.length === 0 ? (
                   <div className="clara-empty-state p-6 text-sm text-[#d6bb84]">
                     Tidak ada lead yang cocok dengan filter saat ini.
@@ -836,7 +1128,7 @@ export default function CrmPage() {
                 ) : (
                   <>
                     <div className="flex min-h-0 flex-col gap-4 xl:max-h-[780px]">
-                      <div className="clara-scrollbar rounded-lg min-h-0 flex-1 space-y-3 xl:overflow-y-auto xl:p-2 bg-[#f0cb73]/16">
+                      <div className="clara-scrollbar min-h-0 flex-1 space-y-3 rounded-[24px] border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(35,25,17,0.82)_0%,rgba(17,13,10,0.86)_100%)] p-3 xl:overflow-y-auto">
                         {renderedBucketSections.map((section) => (
                           <Fragment key={section.title}>
                             {renderBucketSection({
@@ -890,7 +1182,7 @@ export default function CrmPage() {
                         <>
                           <div className="border-b border-[#f0cb73]/12 pb-4">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                              Lead Preview
+                              {previewTitle}
                             </p>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
                               <h3 className="text-xl font-bold tracking-tight text-slate-950">
@@ -914,6 +1206,12 @@ export default function CrmPage() {
                               >
                                 {selectedLead.source_label}
                               </span>
+                              <span
+                                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${selectedLeadPriorityTone.className}`}
+                              >
+                                {selectedLeadPriorityTone.label} • skor{" "}
+                                {selectedLeadPriorityScore}
+                              </span>
                             </div>
                             <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
                               {selectedLead.summary ??
@@ -922,6 +1220,27 @@ export default function CrmPage() {
                           </div>
 
                           <div className="mt-4 space-y-4">
+                            {isLeadershipWorkspace ? (
+                              <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(34,25,18,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
+                                  {isHeadWorkspace
+                                    ? "Fokus head"
+                                    : "Fokus manager"}
+                                </p>
+                                <p className="mt-3 text-sm leading-6 text-[#fff0c9]">
+                                  {selectedLeadLeadershipFocus}
+                                </p>
+                                <div className="mt-3 rounded-2xl border border-[#f0cb73]/12 bg-[#1e160f] px-3 py-3">
+                                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b9924b]">
+                                    Langkah berikutnya
+                                  </p>
+                                  <p className="mt-2 text-sm font-medium leading-6 text-[#f3d89a]">
+                                    {selectedLeadNextAction}
+                                  </p>
+                                </div>
+                              </section>
+                            ) : null}
+
                             <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
                               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
                                 Sync Health
@@ -994,8 +1313,19 @@ export default function CrmPage() {
 
                             <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
                               <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
-                                Update stage cepat
+                                {isHeadWorkspace
+                                  ? "Kontrol cepat head"
+                                  : isManagerWorkspace
+                                    ? "Kontrol cepat manager"
+                                  : "Update stage cepat"}
                               </label>
+                              {isLeadershipWorkspace ? (
+                                <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
+                                  {isHeadWorkspace
+                                    ? "Head cukup cek owner, stage, dan suhu lead di sini sebelum memutuskan perlu turun ke detail atau cukup memberi arahan."
+                                    : "Manager bisa cek stage terakhir di sini sebelum membuka detail lead atau percakapan."}
+                                </p>
+                              ) : null}
                               <StageQuickSelect
                                 value={selectedLead.current_stage}
                                 disabled={updatingLeadId === selectedLead.id}
@@ -1028,8 +1358,7 @@ export default function CrmPage() {
                         </>
                       ) : (
                         <div className="clara-empty-state p-6 text-sm text-[#d6bb84]">
-                          Pilih satu lead dari panel kiri untuk melihat preview
-                          cepatnya.
+                          {previewEmpty}
                         </div>
                       )}
                     </div>
@@ -1098,6 +1427,16 @@ function LeadListRow({
 }) {
   const isOverdue = isOverdueLead(lead);
   const priorityScore = calculateLeadPriority(lead);
+  const priorityTone = getLeadPriorityTone(priorityScore);
+  const nextStepLabel = lead.needs_deal_sync
+    ? "Rapikan sync"
+    : isOverdue
+      ? "Cek follow-up"
+      : lead.discipline_compliance_status !== "logged_today"
+        ? "Cek log sales"
+        : lead.current_stage === "closing"
+          ? "Jaga closing"
+          : "Monitor";
 
   return (
     <button
@@ -1109,83 +1448,98 @@ function LeadListRow({
           : "border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] hover:border-[#f0cb73]/28"
       }`}
     >
-      <div className="">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-slate-950">
-              {lead.display_name}
-            </h2>
-            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-              {STAGE_LABELS[lead.current_stage] ?? lead.current_stage}
-            </span>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                lead.lead_temperature,
-              )}`}
-            >
-              {lead.lead_temperature.toUpperCase()}
-            </span>
-            {lead.account_category !== "unknown" && (
-              <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                {lead.account_category}
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-semibold text-slate-950">
+                {lead.display_name}
+              </h2>
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                {STAGE_LABELS[lead.current_stage] ?? lead.current_stage}
               </span>
-            )}
-            {isOverdue && (
-              <span className="rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                Overdue
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
+                  lead.lead_temperature,
+                )}`}
+              >
+                {lead.lead_temperature.toUpperCase()}
               </span>
-            )}
-            {lead.needs_deal_sync && (
-              <span className="rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                Need sync
+              {lead.account_category !== "unknown" && (
+                <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                  {lead.account_category}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span
+                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${priorityTone.className}`}
+              >
+                {priorityTone.label} • {priorityScore}
               </span>
-            )}
-            {lead.discipline_compliance_status !== "logged_today" && (
-              <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                {DISCIPLINE_LABELS[lead.discipline_compliance_status] ??
-                  lead.discipline_compliance_status}
-              </span>
-            )}
-            <div
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getSourceLabelBadgeClass(
-                lead.source_label,
-              )}`}
-            >
-              {lead.source_label}
+              {isOverdue && (
+                <span className="rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                  Overdue
+                </span>
+              )}
+              {lead.needs_deal_sync && (
+                <span className="rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                  Need sync
+                </span>
+              )}
+              {lead.discipline_compliance_status !== "logged_today" && (
+                <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                  {DISCIPLINE_LABELS[lead.discipline_compliance_status] ??
+                    lead.discipline_compliance_status}
+                </span>
+              )}
+              <div
+                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getSourceLabelBadgeClass(
+                  lead.source_label,
+                )}`}
+              >
+                {lead.source_label}
+              </div>
             </div>
           </div>
 
-          <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#d6bb84]">
-            {lead.summary ??
-              "Belum ada summary lead. Jalankan AI analysis dulu kalau konteksnya masih mentah."}
-          </p>
-
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[#c8ad75]">
-            <p className="rounded-full border border-[#f0cb73]/14 bg-[#1d150d] px-3 py-1.5">
-              Owner:{" "}
-              <span className="font-semibold text-[#f0cb73]">
-                {lead.assigned_user_name ?? "Belum ada owner"}
-              </span>
+          <div className="rounded-[18px] border border-[#f0cb73]/14 bg-[#1c140d] px-3 py-2 text-right">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b9924b]">
+              Next step
             </p>
-            <p className="rounded-full border border-[#f0cb73]/14 bg-[#1d150d] px-3 py-1.5">
-              Last contact:{" "}
-              <span className="font-semibold text-[#f0cb73]">
-                {formatDateTime(lead.last_contact_at)}
-              </span>
-            </p>
-            <p className="rounded-full border border-[#f0cb73]/14 bg-[#1d150d] px-3 py-1.5">
-              Next follow-up:{" "}
-              <span className="font-semibold text-[#f0cb73]">
-                {formatDateTime(lead.next_follow_up_at)}
-              </span>
-            </p>
-            <p className="rounded-full border border-[#f0cb73]/14 bg-[#1d150d] px-3 py-1.5">
-              Priority:{" "}
-              <span className="font-semibold text-[#f0cb73]">
-                {priorityScore}
-              </span>
+            <p className="mt-1 text-sm font-semibold text-[#fff0c9]">
+              {nextStepLabel}
             </p>
           </div>
+        </div>
+
+        <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#d6bb84]">
+          {lead.summary ??
+            "Belum ada summary lead. Jalankan AI analysis dulu kalau konteksnya masih mentah."}
+        </p>
+
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-2">
+          <LeadMetaPill
+            label="Owner"
+            value={lead.assigned_user_name ?? "Belum ada owner"}
+            icon={faUsers}
+          />
+          <LeadMetaPill
+            label="Last contact"
+            value={formatDateTime(lead.last_contact_at)}
+            icon={faArrowDownWideShort}
+          />
+          <LeadMetaPill
+            label="Next follow-up"
+            value={formatDateTime(lead.next_follow_up_at)}
+            icon={faLayerGroup}
+          />
+          <LeadMetaPill
+            label="Deal status"
+            value={lead.deal_status ?? "Belum diisi"}
+            icon={faTrophy}
+          />
         </div>
       </div>
     </button>

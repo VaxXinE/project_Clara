@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
+import { isHeadRole, isManagerRole, normalizeWorkspaceRole } from "@/lib/roles";
 import type {
   CurrentUser,
   CustomerProfileMergeRequest,
@@ -36,6 +37,11 @@ export default function CustomerProfilePage() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [activePanel, setActivePanel] = useState<"leads" | "profile" | "merge">("profile");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const workspaceRole = currentUser ? normalizeWorkspaceRole(currentUser.role) : null;
+  const isSalesWorkspace = workspaceRole === "sales";
+  const isManagerWorkspace = isManagerRole(currentUser?.role);
+  const isHeadWorkspace = isHeadRole(currentUser?.role);
+  const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;
 
   useEffect(() => {
     async function loadProfile() {
@@ -177,15 +183,38 @@ export default function CustomerProfilePage() {
   });
   const canMergeProfiles = ["head", "superadmin"].includes(currentUser?.role ?? "");
   const mergeCandidateCount = profile?.merge_candidates.length ?? 0;
+  const profileFocus = buildCustomerFocusSummary({
+    profile,
+    topPriorityLead,
+    latestLead,
+    isLeadershipWorkspace,
+  });
+  const managerProfileSummary =
+    topPriorityLead
+      ? `Customer ini masih aktif di tim dan lead paling penting saat ini adalah ${topPriorityLead.display_name}. Manager cukup pastikan owner, stage, dan follow-up lead ini masih sehat sebelum membaca lead lain.`
+      : latestLead
+        ? `Belum ada lead yang benar-benar dominan, jadi manager bisa mulai dari lead dengan kontak terbaru yaitu ${latestLead.display_name}.`
+        : "Belum ada lead dominan maupun kontak terbaru yang kuat. Fokus manager cukup ke validitas identitas customer dan distribusi lead-nya.";
+  const managerNextAction = topPriorityLead
+    ? "Buka lead prioritas lalu cek apakah follow-up, stage, dan konteks customer masih sinkron."
+    : latestLead
+      ? "Buka lead dengan kontak terbaru untuk membaca ritme eksekusi terakhir."
+      : "Validasi profil customer ini dulu sebelum turun ke lead lain.";
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Unified customer identity"
-      title={profile?.display_name ?? "Customer Profile"}
-      description="Satu profil customer ini menggabungkan konteks lead dan channel, supaya tim tidak lagi melihat orang yang sama sebagai entitas terpisah."
+      eyebrow="Profil customer"
+      title={profile?.display_name ?? "Profil Customer"}
+      description={
+        isSalesWorkspace
+          ? "Halaman ini merangkum satu customer lintas lead dan channel. Gunakan untuk memastikan identitasnya benar, lihat lead yang paling aktif, lalu lanjut kerja ke lead yang tepat."
+          : isLeadershipWorkspace
+            ? "Halaman manager untuk membaca satu customer lintas lead: siapa owner-nya, lead mana yang paling penting, dan apakah relasi customer ini masih sehat dibaca tim."
+            : "Satu profil customer ini menggabungkan konteks lead dan channel, supaya tim tidak lagi melihat orang yang sama sebagai entitas terpisah."
+      }
       backHref="/dashboard/crm"
-      backLabel="Kembali ke Lead Management"
+      backLabel="Kembali ke lead"
     >
       <div className="space-y-6">
         {isLoading && (
@@ -202,17 +231,48 @@ export default function CustomerProfilePage() {
 
         {profile && !isLoading && !errorMessage ? (
           <>
+            <section className="rounded-[34px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
+                {isLeadershipWorkspace
+                  ? "Fokus manager pada customer ini"
+                  : "Fokus customer ini"}
+              </p>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#fff3cf]">
+                {profileFocus.headline}
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[#e3c990]">
+                {profileFocus.helper}
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#e9d4a0]">
+                <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                  Lead aktif: <span className="font-semibold text-[#fff3cf]">{activeLeadCount}</span>
+                </span>
+                <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                  Channel: <span className="font-semibold text-[#fff3cf]">{dominantSourceLabel}</span>
+                </span>
+                <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                  Kategori akun: <span className="font-semibold text-[#fff3cf]">{accountCategorySummary}</span>
+                </span>
+              </div>
+            </section>
+
             <section className="overflow-hidden rounded-[34px] border border-slate-200 bg-white p-7 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_380px] xl:items-start">
                 <div className="max-w-4xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">
-                    Ringkasan Customer
+                    {isLeadershipWorkspace
+                      ? "Ringkasan monitor customer"
+                      : "Ringkasan customer"}
                   </p>
                   <h2 className="mt-4 max-w-4xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-slate-950">
-                    {profile.display_name} itu satu customer yang sedang dibaca dari banyak lead dan channel.
+                    {isLeadershipWorkspace
+                      ? `${profile.display_name} dibaca Clara sebagai satu customer dengan beberapa lead yang perlu dijaga tetap sinkron.`
+                      : `${profile.display_name} dibaca Clara sebagai satu customer meskipun muncul di beberapa lead atau channel.`}
                   </h2>
                   <p className="mt-4 max-w-3xl text-[15px] leading-8 text-slate-700">
-                    {overviewSummary}
+                    {isLeadershipWorkspace
+                      ? managerProfileSummary
+                      : overviewSummary}
                   </p>
                   <div className="mt-5 flex flex-wrap gap-3">
                     <HeroPill
@@ -221,12 +281,12 @@ export default function CustomerProfilePage() {
                       accent="amber"
                     />
                     <HeroPill
-                      label="Channel dominan"
+                      label="Channel utama"
                       value={dominantSourceLabel}
                       accent="slate"
                     />
                     <HeroPill
-                      label="Identity confidence"
+                      label="Keyakinan identitas"
                       value={`${Math.round(profile.identity_confidence * 100)}%`}
                       accent="emerald"
                     />
@@ -234,10 +294,12 @@ export default function CustomerProfilePage() {
                 </div>
                 <div className="rounded-[30px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_18px_38px_rgba(15,23,42,0.18)]">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">
-                    Apa Yang Harus Dilakukan
+                    Langkah berikutnya
                   </p>
                   <p className="mt-4 text-[15px] leading-8 text-slate-100">
-                    {actionSummary}
+                    {isLeadershipWorkspace
+                      ? managerNextAction
+                      : actionSummary}
                   </p>
                   {topPriorityLead ? (
                     <div className="mt-5 flex flex-wrap gap-3">
@@ -252,7 +314,7 @@ export default function CustomerProfilePage() {
                           href={`/dashboard/sales/conversations/${topPriorityLead.latest_conversation_id}`}
                           className="inline-flex rounded-full border border-white/30 px-4 py-2.5 text-sm font-semibold text-white"
                         >
-                          Buka Chat Terbaru
+                          Buka Percakapan Terbaru
                         </Link>
                       ) : null}
                     </div>
@@ -265,16 +327,20 @@ export default function CustomerProfilePage() {
               <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                 <div className="max-w-3xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
-                    Mulai Dari Sini
+                    Mulai dari sini
                   </p>
                   <p className="mt-3 text-[15px] leading-8 text-slate-700">
-                    Mulai dari profil customer dulu untuk memastikan identitas dan kategori akunnya benar. Setelah itu baru turun ke lead terkait kalau tujuan Anda adalah kerja operasional. Buka merge hanya kalau data customer terasa pecah.
+                    {isSalesWorkspace
+                      ? "Cek dulu identitas customer dan lead yang paling aktif. Setelah itu baru turun ke lead terkait. Edit data customer hanya kalau memang ada data yang salah atau belum lengkap."
+                      : isLeadershipWorkspace
+                        ? "Mulai dari ringkasan customer dulu, lalu cek lead prioritas dan owner-nya. Edit atau merge profile hanya kalau data customer terlihat pecah atau salah baca."
+                        : "Mulai dari profil customer dulu untuk memastikan identitas dan kategori akunnya benar. Setelah itu baru turun ke lead terkait kalau tujuan Anda adalah kerja operasional. Buka merge hanya kalau data customer terasa pecah."}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 rounded-[22px] border border-slate-200 bg-slate-50 p-2">
                   <PanelChip
                     active={activePanel === "profile"}
-                    label="Profil customer"
+                    label="Ringkasan customer"
                     onClick={() => setActivePanel("profile")}
                   />
                   <PanelChip
@@ -294,20 +360,20 @@ export default function CustomerProfilePage() {
             </section>
 
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <Metric label="Lead Count" value={String(profile.lead_count)} />
-              <Metric label="Conversation Count" value={String(profile.conversation_count)} />
-              <Metric label="Last Contact" value={formatDateTime(profile.last_contact_at)} />
+              <Metric label="Jumlah lead" value={String(profile.lead_count)} />
+              <Metric label="Jumlah percakapan" value={String(profile.conversation_count)} />
+              <Metric label="Kontak terakhir" value={formatDateTime(profile.last_contact_at)} />
               <Metric label="PIC" value={profile.assigned_user_name ?? "Belum ada"} />
             </section>
 
             <section className="grid gap-4 md:grid-cols-3">
               <Metric
-                label="Identity Confidence"
+                label="Keyakinan identitas"
                 value={`${Math.round(profile.identity_confidence * 100)}% • ${identityConfidenceLabel}`}
               />
-              <Metric label="Active Leads" value={String(activeLeadCount)} />
+              <Metric label="Lead aktif" value={String(activeLeadCount)} />
               <Metric
-                label="High Intent"
+                label="Minat tinggi"
                 value={`${hotLeadCount} hot • ${warmLeadCount} warm`}
               />
             </section>
@@ -316,9 +382,15 @@ export default function CustomerProfilePage() {
               <article className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">Profil Customer</h2>
+                    <h2 className="text-xl font-semibold text-slate-950">
+                      {isLeadershipWorkspace
+                        ? "Status Customer"
+                        : "Data Customer"}
+                    </h2>
                     <p className="mt-2 text-sm leading-7 text-slate-600">
-                      Bagian ini menjelaskan identitas customer dalam bentuk yang ringkas. Gunakan ini untuk memastikan customer-nya benar, bukan untuk membaca semua histori sekaligus.
+                      {isLeadershipWorkspace
+                        ? "Manager cukup cek apakah identitas customer, status, suhu, dan kategori akun sudah terbaca masuk akal oleh Clara."
+                        : "Ringkasan dan edit data customer disatukan di sini supaya tim bisa langsung cek identitas, lalu rapikan datanya kalau memang perlu."}
                     </p>
                   </div>
                   <button
@@ -329,7 +401,7 @@ export default function CustomerProfilePage() {
                     }}
                     className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
                   >
-                    {isEditingProfile ? "Tutup Edit Data" : "Edit Data Customer"}
+                    {isEditingProfile ? "Tutup Edit" : "Edit Data Customer"}
                   </button>
                 </div>
 
@@ -343,7 +415,7 @@ export default function CustomerProfilePage() {
                   <CompactInfoRow label="Email" value={profile.email ?? "Belum diisi"} />
                   <CompactInfoRow label="Status customer" value={formatCustomerStatus(profile.status)} />
                   <CompactInfoRow
-                    label="Temperature customer"
+                    label="Suhu customer"
                     value={`${formatTemperatureLabel(profile.temperature)} • ${formatTemperatureSourceLabel(profile.temperature_source)}`}
                   />
                   <CompactInfoRow label="Kategori akun" value={accountCategorySummary} />
@@ -364,7 +436,7 @@ export default function CustomerProfilePage() {
 
                 <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                    Channel Coverage
+                    Cakupan channel
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {profile.source_labels.map((label) => (
@@ -377,16 +449,183 @@ export default function CustomerProfilePage() {
                     ))}
                   </div>
                   <p className="mt-4 text-sm leading-7 text-slate-600">
-                    Bagian ini membantu tim melihat customer ini datang dari channel apa saja. Kalau channel-nya banyak, pastikan tim tidak membaca orang yang sama sebagai beberapa customer berbeda.
+                    Bagian ini membantu tim melihat customer ini muncul dari channel mana saja. Kalau channel-nya banyak, pastikan konteksnya tetap dibaca sebagai satu customer yang sama.
                   </p>
                 </div>
+
+                {isEditingProfile ? (
+                  <div className="mt-6 border-t border-slate-200 pt-6">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="max-w-2xl">
+                        <h3 className="text-lg font-semibold text-slate-950">Edit data customer</h3>
+                        <p className="mt-2 text-sm leading-7 text-slate-600">
+                          Isi seperlunya. Fokus ke nama, telepon, status customer, dan kategori akun supaya pembacaan tim tetap rapi.
+                        </p>
+                        <p className="mt-2 text-sm leading-7 text-slate-600">
+                          Kategori akun dibaca otomatis dari lead terkait. Kalau hasil ringkasannya terasa campuran, Anda bisa set manual di form ini untuk menyelaraskan pembacaan tim.
+                        </p>
+                      </div>
+                      <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 lg:max-w-sm">
+                        Jangan isi data palsu. Kalau belum yakin nomor, email, atau alamatnya benar, lebih baik kosongkan dulu.
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                      <label className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">Nama Customer</span>
+                        <input
+                          value={profileForm.display_name}
+                          onChange={(event) => {
+                            setProfileForm((prev) => ({
+                              ...prev,
+                              display_name: event.target.value,
+                            }));
+                          }}
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          placeholder="Masukkan nama customer"
+                        />
+                      </label>
+                      <label className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">Telepon</span>
+                        <input
+                          value={profileForm.phone}
+                          onChange={(event) => {
+                            setProfileForm((prev) => ({
+                              ...prev,
+                              phone: event.target.value,
+                            }));
+                          }}
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          placeholder="08xxxx atau +62xxxx"
+                        />
+                      </label>
+                      <label className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">Email</span>
+                        <input
+                          type="email"
+                          value={profileForm.email}
+                          onChange={(event) => {
+                            setProfileForm((prev) => ({
+                              ...prev,
+                              email: event.target.value,
+                            }));
+                          }}
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          placeholder="customer@email.com"
+                        />
+                      </label>
+                      <label className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">Status Customer</span>
+                        <select
+                          value={profileForm.status}
+                          onChange={(event) => {
+                            setProfileForm((prev) => ({
+                              ...prev,
+                              status: event.target.value,
+                            }));
+                          }}
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                        >
+                          <option value="active">Aktif</option>
+                          <option value="inactive">Tidak aktif</option>
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">Temperature Customer</span>
+                        <select
+                          value={profileForm.temperature}
+                          onChange={(event) => {
+                            setProfileForm((prev) => ({
+                              ...prev,
+                              temperature: event.target.value,
+                            }));
+                          }}
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                        >
+                          <option value="unknown">Belum ditentukan</option>
+                          <option value="cold">Cold</option>
+                          <option value="warm">Warm</option>
+                          <option value="hot">Hot</option>
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">Kategori Akun</span>
+                        <select
+                          value={profileForm.account_category}
+                          onChange={(event) => {
+                            setProfileForm((prev) => ({
+                              ...prev,
+                              account_category: event.target.value,
+                            }));
+                          }}
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                        >
+                          <option value="unknown">Belum ditentukan</option>
+                          <option value="mini">Mini</option>
+                          <option value="reguler">Reguler</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <label className="mt-4 block space-y-2 text-sm text-slate-700">
+                      <span className="font-semibold text-slate-900">Alamat</span>
+                      <textarea
+                        value={profileForm.address}
+                        onChange={(event) => {
+                          setProfileForm((prev) => ({
+                            ...prev,
+                            address: event.target.value,
+                          }));
+                        }}
+                        rows={4}
+                        className="w-full rounded-[24px] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                        placeholder="Isi alamat customer jika memang sudah diketahui"
+                      />
+                    </label>
+
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        disabled={isSavingProfile || !profileForm.display_name.trim()}
+                        onClick={() => {
+                          void handleProfileSave();
+                        }}
+                        className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isSavingProfile ? "Menyimpan..." : "Simpan Data Customer"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileForm({
+                            display_name: profile.display_name,
+                            phone: profile.phone ?? "",
+                            email: profile.email ?? "",
+                            address: profile.address ?? "",
+                            status: profile.status,
+                            temperature: profile.temperature,
+                            account_category: deriveEditableAccountCategory(profile.related_leads),
+                          });
+                          setIsEditingProfile(false);
+                        }}
+                        className="inline-flex rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
+                      >
+                        Reset Form
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </article>
 
               <article className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-                <h2 className="text-xl font-semibold text-slate-950">Yang Perlu Dicek Dulu</h2>
+                <h2 className="text-xl font-semibold text-slate-950">
+                  {isLeadershipWorkspace
+                    ? "Urutan baca manager"
+                    : "Yang Perlu Dicek Dulu"}
+                </h2>
                 <div className="mt-5 space-y-3">
                   <ActionHint
-                    title="1. Cek lead yang paling panas atau paling baru"
+                    title="1. Buka lead yang paling prioritas"
                     description={
                       topPriorityLead
                         ? `${topPriorityLead.display_name} adalah lead paling layak dibuka dulu dari profil customer ini.`
@@ -394,7 +633,7 @@ export default function CustomerProfilePage() {
                     }
                   />
                   <ActionHint
-                    title="2. Pastikan chat terbaru masih nyambung"
+                    title="2. Cek percakapan terakhir"
                     description={
                       latestLead
                         ? `Kontak terakhir tercatat di lead ${latestLead.display_name} pada ${formatDateTime(
@@ -404,178 +643,18 @@ export default function CustomerProfilePage() {
                     }
                   />
                   <ActionHint
-                    title="3. Kalau data terasa pecah, cek kandidat merge"
-                    description="Kalau ada nama atau channel yang mirip, gunakan merge candidates untuk memastikan satu customer tidak tersebar ke beberapa profil."
+                    title="3. Rapikan data kalau perlu"
+                    description={
+                      isSalesWorkspace
+                        ? "Kalau nama, nomor, atau kategori akun belum rapi, edit seperlunya supaya tim berikutnya tidak bingung."
+                        : isLeadershipWorkspace
+                          ? "Kalau profil customer terasa pecah, owner-nya rancu, atau channel-nya tidak nyambung, baru lanjut ke merge candidates."
+                          : "Kalau ada nama atau channel yang mirip, gunakan merge candidates untuk memastikan satu customer tidak tersebar ke beberapa profil."
+                    }
                   />
                 </div>
               </article>
             </section>
-
-            {activePanel === "profile" || isEditingProfile ? (
-              <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="max-w-2xl">
-                    <h2 className="text-xl font-semibold text-slate-950">Data Customer</h2>
-                    <p className="mt-2 text-sm leading-7 text-slate-600">
-                      Bagian ini dipakai untuk mengisi identitas customer yang lebih rapi seperti yang biasanya ada di sistem CRM klasik. Isi seperlunya, tapi pastikan nama, telepon, dan statusnya tidak ngawur karena data ini bisa dipakai tim lain juga.
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-slate-600">
-                      Kategori akun dibaca otomatis dari lead terkait customer ini. Kalau customer punya lebih dari satu lead, kategorinya bisa terlihat campuran di ringkasan profil.
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-slate-600">
-                      Kalau Anda yakin kategori akun customer ini memang harus mini atau reguler, Anda bisa set manual di form ini untuk menyelaraskan lead terkait.
-                    </p>
-                  </div>
-                  <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 lg:max-w-sm">
-                    Jangan isi data palsu. Kalau Anda belum yakin nomor, email, atau alamatnya benar, lebih baik kosongkan dulu daripada membuat tim salah membaca customer.
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <label className="space-y-2 text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">Nama Customer</span>
-                    <input
-                      value={profileForm.display_name}
-                      onChange={(event) => {
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          display_name: event.target.value,
-                        }));
-                      }}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                      placeholder="Masukkan nama customer"
-                    />
-                  </label>
-                  <label className="space-y-2 text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">Telepon</span>
-                    <input
-                      value={profileForm.phone}
-                      onChange={(event) => {
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          phone: event.target.value,
-                        }));
-                      }}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                      placeholder="08xxxx atau +62xxxx"
-                    />
-                  </label>
-                  <label className="space-y-2 text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">Email</span>
-                    <input
-                      type="email"
-                      value={profileForm.email}
-                      onChange={(event) => {
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          email: event.target.value,
-                        }));
-                      }}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                      placeholder="customer@email.com"
-                    />
-                  </label>
-                  <label className="space-y-2 text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">Status Customer</span>
-                    <select
-                      value={profileForm.status}
-                      onChange={(event) => {
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          status: event.target.value,
-                        }));
-                      }}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                    >
-                      <option value="active">Aktif</option>
-                      <option value="inactive">Tidak aktif</option>
-                    </select>
-                  </label>
-                  <label className="space-y-2 text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">Temperature Customer</span>
-                    <select
-                      value={profileForm.temperature}
-                      onChange={(event) => {
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          temperature: event.target.value,
-                        }));
-                      }}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                    >
-                      <option value="unknown">Belum ditentukan</option>
-                      <option value="cold">Cold</option>
-                      <option value="warm">Warm</option>
-                      <option value="hot">Hot</option>
-                    </select>
-                  </label>
-                  <label className="space-y-2 text-sm text-slate-700">
-                    <span className="font-semibold text-slate-900">Kategori Akun</span>
-                    <select
-                      value={profileForm.account_category}
-                      onChange={(event) => {
-                        setProfileForm((prev) => ({
-                          ...prev,
-                          account_category: event.target.value,
-                        }));
-                      }}
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                    >
-                      <option value="unknown">Belum ditentukan</option>
-                      <option value="mini">Mini</option>
-                      <option value="reguler">Reguler</option>
-                    </select>
-                  </label>
-                </div>
-
-                <label className="mt-4 block space-y-2 text-sm text-slate-700">
-                  <span className="font-semibold text-slate-900">Alamat</span>
-                  <textarea
-                    value={profileForm.address}
-                    onChange={(event) => {
-                      setProfileForm((prev) => ({
-                        ...prev,
-                        address: event.target.value,
-                      }));
-                    }}
-                    rows={4}
-                    className="w-full rounded-[24px] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
-                    placeholder="Isi alamat customer jika memang sudah diketahui"
-                  />
-                </label>
-
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    disabled={isSavingProfile || !profileForm.display_name.trim()}
-                    onClick={() => {
-                      void handleProfileSave();
-                    }}
-                    className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isSavingProfile ? "Menyimpan..." : "Simpan Data Customer"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProfileForm({
-                        display_name: profile.display_name,
-                        phone: profile.phone ?? "",
-                        email: profile.email ?? "",
-                        address: profile.address ?? "",
-                        status: profile.status,
-                        temperature: profile.temperature,
-                        account_category: deriveEditableAccountCategory(profile.related_leads),
-                      });
-                      setIsEditingProfile(false);
-                    }}
-                    className="inline-flex rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
-                  >
-                    Reset Form
-                  </button>
-                </div>
-              </section>
-            ) : null}
 
             {canMergeProfiles && activePanel === "merge" ? (
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
@@ -673,7 +752,9 @@ export default function CustomerProfilePage() {
                   <div>
                     <h2 className="text-xl font-semibold text-slate-950">Lead Terkait</h2>
                     <p className="mt-2 max-w-3xl text-sm leading-7 text-[#5a421f]">
-                      Bagian ini menunjukkan semua lead yang masih dianggap milik customer yang sama. Jangan buka semuanya sekaligus. Baca yang paling prioritas dulu, lalu baru turun ke lead lain kalau memang perlu.
+                      {isLeadershipWorkspace
+                        ? "Bagian ini menunjukkan semua lead yang masih dianggap milik customer yang sama. Manager tidak perlu buka semuanya. Mulai dari prioritas teratas, lalu cek apakah owner dan ritme follow-up-nya konsisten."
+                        : "Bagian ini menunjukkan semua lead yang masih dianggap milik customer yang sama. Jangan buka semuanya sekaligus. Mulai dari yang paling prioritas, lalu turun ke lead lain kalau memang perlu."}
                     </p>
                   </div>
                   <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -734,7 +815,7 @@ export default function CustomerProfilePage() {
                             href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
                             className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
                           >
-                            Buka Conversation
+                            Buka Percakapan
                           </Link>
                         ) : null}
                       </div>
@@ -816,10 +897,10 @@ function HeroPill({
 }) {
   const toneClass =
     accent === "amber"
-      ? "border-amber-200 bg-amber-50 text-amber-800"
+      ? "border-[#d5a548]/35 bg-[linear-gradient(135deg,rgba(74,47,14,0.72)_0%,rgba(49,31,12,0.92)_100%)] text-[#f0cb73]"
       : accent === "emerald"
-        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-        : "border-slate-200 bg-slate-100 text-slate-700";
+        ? "border-[#1c8f78]/35 bg-[linear-gradient(135deg,rgba(10,56,50,0.72)_0%,rgba(8,35,32,0.92)_100%)] text-[#3fd0b3]"
+        : "border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(38,28,18,0.76)_0%,rgba(24,18,12,0.92)_100%)] text-[#f7e0a8]";
 
   return (
     <div className={`rounded-full border px-4 py-2 shadow-sm ${toneClass}`}>
@@ -973,6 +1054,43 @@ function deriveEditableAccountCategory(
   }
 
   return "unknown";
+}
+
+function buildCustomerFocusSummary({
+  profile,
+  topPriorityLead,
+  latestLead,
+  isLeadershipWorkspace,
+}: {
+  profile: CustomerProfileSummaryItem | null;
+  topPriorityLead: CustomerProfileSummaryItem["related_leads"][number] | null;
+  latestLead: CustomerProfileSummaryItem["related_leads"][number] | null;
+  isLeadershipWorkspace: boolean;
+}) {
+  if (!profile) {
+    return {
+      headline: "Profil customer belum dimuat.",
+      helper: "Muat data customer dulu untuk melihat konteks lead terkait.",
+    };
+  }
+
+  if (topPriorityLead) {
+    return {
+      headline: isLeadershipWorkspace
+        ? `${topPriorityLead.display_name} adalah lead customer ini yang paling perlu dicek manager dulu.`
+        : `${topPriorityLead.display_name} adalah lead utama yang perlu dibuka dulu.`,
+      helper: latestLead
+        ? `Customer ini terakhir terhubung lewat ${latestLead.display_name} pada ${formatDateTime(
+            latestLead.last_contact_at
+          )}. Cek lead prioritas dulu, lalu cocokkan dengan percakapan terakhir kalau butuh konteks.`
+        : "Mulai dari lead prioritas dulu supaya arah follow-up ke customer ini tetap jelas.",
+    };
+  }
+
+  return {
+    headline: `${profile.display_name} belum punya lead yang menonjol untuk diprioritaskan.`,
+    helper: "Mulai dari data customer ini dulu, lalu cek lead yang kontaknya paling baru untuk menentukan langkah berikutnya.",
+  };
 }
 
 function buildCustomerOverview({

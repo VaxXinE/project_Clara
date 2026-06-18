@@ -46,6 +46,11 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
+    openai_fast_reply_model: str = "gpt-4.1-mini"
+    openai_ultra_fast_reply_model: str = "gpt-4.1-mini"
+    openai_ultra_fast_reply_max_output_tokens: int = 120
+    openai_fast_reply_max_output_tokens: int = 180
+    openai_single_reply_max_output_tokens: int = 260
 
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"

@@ -154,6 +154,8 @@ export default function FollowUpPage() {
   const [hiddenItemKeys, setHiddenItemKeys] = useState<string[]>([]);
   const [actionBucketFilter, setActionBucketFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const workspaceRole = currentUser ? normalizeWorkspaceRole(currentUser.role) : null;
+  const isSalesWorkspace = workspaceRole === "sales";
 
   const loadWorklist = useCallback(async () => {
     try {
@@ -280,34 +282,74 @@ export default function FollowUpPage() {
       }))
       .filter((section) => section.items.length > 0);
   }, [filteredVisibleItems]);
+  const salesActionSummary = useMemo(() => {
+    if (!worklist) {
+      return {
+        focusLabel: "Belum ada data tindak lanjut.",
+        focusHelper: "Muat data dulu untuk melihat pekerjaan yang perlu dikerjakan sekarang.",
+      };
+    }
+
+    if (worklist.overdue_24h_count > 0) {
+      return {
+        focusLabel: `${worklist.overdue_24h_count} follow-up sudah telat berat.`,
+        focusHelper: "Mulai dari item kritis supaya lead tidak makin dingin dan customer tidak merasa ditinggal.",
+      };
+    }
+
+    if (worklist.due_today_count > 0) {
+      return {
+        focusLabel: `${worklist.due_today_count} follow-up harus dibereskan hari ini.`,
+        focusHelper: "Kerjakan item yang sudah jatuh tempo dulu, lalu lanjut ke item siap kirim.",
+      };
+    }
+
+    if (worklist.ready_to_send_count > 0) {
+      return {
+        focusLabel: `${worklist.ready_to_send_count} lead sudah dekat ke aksi kirim.`,
+        focusHelper: "Tinggal cek konteks terakhir, kirim pesan, lalu tandai tugasnya selesai.",
+      };
+    }
+
+    return {
+      focusLabel: "Queue follow-up sedang relatif aman.",
+      focusHelper: "Pakai halaman ini untuk cek item berikutnya dan menjaga ritme follow-up tetap rapi.",
+    };
+  }, [worklist]);
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Action center"
-      title="Action Center"
-      description="Halaman ini menjawab pertanyaan operasional paling penting: hari ini lead mana yang harus dieksekusi dulu, kenapa, dan tindakan follow-up apa yang harus dilakukan sekarang."
+      eyebrow="Tindak lanjut"
+      title={isSalesWorkspace ? "Kerjakan Tindak Lanjut" : "Tindak Lanjut"}
+      description={
+        isSalesWorkspace
+          ? "Halaman ini dipakai untuk membereskan follow-up yang masih aktif. Fokusnya simpel: pilih lead, kerjakan aksi berikutnya, lalu tandai selesai."
+          : "Halaman ini dipakai untuk membereskan pekerjaan follow-up yang masih aktif. Fokusnya sederhana: mana yang perlu dikerjakan sekarang, kenapa, dan aksi berikutnya apa."
+      }
       backHref="/dashboard"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
         <>
-          <Link
-            href="/dashboard/notifications"
-            className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-4 py-2.5 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14"
-          >
-            Alert Center
-          </Link>
+          {!isSalesWorkspace ? (
+            <Link
+              href="/dashboard/notifications"
+              className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-4 py-2.5 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14"
+            >
+              Alert Center
+            </Link>
+          ) : null}
           <Link
             href="/dashboard/sales"
             className="clara-button clara-button-ghost"
           >
-            Queue
+            Buka Chat Masuk
           </Link>
           <Link
             href="/dashboard/crm"
             className="clara-button clara-button-ghost"
           >
-            Lead Management
+            Buka Lead
           </Link>
         </>
       }
@@ -315,7 +357,7 @@ export default function FollowUpPage() {
       <div className="space-y-6">
         {isLoading && (
           <div className="clara-empty-state text-sm text-slate-600">
-            Loading action center...
+            Loading tindak lanjut...
           </div>
         )}
 
@@ -333,39 +375,37 @@ export default function FollowUpPage() {
 
         {!isLoading && worklist && (
           <>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <MetricCard label="Follow-up Overdue" value={String(worklist.overdue_count)} />
-              <MetricCard label="Hot Lead Alert" value={String(worklist.hot_lead_count)} />
-              <MetricCard label="Ready to Send" value={String(worklist.ready_to_send_count)} />
-              <MetricCard
-                label="Needs Analysis"
-                value={String(worklist.pending_analysis_count)}
-              />
-              {/* <MetricCard label="Snoozed Tasks" value={String(worklist.snoozed_count)} /> */}
-              <MetricCard
-                label="Done Today"
-                value={String(worklist.completed_today_count)}
-              />
-              <MetricCard
-                label="Due Today"
-                value={String(worklist.due_today_count)}
-              />
-              <MetricCard
-                label="Open Tasks"
-                value={String(worklist.open_task_count)}
-              />
-              <MetricCard
-                label="Overdue >24h"
-                value={String(worklist.overdue_24h_count)}
-              />
-              <MetricCard
-                label="Overdue >72h"
-                value={String(worklist.overdue_72h_count)}
-              />
-              <MetricCard
-                label="Completion Rate"
-                value={`${worklist.completion_rate_today.toFixed(1)}%`}
-              />
+            <section className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+              <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_50%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                  Fokus kerja sekarang
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#fff3cf]">
+                  {salesActionSummary.focusLabel}
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-[#e3c990]">
+                  {salesActionSummary.focusHelper}
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#e9d4a0]">
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                    Prioritas hari ini: <span className="font-semibold text-[#fff3cf]">{filteredVisibleItems.length}</span>
+                  </span>
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                    Berikutnya: <span className="font-semibold text-[#fff3cf]">{visibleUpcomingItems.length}</span>
+                  </span>
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                    Dibuat: <span className="font-semibold text-[#fff3cf]">{formatDateTime(worklist.generated_at)}</span>
+                  </span>
+                </div>
+              </article>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+                <MetricCard label="Telat berat" value={String(worklist.overdue_24h_count)} />
+                <MetricCard label="Harus hari ini" value={String(worklist.due_today_count)} />
+                <MetricCard label="Siap dikirim" value={String(worklist.ready_to_send_count)} />
+                <MetricCard label="Sudah selesai hari ini" value={String(worklist.completed_today_count)} />
+              </div>
             </section>
 
             <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
@@ -373,45 +413,30 @@ export default function FollowUpPage() {
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="max-w-2xl">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                      Kontrol Action Center
+                      Filter kerja
                     </p>
                     <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
-                      Prioritaskan task harian dari satu toolbar
+                      Cari dulu yang mau dibereskan
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-[#e3c990]">
-                      Gunakan pencarian dan bucket kerja untuk memisahkan item kritis, due today, dan pekerjaan yang masih butuh analisis.
+                      Sales cukup pakai dua hal ini: cari lead yang sedang dicari, lalu pilih prioritas kerja yang ingin difokuskan.
                     </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <ActionMetaPill
-                      label="Kritis"
-                      value={String(worklist.overdue_24h_count)}
-                    />
-                    <ActionMetaPill
-                      label="Due Today"
-                      value={String(worklist.due_today_count)}
-                    />
-                    <ActionMetaPill
-                      label="Hot Lead"
-                      value={String(worklist.hot_lead_count)}
-                    />
                   </div>
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                   <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Cari lead atau alasan task</span>
+                    <span>Cari lead atau alasan follow-up</span>
                     <input
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
-                      placeholder="Cari lead, task label, reason, atau recommended action..."
+                      placeholder="Cari nama lead, alasan, atau aksi berikutnya..."
                       className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none placeholder:text-[#907953]"
                     />
                   </label>
 
                   <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Filter bucket kerja</span>
+                    <span>Pilih prioritas</span>
                     <select
                       value={actionBucketFilter}
                       onChange={(event) => setActionBucketFilter(event.target.value)}
@@ -433,7 +458,7 @@ export default function FollowUpPage() {
                 </span>
                 <span>
                   Menampilkan <span className="font-semibold text-[#fff0c9]">{filteredVisibleItems.length}</span> dari{" "}
-                  <span className="font-semibold text-[#fff0c9]">{visibleItems.length}</span> item prioritas hari ini.
+                  <span className="font-semibold text-[#fff0c9]">{visibleItems.length}</span> follow-up aktif hari ini.
                 </span>
               </div>
             </section>
@@ -442,14 +467,14 @@ export default function FollowUpPage() {
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Prioritas Hari Ini
+                    Kerjakan sekarang
                   </p>
                   <h2 className="mt-1 text-2xl font-bold text-slate-950">
-                    {filteredVisibleItems.length} item kerja siap ditindak
+                    {filteredVisibleItems.length} follow-up siap dibereskan
                   </h2>
                 </div>
                 <p className="text-sm text-slate-500">
-                  Dibuat: {formatDateTime(worklist.generated_at)}
+                  Urutkan dari yang paling butuh tindakan dulu, lalu tandai selesai satu per satu.
                 </p>
               </div>
 
@@ -497,14 +522,14 @@ export default function FollowUpPage() {
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Prioritas Berikutnya
+                    Simpan untuk berikutnya
                   </p>
                   <h2 className="mt-1 text-2xl font-bold text-slate-950">
-                    {visibleUpcomingItems.length} item follow-up untuk besok dan seterusnya
+                    {visibleUpcomingItems.length} follow-up belum perlu dikerjakan hari ini
                   </h2>
                 </div>
                 <p className="text-sm text-slate-500">
-                  Task ini belum jatuh tempo hari ini, jadi disimpan terpisah supaya queue harian tetap bersih.
+                  Item ini tetap aktif, tapi belum jadi fokus sesi kerja sekarang.
                 </p>
               </div>
 
@@ -625,26 +650,26 @@ function WorklistRow({
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="clara-card-soft rounded-2xl p-4">
-              <p className="clara-kicker text-[11px]">Recommended Action</p>
+              <p className="clara-kicker text-[11px]">Aksi yang disarankan</p>
               <p className="mt-2 text-sm leading-6 text-slate-700">
                 {item.recommended_action}
               </p>
             </div>
 
             <div className="clara-card-soft rounded-2xl p-4 text-sm text-slate-600">
-              <p>Last contact: {formatDateTime(item.last_contact_at)}</p>
+              <p>Kontak terakhir: {formatDateTime(item.last_contact_at)}</p>
               <p className="mt-2">
-                Next follow-up: {formatDateTime(item.next_follow_up_at)}
+                Follow-up berikutnya: {formatDateTime(item.next_follow_up_at)}
               </p>
-              <p className="mt-2">Assignee: {item.assigned_user_name ?? "Belum ada"}</p>
-              <p className="mt-2">Priority score: {item.priority_score}</p>
+              <p className="mt-2">PIC: {item.assigned_user_name ?? "Belum ada"}</p>
+              <p className="mt-2">Skor prioritas: {item.priority_score}</p>
             </div>
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
             <div>
               <label className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Reason Tag
+                Hasil aksi
               </label>
               <select
                 value={reasonTag}
@@ -662,13 +687,13 @@ function WorklistRow({
 
             <div>
               <label className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Reason Note
+                Catatan opsional
               </label>
               <input
                 value={reasonNote}
                 onChange={(event) => setReasonNote(event.target.value)}
                 className="clara-input mt-2"
-                placeholder="Catatan singkat kenapa action ini dipilih"
+                placeholder="Isi kalau perlu catatan tambahan"
                 disabled={isUpdating}
               />
             </div>
@@ -681,14 +706,14 @@ function WorklistRow({
               href={`/dashboard/sales/conversations/${item.conversation_id}`}
               className="clara-button clara-button-primary"
             >
-              Buka Conversation
+              Buka Percakapan
             </Link>
           )}
           <Link
             href={`/dashboard/crm/${item.lead_id}`}
             className="clara-button clara-button-ghost"
           >
-            Buka Lead Management
+            Buka Lead
           </Link>
           <button
             type="button"
@@ -698,7 +723,7 @@ function WorklistRow({
             }}
             className="clara-button border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08]"
           >
-            {isUpdating ? "Memproses..." : "Done"}
+            {isUpdating ? "Memproses..." : "Tandai Selesai"}
           </button>
           {/* Snooze UI disembunyikan sementara, backend state tetap dipertahankan untuk kompatibilitas data lama.
           {item.task_status === "snoozed" ? (
@@ -754,21 +779,10 @@ function WorklistRow({
             }}
             className="clara-button border border-[#f0cb73]/20 bg-[#2c1f12] text-[#f0cb73]"
           >
-            Dismiss
+            Sembunyikan
           </button>
         </div>
       </div>
     </article>
-  );
-}
-
-function ActionMetaPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-full border border-[#f0cb73]/18 bg-[#1d150d] px-3.5 py-2 shadow-[0_8px_18px_rgba(0,0,0,0.14)]">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b58d43]">
-        {label}
-      </span>
-      <span className="ml-2 text-sm font-semibold text-[#f0cb73]">{value}</span>
-    </div>
   );
 }
