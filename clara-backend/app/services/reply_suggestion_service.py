@@ -54,6 +54,30 @@ MAX_KNOWLEDGE_ENTRIES_FOR_ULTRA_FAST_REPLY = 1
 MAX_KNOWLEDGE_ENTRIES_FOR_FAST_REPLY = 2
 
 
+def _extract_reply_payload_from_response(response: object) -> dict:
+    output_parsed = getattr(response, "output_parsed", None)
+    if isinstance(output_parsed, dict):
+        return output_parsed
+
+    output_items = getattr(response, "output", None)
+    if isinstance(output_items, list):
+        for item in output_items:
+            content_blocks = getattr(item, "content", None)
+            if not isinstance(content_blocks, list):
+                continue
+
+            for block in content_blocks:
+                parsed = getattr(block, "parsed", None)
+                if isinstance(parsed, dict):
+                    return parsed
+
+    output_text = getattr(response, "output_text", None)
+    if isinstance(output_text, str) and output_text.strip():
+        return json.loads(output_text)
+
+    raise ReplySuggestionError("OpenAI returned empty structured output.")
+
+
 PRODUCT_VARIANT_DISCOVERY_PATTERN = re.compile(
     r"\b("
     r"produk apa saja|program apa saja|produk apa aja|program apa aja|"
@@ -1801,10 +1825,10 @@ def call_openai_for_reply_suggestion(
 
     try:
         validation_started_at = perf_counter()
-        parsed_json = json.loads(response.output_text)
+        parsed_json = _extract_reply_payload_from_response(response)
         reply_payload = ReplySuggestionCreate.model_validate(parsed_json)
         validation_duration_ms = _round_duration_ms(validation_started_at)
-    except (json.JSONDecodeError, ValidationError) as exc:
+    except (ReplySuggestionError, json.JSONDecodeError, ValidationError) as exc:
         reply_logger.exception(
             "reply_generation_validation_failed",
             extra={
@@ -1816,6 +1840,15 @@ def call_openai_for_reply_suggestion(
                 "playbook_duration_ms": playbook_duration_ms,
                 "prompt_duration_ms": prompt_duration_ms,
                 "openai_duration_ms": openai_duration_ms,
+                "response_status": getattr(response, "status", None),
+                "response_incomplete_details": getattr(
+                    response, "incomplete_details", None
+                ),
+                "response_output_excerpt": (
+                    getattr(response, "output_text", "")[:500]
+                    if isinstance(getattr(response, "output_text", None), str)
+                    else None
+                ),
                 "total_duration_ms": _round_duration_ms(total_started_at),
             },
         )
@@ -1944,7 +1977,7 @@ def call_openai_for_reply_suggestion(
         )
         retry_openai_duration_ms = _round_duration_ms(retry_openai_started_at)
         retry_validation_started_at = perf_counter()
-        retry_json = json.loads(retry_response.output_text)
+        retry_json = _extract_reply_payload_from_response(retry_response)
         retried_payload = ReplySuggestionCreate.model_validate(retry_json)
         retry_validation_duration_ms = _round_duration_ms(
             retry_validation_started_at

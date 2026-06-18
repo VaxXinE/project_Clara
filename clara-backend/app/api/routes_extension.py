@@ -24,6 +24,7 @@ from app.services.extension_ingest_service import (
     generate_extension_reply_suggestions,
     sync_whatsapp_extension_snapshot,
 )
+from app.services.reply_suggestion_service import ReplySuggestionError
 
 router = APIRouter(prefix="/extension", tags=["extension"])
 
@@ -116,6 +117,16 @@ def send_whatsapp_reply_suggestion_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
+        ) from exc
+    except ReplySuggestionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unexpected extension reply generation error.",
         ) from exc
     except AccessDeniedError as exc:
         raise HTTPException(
