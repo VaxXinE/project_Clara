@@ -241,6 +241,33 @@ const panelCss = `
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .clara-action-bridge {
+    align-items: center;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr auto 1fr;
+    margin: -2px 0;
+  }
+
+  .clara-action-bridge__line {
+    background: linear-gradient(
+      90deg,
+      rgba(240, 203, 115, 0),
+      rgba(240, 203, 115, 0.18),
+      rgba(240, 203, 115, 0)
+    );
+    height: 1px;
+    width: 100%;
+  }
+
+  .clara-action-bridge__actions {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: min(100%, 420px);
+    width: min(100%, 420px);
+  }
+
   .clara-chip {
     align-items: center;
     border-radius: 999px;
@@ -714,6 +741,21 @@ const panelCss = `
     .clara-overview__grid,
     .clara-draft__actions {
       grid-template-columns: 1fr;
+    }
+
+    .clara-action-bridge {
+      grid-template-columns: 1fr;
+    }
+
+    .clara-action-bridge__line {
+      display: none;
+    }
+
+    .clara-action-bridge__actions,
+    .clara-pane__actions {
+      grid-template-columns: 1fr;
+      min-width: 0;
+      width: 100%;
     }
   }
 
@@ -2383,25 +2425,6 @@ function ClaraSidePanel() {
                 </div>
               </div>
 
-              <div className="clara-pane__actions">
-                <button
-                  className="clara-button clara-button--ghost clara-button--block clara-button--compact"
-                  disabled={isLoading}
-                  onClick={handleReadChat}>
-                  {isLoading
-                    ? "Membaca chat..."
-                    : chatData
-                      ? "Refresh Chat"
-                      : "Baca Chat Aktif"}
-                </button>
-                <button
-                  className="clara-button clara-button--primary clara-button--block clara-button--compact"
-                  disabled={isSuggesting || isLoading || !chatData}
-                  onClick={handleSuggestReplies}>
-                  {isSuggesting ? "Generate..." : "Generate Jawaban"}
-                </button>
-              </div>
-
               {!isWhatsAppTab && !chatData && (
                 <div className="clara-note clara-note--warn">
                   Tab aktif saat ini bukan WhatsApp Web. Buka{" "}
@@ -2482,6 +2505,29 @@ function ClaraSidePanel() {
                 </div>
               )}
             </section>
+
+            <div className="clara-action-bridge">
+              <div className="clara-action-bridge__line" />
+              <div className="clara-action-bridge__actions">
+                <button
+                  className="clara-button clara-button--ghost clara-button--block clara-button--compact"
+                  disabled={isLoading}
+                  onClick={handleReadChat}>
+                  {isLoading
+                    ? "Membaca chat..."
+                    : chatData
+                      ? "Refresh Chat"
+                      : "Baca Chat Aktif"}
+                </button>
+                <button
+                  className="clara-button clara-button--primary clara-button--block clara-button--compact"
+                  disabled={isSuggesting || isLoading || !chatData}
+                  onClick={handleSuggestReplies}>
+                  {isSuggesting ? "Generate..." : "Generate Jawaban"}
+                </button>
+              </div>
+              <div className="clara-action-bridge__line" />
+            </div>
 
             <section className="clara-pane clara-pane--reply">
               <div className="clara-pane__header">
