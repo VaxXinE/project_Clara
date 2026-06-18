@@ -21,6 +21,24 @@ const SOURCE_CHANNEL_OPTIONS = [
   { value: "telegram", label: "Telegram" },
 ] as const;
 
+type StatusBadgeTone = "good" | "warning" | "critical" | "neutral";
+
+type OpsStatusCard = {
+  label: string;
+  title: string;
+  description: string;
+  tone: StatusBadgeTone;
+};
+
+type OpsPriorityItem = {
+  label: string;
+  title: string;
+  description: string;
+  href: string | null;
+  cta: string;
+  tone: StatusBadgeTone;
+};
+
 function numberOrZero(value: number | undefined | null): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
@@ -1052,7 +1070,7 @@ export default function KpiCommandCenterPage() {
   );
 }
 
-function buildOpsStatus(kpi: KpiCommandCenterResponse | null) {
+function buildOpsStatus(kpi: KpiCommandCenterResponse | null): OpsStatusCard {
   if (!kpi) {
     return {
       label: "Loading",
@@ -1081,7 +1099,9 @@ function buildOpsStatus(kpi: KpiCommandCenterResponse | null) {
   };
 }
 
-function buildOpsPriorities(kpi: KpiCommandCenterResponse | null) {
+function buildOpsPriorities(
+  kpi: KpiCommandCenterResponse | null,
+): OpsPriorityItem[] {
   if (!kpi) {
     return [];
   }
@@ -1255,7 +1275,7 @@ function StatusBadge({
   tone,
 }: {
   label: string;
-  tone: "good" | "warning" | "critical" | "neutral";
+  tone: StatusBadgeTone;
 }) {
   const className =
     tone === "good"
