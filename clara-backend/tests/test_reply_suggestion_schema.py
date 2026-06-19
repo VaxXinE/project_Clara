@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -23,6 +24,7 @@ from app.services.reply_suggestion_service import (
     infer_latency_profile,
     infer_latest_customer_intent,
     infer_product_variant_response_mode,
+    get_known_customer_identity_fields,
     response_defers_answer_with_question,
     response_misses_latest_customer_intent,
     response_is_vague_after_identity_submission,
@@ -127,6 +129,22 @@ def test_infer_latest_customer_intent_detects_timing() -> None:
     assert infer_latest_customer_intent("Berapa lama kak untuk verifikasi?") == "timing"
 
 
+def test_infer_latest_customer_intent_detects_verification_complete() -> None:
+    assert (
+        infer_latest_customer_intent(
+            "Kaak, untuk proses verifikasi mini nya sudah selesai, selanjutnya apa?"
+        )
+        == "verification_complete"
+    )
+
+
+def test_infer_latest_customer_intent_detects_verification_status() -> None:
+    assert (
+        infer_latest_customer_intent("Apakah sudah kak untuk verifikasinya?")
+        == "verification_status"
+    )
+
+
 def test_response_misses_latest_customer_intent_flags_misaligned_answer() -> None:
     assert response_misses_latest_customer_intent(
         "Solid itu diawasi resmi dan ada pengawasan BAPPEBTI.",
@@ -198,11 +216,56 @@ def test_response_is_vague_after_identity_submission_accepts_concrete_handoff() 
     )
 
 
+def test_response_is_vague_after_verification_complete_flags_backward_answer() -> None:
+    assert response_is_vague_after_identity_submission(
+        "Step selanjutnya, Kak Arya kirim nama lengkap dan kota domisili dulu ya.",
+        latest_customer_intent="verification_complete",
+        customer_has_variant_commitment=True,
+        customer_has_identity_submission=True,
+        customer_has_verification_completion=True,
+    )
+
+
+def test_response_is_vague_after_verification_complete_accepts_onboarding_handoff() -> None:
+    assert not response_is_vague_after_identity_submission(
+        "Siap kak, kalau email verifikasi sudah masuk berarti proses Mini sudah lanjut. Step berikutnya saya hubungkan ke tim onboarding supaya aktivasi dan arahan mulai-nya dibantu sampai jelas.",
+        latest_customer_intent="verification_complete",
+        customer_has_variant_commitment=True,
+        customer_has_identity_submission=True,
+        customer_has_verification_completion=True,
+    )
+
+
 def test_response_misses_latest_customer_intent_accepts_timing_answer() -> None:
     assert not response_misses_latest_customer_intent(
         "Untuk estimasi waktunya mengikuti kelengkapan data dan proses verifikasi tim ya, kak. Biar lebih akurat, nanti tim onboarding yang bantu kasih update durasi prosesnya.",
         "timing",
     )
+
+
+def test_get_known_customer_identity_fields_merges_multiple_customer_messages() -> None:
+    conversation = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Nama: Arya hondavario\nNo hp: 088238768897\nDomisili: Depok",
+            ),
+            SimpleNamespace(
+                sender_type="sales",
+                message_text="Siap kak, saya bantu lanjutkan ya.",
+            ),
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Nama Arya Pramuditha, domisili kota depok",
+            ),
+        ]
+    )
+
+    assert get_known_customer_identity_fields(conversation) == {
+        "name": "Arya Pramuditha",
+        "phone": "088238768897",
+        "domicile": "depok",
+    }
 
 
 def test_build_prioritized_knowledge_brief_summarizes_top_entries() -> None:

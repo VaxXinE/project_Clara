@@ -236,6 +236,34 @@ CUSTOMER_IDENTITY_REQUEST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+VERIFICATION_COMPLETE_PATTERN = re.compile(
+    r"\b("
+    r"sudah\s+terverifikasi|"
+    r"udah\s+terverifikasi|"
+    r"telah\s+terverifikasi|"
+    r"verifikasi(?:\s+\w+){0,3}\s+sudah\s+selesai|"
+    r"verifikasi(?:\s+\w+){0,3}\s+selesai|"
+    r"verifikasi(?:\s+\w+){0,3}\s+sudah\s+beres|"
+    r"sudah\s+dapat\s+email|"
+    r"sudah\s+dapet\s+email|"
+    r"email(?:\s+\w+){0,4}\s+terverifikasi|"
+    r"data\s+saya\s+sudah\s+terverifikasi|"
+    r"proses\s+verifikasi(?:\s+\w+){0,3}\s+sudah\s+selesai"
+    r")\b",
+    re.IGNORECASE,
+)
+
+VERIFICATION_STATUS_REQUEST_PATTERN = re.compile(
+    r"\b("
+    r"apakah\s+sudah(?:\s+\w+){0,3}\s+verifikasi(?:nya)?|"
+    r"sudah\s+belum(?:\s+\w+){0,3}\s+verifikasi(?:nya)?|"
+    r"status\s+verifikasi(?:nya)?|"
+    r"verifikasi(?:nya)?\s+sudah\s+belum|"
+    r"sudah\s+kak\s+untuk\s+verifikasinya"
+    r")\b",
+    re.IGNORECASE,
+)
+
 VAGUE_NEXT_STEP_PATTERN = re.compile(
     r"\b("
     r"cek(?:kan)?\s+alurnya\s+dulu|"
@@ -418,6 +446,10 @@ def infer_latest_customer_intent(latest_customer_message: str) -> str:
     if not message:
         return "general"
 
+    if VERIFICATION_COMPLETE_PATTERN.search(message):
+        return "verification_complete"
+    if VERIFICATION_STATUS_REQUEST_PATTERN.search(message):
+        return "verification_status"
     if customer_has_provided_basic_identity(message):
         return "identity_submission"
     if should_message_ask_product_options(message):
@@ -487,6 +519,16 @@ def get_intent_guidance(latest_customer_intent: str) -> str:
             "- Customer sedang menanyakan estimasi waktu proses/verifikasi/onboarding.\n"
             "- Jika knowledge base tidak punya SLA atau durasi yang eksplisit, jangan mengarang angka atau berkata 'cek alur resmi'.\n"
             "- Jawab jujur bahwa durasi mengikuti kelengkapan data/proses tim, lalu arahkan ke tim onboarding atau tim senior untuk estimasi aktual."
+        ),
+        "verification_status": (
+            "- Customer sedang menanyakan status verifikasi.\n"
+            "- Jika sistem chat ini tidak punya akses status real-time, jangan pura-pura bisa mengecek status final.\n"
+            "- Jawab jujur berdasarkan konteks chat, lalu arahkan ke tim onboarding/senior untuk konfirmasi status aktual."
+        ),
+        "verification_complete": (
+            "- Customer menyatakan verifikasi sudah selesai atau sudah menerima email verifikasi.\n"
+            "- Jangan minta ulang nama/HP/domisili.\n"
+            "- Lanjutkan ke onboarding, aktivasi, atau handoff ke tim senior secara konkret."
         ),
         "next_step": (
             "- Customer sedang meminta langkah awal / next step.\n"
@@ -647,7 +689,12 @@ def extract_customer_identity_fields(latest_customer_message: str) -> dict[str, 
 
     domicile_match = CUSTOMER_IDENTITY_DOMICILE_PATTERN.search(message)
     if domicile_match:
-        fields["domicile"] = _compact_whitespace(domicile_match.group(2))
+        fields["domicile"] = re.sub(
+            r"^(kota|kabupaten)\s+",
+            "",
+            _compact_whitespace(domicile_match.group(2)),
+            flags=re.IGNORECASE,
+        )
 
     if "name" not in fields:
         lines = [line.strip() for line in latest_customer_message.splitlines() if line.strip()]
@@ -663,7 +710,12 @@ def extract_customer_identity_fields(latest_customer_message: str) -> dict[str, 
     if "domicile" not in fields and "domisili" in message.lower():
         fallback = re.search(r"domisili[\s:,-]+([A-Za-z][A-Za-z\s\.'-]{2,})", message, re.I)
         if fallback:
-            fields["domicile"] = _compact_whitespace(fallback.group(1))
+            fields["domicile"] = re.sub(
+                r"^(kota|kabupaten)\s+",
+                "",
+                _compact_whitespace(fallback.group(1)),
+                flags=re.IGNORECASE,
+            )
 
     return fields
 
@@ -671,6 +723,11 @@ def extract_customer_identity_fields(latest_customer_message: str) -> dict[str, 
 def customer_has_provided_basic_identity(latest_customer_message: str) -> bool:
     fields = extract_customer_identity_fields(latest_customer_message)
     return len(fields) >= 2 and "phone" in fields
+
+
+def message_indicates_verification_complete(latest_customer_message: str) -> bool:
+    message = _compact_whitespace(latest_customer_message)
+    return bool(message and VERIFICATION_COMPLETE_PATTERN.search(message))
 
 
 def should_preserve_previous_topic(
@@ -705,14 +762,26 @@ def conversation_has_customer_identity_submission(conversation: Conversation) ->
     )
 
 
-def get_latest_customer_identity_fields(conversation: Conversation) -> dict[str, str]:
-    for message in reversed(conversation.messages):
+def conversation_has_customer_verification_complete(conversation: Conversation) -> bool:
+    return any(
+        message.sender_type == "customer"
+        and message_indicates_verification_complete(message.message_text)
+        for message in conversation.messages
+    )
+
+
+def get_known_customer_identity_fields(conversation: Conversation) -> dict[str, str]:
+    merged_fields: dict[str, str] = {}
+
+    for message in conversation.messages:
         if message.sender_type != "customer":
             continue
         fields = extract_customer_identity_fields(message.message_text)
-        if fields:
-            return fields
-    return {}
+        if not fields:
+            continue
+        merged_fields.update(fields)
+
+    return merged_fields
 
 
 def get_question_discipline_guidance(answer_commitment_level: str) -> str:
@@ -873,7 +942,8 @@ def build_runtime_rule_brief(
     discusses_scalping_or_setup: bool,
     customer_has_variant_commitment: bool = False,
     customer_has_identity_submission: bool = False,
-    latest_identity_fields: dict[str, str] | None = None,
+    known_identity_fields: dict[str, str] | None = None,
+    customer_has_verification_completion: bool = False,
 ) -> str:
     rules: list[str] = []
     customer_chose_variant = (
@@ -883,7 +953,7 @@ def build_runtime_rule_brief(
     customer_post_signup_or_deposit = customer_is_already_post_signup_or_deposit(
         latest_customer_message
     )
-    customer_identity_fields = latest_identity_fields or {}
+    customer_identity_fields = known_identity_fields or {}
     has_identity_submission = customer_has_identity_submission or bool(
         customer_identity_fields
     )
@@ -928,6 +998,14 @@ def build_runtime_rule_brief(
                 "- Customer sudah mengirim data identitas dasar. Akui data diterima lalu lanjutkan step berikutnya."
             )
 
+    if customer_has_verification_completion:
+        rules.append(
+            "- Customer sudah menyatakan verifikasi selesai/terverifikasi. Jangan kembali meminta data dasar atau mengulang verifikasi dari awal."
+        )
+        rules.append(
+            "- Setelah verifikasi selesai, langkah berikutnya harus maju ke onboarding, aktivasi, handoff ke tim senior, atau instruksi proses lanjutan yang konkret."
+        )
+
     if preserve_previous_topic:
         rules.append(
             "- Pesan customer terbaru adalah follow-up lanjutan yang pendek. Pertahankan topik dari balasan sales sebelumnya; jangan reset ke topik generik lain."
@@ -955,7 +1033,7 @@ def build_runtime_rule_brief(
         rules.append(
             "- Fokus ke langkah berikutnya yang operasional. Jangan mundur ke pengenalan produk umum."
         )
-        if has_identity_submission or customer_chose_variant:
+        if has_identity_submission or customer_chose_variant or customer_has_verification_completion:
             rules.append(
                 "- Karena customer sudah kirim data dan/atau sudah pilih produk, next step harus konkret: misalnya verifikasi data, proses onboarding, atau handoff ke tim senior. Jangan jawab dengan 'saya cek alurnya dulu' atau filler sejenis."
             )
@@ -966,6 +1044,19 @@ def build_runtime_rule_brief(
         )
         rules.append(
             "- Jangan pakai frasa kabur seperti 'saya cek alur resmi yang berlaku'. Lebih baik bilang durasi mengikuti kelengkapan data/proses tim lalu arahkan ke tim onboarding/senior untuk estimasi aktual."
+        )
+
+    if latest_customer_intent == "verification_status":
+        rules.append(
+            "- Customer menanyakan status verifikasi. Jangan klaim bisa melihat status real-time kalau memang tidak ada akses sistem."
+        )
+        rules.append(
+            "- Jika konteks chat menunjukkan verifikasi sudah selesai/email sudah masuk, jawab konsisten bahwa proses sudah lanjut ke onboarding atau langkah berikutnya."
+        )
+
+    if latest_customer_intent == "verification_complete":
+        rules.append(
+            "- Customer menyatakan verifikasi sudah selesai. Akui milestone itu, lalu lanjutkan ke onboarding/handoff; jangan minta data lagi."
         )
 
     if latest_customer_intent == "identity_submission":
@@ -1018,7 +1109,8 @@ def build_extraction_runtime_summary(
     variant_response_mode: str,
     customer_has_variant_commitment: bool = False,
     customer_has_identity_submission: bool = False,
-    latest_identity_fields: dict[str, str] | None = None,
+    known_identity_fields: dict[str, str] | None = None,
+    customer_has_verification_completion: bool = False,
 ) -> str:
     main_objections = ", ".join(extraction.main_objections) or "-"
     budget_signal = get_budget_signal(extraction)
@@ -1038,15 +1130,15 @@ def build_extraction_runtime_summary(
         f"- budget={budget_summary}",
         f"- next_best_action={_truncate_text(extraction.next_best_action, 140)}",
         f"- account_category={normalize_account_category(account_category)}, latest_intent={latest_customer_intent}, answer_mode={answer_commitment_level}, variant_mode={variant_response_mode}",
-        f"- customer_variant_committed={customer_has_variant_commitment}, customer_identity_submitted={customer_has_identity_submission}",
+        f"- customer_variant_committed={customer_has_variant_commitment}, customer_identity_submitted={customer_has_identity_submission}, customer_verification_completed={customer_has_verification_completion}",
         f"- policy_action_mode={action_mode}",
         f"- latest_customer_message={latest_customer_message or '-'}",
     ]
 
-    if latest_identity_fields:
+    if known_identity_fields:
         lines.append(
             "- latest_identity_fields="
-            + ", ".join(f"{key}={value}" for key, value in latest_identity_fields.items())
+            + ", ".join(f"{key}={value}" for key, value in known_identity_fields.items())
         )
 
     if latest_sales_message:
@@ -1466,7 +1558,8 @@ def build_reply_prompt(
     variant_response_mode: str,
     customer_has_variant_commitment: bool,
     customer_has_identity_submission: bool,
-    latest_identity_fields: dict[str, str] | None,
+    known_identity_fields: dict[str, str] | None,
+    customer_has_verification_completion: bool,
     latency_profile: str = "standard",
     desired_count: int = 3,
 ) -> str:
@@ -1489,7 +1582,8 @@ def build_reply_prompt(
         discusses_scalping_or_setup=discusses_scalping_or_setup,
         customer_has_variant_commitment=customer_has_variant_commitment,
         customer_has_identity_submission=customer_has_identity_submission,
-        latest_identity_fields=latest_identity_fields,
+        known_identity_fields=known_identity_fields,
+        customer_has_verification_completion=customer_has_verification_completion,
     )
     extraction_runtime_summary = build_extraction_runtime_summary(
         extraction,
@@ -1502,7 +1596,8 @@ def build_reply_prompt(
         variant_response_mode=variant_response_mode,
         customer_has_variant_commitment=customer_has_variant_commitment,
         customer_has_identity_submission=customer_has_identity_submission,
-        latest_identity_fields=latest_identity_fields,
+        known_identity_fields=known_identity_fields,
+        customer_has_verification_completion=customer_has_verification_completion,
     )
     required_fact_brief = build_required_fact_brief(
         grounded_knowledge=grounded_knowledge,
@@ -2099,11 +2194,21 @@ def response_is_vague_after_identity_submission(
     latest_customer_intent: str,
     customer_has_variant_commitment: bool,
     customer_has_identity_submission: bool,
+    customer_has_verification_completion: bool = False,
 ) -> bool:
-    if latest_customer_intent not in {"identity_submission", "next_step"}:
+    if latest_customer_intent not in {
+        "identity_submission",
+        "next_step",
+        "verification_status",
+        "verification_complete",
+    }:
         return False
 
-    if not (customer_has_variant_commitment or customer_has_identity_submission):
+    if not (
+        customer_has_variant_commitment
+        or customer_has_identity_submission
+        or customer_has_verification_completion
+    ):
         return False
 
     normalized = _compact_whitespace(text)
@@ -2360,6 +2465,24 @@ def response_misses_latest_customer_intent(
             )
         )
 
+    if latest_customer_intent == "verification_status":
+        return not bool(
+            re.search(
+                r"\b(status|verifikasi|onboarding|tim senior|tim onboarding|proses lanjut|langkah berikutnya)\b",
+                normalized,
+                re.I,
+            )
+        )
+
+    if latest_customer_intent == "verification_complete":
+        return not bool(
+            re.search(
+                r"\b(onboarding|aktivasi|tim senior|tim onboarding|langkah berikutnya|proses lanjut|selanjutnya)\b",
+                normalized,
+                re.I,
+            )
+        )
+
     if latest_customer_intent == "next_step":
         return not bool(
             re.search(
@@ -2422,6 +2545,8 @@ def response_starts_too_generic(
         "legality": r"\b(legal|legalitas|resmi|bappebti|diawasi)\b",
         "safety": r"\b(aman|risiko|rugi)\b",
         "minimum_capital": r"\b(minimal|minimum|modal|deposit|rp)\b",
+        "verification_status": r"\b(status|verifikasi|onboarding|langkah berikutnya)\b",
+        "verification_complete": r"\b(verifikasi|onboarding|aktivasi|selanjutnya|langkah berikutnya)\b",
         "next_step": r"\b(pertama|langkah|mulai|setelah itu|berikutnya)\b",
         "setup_scalping": r"\b(entry|setup|arah market|risiko|stop loss|take profit)\b",
         "mechanism": r"\b(sistem|cara kerja|alur|proses)\b",
@@ -2479,7 +2604,8 @@ def call_openai_for_reply_suggestion(
     variant_response_mode: str,
     customer_has_variant_commitment: bool,
     customer_has_identity_submission: bool,
-    latest_identity_fields: dict[str, str] | None,
+    known_identity_fields: dict[str, str] | None,
+    customer_has_verification_completion: bool,
     latency_profile: str = "standard",
     desired_count: int = 3,
 ) -> ReplySuggestionCreate:
@@ -2528,7 +2654,8 @@ def call_openai_for_reply_suggestion(
         variant_response_mode=variant_response_mode,
         customer_has_variant_commitment=customer_has_variant_commitment,
         customer_has_identity_submission=customer_has_identity_submission,
-        latest_identity_fields=latest_identity_fields,
+        known_identity_fields=known_identity_fields,
+        customer_has_verification_completion=customer_has_verification_completion,
         latency_profile=latency_profile,
         desired_count=desired_count,
     )
@@ -2654,13 +2781,14 @@ def call_openai_for_reply_suggestion(
             )
             or response_reasks_identity_data(
                 primary_text,
-                latest_identity_fields=latest_identity_fields or {},
+                latest_identity_fields=known_identity_fields or {},
             )
             or response_is_vague_after_identity_submission(
                 primary_text,
                 latest_customer_intent=latest_customer_intent,
                 customer_has_variant_commitment=customer_has_variant_commitment,
                 customer_has_identity_submission=customer_has_identity_submission,
+                customer_has_verification_completion=customer_has_verification_completion,
             )
             or response_breaks_followup_topic(
                 primary_text,
@@ -2707,13 +2835,14 @@ def call_openai_for_reply_suggestion(
             )
             or response_reasks_identity_data(
                 primary_text,
-                latest_identity_fields=latest_identity_fields or {},
+                latest_identity_fields=known_identity_fields or {},
             )
             or response_is_vague_after_identity_submission(
                 primary_text,
                 latest_customer_intent=latest_customer_intent,
                 customer_has_variant_commitment=customer_has_variant_commitment,
                 customer_has_identity_submission=customer_has_identity_submission,
+                customer_has_verification_completion=customer_has_verification_completion,
             )
             or response_breaks_followup_topic(
                 primary_text,
@@ -2767,13 +2896,14 @@ def call_openai_for_reply_suggestion(
             )
             or response_reasks_identity_data(
                 primary_text,
-                latest_identity_fields=latest_identity_fields or {},
+                latest_identity_fields=known_identity_fields or {},
             )
             or response_is_vague_after_identity_submission(
                 primary_text,
                 latest_customer_intent=latest_customer_intent,
                 customer_has_variant_commitment=customer_has_variant_commitment,
                 customer_has_identity_submission=customer_has_identity_submission,
+                customer_has_verification_completion=customer_has_verification_completion,
             )
             or response_breaks_followup_topic(
                 primary_text,
@@ -2999,9 +3129,12 @@ def create_reply_suggestion(
     customer_has_variant_commitment = conversation_has_customer_chosen_product_variant(
         conversation
     )
-    latest_identity_fields = get_latest_customer_identity_fields(conversation)
+    known_identity_fields = get_known_customer_identity_fields(conversation)
     customer_has_identity_submission = conversation_has_customer_identity_submission(
         conversation
+    )
+    customer_has_verification_completion = (
+        conversation_has_customer_verification_complete(conversation)
     )
     latest_customer_intent = infer_latest_customer_intent(latest_customer_message)
     answer_commitment_level = infer_answer_commitment_level(
@@ -3072,7 +3205,8 @@ def create_reply_suggestion(
         variant_response_mode=variant_response_mode,
         customer_has_variant_commitment=customer_has_variant_commitment,
         customer_has_identity_submission=customer_has_identity_submission,
-        latest_identity_fields=latest_identity_fields,
+        known_identity_fields=known_identity_fields,
+        customer_has_verification_completion=customer_has_verification_completion,
         latency_profile=latency_profile,
         desired_count=desired_count,
     )
