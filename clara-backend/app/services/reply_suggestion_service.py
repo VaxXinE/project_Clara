@@ -43,11 +43,11 @@ class ReplySuggestionError(RuntimeError):
 MAX_MESSAGES_FOR_REPLY_CONTEXT = 14
 MAX_MESSAGES_FOR_SINGLE_REPLY_CONTEXT = 8
 MAX_MESSAGES_FOR_ULTRA_FAST_REPLY_CONTEXT = 2
-MAX_MESSAGES_FOR_FAST_REPLY_CONTEXT = 4
+MAX_MESSAGES_FOR_FAST_REPLY_CONTEXT = 3
 MAX_REPLY_MESSAGE_CHARS = 420
 MAX_REPLY_MESSAGE_CHARS_SINGLE = 280
 MAX_REPLY_MESSAGE_CHARS_ULTRA_FAST = 110
-MAX_REPLY_MESSAGE_CHARS_FAST = 140
+MAX_REPLY_MESSAGE_CHARS_FAST = 120
 MAX_KNOWLEDGE_ENTRIES_FOR_REPLY = 8
 MAX_KNOWLEDGE_ENTRIES_FOR_SINGLE_REPLY = 5
 MAX_KNOWLEDGE_ENTRIES_FOR_ULTRA_FAST_REPLY = 1
@@ -173,6 +173,35 @@ BEGINNER_REQUEST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+CUSTOMER_CHOSE_MINI_PATTERN = re.compile(
+    r"\b("
+    r"pilih mini|mau mini|ambil mini|tertarik mini|cocok mini|"
+    r"pakai mini|lanjut mini|mini aja|mini dulu"
+    r")\b",
+    re.IGNORECASE,
+)
+
+CUSTOMER_CHOSE_REGULAR_PATTERN = re.compile(
+    r"\b("
+    r"pilih reguler|pilih regular|mau reguler|mau regular|"
+    r"ambil reguler|ambil regular|tertarik reguler|tertarik regular|"
+    r"cocok reguler|cocok regular|pakai reguler|pakai regular|"
+    r"lanjut reguler|lanjut regular|reguler aja|regular aja"
+    r")\b",
+    re.IGNORECASE,
+)
+
+POST_SIGNUP_OR_DEPOSIT_PATTERN = re.compile(
+    r"\b("
+    r"sudah daftar|udah daftar|berhasil daftar|selesai daftar|"
+    r"sudah registrasi|udah registrasi|sudah mendaftar|"
+    r"sudah deposit|udah deposit|sudah transfer|udah transfer|"
+    r"sudah top up|udah top up|sudah isi dana|udah isi dana|"
+    r"sudah kirim berkas|udah kirim berkas|berhasil deposit"
+    r")\b",
+    re.IGNORECASE,
+)
+
 SEARCH_STOPWORDS = {
     "yang",
     "dan",
@@ -220,6 +249,21 @@ FOLLOW_UP_CONTINUATION_PATTERN = re.compile(
     r"yang dimaksud|maksudnya|gimana tuh|gimana itu|"
     r"detailnya|lebih detail|lanjut|contohnya|sistemnya|alur(?:nya)?"
     r")\b",
+    re.IGNORECASE,
+)
+
+CLOSING_TEMPLATE_PATTERN = re.compile(
+    r"\b("
+    r"kalau mau saya bantu|kalau kakak mau saya bantu|"
+    r"kalau mau saya jelaskan|kalau kakak mau saya jelaskan|"
+    r"nanti saya bantu|nanti saya bantu arahin|"
+    r"kalau mau saya lanjut|kalau mau bisa saya bantu"
+    r")\b",
+    re.IGNORECASE,
+)
+
+LEGALITY_AUTHORITY_PATTERN = re.compile(
+    r"\b(bappebti|pengawasan resmi|diawasi resmi|regulator)\b",
     re.IGNORECASE,
 )
 
@@ -327,17 +371,37 @@ def infer_latest_customer_intent(latest_customer_message: str) -> str:
     return "general"
 
 
+def is_short_faq_customer_message(latest_customer_message: str) -> bool:
+    message = _compact_whitespace(latest_customer_message)
+    if not message:
+        return False
+
+    if should_message_ask_product_options(message):
+        return False
+
+    if DETAIL_REQUEST_PATTERN.search(message) or STEP_REQUEST_PATTERN.search(message):
+        return False
+
+    if SCALPING_REQUEST_PATTERN.search(message):
+        return False
+
+    word_count = len(message.split())
+    return word_count <= 8
+
+
 def get_intent_guidance(latest_customer_intent: str) -> str:
     guidance_map = {
         "product_options": (
             "- Customer sedang minta daftar opsi produk/program.\n"
             "- Jawab langsung dengan opsi yang ada di knowledge base.\n"
             "- Ringkas per opsi: cocok untuk siapa, positioning, dan minimal jika tersedia.\n"
-            "- Kalau kategori akun belum pasti, jangan paksa salah satu opsi."
+            "- Kalau kategori akun belum pasti, jangan paksa salah satu opsi.\n"
+            "- Jika customer bertanya 'ada apa saja', jawab keduanya dulu; jangan langsung memilih satu produk."
         ),
         "legality": (
             "- Customer sedang mengecek legalitas/resmi/tata pengawasan.\n"
             "- Jawab langsung soal status pengawasan atau bukti resmi yang memang ada di knowledge base.\n"
+            "- Kalau yang ditanya siapa pengawasnya, sebut nama regulator/pengawasan itu di kalimat pertama.\n"
             "- Hindari janji berlebihan; cukup jelas, tenang, dan faktual."
         ),
         "safety": (
@@ -350,7 +414,8 @@ def get_intent_guidance(latest_customer_intent: str) -> str:
         ),
         "next_step": (
             "- Customer sedang meminta langkah awal / next step.\n"
-            "- Jawab dalam urutan langkah konkret, singkat, dan mudah diikuti."
+            "- Jawab dalam urutan langkah konkret, singkat, dan mudah diikuti.\n"
+            "- Kalau customer sudah daftar/deposit, next step harus lanjut dari kondisi itu, bukan mengulang dari nol."
         ),
         "setup_scalping": (
             "- Customer sedang membahas setup/scalping/entry.\n"
@@ -358,7 +423,8 @@ def get_intent_guidance(latest_customer_intent: str) -> str:
         ),
         "mechanism": (
             "- Customer sedang bertanya sistem, alur, atau cara kerja.\n"
-            "- Jawab inti mekanisme dulu secara langsung dan sederhana, lalu baru arahkan lanjut jika perlu."
+            "- Jawab inti mekanisme dulu secara langsung dan sederhana, lalu baru arahkan lanjut jika perlu.\n"
+            "- Jangan berhenti di kalimat abstrak seperti 'ada alurnya'; sebut inti proses yang benar-benar bisa dibayangkan customer."
         ),
         "beginner": (
             "- Customer terlihat pemula.\n"
@@ -390,8 +456,9 @@ def get_register_guidance(preferred_reply_register: str) -> str:
 def get_answer_shape_guidance(latest_customer_intent: str) -> str:
     shape_map = {
         "product_options": (
-            "- Pola jawaban: pembuka 1 kalimat -> daftar opsi ringkas -> tutup dengan 1 pertanyaan pemilih.\n"
-            "- Contoh bentuk: 'Ada 2 opsi yang paling sering dipakai: Mini ... Regular ... Kalau kakaknya mau mulai pelan-pelan, saya bantu jelaskan yang paling pas.'"
+            "- Pola jawaban: pembuka 1 kalimat -> daftar opsi ringkas -> beda inti tiap opsi -> tutup singkat.\n"
+            "- Wajib ada pembeda konkret antar opsi, misalnya target user, modal awal, atau pendekatan pendampingan.\n"
+            "- Jangan tutup dengan pertanyaan pemilih kalau customer belum butuh dipaksa memilih saat itu."
         ),
         "legality": (
             "- Pola jawaban: status legalitas dulu -> sumber pengawasan/bukti -> batasan yang jujur.\n"
@@ -405,13 +472,15 @@ def get_answer_shape_guidance(latest_customer_intent: str) -> str:
         ),
         "next_step": (
             "- Pola jawaban: urutkan 2-4 langkah nyata.\n"
-            "- Gunakan penanda seperti 'pertama', 'kedua', 'setelah itu'."
+            "- Gunakan penanda seperti 'pertama', 'kedua', 'setelah itu'.\n"
+            "- Jangan kembali membahas modal minimal atau overview produk kalau customer sudah masuk tahap lanjut."
         ),
         "setup_scalping": (
             "- Pola jawaban: arah market -> area entry -> batas risiko -> pertanyaan lanjutan singkat."
         ),
         "mechanism": (
-            "- Pola jawaban: jelaskan cara kerja inti dulu dalam bahasa sederhana -> pecah jadi 2-3 poin singkat -> baru tawarkan lanjut."
+            "- Pola jawaban: jelaskan cara kerja inti dulu dalam bahasa sederhana -> pecah jadi 2-3 poin singkat -> baru tawarkan lanjut.\n"
+            "- Customer harus bisa membayangkan urutan prosesnya setelah membaca jawaban."
         ),
         "beginner": (
             "- Pola jawaban: satu penjelasan sederhana dulu -> jangan overload istilah -> tutup dengan 1 pertanyaan arahan."
@@ -456,6 +525,35 @@ def infer_answer_commitment_level(
         return "direct_answer_first"
 
     return "answer_then_optional_clarify"
+
+
+def customer_has_chosen_product_variant(latest_customer_message: str) -> bool:
+    message = _compact_whitespace(latest_customer_message)
+    return bool(
+        CUSTOMER_CHOSE_MINI_PATTERN.search(message)
+        or CUSTOMER_CHOSE_REGULAR_PATTERN.search(message)
+    )
+
+
+def customer_is_already_post_signup_or_deposit(latest_customer_message: str) -> bool:
+    message = _compact_whitespace(latest_customer_message)
+    return bool(POST_SIGNUP_OR_DEPOSIT_PATTERN.search(message))
+
+
+def should_preserve_previous_topic(
+    latest_customer_message: str,
+    latest_sales_message: str,
+) -> bool:
+    customer_message = _compact_whitespace(latest_customer_message)
+    sales_message = _compact_whitespace(latest_sales_message)
+
+    if not customer_message or not sales_message:
+        return False
+
+    if len(customer_message.split()) <= 8:
+        return True
+
+    return bool(FOLLOW_UP_CONTINUATION_PATTERN.search(customer_message))
 
 
 def get_question_discipline_guidance(answer_commitment_level: str) -> str:
@@ -528,6 +626,7 @@ def build_output_contract(desired_count: int) -> str:
 def infer_latency_profile(
     *,
     desired_count: int,
+    latest_customer_message: str,
     latest_customer_intent: str,
     must_answer_with_product_options: bool,
     must_give_detailed_explanation: bool,
@@ -553,10 +652,12 @@ def infer_latency_profile(
     }:
         return "ultra_fast"
 
-    if latest_customer_intent in {
-        "mechanism",
-        "product_options",
-    }:
+    if latest_customer_intent == "mechanism" and is_short_faq_customer_message(
+        latest_customer_message
+    ):
+        return "ultra_fast"
+
+    if latest_customer_intent in {"mechanism", "product_options"}:
         return "fast"
 
     return "standard"
@@ -593,13 +694,18 @@ def build_core_reply_rules() -> str:
         "- Jangan memaksa customer untuk bayar, jangan bocorkan data internal, dan jangan tulis data pribadi sensitif.\n"
         "- Jawab inti pertanyaan customer di 1-2 kalimat pertama; hindari pembuka generik yang muter.\n"
         "- Jaga register bahasa tetap konsisten; jangan campur gaya santai dengan formal dalam satu balasan.\n"
-        "- Jika knowledge tidak cukup, bilang akan cek detail resmi atau kirim dokumen pendukung."
+        "- Jika knowledge tidak cukup, bilang akan cek detail resmi atau kirim dokumen pendukung.\n"
+        "- Jangan mengulang template closing yang sama di setiap jawaban seperti 'kalau mau saya bantu jelaskan lagi' kecuali memang dibutuhkan.\n"
+        "- Jangan menyisipkan Mini/Regular kalau pertanyaan customer bukan sedang membahas produk, pilihan akun, atau modal.\n"
+        "- Kalau customer sudah jelas menanyakan satu hal spesifik, jawab hal spesifik itu dulu sebelum mengarahkan ke topik lain."
     )
 
 
 def build_runtime_rule_brief(
     *,
     latest_customer_intent: str,
+    latest_customer_message: str,
+    latest_sales_message: str,
     must_answer_with_product_options: bool,
     avoid_product_variant_locking: bool,
     should_avoid_repeating_sales_reply: bool,
@@ -608,6 +714,16 @@ def build_runtime_rule_brief(
     discusses_scalping_or_setup: bool,
 ) -> str:
     rules: list[str] = []
+    customer_chose_variant = customer_has_chosen_product_variant(
+        latest_customer_message
+    )
+    customer_post_signup_or_deposit = customer_is_already_post_signup_or_deposit(
+        latest_customer_message
+    )
+    preserve_previous_topic = should_preserve_previous_topic(
+        latest_customer_message,
+        latest_sales_message,
+    )
 
     if must_answer_with_product_options:
         rules.append(
@@ -619,9 +735,24 @@ def build_runtime_rule_brief(
             "- Jangan mengunci customer ke Mini/Regular jika konteksnya belum cukup kuat."
         )
 
+    if customer_chose_variant:
+        rules.append(
+            "- Customer sudah menunjukkan pilihan/arah produk. Jangan reset jawaban ke perbandingan umum atau topik legalitas kecuali memang ditanya."
+        )
+
+    if customer_post_signup_or_deposit:
+        rules.append(
+            "- Customer sudah masuk tahap daftar/deposit. Fokus jawaban harus ke onboarding, penggunaan, atau next step; jangan balik lagi ke modal minimal atau pengenalan produk."
+        )
+
+    if preserve_previous_topic:
+        rules.append(
+            "- Pesan customer terbaru adalah follow-up lanjutan yang pendek. Pertahankan topik dari balasan sales sebelumnya; jangan reset ke topik generik lain."
+        )
+
     if latest_customer_intent == "mechanism":
         rules.append(
-            "- Customer bertanya mekanisme/alur: jawab netral dan langsung ke cara kerja inti."
+            "- Customer bertanya mekanisme/alur: jawab netral dan langsung ke cara kerja inti yang bisa dibayangkan customer."
         )
 
     if should_avoid_repeating_sales_reply:
@@ -643,6 +774,10 @@ def build_runtime_rule_brief(
         rules.append(
             "- Konteks setup/scalping: sebut arah market, area entry, dan batas risiko yang aman untuk pemula."
         )
+
+    rules.append(
+        "- Hindari jawaban yang cuma memutar dengan frasa seperti 'pelan-pelan dulu', 'nanti dibantu', atau 'ada alurnya' tanpa isi konkret."
+    )
 
     if not rules:
         rules.append("- Fokus jawab pertanyaan terakhir customer dengan informasi paling relevan.")
@@ -938,6 +1073,92 @@ def build_prioritized_knowledge_brief(
     return "\n".join(lines)
 
 
+def _extract_grounded_lines(grounded_knowledge: str) -> list[str]:
+    return [
+        line.strip()
+        for line in grounded_knowledge.splitlines()
+        if line.strip().startswith("- [")
+    ]
+
+
+def build_required_fact_brief(
+    *,
+    grounded_knowledge: str,
+    latest_customer_intent: str,
+    product_option_summary: str,
+    must_answer_with_product_options: bool,
+) -> str:
+    knowledge_lines = _extract_grounded_lines(grounded_knowledge)
+    if not knowledge_lines:
+        return "- Tidak ada fakta wajib tambahan."
+
+    facts: list[str] = []
+
+    if must_answer_with_product_options or latest_customer_intent == "product_options":
+        facts.append(
+            "- Pertanyaan ini wajib dijawab memakai opsi produk yang memang muncul di knowledge base."
+        )
+        summary = _compact_whitespace(product_option_summary)
+        if summary:
+            facts.append(summary)
+        facts.append(
+            "- Jangan menambah nama produk atau akun baru di luar yang benar-benar ada pada ringkasan di atas."
+        )
+        return "\n".join(facts)
+
+    if latest_customer_intent == "legality":
+        legality_lines = [
+            line
+            for line in knowledge_lines
+            if re.search(
+                r"\b(legal|legalitas|bappebti|resmi|izin|pengawasan|regulator)\b",
+                line,
+                re.IGNORECASE,
+            )
+        ]
+        if legality_lines:
+            facts.append(
+                "- Untuk legalitas, pakai dulu fakta pengawasan/resmi yang muncul di bawah ini."
+            )
+            facts.extend(legality_lines[:3])
+            return "\n".join(facts)
+
+    if latest_customer_intent == "minimum_capital":
+        capital_lines = [
+            line
+            for line in knowledge_lines
+            if _extract_minimum_hint(line)
+            or re.search(r"\b(minimal|minimum|modal|deposit)\b", line, re.IGNORECASE)
+        ]
+        if capital_lines:
+            facts.append(
+                "- Untuk pertanyaan modal/minimum, pakai hanya angka atau hint minimum yang memang ada di knowledge base ini."
+            )
+            facts.extend(capital_lines[:3])
+            return "\n".join(facts)
+
+    if latest_customer_intent == "mechanism":
+        mechanism_lines = [
+            line
+            for line in knowledge_lines
+            if re.search(
+                r"\b(sistem|alur|cara kerja|proses|tahap|langkah|pendampingan|verifikasi)\b",
+                line,
+                re.IGNORECASE,
+            )
+        ]
+        if mechanism_lines:
+            facts.append(
+                "- Untuk pertanyaan sistem/alur, prioritaskan fakta proses yang muncul di bawah ini."
+            )
+            facts.extend(mechanism_lines[:3])
+            return "\n".join(facts)
+
+    facts.append("- Gunakan hanya fakta paling relevan dari knowledge base yang sudah diprioritaskan.")
+    facts.extend(knowledge_lines[:2])
+    return "\n".join(facts)
+
+
 def should_message_ask_product_options(latest_customer_message: str) -> bool:
     return bool(
         re.search(
@@ -1024,6 +1245,8 @@ def build_reply_prompt(
     core_rules = build_core_reply_rules()
     runtime_rule_brief = build_runtime_rule_brief(
         latest_customer_intent=latest_customer_intent,
+        latest_customer_message=latest_customer_message,
+        latest_sales_message=latest_sales_message,
         must_answer_with_product_options=must_answer_with_product_options,
         avoid_product_variant_locking=avoid_product_variant_locking,
         should_avoid_repeating_sales_reply=should_avoid_repeating_sales_reply,
@@ -1040,6 +1263,12 @@ def build_reply_prompt(
         latest_customer_intent=latest_customer_intent,
         answer_commitment_level=answer_commitment_level,
         variant_response_mode=variant_response_mode,
+    )
+    required_fact_brief = build_required_fact_brief(
+        grounded_knowledge=grounded_knowledge,
+        latest_customer_intent=latest_customer_intent,
+        product_option_summary=product_option_summary,
+        must_answer_with_product_options=must_answer_with_product_options,
     )
 
     if latency_profile == "fast":
@@ -1072,6 +1301,9 @@ ATURAN VARIAN PRODUK:
 
 FAKTA PRIORITAS:
 {prioritized_knowledge_brief}
+
+FAKTA WAJIB PAKAI:
+{required_fact_brief}
 
 PLAYBOOK RINGKAS:
 {response_playbook or "- Tidak ada playbook tambahan."}
@@ -1110,6 +1342,9 @@ VARIAN PRODUK:
 
 FAKTA TERPENTING:
 {prioritized_knowledge_brief}
+
+FAKTA WAJIB:
+{required_fact_brief}
 
 CUSTOMER TERAKHIR:
 {latest_customer_message}
@@ -1161,6 +1396,9 @@ RINGKASAN OPSI PRODUK TERSTRUKTUR:
 
 FAKTA PALING RELEVAN UNTUK PERTANYAAN TERAKHIR:
 {prioritized_knowledge_brief}
+
+FAKTA WAJIB YANG TIDAK BOLEH DILANGGAR:
+{required_fact_brief}
 
 KNOWLEDGE BASE TERPERCAYA:
 {grounded_knowledge}
@@ -1510,8 +1748,146 @@ def response_fails_product_option_requirement(
     normalized = text.lower()
     mentions_mini = "mini" in normalized
     mentions_regular = "regular" in normalized or "reguler" in normalized
+    comparison_markers = bool(
+        re.search(
+            r"\b(cocok|untuk|pemula|serius|modal|minimal|pendampingan|struktur|belajar)\b",
+            normalized,
+            re.IGNORECASE,
+        )
+    )
+    has_sentence_count = len(
+        [
+            part
+            for part in re.split(r"(?<=[.!?])\s+", _compact_whitespace(text))
+            if part
+        ]
+    ) >= 2
 
-    return not (mentions_mini and mentions_regular)
+    return not (
+        mentions_mini
+        and mentions_regular
+        and comparison_markers
+        and has_sentence_count
+    )
+
+
+def response_ignores_post_signup_state(
+    text: str,
+    latest_customer_message: str,
+) -> bool:
+    if not customer_is_already_post_signup_or_deposit(latest_customer_message):
+        return False
+
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return True
+
+    mentions_reset_topics = bool(
+        re.search(
+            r"\b(minimal|minimum|modal awal|produk kami|ada dua produk|pemula)\b",
+            normalized,
+            re.IGNORECASE,
+        )
+    )
+    mentions_onboarding_topics = bool(
+        re.search(
+            r"\b(langkah|selanjutnya|verifikasi|aplikasi|penggunaan|onboarding|mulai pakai|pendampingan|aktivasi)\b",
+            normalized,
+            re.IGNORECASE,
+        )
+    )
+
+    return mentions_reset_topics and not mentions_onboarding_topics
+
+
+def response_breaks_followup_topic(
+    text: str,
+    latest_customer_message: str,
+    latest_sales_message: str,
+) -> bool:
+    if not should_preserve_previous_topic(
+        latest_customer_message,
+        latest_sales_message,
+    ):
+        return False
+
+    current = _normalize_similarity_text(text)
+    previous = _normalize_similarity_text(latest_sales_message)
+    if not current or not previous:
+        return False
+
+    previous_terms = {
+        token
+        for token in previous.split()
+        if len(token) >= 4 and token not in SEARCH_STOPWORDS
+    }
+    current_terms = {
+        token
+        for token in current.split()
+        if len(token) >= 4 and token not in SEARCH_STOPWORDS
+    }
+
+    if not previous_terms or not current_terms:
+        return False
+
+    overlap = len(previous_terms & current_terms)
+    return overlap == 0
+
+
+def response_uses_repetitive_closing_template(text: str) -> bool:
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return False
+
+    sentences = [
+        part.strip()
+        for part in re.split(r"(?<=[.!?])\s+", normalized)
+        if part.strip()
+    ]
+    if not sentences:
+        return False
+
+    last_sentence = sentences[-1]
+    return bool(CLOSING_TEMPLATE_PATTERN.search(last_sentence))
+
+
+def response_lacks_legality_authority(text: str, latest_customer_intent: str) -> bool:
+    if latest_customer_intent != "legality":
+        return False
+
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return True
+
+    first_sentence = _extract_first_sentence(normalized)
+    if not first_sentence:
+        return True
+
+    return not bool(LEGALITY_AUTHORITY_PATTERN.search(first_sentence))
+
+
+def response_mentions_variant_not_in_grounding(
+    text: str,
+    product_option_summary: str,
+    must_answer_with_product_options: bool,
+) -> bool:
+    if not must_answer_with_product_options:
+        return False
+
+    normalized_text = text.lower()
+    normalized_summary = product_option_summary.lower()
+
+    mentions_mini = "mini" in normalized_text
+    mentions_regular = "regular" in normalized_text or "reguler" in normalized_text
+    summary_has_mini = "mini" in normalized_summary
+    summary_has_regular = "regular" in normalized_summary or "reguler" in normalized_summary
+
+    if mentions_mini and not summary_has_mini:
+        return True
+    if mentions_regular and not summary_has_regular:
+        return True
+
+    return False
 
 
 def response_is_too_similar_to_latest_sales_message(
@@ -1631,7 +2007,11 @@ def response_misses_latest_customer_intent(
 
     if latest_customer_intent == "mechanism":
         return not bool(
-            re.search(r"\b(sistem|alur|cara kerja|proses|tahap)\b", normalized, re.I)
+            re.search(
+                r"\b(sistem|alur|cara kerja|proses|tahap|langkah|mulai|pendampingan|verifikasi)\b",
+                normalized,
+                re.I,
+            )
         )
 
     return False
@@ -1863,6 +2243,25 @@ def call_openai_for_reply_suggestion(
                 primary_text,
                 must_answer_with_product_options,
             )
+            or response_mentions_variant_not_in_grounding(
+                primary_text,
+                product_option_summary,
+                must_answer_with_product_options,
+            )
+            or response_lacks_legality_authority(
+                primary_text,
+                latest_customer_intent,
+            )
+            or response_ignores_post_signup_state(
+                primary_text,
+                latest_customer_message,
+            )
+            or response_breaks_followup_topic(
+                primary_text,
+                latest_customer_message,
+                latest_sales_message,
+            )
+            or response_uses_repetitive_closing_template(primary_text)
             or response_is_too_similar_to_latest_sales_message(
                 primary_text,
                 latest_sales_message,
@@ -1884,6 +2283,25 @@ def call_openai_for_reply_suggestion(
                 primary_text,
                 must_answer_with_product_options,
             )
+            or response_mentions_variant_not_in_grounding(
+                primary_text,
+                product_option_summary,
+                must_answer_with_product_options,
+            )
+            or response_lacks_legality_authority(
+                primary_text,
+                latest_customer_intent,
+            )
+            or response_ignores_post_signup_state(
+                primary_text,
+                latest_customer_message,
+            )
+            or response_breaks_followup_topic(
+                primary_text,
+                latest_customer_message,
+                latest_sales_message,
+            )
+            or response_uses_repetitive_closing_template(primary_text)
             or response_is_too_similar_to_latest_sales_message(
                 primary_text,
                 latest_sales_message,
@@ -1945,6 +2363,13 @@ def call_openai_for_reply_suggestion(
         "- Kalimat pertama jangan generik. Kalimat pertama harus langsung menjawab topik utama customer.\n"
         "- Jangan buka dengan pertanyaan balik jika customer sebenarnya sudah cukup jelas. Jawab dulu, baru kalau perlu tutup dengan 1 pertanyaan singkat.\n"
         "- Ikuti aturan pemilihan varian produk dengan disiplin: hanya condong ke Mini/Regular kalau sinyalnya memang cukup kuat.\n"
+        "- Jika customer sudah memilih produk tertentu, jangan kembali ke jawaban perbandingan umum kecuali diminta.\n"
+        "- Jika customer sudah daftar atau deposit, jangan mundur lagi ke penjelasan modal minimal atau pengenalan produk awal.\n"
+        "- Kurangi template closing berulang. Hanya tutup dengan ajakan lanjut jika memang membantu langkah berikutnya.\n"
+        "- Jika pesan customer pendek dan jelas merupakan follow-up, pertahankan topik dari balasan sales sebelumnya. Jangan lompat topik.\n"
+        "- Jika customer minta opsi produk, Mini dan Regular/Reguler harus sama-sama muncul dan harus dibedakan secara konkret, bukan cuma disebut namanya.\n"
+        "- Jika customer bertanya legalitas, kalimat pertama wajib langsung menyebut otoritas pengawasan yang relevan dari knowledge base.\n"
+        "- Jangan menyebut varian produk yang tidak muncul di ringkasan opsi produk terstruktur / grounding saat ini.\n"
     )
 
     try:
@@ -2095,6 +2520,7 @@ def create_reply_suggestion(
     )
     latency_profile = infer_latency_profile(
         desired_count=desired_count,
+        latest_customer_message=latest_customer_message,
         latest_customer_intent=latest_customer_intent,
         must_answer_with_product_options=must_answer_with_product_options,
         must_give_detailed_explanation=must_give_detailed_explanation,
