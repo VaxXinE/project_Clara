@@ -43,7 +43,7 @@ class ReplySuggestionError(RuntimeError):
 MAX_MESSAGES_FOR_REPLY_CONTEXT = 14
 MAX_MESSAGES_FOR_SINGLE_REPLY_CONTEXT = 8
 MAX_MESSAGES_FOR_ULTRA_FAST_REPLY_CONTEXT = 2
-MAX_MESSAGES_FOR_FAST_REPLY_CONTEXT = 3
+MAX_MESSAGES_FOR_FAST_REPLY_CONTEXT = 4
 MAX_REPLY_MESSAGE_CHARS = 420
 MAX_REPLY_MESSAGE_CHARS_SINGLE = 280
 MAX_REPLY_MESSAGE_CHARS_ULTRA_FAST = 110
@@ -200,6 +200,27 @@ POST_SIGNUP_OR_DEPOSIT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+CUSTOMER_IDENTITY_NAME_PATTERN = re.compile(
+    r"\b(nama(?:\s+lengkap)?)[\s:,-]+([A-Za-z][A-Za-z\s\.'-]{2,})",
+    re.IGNORECASE,
+)
+
+CUSTOMER_IDENTITY_PHONE_PATTERN = re.compile(
+    r"\b(?:no(?:mor)?\s*(?:hp|wa|whatsapp)?|hp|wa|whatsapp|telp|telepon)?[\s:,-]*"
+    r"(\+?62\d{7,15}|0\d{8,15})\b",
+    re.IGNORECASE,
+)
+
+CUSTOMER_IDENTITY_DOMICILE_PATTERN = re.compile(
+    r"\b(domisili|kota|asal kota|tinggal di)[\s:,-]+([A-Za-z][A-Za-z\s\.'-]{2,})",
+    re.IGNORECASE,
+)
+
+CUSTOMER_IDENTITY_REQUEST_PATTERN = re.compile(
+    r"\b(nama(?:\s+lengkap)?|nomor hp|no hp|hp aktif|domisili|kota domisili)\b",
+    re.IGNORECASE,
+)
+
 SEARCH_STOPWORDS = {
     "yang",
     "dan",
@@ -349,6 +370,8 @@ def infer_latest_customer_intent(latest_customer_message: str) -> str:
     if not message:
         return "general"
 
+    if customer_has_provided_basic_identity(message):
+        return "identity_submission"
     if should_message_ask_product_options(message):
         return "product_options"
     if LEGALITY_REQUEST_PATTERN.search(message):
@@ -415,6 +438,11 @@ def get_intent_guidance(latest_customer_intent: str) -> str:
             "- Jawab dalam urutan langkah konkret, singkat, dan mudah diikuti.\n"
             "- Kalau customer sudah daftar/deposit, next step harus lanjut dari kondisi itu, bukan mengulang dari nol."
         ),
+        "identity_submission": (
+            "- Customer baru saja mengirim data identitas dasar seperti nama, nomor HP, atau domisili.\n"
+            "- Akui bahwa data sudah diterima, rangkum seperlunya, lalu lanjutkan ke step berikutnya.\n"
+            "- Jangan minta ulang data yang sudah jelas tertulis kecuali memang ada field yang masih kurang."
+        ),
         "setup_scalping": (
             "- Customer sedang membahas setup/scalping/entry.\n"
             "- Jawab dengan elemen teknis dasar yang aman untuk pemula: arah market, area entry, batas risiko."
@@ -473,6 +501,10 @@ def get_answer_shape_guidance(latest_customer_intent: str) -> str:
             "- Gunakan penanda seperti 'pertama', 'kedua', 'setelah itu'.\n"
             "- Jangan kembali membahas modal minimal atau overview produk kalau customer sudah masuk tahap lanjut."
         ),
+        "identity_submission": (
+            "- Pola jawaban: konfirmasi data diterima -> sebut field yang sudah masuk secara singkat -> lanjutkan ke step berikutnya.\n"
+            "- Jangan ulangi permintaan nama/HP/domisili jika ketiganya sudah ada di pesan customer."
+        ),
         "setup_scalping": (
             "- Pola jawaban: arah market -> area entry -> batas risiko -> pertanyaan lanjutan singkat."
         ),
@@ -507,6 +539,7 @@ def infer_answer_commitment_level(
         "safety",
         "minimum_capital",
         "next_step",
+        "identity_submission",
         "setup_scalping",
         "mechanism",
     }:
@@ -538,6 +571,49 @@ def customer_is_already_post_signup_or_deposit(latest_customer_message: str) -> 
     return bool(POST_SIGNUP_OR_DEPOSIT_PATTERN.search(message))
 
 
+def extract_customer_identity_fields(latest_customer_message: str) -> dict[str, str]:
+    message = _compact_whitespace(latest_customer_message)
+    if not message:
+        return {}
+
+    fields: dict[str, str] = {}
+
+    name_match = CUSTOMER_IDENTITY_NAME_PATTERN.search(message)
+    if name_match:
+        fields["name"] = _compact_whitespace(name_match.group(2))
+
+    phone_match = CUSTOMER_IDENTITY_PHONE_PATTERN.search(message)
+    if phone_match:
+        fields["phone"] = _compact_whitespace(phone_match.group(1))
+
+    domicile_match = CUSTOMER_IDENTITY_DOMICILE_PATTERN.search(message)
+    if domicile_match:
+        fields["domicile"] = _compact_whitespace(domicile_match.group(2))
+
+    if "name" not in fields:
+        lines = [line.strip() for line in latest_customer_message.splitlines() if line.strip()]
+        if len(lines) >= 2:
+            possible_name = _compact_whitespace(lines[0])
+            if (
+                not CUSTOMER_IDENTITY_REQUEST_PATTERN.search(possible_name)
+                and not CUSTOMER_IDENTITY_PHONE_PATTERN.search(possible_name)
+                and re.fullmatch(r"[A-Za-z][A-Za-z\s\.'-]{2,}", possible_name)
+            ):
+                fields["name"] = possible_name
+
+    if "domicile" not in fields and "domisili" in message.lower():
+        fallback = re.search(r"domisili[\s:,-]+([A-Za-z][A-Za-z\s\.'-]{2,})", message, re.I)
+        if fallback:
+            fields["domicile"] = _compact_whitespace(fallback.group(1))
+
+    return fields
+
+
+def customer_has_provided_basic_identity(latest_customer_message: str) -> bool:
+    fields = extract_customer_identity_fields(latest_customer_message)
+    return len(fields) >= 2 and "phone" in fields
+
+
 def should_preserve_previous_topic(
     latest_customer_message: str,
     latest_sales_message: str,
@@ -552,6 +628,32 @@ def should_preserve_previous_topic(
         return True
 
     return bool(FOLLOW_UP_CONTINUATION_PATTERN.search(customer_message))
+
+
+def conversation_has_customer_chosen_product_variant(conversation: Conversation) -> bool:
+    return any(
+        message.sender_type == "customer"
+        and customer_has_chosen_product_variant(message.message_text)
+        for message in conversation.messages
+    )
+
+
+def conversation_has_customer_identity_submission(conversation: Conversation) -> bool:
+    return any(
+        message.sender_type == "customer"
+        and customer_has_provided_basic_identity(message.message_text)
+        for message in conversation.messages
+    )
+
+
+def get_latest_customer_identity_fields(conversation: Conversation) -> dict[str, str]:
+    for message in reversed(conversation.messages):
+        if message.sender_type != "customer":
+            continue
+        fields = extract_customer_identity_fields(message.message_text)
+        if fields:
+            return fields
+    return {}
 
 
 def get_question_discipline_guidance(answer_commitment_level: str) -> str:
@@ -624,7 +726,7 @@ def build_output_contract(desired_count: int) -> str:
 def infer_latency_profile(
     *,
     desired_count: int,
-    latest_customer_message: str,
+    latest_customer_message: str = "",
     latest_customer_intent: str,
     must_answer_with_product_options: bool,
     must_give_detailed_explanation: bool,
@@ -710,13 +812,21 @@ def build_runtime_rule_brief(
     must_give_concrete_steps: bool,
     must_give_detailed_explanation: bool,
     discusses_scalping_or_setup: bool,
+    customer_has_variant_commitment: bool = False,
+    customer_has_identity_submission: bool = False,
+    latest_identity_fields: dict[str, str] | None = None,
 ) -> str:
     rules: list[str] = []
-    customer_chose_variant = customer_has_chosen_product_variant(
-        latest_customer_message
+    customer_chose_variant = (
+        customer_has_variant_commitment
+        or customer_has_chosen_product_variant(latest_customer_message)
     )
     customer_post_signup_or_deposit = customer_is_already_post_signup_or_deposit(
         latest_customer_message
+    )
+    customer_identity_fields = latest_identity_fields or {}
+    has_identity_submission = customer_has_identity_submission or bool(
+        customer_identity_fields
     )
     preserve_previous_topic = should_preserve_previous_topic(
         latest_customer_message,
@@ -737,11 +847,27 @@ def build_runtime_rule_brief(
         rules.append(
             "- Customer sudah menunjukkan pilihan/arah produk. Jangan reset jawaban ke perbandingan umum atau topik legalitas kecuali memang ditanya."
         )
+        rules.append(
+            "- Jika customer sudah memilih Mini/Regular, jangan tanya ulang mau pilih yang mana kecuali customer sendiri berubah arah."
+        )
 
     if customer_post_signup_or_deposit:
         rules.append(
             "- Customer sudah masuk tahap daftar/deposit. Fokus jawaban harus ke onboarding, penggunaan, atau next step; jangan balik lagi ke modal minimal atau pengenalan produk."
         )
+
+    if has_identity_submission:
+        submitted_bits = ", ".join(
+            key for key in ("name", "phone", "domicile") if key in customer_identity_fields
+        )
+        if submitted_bits:
+            rules.append(
+                f"- Customer sudah mengirim data identitas dasar ({submitted_bits}). Jangan minta ulang field yang sudah ada."
+            )
+        else:
+            rules.append(
+                "- Customer sudah mengirim data identitas dasar. Akui data diterima lalu lanjutkan step berikutnya."
+            )
 
     if preserve_previous_topic:
         rules.append(
@@ -769,6 +895,11 @@ def build_runtime_rule_brief(
     if latest_customer_intent == "next_step":
         rules.append(
             "- Fokus ke langkah berikutnya yang operasional. Jangan mundur ke pengenalan produk umum."
+        )
+
+    if latest_customer_intent == "identity_submission":
+        rules.append(
+            "- Customer baru saja mengirim identitas. Tugasmu adalah konfirmasi data yang terbaca lalu lanjutkan proses Mini/Regular yang sudah dipilih, bukan mengulang permintaan datanya."
         )
 
     if should_avoid_repeating_sales_reply:
@@ -811,6 +942,9 @@ def build_extraction_runtime_summary(
     latest_customer_intent: str,
     answer_commitment_level: str,
     variant_response_mode: str,
+    customer_has_variant_commitment: bool = False,
+    customer_has_identity_submission: bool = False,
+    latest_identity_fields: dict[str, str] | None = None,
 ) -> str:
     main_objections = ", ".join(extraction.main_objections) or "-"
     budget_signal = get_budget_signal(extraction)
@@ -830,9 +964,16 @@ def build_extraction_runtime_summary(
         f"- budget={budget_summary}",
         f"- next_best_action={_truncate_text(extraction.next_best_action, 140)}",
         f"- account_category={normalize_account_category(account_category)}, latest_intent={latest_customer_intent}, answer_mode={answer_commitment_level}, variant_mode={variant_response_mode}",
+        f"- customer_variant_committed={customer_has_variant_commitment}, customer_identity_submitted={customer_has_identity_submission}",
         f"- policy_action_mode={action_mode}",
         f"- latest_customer_message={latest_customer_message or '-'}",
     ]
+
+    if latest_identity_fields:
+        lines.append(
+            "- latest_identity_fields="
+            + ", ".join(f"{key}={value}" for key, value in latest_identity_fields.items())
+        )
 
     if latest_sales_message:
         lines.append(f"- latest_sales_message={_truncate_text(latest_sales_message, 180)}")
@@ -1249,6 +1390,9 @@ def build_reply_prompt(
     prioritized_knowledge_brief: str,
     answer_commitment_level: str,
     variant_response_mode: str,
+    customer_has_variant_commitment: bool,
+    customer_has_identity_submission: bool,
+    latest_identity_fields: dict[str, str] | None,
     latency_profile: str = "standard",
     desired_count: int = 3,
 ) -> str:
@@ -1269,6 +1413,9 @@ def build_reply_prompt(
         must_give_concrete_steps=must_give_concrete_steps,
         must_give_detailed_explanation=must_give_detailed_explanation,
         discusses_scalping_or_setup=discusses_scalping_or_setup,
+        customer_has_variant_commitment=customer_has_variant_commitment,
+        customer_has_identity_submission=customer_has_identity_submission,
+        latest_identity_fields=latest_identity_fields,
     )
     extraction_runtime_summary = build_extraction_runtime_summary(
         extraction,
@@ -1279,6 +1426,9 @@ def build_reply_prompt(
         latest_customer_intent=latest_customer_intent,
         answer_commitment_level=answer_commitment_level,
         variant_response_mode=variant_response_mode,
+        customer_has_variant_commitment=customer_has_variant_commitment,
+        customer_has_identity_submission=customer_has_identity_submission,
+        latest_identity_fields=latest_identity_fields,
     )
     required_fact_brief = build_required_fact_brief(
         grounded_knowledge=grounded_knowledge,
@@ -1816,6 +1966,59 @@ def response_ignores_post_signup_state(
     return mentions_reset_topics and not mentions_onboarding_topics
 
 
+def response_reopens_product_selection(
+    text: str,
+    *,
+    customer_has_variant_commitment: bool,
+) -> bool:
+    if not customer_has_variant_commitment:
+        return False
+
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return False
+
+    return bool(
+        re.search(
+            r"\b(mau mulai dari mini atau regular|mini atau regular|regular atau mini|pilih mini atau regular|pilih mini atau reguler|mau mini atau regular)\b",
+            normalized,
+            re.IGNORECASE,
+        )
+    )
+
+
+def response_reasks_identity_data(
+    text: str,
+    *,
+    latest_identity_fields: dict[str, str],
+) -> bool:
+    if not latest_identity_fields:
+        return False
+
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return False
+
+    asks_name = bool(
+        re.search(r"\b(kirim|mohon kirim|tolong kirim).*(nama(?:\s+lengkap)?)\b", normalized, re.I)
+    )
+    asks_phone = bool(
+        re.search(r"\b(kirim|mohon kirim|tolong kirim).*(nomor hp|no hp|hp aktif|telepon)\b", normalized, re.I)
+    )
+    asks_domicile = bool(
+        re.search(r"\b(kirim|mohon kirim|tolong kirim).*(domisili|kota domisili|kota)\b", normalized, re.I)
+    )
+
+    if "name" in latest_identity_fields and asks_name:
+        return True
+    if "phone" in latest_identity_fields and asks_phone:
+        return True
+    if "domicile" in latest_identity_fields and asks_domicile:
+        return True
+
+    return False
+
+
 def response_breaks_followup_topic(
     text: str,
     latest_customer_message: str,
@@ -2060,6 +2263,15 @@ def response_misses_latest_customer_intent(
             )
         )
 
+    if latest_customer_intent == "identity_submission":
+        return not bool(
+            re.search(
+                r"\b(terima|diterima|siap|selanjutnya|berikutnya|lanjut|proses|verifikasi)\b",
+                normalized,
+                re.I,
+            )
+        )
+
     if latest_customer_intent == "setup_scalping":
         return not bool(
             re.search(
@@ -2159,6 +2371,9 @@ def call_openai_for_reply_suggestion(
     prioritized_knowledge_brief: str,
     answer_commitment_level: str,
     variant_response_mode: str,
+    customer_has_variant_commitment: bool,
+    customer_has_identity_submission: bool,
+    latest_identity_fields: dict[str, str] | None,
     latency_profile: str = "standard",
     desired_count: int = 3,
 ) -> ReplySuggestionCreate:
@@ -2205,6 +2420,9 @@ def call_openai_for_reply_suggestion(
         prioritized_knowledge_brief=prioritized_knowledge_brief,
         answer_commitment_level=answer_commitment_level,
         variant_response_mode=variant_response_mode,
+        customer_has_variant_commitment=customer_has_variant_commitment,
+        customer_has_identity_submission=customer_has_identity_submission,
+        latest_identity_fields=latest_identity_fields,
         latency_profile=latency_profile,
         desired_count=desired_count,
     )
@@ -2324,6 +2542,14 @@ def call_openai_for_reply_suggestion(
                 primary_text,
                 latest_customer_message,
             )
+            or response_reopens_product_selection(
+                primary_text,
+                customer_has_variant_commitment=customer_has_variant_commitment,
+            )
+            or response_reasks_identity_data(
+                primary_text,
+                latest_identity_fields=latest_identity_fields or {},
+            )
             or response_breaks_followup_topic(
                 primary_text,
                 latest_customer_message,
@@ -2362,6 +2588,14 @@ def call_openai_for_reply_suggestion(
             or response_ignores_post_signup_state(
                 primary_text,
                 latest_customer_message,
+            )
+            or response_reopens_product_selection(
+                primary_text,
+                customer_has_variant_commitment=customer_has_variant_commitment,
+            )
+            or response_reasks_identity_data(
+                primary_text,
+                latest_identity_fields=latest_identity_fields or {},
             )
             or response_breaks_followup_topic(
                 primary_text,
@@ -2408,6 +2642,14 @@ def call_openai_for_reply_suggestion(
             or response_ignores_post_signup_state(
                 primary_text,
                 latest_customer_message,
+            )
+            or response_reopens_product_selection(
+                primary_text,
+                customer_has_variant_commitment=customer_has_variant_commitment,
+            )
+            or response_reasks_identity_data(
+                primary_text,
+                latest_identity_fields=latest_identity_fields or {},
             )
             or response_breaks_followup_topic(
                 primary_text,
@@ -2477,7 +2719,9 @@ def call_openai_for_reply_suggestion(
         "- Jangan buka dengan pertanyaan balik jika customer sebenarnya sudah cukup jelas. Jawab dulu, baru kalau perlu tutup dengan 1 pertanyaan singkat.\n"
         "- Ikuti aturan pemilihan varian produk dengan disiplin: hanya condong ke Mini/Regular kalau sinyalnya memang cukup kuat.\n"
         "- Jika customer sudah memilih produk tertentu, jangan kembali ke jawaban perbandingan umum kecuali diminta.\n"
+        "- Jika customer sudah jelas memilih Mini/Regular, jangan tanya ulang pilihannya.\n"
         "- Jika customer sudah daftar atau deposit, jangan mundur lagi ke penjelasan modal minimal atau pengenalan produk awal.\n"
+        "- Jika customer sudah mengirim nama, nomor HP, atau domisili, jangan minta ulang field yang sudah jelas tertulis. Konfirmasi lalu lanjut ke step berikutnya.\n"
         "- Kurangi template closing berulang. Hanya tutup dengan ajakan lanjut jika memang membantu langkah berikutnya.\n"
         "- Jika pesan customer pendek dan jelas merupakan follow-up, pertahankan topik dari balasan sales sebelumnya. Jangan lompat topik.\n"
         "- Jika customer minta opsi produk, Mini dan Regular/Reguler harus sama-sama muncul dan harus dibedakan secara konkret, bukan cuma disebut namanya.\n"
@@ -2627,6 +2871,13 @@ def create_reply_suggestion(
     preferred_reply_register = get_preferred_reply_register(
         latest_customer_message
     )
+    customer_has_variant_commitment = conversation_has_customer_chosen_product_variant(
+        conversation
+    )
+    latest_identity_fields = get_latest_customer_identity_fields(conversation)
+    customer_has_identity_submission = conversation_has_customer_identity_submission(
+        conversation
+    )
     latest_customer_intent = infer_latest_customer_intent(latest_customer_message)
     answer_commitment_level = infer_answer_commitment_level(
         latest_customer_message,
@@ -2694,6 +2945,9 @@ def create_reply_suggestion(
         prioritized_knowledge_brief=prioritized_knowledge_brief,
         answer_commitment_level=answer_commitment_level,
         variant_response_mode=variant_response_mode,
+        customer_has_variant_commitment=customer_has_variant_commitment,
+        customer_has_identity_submission=customer_has_identity_submission,
+        latest_identity_fields=latest_identity_fields,
         latency_profile=latency_profile,
         desired_count=desired_count,
     )
