@@ -1436,22 +1436,41 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     return "incoming"
   }
 
-  const getLeafTextCandidates = (nodes: HTMLElement[]) => {
-    return nodes.filter(
-      (node) =>
-        !nodes.some(
-          (otherNode) => otherNode !== node && node.contains(otherNode)
+  const normalizeMessageBlockText = (value: string) =>
+    value
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join("\n")
+      .trim()
+
+  const getPreferredMessageTexts = (nodes: HTMLElement[]) => {
+    const uniqueTexts = Array.from(
+      new Set(
+        nodes
+          .map((node) => normalizeMessageBlockText(node.innerText || ""))
+          .filter(Boolean)
+      )
+    )
+
+    return uniqueTexts.filter(
+      (text) =>
+        !uniqueTexts.some(
+          (otherText) =>
+            otherText !== text &&
+            otherText.length > text.length &&
+            otherText.includes(text)
         )
     )
   }
 
   const getMessageText = (container: HTMLElement) => {
-    const primaryCandidates = getLeafTextCandidates(
+    const primaryCandidates = getPreferredMessageTexts(
       Array.from(
         container.querySelectorAll<HTMLElement>('[data-testid="msg-text"]')
       )
     )
-    const fallbackCandidates = getLeafTextCandidates(
+    const fallbackCandidates = getPreferredMessageTexts(
       Array.from(
         container.querySelectorAll<HTMLElement>(
           '[data-testid="selectable-text"], .copyable-text'
@@ -1461,23 +1480,19 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     const candidates =
       primaryCandidates.length > 0 ? primaryCandidates : fallbackCandidates
 
-    const uniqueTexts = Array.from(
-      new Set(
-        candidates
-          .map((node) => node.innerText.replace(/\s+/g, " ").trim())
-          .filter(Boolean)
-      )
-    )
-
-    if (uniqueTexts.length > 0) {
-      return uniqueTexts.join("\n")
+    if (candidates.length > 0) {
+      return candidates[0]
     }
 
     const mediaLabel = container
       .querySelector<HTMLElement>('[data-testid="media-caption"], [aria-label]')
-      ?.innerText?.trim()
+      ?.innerText
 
-    return mediaLabel || ""
+    const normalizedMediaLabel = mediaLabel
+      ? normalizeMessageBlockText(mediaLabel)
+      : ""
+
+    return normalizedMediaLabel || ""
   }
 
   const chatRoot = getChatRoot()
