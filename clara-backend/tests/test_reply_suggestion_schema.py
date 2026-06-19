@@ -123,6 +123,10 @@ def test_infer_latest_customer_intent_detects_identity_submission() -> None:
     )
 
 
+def test_infer_latest_customer_intent_detects_timing() -> None:
+    assert infer_latest_customer_intent("Berapa lama kak untuk verifikasi?") == "timing"
+
+
 def test_response_misses_latest_customer_intent_flags_misaligned_answer() -> None:
     assert response_misses_latest_customer_intent(
         "Solid itu diawasi resmi dan ada pengawasan BAPPEBTI.",
@@ -191,6 +195,13 @@ def test_response_is_vague_after_identity_submission_accepts_concrete_handoff() 
         latest_customer_intent="next_step",
         customer_has_variant_commitment=True,
         customer_has_identity_submission=True,
+    )
+
+
+def test_response_misses_latest_customer_intent_accepts_timing_answer() -> None:
+    assert not response_misses_latest_customer_intent(
+        "Untuk estimasi waktunya mengikuti kelengkapan data dan proses verifikasi tim ya, kak. Biar lebih akurat, nanti tim onboarding yang bantu kasih update durasi prosesnya.",
+        "timing",
     )
 
 

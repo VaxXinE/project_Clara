@@ -123,6 +123,21 @@ STEP_REQUEST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+TIMING_REQUEST_PATTERN = re.compile(
+    r"\b("
+    r"berapa lama|"
+    r"butuh waktu berapa|"
+    r"estimasi(?:nya)?|"
+    r"durasi(?:nya)?|"
+    r"kapan selesai|"
+    r"kapan beres|"
+    r"prosesnya berapa lama|"
+    r"verifikasi berapa lama|"
+    r"onboarding berapa lama"
+    r")\b",
+    re.IGNORECASE,
+)
+
 SCALPING_REQUEST_PATTERN = re.compile(
     r"\b(scalping|setup|entry|stop loss|take profit|risk management|manajemen risiko)\b",
     re.IGNORECASE,
@@ -413,6 +428,8 @@ def infer_latest_customer_intent(latest_customer_message: str) -> str:
         return "safety"
     if MINIMUM_CAPITAL_PATTERN.search(message):
         return "minimum_capital"
+    if TIMING_REQUEST_PATTERN.search(message):
+        return "timing"
     if STEP_REQUEST_PATTERN.search(message):
         return "next_step"
     if SCALPING_REQUEST_PATTERN.search(message):
@@ -465,6 +482,11 @@ def get_intent_guidance(latest_customer_intent: str) -> str:
         "minimum_capital": (
             "- Customer sedang menanyakan modal/deposit/minimal awal.\n"
             "- Jawab angka atau range yang memang ada di knowledge base. Jangan mengarang angka baru."
+        ),
+        "timing": (
+            "- Customer sedang menanyakan estimasi waktu proses/verifikasi/onboarding.\n"
+            "- Jika knowledge base tidak punya SLA atau durasi yang eksplisit, jangan mengarang angka atau berkata 'cek alur resmi'.\n"
+            "- Jawab jujur bahwa durasi mengikuti kelengkapan data/proses tim, lalu arahkan ke tim onboarding atau tim senior untuk estimasi aktual."
         ),
         "next_step": (
             "- Customer sedang meminta langkah awal / next step.\n"
@@ -529,6 +551,9 @@ def get_answer_shape_guidance(latest_customer_intent: str) -> str:
         "minimum_capital": (
             "- Pola jawaban: sebut angka/range dulu -> jelaskan konteks singkat -> tanya kecocokan tujuan customer."
         ),
+        "timing": (
+            "- Pola jawaban: akui bahwa durasi tergantung kelengkapan/proses -> jangan janji angka tanpa dasar -> arahkan ke tim yang pegang verifikasi/onboarding."
+        ),
         "next_step": (
             "- Pola jawaban: urutkan 2-4 langkah nyata.\n"
             "- Gunakan penanda seperti 'pertama', 'kedua', 'setelah itu'.\n"
@@ -571,6 +596,7 @@ def infer_answer_commitment_level(
         "legality",
         "safety",
         "minimum_capital",
+        "timing",
         "next_step",
         "identity_submission",
         "setup_scalping",
@@ -933,6 +959,14 @@ def build_runtime_rule_brief(
             rules.append(
                 "- Karena customer sudah kirim data dan/atau sudah pilih produk, next step harus konkret: misalnya verifikasi data, proses onboarding, atau handoff ke tim senior. Jangan jawab dengan 'saya cek alurnya dulu' atau filler sejenis."
             )
+
+    if latest_customer_intent == "timing":
+        rules.append(
+            "- Customer menanyakan durasi proses. Jangan mengarang SLA atau estimasi waktu kalau tidak ada di knowledge."
+        )
+        rules.append(
+            "- Jangan pakai frasa kabur seperti 'saya cek alur resmi yang berlaku'. Lebih baik bilang durasi mengikuti kelengkapan data/proses tim lalu arahkan ke tim onboarding/senior untuk estimasi aktual."
+        )
 
     if latest_customer_intent == "identity_submission":
         rules.append(
@@ -2315,6 +2349,15 @@ def response_misses_latest_customer_intent(
         return not bool(
             _extract_minimum_hint(normalized)
             or re.search(r"\b(minimal|minimum|modal|deposit)\b", normalized, re.I)
+        )
+
+    if latest_customer_intent == "timing":
+        return not bool(
+            re.search(
+                r"\b(waktu|durasi|estimasi|proses|verifikasi|onboarding|tim senior|tim onboarding|kelengkapan data)\b",
+                normalized,
+                re.I,
+            )
         )
 
     if latest_customer_intent == "next_step":
