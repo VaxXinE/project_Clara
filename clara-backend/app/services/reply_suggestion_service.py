@@ -221,6 +221,39 @@ CUSTOMER_IDENTITY_REQUEST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+VAGUE_NEXT_STEP_PATTERN = re.compile(
+    r"\b("
+    r"cek(?:kan)?\s+alurnya\s+dulu|"
+    r"lihat\s+dulu\s+proses(?:nya)?|"
+    r"cek\s+proses(?:nya)?\s+dulu|"
+    r"kirimkan?\s+langkah\s+lanjut|"
+    r"lanjutkan?\s+pengecekan|"
+    r"lihat\s+dulu\s+alurnya|"
+    r"saya\s+cek\s+dulu"
+    r")\b",
+    re.IGNORECASE,
+)
+
+CONCRETE_HANDOFF_OR_ONBOARDING_PATTERN = re.compile(
+    r"\b("
+    r"hubungkan\s+ke\s+tim\s+senior|"
+    r"tim\s+senior|"
+    r"telepon(?:an)?|"
+    r"call|"
+    r"link\s+pendaftaran|"
+    r"link|"
+    r"verifikasi\s+data|"
+    r"verifikasi|"
+    r"onboarding|"
+    r"proses\s+mini|"
+    r"proses\s+regular|"
+    r"dibantu\s+tim|"
+    r"bantu\s+proses|"
+    r"step\s+berikutnya"
+    r")\b",
+    re.IGNORECASE,
+)
+
 SEARCH_STOPWORDS = {
     "yang",
     "dan",
@@ -896,10 +929,17 @@ def build_runtime_rule_brief(
         rules.append(
             "- Fokus ke langkah berikutnya yang operasional. Jangan mundur ke pengenalan produk umum."
         )
+        if has_identity_submission or customer_chose_variant:
+            rules.append(
+                "- Karena customer sudah kirim data dan/atau sudah pilih produk, next step harus konkret: misalnya verifikasi data, proses onboarding, atau handoff ke tim senior. Jangan jawab dengan 'saya cek alurnya dulu' atau filler sejenis."
+            )
 
     if latest_customer_intent == "identity_submission":
         rules.append(
             "- Customer baru saja mengirim identitas. Tugasmu adalah konfirmasi data yang terbaca lalu lanjutkan proses Mini/Regular yang sudah dipilih, bukan mengulang permintaan datanya."
+        )
+        rules.append(
+            "- Setelah konfirmasi, beri tindakan lanjut yang nyata: misalnya verifikasi data, proses onboarding Mini/Regular, atau hubungkan ke tim senior. Jangan berhenti di kalimat 'nanti saya cek dulu'."
         )
 
     if should_avoid_repeating_sales_reply:
@@ -2019,6 +2059,29 @@ def response_reasks_identity_data(
     return False
 
 
+def response_is_vague_after_identity_submission(
+    text: str,
+    *,
+    latest_customer_intent: str,
+    customer_has_variant_commitment: bool,
+    customer_has_identity_submission: bool,
+) -> bool:
+    if latest_customer_intent not in {"identity_submission", "next_step"}:
+        return False
+
+    if not (customer_has_variant_commitment or customer_has_identity_submission):
+        return False
+
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return True
+
+    if VAGUE_NEXT_STEP_PATTERN.search(normalized):
+        return True
+
+    return not bool(CONCRETE_HANDOFF_OR_ONBOARDING_PATTERN.search(normalized))
+
+
 def response_breaks_followup_topic(
     text: str,
     latest_customer_message: str,
@@ -2550,6 +2613,12 @@ def call_openai_for_reply_suggestion(
                 primary_text,
                 latest_identity_fields=latest_identity_fields or {},
             )
+            or response_is_vague_after_identity_submission(
+                primary_text,
+                latest_customer_intent=latest_customer_intent,
+                customer_has_variant_commitment=customer_has_variant_commitment,
+                customer_has_identity_submission=customer_has_identity_submission,
+            )
             or response_breaks_followup_topic(
                 primary_text,
                 latest_customer_message,
@@ -2596,6 +2665,12 @@ def call_openai_for_reply_suggestion(
             or response_reasks_identity_data(
                 primary_text,
                 latest_identity_fields=latest_identity_fields or {},
+            )
+            or response_is_vague_after_identity_submission(
+                primary_text,
+                latest_customer_intent=latest_customer_intent,
+                customer_has_variant_commitment=customer_has_variant_commitment,
+                customer_has_identity_submission=customer_has_identity_submission,
             )
             or response_breaks_followup_topic(
                 primary_text,
@@ -2650,6 +2725,12 @@ def call_openai_for_reply_suggestion(
             or response_reasks_identity_data(
                 primary_text,
                 latest_identity_fields=latest_identity_fields or {},
+            )
+            or response_is_vague_after_identity_submission(
+                primary_text,
+                latest_customer_intent=latest_customer_intent,
+                customer_has_variant_commitment=customer_has_variant_commitment,
+                customer_has_identity_submission=customer_has_identity_submission,
             )
             or response_breaks_followup_topic(
                 primary_text,
@@ -2722,6 +2803,7 @@ def call_openai_for_reply_suggestion(
         "- Jika customer sudah jelas memilih Mini/Regular, jangan tanya ulang pilihannya.\n"
         "- Jika customer sudah daftar atau deposit, jangan mundur lagi ke penjelasan modal minimal atau pengenalan produk awal.\n"
         "- Jika customer sudah mengirim nama, nomor HP, atau domisili, jangan minta ulang field yang sudah jelas tertulis. Konfirmasi lalu lanjut ke step berikutnya.\n"
+        "- Jika customer sudah mengirim identitas dan bertanya step berikutnya, jawab dengan langkah operasional yang nyata seperti verifikasi, onboarding, atau handoff ke tim senior. Jangan pakai filler seperti 'saya cek alurnya dulu'.\n"
         "- Kurangi template closing berulang. Hanya tutup dengan ajakan lanjut jika memang membantu langkah berikutnya.\n"
         "- Jika pesan customer pendek dan jelas merupakan follow-up, pertahankan topik dari balasan sales sebelumnya. Jangan lompat topik.\n"
         "- Jika customer minta opsi produk, Mini dan Regular/Reguler harus sama-sama muncul dan harus dibedakan secara konkret, bukan cuma disebut namanya.\n"

@@ -24,8 +24,9 @@ from app.services.reply_suggestion_service import (
     infer_latest_customer_intent,
     infer_product_variant_response_mode,
     response_defers_answer_with_question,
-    response_starts_too_generic,
     response_misses_latest_customer_intent,
+    response_is_vague_after_identity_submission,
+    response_starts_too_generic,
 )
 
 
@@ -113,6 +114,15 @@ def test_infer_latest_customer_intent_detects_mechanism() -> None:
     assert infer_latest_customer_intent("Sistemnya gimana bro?") == "mechanism"
 
 
+def test_infer_latest_customer_intent_detects_identity_submission() -> None:
+    assert (
+        infer_latest_customer_intent(
+            "Nama: Arya hondavario\nNo hp: 088238768897\nDomisili: Depok"
+        )
+        == "identity_submission"
+    )
+
+
 def test_response_misses_latest_customer_intent_flags_misaligned_answer() -> None:
     assert response_misses_latest_customer_intent(
         "Solid itu diawasi resmi dan ada pengawasan BAPPEBTI.",
@@ -163,6 +173,24 @@ def test_response_defers_answer_with_question_accepts_answer_then_single_questio
     assert not response_defers_answer_with_question(
         "Sistemnya dijelaskan dulu alurnya, lalu akun disesuaikan dengan tujuan dan batas risiko. Kalau mau, saya lanjut jelaskan step awalnya ya?",
         "direct_answer_first",
+    )
+
+
+def test_response_is_vague_after_identity_submission_flags_filler_step() -> None:
+    assert response_is_vague_after_identity_submission(
+        "Siap bro, tahap berikutnya saya cek alurnya dulu dari data yang sudah masuk, lalu saya kirimkan langkah lanjut yang paling sesuai.",
+        latest_customer_intent="next_step",
+        customer_has_variant_commitment=True,
+        customer_has_identity_submission=True,
+    )
+
+
+def test_response_is_vague_after_identity_submission_accepts_concrete_handoff() -> None:
+    assert not response_is_vague_after_identity_submission(
+        "Siap bro, data Kak Arya sudah saya terima. Step berikutnya saya lanjutkan ke verifikasi data Mini dulu, lalu saya hubungkan ke tim senior supaya proses onboarding-nya dibantu sampai tuntas.",
+        latest_customer_intent="next_step",
+        customer_has_variant_commitment=True,
+        customer_has_identity_submission=True,
     )
 
 
