@@ -86,9 +86,7 @@ PRODUCT_VARIANT_DISCOVERY_PATTERN = re.compile(
     r"ada apa aja|ada apa saja|opsinya apa aja|opsinya apa saja|"
     r"produk dari solid|program dari solid|solid punya apa aja|"
     r"mini atau reguler|reguler atau mini|regular atau mini|mini atau regular|"
-    r"pilihan produk|opsi produk|opsi program|"
-    r"sistemnya|gimana sistemnya|bagaimana sistemnya|cara kerjanya|"
-    r"alur(?:nya)?|mekanisme(?:nya)?|proses(?:nya)?"
+    r"pilihan produk|opsi produk|opsi program"
     r")\b",
     re.IGNORECASE,
 )
@@ -753,6 +751,24 @@ def build_runtime_rule_brief(
     if latest_customer_intent == "mechanism":
         rules.append(
             "- Customer bertanya mekanisme/alur: jawab netral dan langsung ke cara kerja inti yang bisa dibayangkan customer."
+        )
+        rules.append(
+            "- Jangan ubah jawaban mekanisme menjadi perbandingan Mini/Regular kecuali customer memang minta opsi produk, pilihan akun, atau modal."
+        )
+
+    if latest_customer_intent == "legality":
+        rules.append(
+            "- Fokus hanya ke legalitas dan pengawasan resminya. Jangan bawa Mini/Regular kecuali customer memang menanyakan produk atau modal."
+        )
+
+    if latest_customer_intent == "safety":
+        rules.append(
+            "- Fokus ke keamanan, risiko, dan mitigasinya. Jangan alihkan ke Mini/Regular kecuali customer memang bertanya opsi produk/modal."
+        )
+
+    if latest_customer_intent == "next_step":
+        rules.append(
+            "- Fokus ke langkah berikutnya yang operasional. Jangan mundur ke pengenalan produk umum."
         )
 
     if should_avoid_repeating_sales_reply:
@@ -1784,7 +1800,7 @@ def response_ignores_post_signup_state(
 
     mentions_reset_topics = bool(
         re.search(
-            r"\b(minimal|minimum|modal awal|produk kami|ada dua produk|pemula)\b",
+            r"\b(minimal|minimum|modal awal|produk kami|ada dua produk|pemula|mini|regular|reguler|akun|account|produk)\b",
             normalized,
             re.IGNORECASE,
         )
@@ -1890,6 +1906,48 @@ def response_mentions_variant_not_in_grounding(
     return False
 
 
+def response_unnecessarily_mentions_product_variants(
+    text: str,
+    latest_customer_intent: str,
+    latest_customer_message: str,
+    must_answer_with_product_options: bool,
+) -> bool:
+    if must_answer_with_product_options:
+        return False
+
+    if customer_has_chosen_product_variant(latest_customer_message):
+        return False
+
+    customer_message = _compact_whitespace(latest_customer_message)
+    if not customer_message:
+        return False
+
+    if EXPLICIT_VARIANT_PATTERN.search(customer_message):
+        return False
+
+    if MINIMUM_CAPITAL_PATTERN.search(customer_message):
+        return False
+
+    if should_message_ask_product_options(customer_message):
+        return False
+
+    if latest_customer_intent not in {
+        "legality",
+        "safety",
+        "mechanism",
+        "next_step",
+        "beginner",
+        "general",
+    }:
+        return False
+
+    normalized = _compact_whitespace(text).lower()
+    if not normalized:
+        return False
+
+    return bool(re.search(r"\b(mini|regular|reguler)\b", normalized))
+
+
 def response_is_too_similar_to_latest_sales_message(
     text: str,
     latest_sales_message: str,
@@ -1974,7 +2032,13 @@ def response_misses_latest_customer_intent(
         return not (mentions_mini or mentions_regular)
 
     if latest_customer_intent == "legality":
-        return not bool(LEGALITY_REQUEST_PATTERN.search(normalized))
+        return not bool(
+            re.search(
+                r"\b(legal|legalitas|resmi|diawasi|bappebti|izin|pengawasan)\b",
+                normalized,
+                re.I,
+            )
+        )
 
     if latest_customer_intent == "safety":
         return not bool(
@@ -2236,7 +2300,44 @@ def call_openai_for_reply_suggestion(
 
     primary_text = reply_payload.suggested_replies[0].text
     if desired_count == 1 and latency_profile == "ultra_fast":
-        needs_retry = False
+        needs_retry = (
+            response_fails_product_option_requirement(
+                primary_text,
+                must_answer_with_product_options,
+            )
+            or response_mentions_variant_not_in_grounding(
+                primary_text,
+                product_option_summary,
+                must_answer_with_product_options,
+            )
+            or response_unnecessarily_mentions_product_variants(
+                primary_text,
+                latest_customer_intent,
+                latest_customer_message,
+                must_answer_with_product_options,
+            )
+            or response_lacks_legality_authority(
+                primary_text,
+                latest_customer_intent,
+            )
+            or response_ignores_post_signup_state(
+                primary_text,
+                latest_customer_message,
+            )
+            or response_breaks_followup_topic(
+                primary_text,
+                latest_customer_message,
+                latest_sales_message,
+            )
+            or response_misses_latest_customer_intent(
+                primary_text,
+                latest_customer_intent,
+            )
+            or response_defers_answer_with_question(
+                primary_text,
+                answer_commitment_level,
+            )
+        )
     elif desired_count == 1 and latency_profile == "fast":
         needs_retry = (
             response_fails_product_option_requirement(
@@ -2246,6 +2347,12 @@ def call_openai_for_reply_suggestion(
             or response_mentions_variant_not_in_grounding(
                 primary_text,
                 product_option_summary,
+                must_answer_with_product_options,
+            )
+            or response_unnecessarily_mentions_product_variants(
+                primary_text,
+                latest_customer_intent,
+                latest_customer_message,
                 must_answer_with_product_options,
             )
             or response_lacks_legality_authority(
@@ -2286,6 +2393,12 @@ def call_openai_for_reply_suggestion(
             or response_mentions_variant_not_in_grounding(
                 primary_text,
                 product_option_summary,
+                must_answer_with_product_options,
+            )
+            or response_unnecessarily_mentions_product_variants(
+                primary_text,
+                latest_customer_intent,
+                latest_customer_message,
                 must_answer_with_product_options,
             )
             or response_lacks_legality_authority(
@@ -2370,6 +2483,8 @@ def call_openai_for_reply_suggestion(
         "- Jika customer minta opsi produk, Mini dan Regular/Reguler harus sama-sama muncul dan harus dibedakan secara konkret, bukan cuma disebut namanya.\n"
         "- Jika customer bertanya legalitas, kalimat pertama wajib langsung menyebut otoritas pengawasan yang relevan dari knowledge base.\n"
         "- Jangan menyebut varian produk yang tidak muncul di ringkasan opsi produk terstruktur / grounding saat ini.\n"
+        "- Untuk intent legalitas, keamanan, mekanisme, dan next step: JANGAN sebut Mini/Regular kecuali customer memang bertanya soal produk, pilihan akun, atau modal.\n"
+        "- Jika customer sudah daftar atau deposit, jawaban wajib fokus ke langkah lanjutan yang operasional.\n"
     )
 
     try:
