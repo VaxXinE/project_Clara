@@ -31,6 +31,7 @@ from app.services.reply_suggestion_service import (
     response_defers_answer_with_question,
     response_misses_latest_customer_intent,
     response_is_vague_after_identity_submission,
+    response_opens_with_source_dump,
     response_starts_too_generic,
     response_unnecessarily_mentions_product_variants,
     response_uses_abstract_data_requirement,
@@ -40,6 +41,9 @@ from app.services.official_source_service import (
     OFFICIAL_BAPPEBTI_URL,
     OFFICIAL_SOLID_URL,
     get_official_source_entries,
+)
+from app.services.ai_extraction_service import (
+    infer_account_category_from_conversation_text,
 )
 
 
@@ -649,3 +653,36 @@ def test_response_unnecessarily_mentions_other_variant_when_customer_focus_is_mi
         must_answer_with_product_options=False,
         conversation_variant_focus="mini",
     )
+
+
+def test_response_unnecessarily_mentions_variants_after_verification_complete() -> None:
+    assert response_unnecessarily_mentions_product_variants(
+        "Setelah ini lanjut onboarding Mini ya kak, tidak perlu balik lagi membahas Regular.",
+        latest_customer_intent="verification_complete",
+        latest_customer_message="Saya sudah dapat email terverifikasi kak.",
+        must_answer_with_product_options=False,
+        conversation_variant_focus="mini",
+    )
+
+
+def test_response_opens_with_source_dump_for_generic_mini_interest() -> None:
+    assert response_opens_with_source_dump(
+        "Halo kak, untuk Mini itu produk resminya mengacu ke https://sg-berjangka.com/ ya, dan legalitasnya bisa dicek di https://bappebti.go.id/pialang_berjangka/detail/049.",
+        "general",
+    )
+
+
+def test_response_opens_with_source_dump_allows_substantive_mini_opening() -> None:
+    assert not response_opens_with_source_dump(
+        "Mini biasanya cocok untuk yang mau mulai lebih ringan dulu, terutama kalau masih pemula. Kalau nanti kakak mau cek legalitas atau detail teknisnya, saya arahkan ke sumber resminya.",
+        "general",
+    )
+
+
+def test_infer_account_category_from_conversation_text_detects_mini_focus() -> None:
+    conversation_text = """
+    [2026-06-22T03:26:00+00:00] customer (Bagol A): Halo kak saya mau tanya tentang mini
+    [2026-06-22T03:27:00+00:00] customer (Bagol A): Kalau saya mau lanjut mini hari ini, proses awalnya apa kak?
+    """.strip()
+
+    assert infer_account_category_from_conversation_text(conversation_text) == "mini"

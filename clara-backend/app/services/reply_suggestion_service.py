@@ -1100,6 +1100,10 @@ def build_runtime_rule_brief(
         rules.append(
             f"- Riwayat percakapan menunjukkan customer sedang fokus ke {conversation_variant_focus}. Jangan bandingkan lagi dengan varian lain kecuali customer meminta perbandingan."
         )
+        if latest_customer_intent in {"general", "beginner", "mechanism", "next_step"}:
+            rules.append(
+                "- Karena fokus customer sudah jelas ke satu varian, buka jawaban dengan inti penjelasan varian itu dulu. Jangan jadikan URL atau sumber resmi sebagai kalimat pembuka kecuali customer sedang bertanya legalitas atau detail teknis spesifik."
+            )
 
     if customer_post_signup_or_deposit:
         rules.append(
@@ -2567,6 +2571,8 @@ def response_unnecessarily_mentions_product_variants(
         "next_step",
         "beginner",
         "general",
+        "verification_complete",
+        "verification_status",
     }:
         return False
 
@@ -2580,6 +2586,40 @@ def response_unnecessarily_mentions_product_variants(
         return True
 
     return bool(re.search(r"\b(mini|regular|reguler)\b", normalized))
+
+
+def response_opens_with_source_dump(
+    text: str,
+    latest_customer_intent: str,
+) -> bool:
+    if latest_customer_intent not in {"general", "beginner"}:
+        return False
+
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return False
+
+    sentences = [
+        part.strip()
+        for part in re.split(r"(?<=[.!?])\s+", normalized)
+        if part.strip()
+    ]
+    opening = " ".join(sentences[:2]).lower()
+    if not opening:
+        return False
+
+    if not any(
+        marker in opening
+        for marker in ("sg-berjangka.com", "bappebti.go.id", "https://")
+    ):
+        return False
+
+    return not bool(
+        re.search(
+            r"\b(mini cocok|mini biasanya|mulai lebih ringan|pemula|langkah awal|alur awal)\b",
+            opening,
+        )
+    )
 
 
 def response_is_too_similar_to_latest_sales_message(
@@ -3043,6 +3083,10 @@ def call_openai_for_reply_suggestion(
                 primary_text,
                 answer_commitment_level,
             )
+            or response_opens_with_source_dump(
+                primary_text,
+                latest_customer_intent,
+            )
         )
     elif desired_count == 1 and latency_profile == "fast":
         needs_retry = (
@@ -3111,6 +3155,10 @@ def call_openai_for_reply_suggestion(
             or response_defers_answer_with_question(
                 primary_text,
                 answer_commitment_level,
+            )
+            or response_opens_with_source_dump(
+                primary_text,
+                latest_customer_intent,
             )
         )
     else:
@@ -3191,6 +3239,10 @@ def call_openai_for_reply_suggestion(
             or response_defers_answer_with_question(
                 primary_text,
                 answer_commitment_level,
+            )
+            or response_opens_with_source_dump(
+                primary_text,
+                latest_customer_intent,
             )
         )
 

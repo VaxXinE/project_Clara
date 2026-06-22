@@ -45,6 +45,12 @@ Jangan gunakan pola lama seperti:
 
 kecuali setelahnya ada isi yang konkret.
 
+Untuk sapaan awal atau minat awal seperti "mau tanya Mini":
+
+- jangan buka dengan link
+- jangan buka dengan legalitas kalau user belum tanya legal
+- jelaskan dulu posisi Mini secara ringkas lalu arahkan ke pertanyaan paling relevan
+
 ---
 
 ## FAQ 001 — Legal tapi kok banyak yang rugi?
