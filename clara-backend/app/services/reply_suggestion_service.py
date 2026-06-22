@@ -204,6 +204,24 @@ CUSTOMER_CHOSE_REGULAR_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+CUSTOMER_FOCUS_MINI_PATTERN = re.compile(
+    r"\b("
+    r"tentang mini|soal mini|mau tanya mini|tanya mini|bahas mini|"
+    r"mini kak|fokus mini|yang mini"
+    r")\b",
+    re.IGNORECASE,
+)
+
+CUSTOMER_FOCUS_REGULAR_PATTERN = re.compile(
+    r"\b("
+    r"tentang reguler|tentang regular|soal reguler|soal regular|"
+    r"mau tanya reguler|mau tanya regular|tanya reguler|tanya regular|"
+    r"bahas reguler|bahas regular|reguler kak|regular kak|"
+    r"fokus reguler|fokus regular|yang reguler|yang regular"
+    r")\b",
+    re.IGNORECASE,
+)
+
 POST_SIGNUP_OR_DEPOSIT_PATTERN = re.compile(
     r"\b("
     r"sudah daftar|udah daftar|berhasil daftar|selesai daftar|"
@@ -667,6 +685,31 @@ def customer_has_chosen_product_variant(latest_customer_message: str) -> bool:
     )
 
 
+def infer_customer_variant_focus(message_text: str) -> str | None:
+    message = _compact_whitespace(message_text)
+    if not message:
+        return None
+
+    lowered = message.lower()
+    mentions_mini = bool(
+        CUSTOMER_CHOSE_MINI_PATTERN.search(message)
+        or CUSTOMER_FOCUS_MINI_PATTERN.search(message)
+    )
+    mentions_reguler = bool(
+        CUSTOMER_CHOSE_REGULAR_PATTERN.search(message)
+        or CUSTOMER_FOCUS_REGULAR_PATTERN.search(message)
+    )
+
+    if mentions_mini and not mentions_reguler:
+        return "mini"
+    if mentions_reguler and not mentions_mini:
+        return "reguler"
+    if "mini" in lowered and ("regular" in lowered or "reguler" in lowered):
+        return "compare_all"
+
+    return None
+
+
 def customer_is_already_post_signup_or_deposit(latest_customer_message: str) -> bool:
     message = _compact_whitespace(latest_customer_message)
     return bool(POST_SIGNUP_OR_DEPOSIT_PATTERN.search(message))
@@ -752,6 +795,26 @@ def conversation_has_customer_chosen_product_variant(conversation: Conversation)
         and customer_has_chosen_product_variant(message.message_text)
         for message in conversation.messages
     )
+
+
+def get_conversation_customer_variant_focus(conversation: Conversation) -> str | None:
+    focus: str | None = None
+
+    for message in conversation.messages:
+        if message.sender_type != "customer":
+            continue
+
+        current_focus = infer_customer_variant_focus(message.message_text)
+        if current_focus is None:
+            continue
+        if current_focus == "compare_all":
+            return "compare_all"
+        if focus is None:
+            focus = current_focus
+        elif focus != current_focus:
+            return "compare_all"
+
+    return focus
 
 
 def conversation_has_customer_identity_submission(conversation: Conversation) -> bool:
@@ -925,7 +988,8 @@ def build_core_reply_rules() -> str:
         "- Jika knowledge tidak cukup, bilang akan cek detail resmi atau kirim dokumen pendukung.\n"
         "- Jangan mengulang template closing yang sama di setiap jawaban seperti 'kalau mau saya bantu jelaskan lagi' kecuali memang dibutuhkan.\n"
         "- Jangan menyisipkan Mini/Regular kalau pertanyaan customer bukan sedang membahas produk, pilihan akun, atau modal.\n"
-        "- Kalau customer sudah jelas menanyakan satu hal spesifik, jawab hal spesifik itu dulu sebelum mengarahkan ke topik lain."
+        "- Kalau customer sudah jelas menanyakan satu hal spesifik, jawab hal spesifik itu dulu sebelum mengarahkan ke topik lain.\n"
+        "- Untuk pertanyaan legalitas atau aman, jangan jawab kabur dengan frasa seperti 'cek status resmi sesuai produk/akun' jika knowledge base sudah punya fakta pengawasan resmi yang bisa disebut langsung."
     )
 
 
@@ -941,6 +1005,7 @@ def build_runtime_rule_brief(
     must_give_detailed_explanation: bool,
     discusses_scalping_or_setup: bool,
     customer_has_variant_commitment: bool = False,
+    conversation_variant_focus: str | None = None,
     customer_has_identity_submission: bool = False,
     known_identity_fields: dict[str, str] | None = None,
     customer_has_verification_completion: bool = False,
@@ -978,6 +1043,11 @@ def build_runtime_rule_brief(
         )
         rules.append(
             "- Jika customer sudah memilih Mini/Regular, jangan tanya ulang mau pilih yang mana kecuali customer sendiri berubah arah."
+        )
+
+    if conversation_variant_focus in {"mini", "reguler"} and not must_answer_with_product_options:
+        rules.append(
+            f"- Riwayat percakapan menunjukkan customer sedang fokus ke {conversation_variant_focus}. Jangan bandingkan lagi dengan varian lain kecuali customer meminta perbandingan."
         )
 
     if customer_post_signup_or_deposit:
@@ -1022,6 +1092,9 @@ def build_runtime_rule_brief(
     if latest_customer_intent == "legality":
         rules.append(
             "- Fokus hanya ke legalitas dan pengawasan resminya. Jangan bawa Mini/Regular kecuali customer memang menanyakan produk atau modal."
+        )
+        rules.append(
+            "- Kalimat pertama wajib langsung menjawab legalitas dengan fakta pengawasan resmi yang ada. Jangan buka dengan jawaban kabur seperti 'perlu cek status resmi dulu'."
         )
 
     if latest_customer_intent == "safety":
@@ -1108,6 +1181,7 @@ def build_extraction_runtime_summary(
     answer_commitment_level: str,
     variant_response_mode: str,
     customer_has_variant_commitment: bool = False,
+    conversation_variant_focus: str | None = None,
     customer_has_identity_submission: bool = False,
     known_identity_fields: dict[str, str] | None = None,
     customer_has_verification_completion: bool = False,
@@ -1130,7 +1204,7 @@ def build_extraction_runtime_summary(
         f"- budget={budget_summary}",
         f"- next_best_action={_truncate_text(extraction.next_best_action, 140)}",
         f"- account_category={normalize_account_category(account_category)}, latest_intent={latest_customer_intent}, answer_mode={answer_commitment_level}, variant_mode={variant_response_mode}",
-        f"- customer_variant_committed={customer_has_variant_commitment}, customer_identity_submitted={customer_has_identity_submission}, customer_verification_completed={customer_has_verification_completion}",
+        f"- customer_variant_committed={customer_has_variant_commitment}, conversation_variant_focus={conversation_variant_focus or '-'}, customer_identity_submitted={customer_has_identity_submission}, customer_verification_completed={customer_has_verification_completion}",
         f"- policy_action_mode={action_mode}",
         f"- latest_customer_message={latest_customer_message or '-'}",
     ]
@@ -1195,6 +1269,7 @@ def infer_product_variant_response_mode(
     current_account_category: str | None,
     include_all_variants: bool,
     latest_customer_intent: str,
+    conversation_variant_focus: str | None = None,
 ) -> str:
     normalized_category = normalize_account_category(current_account_category)
     message = _compact_whitespace(latest_customer_message).lower()
@@ -1205,6 +1280,9 @@ def infer_product_variant_response_mode(
 
     if normalized_category in {"mini", "reguler"}:
         return f"anchor_{normalized_category}"
+
+    if conversation_variant_focus in {"mini", "reguler"} and latest_customer_intent != "product_options":
+        return f"lean_{conversation_variant_focus}"
 
     if prediction.value in {"mini", "reguler"} and prediction.confidence_score >= 0.78:
         return f"lean_{prediction.value}"
@@ -1557,6 +1635,7 @@ def build_reply_prompt(
     answer_commitment_level: str,
     variant_response_mode: str,
     customer_has_variant_commitment: bool,
+    conversation_variant_focus: str | None,
     customer_has_identity_submission: bool,
     known_identity_fields: dict[str, str] | None,
     customer_has_verification_completion: bool,
@@ -1581,6 +1660,7 @@ def build_reply_prompt(
         must_give_detailed_explanation=must_give_detailed_explanation,
         discusses_scalping_or_setup=discusses_scalping_or_setup,
         customer_has_variant_commitment=customer_has_variant_commitment,
+        conversation_variant_focus=conversation_variant_focus,
         customer_has_identity_submission=customer_has_identity_submission,
         known_identity_fields=known_identity_fields,
         customer_has_verification_completion=customer_has_verification_completion,
@@ -1595,6 +1675,7 @@ def build_reply_prompt(
         answer_commitment_level=answer_commitment_level,
         variant_response_mode=variant_response_mode,
         customer_has_variant_commitment=customer_has_variant_commitment,
+        conversation_variant_focus=conversation_variant_focus,
         customer_has_identity_submission=customer_has_identity_submission,
         known_identity_fields=known_identity_fields,
         customer_has_verification_completion=customer_has_verification_completion,
@@ -1957,6 +2038,10 @@ def should_include_all_product_variants(conversation: Conversation) -> bool:
     if not latest_customer_message:
         return False
 
+    conversation_variant_focus = get_conversation_customer_variant_focus(conversation)
+    if conversation_variant_focus in {"mini", "reguler"}:
+        return False
+
     if bool(PRODUCT_VARIANT_DISCOVERY_PATTERN.search(latest_customer_message)):
         return True
 
@@ -2287,6 +2372,32 @@ def response_lacks_legality_authority(text: str, latest_customer_intent: str) ->
     return not bool(LEGALITY_AUTHORITY_PATTERN.search(first_sentence))
 
 
+def response_uses_vague_legality_deflection(
+    text: str,
+    latest_customer_intent: str,
+) -> bool:
+    if latest_customer_intent != "legality":
+        return False
+
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return True
+
+    return bool(
+        re.search(
+            r"\b("
+            r"cek status resmi(?:\s+\w+){0,4}|"
+            r"perlu cek status resmi(?:\s+\w+){0,4}|"
+            r"sesuai produk(?:/akun)? yang dipilih dulu|"
+            r"sesuai akun yang dipilih dulu|"
+            r"cek dulu status resmi"
+            r")\b",
+            normalized,
+            re.IGNORECASE,
+        )
+    )
+
+
 def response_mentions_variant_not_in_grounding(
     text: str,
     product_option_summary: str,
@@ -2316,6 +2427,7 @@ def response_unnecessarily_mentions_product_variants(
     latest_customer_intent: str,
     latest_customer_message: str,
     must_answer_with_product_options: bool,
+    conversation_variant_focus: str | None = None,
 ) -> bool:
     if must_answer_with_product_options:
         return False
@@ -2349,6 +2461,11 @@ def response_unnecessarily_mentions_product_variants(
     normalized = _compact_whitespace(text).lower()
     if not normalized:
         return False
+
+    if conversation_variant_focus == "mini" and re.search(r"\b(regular|reguler)\b", normalized):
+        return True
+    if conversation_variant_focus == "reguler" and re.search(r"\bmini\b", normalized):
+        return True
 
     return bool(re.search(r"\b(mini|regular|reguler)\b", normalized))
 
@@ -2603,6 +2720,7 @@ def call_openai_for_reply_suggestion(
     answer_commitment_level: str,
     variant_response_mode: str,
     customer_has_variant_commitment: bool,
+    conversation_variant_focus: str | None,
     customer_has_identity_submission: bool,
     known_identity_fields: dict[str, str] | None,
     customer_has_verification_completion: bool,
@@ -2653,6 +2771,7 @@ def call_openai_for_reply_suggestion(
         answer_commitment_level=answer_commitment_level,
         variant_response_mode=variant_response_mode,
         customer_has_variant_commitment=customer_has_variant_commitment,
+        conversation_variant_focus=conversation_variant_focus,
         customer_has_identity_submission=customer_has_identity_submission,
         known_identity_fields=known_identity_fields,
         customer_has_verification_completion=customer_has_verification_completion,
@@ -2766,8 +2885,13 @@ def call_openai_for_reply_suggestion(
                 latest_customer_intent,
                 latest_customer_message,
                 must_answer_with_product_options,
+                conversation_variant_focus,
             )
             or response_lacks_legality_authority(
+                primary_text,
+                latest_customer_intent,
+            )
+            or response_uses_vague_legality_deflection(
                 primary_text,
                 latest_customer_intent,
             )
@@ -2820,8 +2944,13 @@ def call_openai_for_reply_suggestion(
                 latest_customer_intent,
                 latest_customer_message,
                 must_answer_with_product_options,
+                conversation_variant_focus,
             )
             or response_lacks_legality_authority(
+                primary_text,
+                latest_customer_intent,
+            )
+            or response_uses_vague_legality_deflection(
                 primary_text,
                 latest_customer_intent,
             )
@@ -2881,8 +3010,13 @@ def call_openai_for_reply_suggestion(
                 latest_customer_intent,
                 latest_customer_message,
                 must_answer_with_product_options,
+                conversation_variant_focus,
             )
             or response_lacks_legality_authority(
+                primary_text,
+                latest_customer_intent,
+            )
+            or response_uses_vague_legality_deflection(
                 primary_text,
                 latest_customer_intent,
             )
@@ -2974,6 +3108,7 @@ def call_openai_for_reply_suggestion(
         "- Ikuti aturan pemilihan varian produk dengan disiplin: hanya condong ke Mini/Regular kalau sinyalnya memang cukup kuat.\n"
         "- Jika customer sudah memilih produk tertentu, jangan kembali ke jawaban perbandingan umum kecuali diminta.\n"
         "- Jika customer sudah jelas memilih Mini/Regular, jangan tanya ulang pilihannya.\n"
+        "- Jika riwayat percakapan sudah jelas fokus ke Mini atau ke Regular/Reguler, jangan seret jawaban kembali ke perbandingan dua produk kecuali customer minta dibandingkan.\n"
         "- Jika customer sudah daftar atau deposit, jangan mundur lagi ke penjelasan modal minimal atau pengenalan produk awal.\n"
         "- Jika customer sudah mengirim nama, nomor HP, atau domisili, jangan minta ulang field yang sudah jelas tertulis. Konfirmasi lalu lanjut ke step berikutnya.\n"
         "- Jika customer sudah mengirim identitas dan bertanya step berikutnya, jawab dengan langkah operasional yang nyata seperti verifikasi, onboarding, atau handoff ke tim senior. Jangan pakai filler seperti 'saya cek alurnya dulu'.\n"
@@ -2981,6 +3116,7 @@ def call_openai_for_reply_suggestion(
         "- Jika pesan customer pendek dan jelas merupakan follow-up, pertahankan topik dari balasan sales sebelumnya. Jangan lompat topik.\n"
         "- Jika customer minta opsi produk, Mini dan Regular/Reguler harus sama-sama muncul dan harus dibedakan secara konkret, bukan cuma disebut namanya.\n"
         "- Jika customer bertanya legalitas, kalimat pertama wajib langsung menyebut otoritas pengawasan yang relevan dari knowledge base.\n"
+        "- Jika customer bertanya legalitas, jangan pakai jawaban kabur seperti 'cek status resmi sesuai produk/akun' bila fakta pengawasan resmi sudah ada di grounding.\n"
         "- Jangan menyebut varian produk yang tidak muncul di ringkasan opsi produk terstruktur / grounding saat ini.\n"
         "- Untuk intent legalitas, keamanan, mekanisme, dan next step: JANGAN sebut Mini/Regular kecuali customer memang bertanya soal produk, pilihan akun, atau modal.\n"
         "- Jika customer sudah daftar atau deposit, jawaban wajib fokus ke langkah lanjutan yang operasional.\n"
@@ -3129,6 +3265,7 @@ def create_reply_suggestion(
     customer_has_variant_commitment = conversation_has_customer_chosen_product_variant(
         conversation
     )
+    conversation_variant_focus = get_conversation_customer_variant_focus(conversation)
     known_identity_fields = get_known_customer_identity_fields(conversation)
     customer_has_identity_submission = conversation_has_customer_identity_submission(
         conversation
@@ -3165,6 +3302,7 @@ def create_reply_suggestion(
         conversation.lead.account_category if conversation.lead else None,
         include_all_variants,
         latest_customer_intent,
+        conversation_variant_focus,
     )
     variant_duration_ms = _round_duration_ms(variant_started_at)
     knowledge_started_at = perf_counter()
@@ -3204,6 +3342,7 @@ def create_reply_suggestion(
         answer_commitment_level=answer_commitment_level,
         variant_response_mode=variant_response_mode,
         customer_has_variant_commitment=customer_has_variant_commitment,
+        conversation_variant_focus=conversation_variant_focus,
         customer_has_identity_submission=customer_has_identity_submission,
         known_identity_fields=known_identity_fields,
         customer_has_verification_completion=customer_has_verification_completion,

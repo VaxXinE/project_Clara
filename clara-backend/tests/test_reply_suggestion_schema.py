@@ -20,7 +20,9 @@ from app.services.reply_suggestion_service import (
     build_prioritized_knowledge_brief,
     format_conversation_for_reply,
     get_reply_suggestion_json_schema,
+    get_conversation_customer_variant_focus,
     infer_answer_commitment_level,
+    infer_customer_variant_focus,
     infer_latency_profile,
     infer_latest_customer_intent,
     infer_product_variant_response_mode,
@@ -29,6 +31,8 @@ from app.services.reply_suggestion_service import (
     response_misses_latest_customer_intent,
     response_is_vague_after_identity_submission,
     response_starts_too_generic,
+    response_unnecessarily_mentions_product_variants,
+    response_uses_vague_legality_deflection,
 )
 
 
@@ -297,6 +301,22 @@ def test_build_prioritized_knowledge_brief_summarizes_top_entries() -> None:
     assert "Fokus saat menjawab" in brief
 
 
+def test_infer_customer_variant_focus_detects_mini_topic() -> None:
+    assert infer_customer_variant_focus("Saya mau tanya tentang mini kak.") == "mini"
+
+
+def test_get_conversation_customer_variant_focus_tracks_single_variant_topic() -> None:
+    conversation = SimpleNamespace(
+        messages=[
+            SimpleNamespace(sender_type="customer", message_text="Halo kak, saya mau tanya tentang mini."),
+            SimpleNamespace(sender_type="sales", message_text="Siap kak, saya bantu ya."),
+            SimpleNamespace(sender_type="customer", message_text="Saya masih baru kak."),
+        ]
+    )
+
+    assert get_conversation_customer_variant_focus(conversation) == "mini"
+
+
 def test_infer_product_variant_response_mode_compares_all_for_product_options() -> None:
     mode = infer_product_variant_response_mode(
         latest_customer_message="Solid ini ada produk apa aja kak?",
@@ -351,6 +371,19 @@ def test_infer_product_variant_response_mode_anchors_existing_account_category()
     )
 
     assert mode == "anchor_mini"
+
+
+def test_infer_product_variant_response_mode_leans_to_conversation_focus() -> None:
+    mode = infer_product_variant_response_mode(
+        latest_customer_message="Ini legal dan aman kak?",
+        extraction=build_extraction(),
+        current_account_category=None,
+        include_all_variants=False,
+        latest_customer_intent="legality",
+        conversation_variant_focus="mini",
+    )
+
+    assert mode == "lean_mini"
 
 
 def test_format_conversation_for_reply_uses_shorter_window_for_single_reply() -> None:
@@ -495,3 +528,20 @@ def test_infer_latency_profile_prefers_ultra_fast_for_simple_legality() -> None:
     )
 
     assert profile == "ultra_fast"
+
+
+def test_response_uses_vague_legality_deflection_flags_non_answer() -> None:
+    assert response_uses_vague_legality_deflection(
+        "Kalau yang dimaksud legal dan aman, kami perlu cek status resmi sesuai produk atau akun yang dipilih dulu ya kak.",
+        "legality",
+    )
+
+
+def test_response_unnecessarily_mentions_other_variant_when_customer_focus_is_mini() -> None:
+    assert response_unnecessarily_mentions_product_variants(
+        "Untuk Mini cocok buat pemula, sedangkan Regular lebih pas kalau modalnya lebih besar.",
+        latest_customer_intent="legality",
+        latest_customer_message="Ini legal dan aman kak?",
+        must_answer_with_product_options=False,
+        conversation_variant_focus="mini",
+    )
