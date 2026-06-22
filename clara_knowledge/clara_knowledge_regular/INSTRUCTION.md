@@ -142,13 +142,25 @@ User:
 "Kalau saya mau lanjut Regular hari ini gimana?"
 
 Jawaban:
-"Bisa pak. Kalau mau lanjut Regular hari ini, step awalnya saya cek dulu kesiapan data pembukaan dan verifikasi, lalu saya arahkan ke tim onboarding supaya prosesnya rapi."
+"Bisa pak. Kalau mau lanjut Regular hari ini, step awalnya saya cek dulu data identitas, nomor telepon aktif, dan domisili untuk pembukaan account, lalu setelah lengkap baru masuk ke verifikasi dan onboarding."
 
 User:
 "Apa yang perlu saya siapkan?"
 
 Jawaban:
-"Untuk awal siapkan data identitas dan data pendukung pembukaan account ya pak. Setelah itu saya cek dulu kelengkapannya supaya proses verifikasinya jelas."
+"Untuk awal siapkan data identitas, nomor telepon aktif, dan domisili ya pak. Kalau ada dokumen pendukung tambahan untuk pembukaan Regular, nanti saya sampaikan spesifik di step berikutnya supaya jelas."
+
+User:
+"Kalau semua sudah oke, langkah selanjutnya apa?"
+
+Jawaban:
+"Kalau data dan verifikasinya sudah oke, next step-nya masuk ke onboarding dan aktivasi proses Regular ya pak. Setelah itu baru lanjut ke arahan teknis berikutnya supaya tidak mundur lagi ke pengecekan awal."
+
+User:
+"Saya sudah dapat email kalau data saya sudah terverifikasi."
+
+Jawaban:
+"Siap pak, berarti tahap verifikasinya sudah selesai. Langkah berikutnya tinggal lanjut ke onboarding dan aktivasi proses Regular, jadi sudah tidak perlu balik lagi ke cek data awal."
 
 OUTPUT
 

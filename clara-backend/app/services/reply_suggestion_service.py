@@ -124,6 +124,19 @@ STEP_REQUEST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+DATA_PREPARATION_REQUEST_PATTERN = re.compile(
+    r"\b("
+    r"apa aja yang perlu saya siapkan|"
+    r"apa yang perlu saya siapkan|"
+    r"data apa aja|"
+    r"data apa yang perlu|"
+    r"siapkan apa aja|"
+    r"berkas apa aja|"
+    r"dokumen apa aja"
+    r")\b",
+    re.IGNORECASE,
+)
+
 TIMING_REQUEST_PATTERN = re.compile(
     r"\b("
     r"berapa lama|"
@@ -266,7 +279,9 @@ VERIFICATION_COMPLETE_PATTERN = re.compile(
     r"sudah\s+dapat\s+email|"
     r"sudah\s+dapet\s+email|"
     r"email(?:\s+\w+){0,4}\s+terverifikasi|"
+    r"email(?:\s+\w+){0,4}\s+ter\s*veri\w+|"
     r"data\s+saya\s+sudah\s+terverifikasi|"
+    r"data\s+saya\s+sudah\s+ter\s*veri\w+|"
     r"proses\s+verifikasi(?:\s+\w+){0,3}\s+sudah\s+selesai"
     r")\b",
     re.IGNORECASE,
@@ -291,7 +306,42 @@ VAGUE_NEXT_STEP_PATTERN = re.compile(
     r"kirimkan?\s+langkah\s+lanjut|"
     r"lanjutkan?\s+pengecekan|"
     r"lihat\s+dulu\s+alurnya|"
-    r"saya\s+cek\s+dulu"
+    r"saya\s+cek\s+dulu|"
+    r"data\s+dasar|"
+    r"kelengkapan\s+data\s+dulu"
+    r")\b",
+    re.IGNORECASE,
+)
+
+ABSTRACT_DATA_REQUIREMENT_PATTERN = re.compile(
+    r"\b("
+    r"data\s+dasar|"
+    r"data\s+pendukung|"
+    r"berkas\s+pendukung"
+    r")\b",
+    re.IGNORECASE,
+)
+
+CONCRETE_DATA_ITEMS_PATTERN = re.compile(
+    r"\b("
+    r"nama|"
+    r"nomor\s+(?:telepon|hp|wa)|"
+    r"domisili|"
+    r"alamat|"
+    r"ktp|"
+    r"email|"
+    r"rekening|"
+    r"identitas"
+    r")\b",
+    re.IGNORECASE,
+)
+
+BACKWARD_VERIFICATION_AFTER_COMPLETE_PATTERN = re.compile(
+    r"\b("
+    r"verifikasi\s+kelengkapan\s+data\s+dulu|"
+    r"cek\s+kelengkapan\s+data\s+dulu|"
+    r"verifikasi\s+data\s+dulu|"
+    r"masuk\s+ke\s+verifikasi\s+dulu"
     r")\b",
     re.IGNORECASE,
 )
@@ -1112,6 +1162,14 @@ def build_runtime_rule_brief(
                 "- Karena customer sudah kirim data dan/atau sudah pilih produk, next step harus konkret: misalnya verifikasi data, proses onboarding, atau handoff ke tim senior. Jangan jawab dengan 'saya cek alurnya dulu' atau filler sejenis."
             )
 
+    if DATA_PREPARATION_REQUEST_PATTERN.search(latest_customer_message):
+        rules.append(
+            "- Customer sedang meminta data/berkas yang perlu disiapkan. Jangan jawab abstrak dengan 'data dasar' atau 'data pendukung' saja."
+        )
+        rules.append(
+            "- Sebutkan item konkret yang perlu disiapkan, minimal data identitas, nomor telepon aktif, dan domisili; tambahkan dokumen pendukung hanya jika memang ada di knowledge."
+        )
+
     if latest_customer_intent == "timing":
         rules.append(
             "- Customer menanyakan durasi proses. Jangan mengarang SLA atau estimasi waktu kalau tidak ada di knowledge."
@@ -1131,6 +1189,9 @@ def build_runtime_rule_brief(
     if latest_customer_intent == "verification_complete":
         rules.append(
             "- Customer menyatakan verifikasi sudah selesai. Akui milestone itu, lalu lanjutkan ke onboarding/handoff; jangan minta data lagi."
+        )
+        rules.append(
+            "- Setelah customer menyatakan verifikasi selesai, jangan mundur lagi ke 'cek kelengkapan data' atau 'verifikasi data dulu'. Langsung maju ke onboarding, aktivasi, atau proses lanjutan."
         )
 
     if latest_customer_intent == "identity_submission":
@@ -2330,7 +2391,31 @@ def response_is_vague_after_identity_submission(
     if VAGUE_NEXT_STEP_PATTERN.search(normalized):
         return True
 
+    if (
+        DATA_PREPARATION_REQUEST_PATTERN.search(_compact_whitespace(text)) is None
+        and latest_customer_intent == "verification_complete"
+        and BACKWARD_VERIFICATION_AFTER_COMPLETE_PATTERN.search(normalized)
+    ):
+        return True
+
     return not bool(CONCRETE_HANDOFF_OR_ONBOARDING_PATTERN.search(normalized))
+
+
+def response_uses_abstract_data_requirement(
+    text: str,
+    latest_customer_message: str,
+) -> bool:
+    if not DATA_PREPARATION_REQUEST_PATTERN.search(_compact_whitespace(latest_customer_message)):
+        return False
+
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return True
+
+    if not ABSTRACT_DATA_REQUIREMENT_PATTERN.search(normalized):
+        return False
+
+    return not bool(CONCRETE_DATA_ITEMS_PATTERN.search(normalized))
 
 
 def response_breaks_followup_topic(
@@ -2934,6 +3019,10 @@ def call_openai_for_reply_suggestion(
                 primary_text,
                 latest_identity_fields=known_identity_fields or {},
             )
+            or response_uses_abstract_data_requirement(
+                primary_text,
+                latest_customer_message,
+            )
             or response_is_vague_after_identity_submission(
                 primary_text,
                 latest_customer_intent=latest_customer_intent,
@@ -2992,6 +3081,10 @@ def call_openai_for_reply_suggestion(
             or response_reasks_identity_data(
                 primary_text,
                 latest_identity_fields=known_identity_fields or {},
+            )
+            or response_uses_abstract_data_requirement(
+                primary_text,
+                latest_customer_message,
             )
             or response_is_vague_after_identity_submission(
                 primary_text,
@@ -3058,6 +3151,10 @@ def call_openai_for_reply_suggestion(
             or response_reasks_identity_data(
                 primary_text,
                 latest_identity_fields=known_identity_fields or {},
+            )
+            or response_uses_abstract_data_requirement(
+                primary_text,
+                latest_customer_message,
             )
             or response_is_vague_after_identity_submission(
                 primary_text,

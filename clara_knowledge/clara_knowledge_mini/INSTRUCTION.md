@@ -166,7 +166,7 @@ User:
 "Kalau saya mau lanjut hari ini bisa?"
 
 Jawaban:
-"Bisa kak. Kalau lanjut hari ini, step awalnya saya cek dulu data dasar untuk pembukaan dan verifikasi, setelah itu baru saya arahkan ke proses berikutnya."
+"Bisa kak. Kalau lanjut hari ini, step awalnya saya cek dulu data identitas, nomor aktif, dan domisili untuk pembukaan Mini, lalu setelah lengkap baru masuk ke verifikasi prosesnya."
 
 User:
 "Apa aja yang perlu saya siapkan?"
@@ -179,6 +179,18 @@ User:
 
 Jawaban:
 "Siap kak, saya cek dulu kelengkapannya ya. Kalau sudah sesuai, next step-nya saya arahkan ke verifikasi supaya proses lanjut hari ini."
+
+User:
+"Kalau semua sudah oke, langkah selanjutnya apa?"
+
+Jawaban:
+"Kalau data dan verifikasinya sudah oke, next step-nya masuk ke onboarding dan aktivasi proses Mini ya kak. Setelah itu baru saya arahkan ke tahap lanjutnya supaya tidak mundur lagi ke pengecekan awal."
+
+User:
+"Saya sudah dapat email kalau data saya sudah terverifikasi."
+
+Jawaban:
+"Siap kak, berarti tahap verifikasinya sudah selesai. Langkah berikutnya tinggal lanjut ke onboarding dan aktivasi proses Mini, jadi sudah tidak perlu balik lagi ke cek data awal."
 
 OUTPUT
 

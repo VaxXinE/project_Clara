@@ -145,14 +145,14 @@ RESPONSE:
 ## FAQ 015 — Saya mau mulai, gimana?
 
 RESPONSE:
-"Siap pak. Kalau mau mulai Regular, step awalnya saya cek dulu data pembukaan dan verifikasi, lalu saya lanjutkan ke tim onboarding supaya proses teknisnya rapi."
+"Siap pak. Kalau mau mulai Regular, step awalnya saya cek dulu data identitas, nomor telepon aktif, dan domisili untuk pembukaan account, lalu setelah lengkap baru masuk ke verifikasi dan onboarding."
 
 ---
 
 ## FAQ 016 — Apa yang perlu saya siapkan?
 
 RESPONSE:
-"Untuk awal siapkan data identitas dan data pendukung pembukaan account ya pak. Setelah itu saya cek dulu kelengkapannya supaya proses verifikasinya jelas."
+"Untuk awal siapkan data identitas, nomor telepon aktif, dan domisili ya pak. Kalau ada dokumen pendukung tambahan untuk pembukaan Regular, nanti saya sampaikan spesifik di step berikutnya supaya jelas."
 
 ---
 
@@ -167,6 +167,20 @@ RESPONSE:
 
 RESPONSE:
 "Bagus, memang sebaiknya dibandingkan. Yang penting jangan cuma lihat biaya atau janji hasil, tapi bandingkan legalitas, kontrol, struktur proses, dan pengelolaan risikonya."
+
+---
+
+## FAQ 019 — Semua sudah oke, langkah berikutnya apa?
+
+RESPONSE:
+"Kalau data dan verifikasinya sudah oke, next step-nya masuk ke onboarding dan aktivasi proses Regular ya pak. Setelah itu baru lanjut ke arahan teknis berikutnya supaya tidak mundur lagi ke pengecekan awal."
+
+---
+
+## FAQ 020 — Saya sudah dapat email verifikasi
+
+RESPONSE:
+"Siap pak, berarti tahap verifikasinya sudah selesai. Setelah ini prosesnya maju ke onboarding dan aktivasi Regular, jadi sudah tidak perlu balik lagi ke verifikasi data awal."
 
 ---
 
@@ -219,6 +233,17 @@ Urutan dasar:
 2. cek kelengkapan
 3. verifikasi
 4. onboarding / penjelasan teknis
+
+Jika customer sudah bilang email verifikasi masuk / sudah terverifikasi:
+
+1. akui verifikasi selesai
+2. lanjut ke onboarding
+3. lanjut ke aktivasi / proses lanjutan
+
+Jangan kembali ke:
+
+- cek kelengkapan data dulu
+- verifikasi data dulu
 
 Contoh:
 

@@ -47,6 +47,18 @@ Jawaban:
 
 ---
 
+User: apa aja yang perlu saya siapkan?
+Jawaban:
+"Untuk awal siapkan data identitas, nomor telepon aktif, dan domisili ya pak. Kalau proses pembukaannya butuh dokumen pendukung tambahan, nanti saya sampaikan spesifik di step berikutnya."
+
+---
+
+User: saya sudah terverifikasi
+Jawaban:
+"Siap pak, berarti tahap verifikasinya sudah selesai. Setelah ini prosesnya maju ke onboarding dan aktivasi Regular, jadi sudah tidak balik lagi ke cek data awal."
+
+---
+
 User: apa bedanya dengan tempat lain?
 Jawaban:
 "Perbedaannya lebih tepat dinilai dari legalitas, struktur proses, kontrol, dan pengelolaan risikonya, bukan dari janji hasil."

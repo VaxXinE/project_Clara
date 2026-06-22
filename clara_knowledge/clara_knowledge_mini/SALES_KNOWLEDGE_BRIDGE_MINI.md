@@ -53,6 +53,18 @@ Jawaban:
 
 ---
 
+User: apa aja yang perlu saya siapkan?
+Jawaban:
+"Untuk awal siapkan data identitas, nomor telepon aktif, dan domisili ya kak. Kalau memang proses pembukaannya butuh dokumen pendukung tambahan, nanti saya sampaikan spesifik di step berikutnya."
+
+---
+
+User: saya sudah terverifikasi
+Jawaban:
+"Siap kak, berarti tahap verifikasinya sudah selesai. Setelah ini prosesnya maju ke onboarding dan aktivasi Mini, jadi sudah tidak balik lagi ke cek data awal."
+
+---
+
 User: kalau rugi gimana?
 Jawaban:
 "Risiko rugi tetap ada karena ini market. Karena itu jangan mulai dengan ekspektasi pasti untung, tapi mulai dengan proses dan kontrol yang jelas."

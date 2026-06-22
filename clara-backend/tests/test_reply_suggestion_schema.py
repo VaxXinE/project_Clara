@@ -33,6 +33,7 @@ from app.services.reply_suggestion_service import (
     response_is_vague_after_identity_submission,
     response_starts_too_generic,
     response_unnecessarily_mentions_product_variants,
+    response_uses_abstract_data_requirement,
     response_uses_vague_legality_deflection,
 )
 from app.services.official_source_service import (
@@ -148,6 +149,15 @@ def test_infer_latest_customer_intent_detects_verification_complete() -> None:
     )
 
 
+def test_infer_latest_customer_intent_detects_verification_complete_with_typo() -> None:
+    assert (
+        infer_latest_customer_intent(
+            "Saya sudah dapat email kalau data saya sudah Ter verivikasi kak"
+        )
+        == "verification_complete"
+    )
+
+
 def test_infer_latest_customer_intent_detects_verification_status() -> None:
     assert (
         infer_latest_customer_intent("Apakah sudah kak untuk verifikasinya?")
@@ -243,6 +253,40 @@ def test_response_is_vague_after_verification_complete_accepts_onboarding_handof
         customer_has_variant_commitment=True,
         customer_has_identity_submission=True,
         customer_has_verification_completion=True,
+    )
+
+
+def test_response_is_vague_after_verification_complete_accepts_regular_activation() -> None:
+    assert not response_is_vague_after_identity_submission(
+        "Siap pak, berarti tahap verifikasinya sudah selesai. Setelah ini prosesnya maju ke onboarding dan aktivasi Regular, jadi tidak perlu balik lagi ke verifikasi data awal.",
+        latest_customer_intent="verification_complete",
+        customer_has_variant_commitment=True,
+        customer_has_identity_submission=True,
+        customer_has_verification_completion=True,
+    )
+
+
+def test_response_is_vague_after_verification_complete_flags_backward_verification() -> None:
+    assert response_is_vague_after_identity_submission(
+        "Siap kak, langkah berikutnya saya lanjut verifikasi kelengkapan data dulu, lalu masuk pembukaan akun.",
+        latest_customer_intent="verification_complete",
+        customer_has_variant_commitment=True,
+        customer_has_identity_submission=True,
+        customer_has_verification_completion=True,
+    )
+
+
+def test_response_uses_abstract_data_requirement_flags_data_dasar_only() -> None:
+    assert response_uses_abstract_data_requirement(
+        "Untuk awal siapkan data dasar dan data pendukung pembukaan dulu ya kak.",
+        "Apa aja yang perlu saya siapkan kak?",
+    )
+
+
+def test_response_uses_abstract_data_requirement_accepts_concrete_items() -> None:
+    assert not response_uses_abstract_data_requirement(
+        "Untuk awal siapkan data identitas, nomor telepon aktif, dan domisili ya kak.",
+        "Apa aja yang perlu saya siapkan kak?",
     )
 
 

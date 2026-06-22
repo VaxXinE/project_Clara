@@ -157,7 +157,7 @@ RESPONSE:
 ## FAQ 016 — Apa aja yang perlu saya siapkan?
 
 RESPONSE:
-"Untuk awal siapkan data identitas dan data pendukung pembukaan ya kak. Setelah masuk, saya cek kelengkapannya supaya proses verifikasinya lancar."
+"Untuk awal siapkan data identitas, nomor telepon aktif, dan domisili ya kak. Kalau ada dokumen pendukung tambahan untuk pembukaan Mini, nanti saya sampaikan spesifik di step berikutnya supaya nggak membingungkan."
 
 ---
 
@@ -165,6 +165,20 @@ RESPONSE:
 
 RESPONSE:
 "Siap kak, saya cek dulu kelengkapannya ya. Kalau sudah sesuai, next step-nya saya arahkan ke verifikasi supaya prosesnya lanjut."
+
+---
+
+## FAQ 018 — Semua sudah oke, langkah berikutnya apa?
+
+RESPONSE:
+"Kalau data dan verifikasinya sudah oke, next step-nya masuk ke onboarding dan aktivasi proses Mini ya kak. Setelah itu baru lanjut ke arahan penggunaan, jadi sudah tidak mundur lagi ke pengecekan awal."
+
+---
+
+## FAQ 019 — Saya sudah dapat email verifikasi
+
+RESPONSE:
+"Siap kak, berarti tahap verifikasinya sudah selesai. Setelah ini prosesnya maju ke onboarding dan aktivasi Mini, jadi sudah tidak perlu balik lagi ke verifikasi data awal."
 
 ---
 
@@ -219,6 +233,17 @@ Urutan dasar:
 2. cek kelengkapan
 3. verifikasi
 4. onboarding / handoff bila diperlukan
+
+Jika customer sudah bilang email verifikasi masuk / sudah terverifikasi:
+
+1. akui verifikasi selesai
+2. lanjut ke onboarding
+3. lanjut ke aktivasi / proses lanjutan
+
+Jangan kembali ke:
+
+- cek kelengkapan data dulu
+- verifikasi data dulu
 
 ---
 

@@ -15,6 +15,12 @@ Teknik:
 4. Onboarding Close
    "Kalau sudah siap action, saya lanjutkan ke tim onboarding supaya penjelasan teknis dan verifikasinya tidak miss."
 
+5. Data Close
+   "Untuk awal siapkan data identitas, nomor telepon aktif, dan domisili ya pak."
+
+6. Post-Verification Close
+   "Kalau email verifikasinya sudah masuk, berarti tahap itu sudah selesai pak. Setelah ini tinggal lanjut ke onboarding dan aktivasi proses Regular."
+
 Larangan:
 
 * jangan tutup dengan kalimat abstrak

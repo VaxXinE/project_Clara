@@ -16,13 +16,16 @@ Teknik:
    "Kalau mau lanjut hari ini, saya cek dulu data awal untuk pembukaan dan verifikasi."
 
 3. Data Close
-   "Yang perlu disiapkan dulu data identitas dan data pendukung pembukaan ya kak."
+   "Yang perlu disiapkan dulu data identitas, nomor telepon aktif, dan domisili ya kak."
 
 4. Verification Close
    "Kalau data awal sudah masuk, saya cek kelengkapannya lalu saya arahkan ke verifikasi."
 
 5. Handoff Close
    "Kalau sudah siap action, saya lanjutkan ke tim onboarding supaya prosesnya cepat dan rapi."
+
+6. Post-Verification Close
+   "Kalau email verifikasinya sudah masuk, berarti tahap itu sudah selesai ya kak. Setelah ini tinggal lanjut ke onboarding dan aktivasi proses Mini."
 
 Larangan:
 
