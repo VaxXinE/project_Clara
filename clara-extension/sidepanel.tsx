@@ -1098,8 +1098,14 @@ const sendReplyFromPanel = async (
 
   const getMessageContainers = () =>
     Array.from(
-      document.querySelectorAll<HTMLElement>(
-        '[data-testid="conversation-panel-messages"] [data-testid="msg-container"], [data-testid="msg-container"]'
+      new Set(
+        Array.from(
+          (
+            document.querySelector<HTMLElement>(
+              '[data-testid="conversation-panel-messages"]'
+            ) || document
+          ).querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
+        )
       )
     )
 
@@ -1513,8 +1519,14 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
   }
 
   const messageContainers = Array.from(
-    chatRoot.querySelectorAll<HTMLElement>(
-      '[data-testid="conversation-panel-messages"] [data-testid="msg-container"], [data-testid="msg-container"]'
+    new Set(
+      Array.from(
+        (
+          chatRoot.querySelector<HTMLElement>(
+            '[data-testid="conversation-panel-messages"]'
+          ) || chatRoot
+        ).querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
+      )
     )
   )
 

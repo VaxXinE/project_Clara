@@ -77,6 +77,20 @@ const getConversationSubtitle = (chatRoot: HTMLElement) => {
   return ""
 }
 
+const queryUniqueMessageContainers = (root: ParentNode) => {
+  const panelRoot =
+    root.querySelector<HTMLElement>('[data-testid="conversation-panel-messages"]') ||
+    root
+
+  return Array.from(
+    new Set(
+      Array.from(
+        panelRoot.querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
+      )
+    )
+  )
+}
+
 const getMessageDirection = (container: HTMLElement): WhatsAppMessageDirection => {
   const metaSource =
     container
@@ -304,11 +318,7 @@ export const readOpenChat = (): WhatsAppReadResponse => {
     }
   }
 
-  const messageContainers = Array.from(
-    chatRoot.querySelectorAll<HTMLElement>(
-      '[data-testid="conversation-panel-messages"] [data-testid="msg-container"], [data-testid="msg-container"]'
-    )
-  )
+  const messageContainers = queryUniqueMessageContainers(chatRoot)
 
   const messages: WhatsAppMessage[] = messageContainers
     .map((container, index) => {
@@ -476,9 +486,7 @@ const getMessageContainers = () => {
   }
 
   return Array.from(
-    chatRoot.querySelectorAll<HTMLElement>(
-      '[data-testid="conversation-panel-messages"] [data-testid="msg-container"], [data-testid="msg-container"]'
-    )
+    queryUniqueMessageContainers(chatRoot)
   )
 }
 

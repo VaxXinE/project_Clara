@@ -169,7 +169,29 @@ def normalize_snapshot_messages(
             )
         )
 
-    return normalized_messages
+    return dedupe_normalized_snapshot_messages(normalized_messages)
+
+
+def dedupe_normalized_snapshot_messages(
+    messages: list[NormalizedSnapshotMessage],
+) -> list[NormalizedSnapshotMessage]:
+    deduped: list[NormalizedSnapshotMessage] = []
+    seen_keys: set[tuple[str, str, str, str]] = set()
+
+    for message in messages:
+        key = (
+            message.sender_type,
+            message.author.strip().lower(),
+            message.text.strip(),
+            message.timestamp_label.strip(),
+        )
+        if key in seen_keys:
+            continue
+
+        seen_keys.add(key)
+        deduped.append(message)
+
+    return deduped
 
 
 def ensure_aware_utc(value: datetime) -> datetime:
