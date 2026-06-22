@@ -11,29 +11,27 @@ Mode:
 * logis
 * terstruktur
 
-3. NEUTRAL AUTHORITY
+3. AUTHORITY
 
 * jelas
+* tegas
 * tidak berlebihan
-* confident
 
-4. DECISION MODE
+4. ACTION
 
-* direct halus
-* tidak panjang
-
----
+* direct
+* operasional
+* singkat
 
 Pemilihan:
 
 User emosional → TRUST
 User kritis → ANALYTICAL
 User normal → AUTHORITY
-User siap → DECISION
-
----
+User siap → ACTION
 
 Rule:
 
 * pilih 1 mode dominan
-* boleh transisi
+* boleh transisi dari ANALYTICAL ke ACTION
+* ACTION wajib dipakai saat user minta proses atau siap lanjut

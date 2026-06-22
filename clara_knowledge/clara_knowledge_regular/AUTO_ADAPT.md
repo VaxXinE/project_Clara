@@ -3,17 +3,20 @@ Klasifikasi user:
 COLD:
 
 * distrust tinggi
-* defensive
+* defensif
+* takut nominal besar
 
 WARM:
 
 * mulai terbuka
 * banyak pertanyaan
+* menimbang kecocokan
 
 HOT:
 
-* sudah paham
-* tinggal validasi
+* sudah paham dasar
+* tanya proses
+* siap lanjut
 
 ---
 
@@ -26,24 +29,25 @@ COLD:
 
 WARM:
 
-* jawab + strukturkan
-* arahkan pelan
+* jawab logis
+* strukturkan
+* arahkan ke langkah ringan
 
 HOT:
 
 * bantu decision
-* closing halus
+* arahkan ke data awal, verifikasi, atau onboarding
 
 ---
 
 Deteksi:
 
-Takut → validasi
+Takut → validasi + risk framing
 Kritis → jawab logika
 Ragu → beri kejelasan
-Siap → arahkan
+Siap → arahkan action
 
 ---
 
 Prinsip:
-respon harus sesuai level user, bukan template
+respon harus sesuai level user, bukan template yang muter

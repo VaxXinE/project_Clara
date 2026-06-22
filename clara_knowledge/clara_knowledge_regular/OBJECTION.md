@@ -1,17 +1,14 @@
 Risk tinggi:
-"Memang ada risiko, itu tidak bisa dihindari. Biasanya yang dilihat bukan menghilangkan risiko, tapi bagaimana cara mengelolanya."
+"Memang ada risiko dan itu tidak bisa dihilangkan. Yang perlu dinilai justru bagaimana sistem, kontrol, dan cara mengelolanya."
 
 Sistem kerja:
-"Secara umum memang ada alur yang dijalankan, jadi bukan langsung masuk tanpa arah."
+"Untuk Regular ada alur yang jelas, jadi bukan masuk tanpa arah. Biasanya user perlu paham dulu bagaimana proses dan pengelolaannya sebelum lanjut."
 
 Kontrol:
-"Biasanya tetap ada kontrol di sisi nasabah, jadi tidak dilepas sepenuhnya."
+"Kontrol tetap penting ada di sisi nasabah, karena keputusan dan risiko tetap harus dipahami pemilik account."
 
 Track record:
-"Yang lebih penting biasanya bukan hanya hasil, tapi bagaimana proses dan cara menjalankannya."
+"Yang relevan bukan hanya hasil orang lain, tapi bagaimana sistemnya dijalankan dan ekspektasinya dibentuk dari awal."
 
 Kenapa harus di sini:
-"Biasanya yang dipertimbangkan bukan hanya tempatnya, tapi pendekatan dan cara kerjanya."
-
-Perbandingan tempat lain:
-"Setiap tempat punya pendekatan berbeda, tinggal dilihat mana yang lebih sesuai dengan cara berpikir Anda."
+"Bukan soal harus, tapi apakah pendekatannya cocok dengan cara Anda menilai risiko dan menjalankan market."

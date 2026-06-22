@@ -1,45 +1,39 @@
 User: ini legal gak?
 Jawaban:
-"Untuk legalitasnya sudah masuk pengawasan resmi seperti BAPPEBTI, jadi secara sistem diawasi. Tapi tetap penting dipahami cara kerjanya, bukan hanya lihat legalitas saja."
+"Legal kak, PT Solid Gold Berjangka diawasi BAPPEBTI. Kalau mau, setelah legalitas saya jelaskan juga alur Mini dan risikonya biar lengkap."
 
 ---
 
 User: ini aman gak?
 Jawaban:
-"Kalau dibilang aman sepenuhnya nggak juga, karena market tetap punya risiko. Makanya biasanya disarankan mulai dari kecil dulu supaya lebih nyaman."
+"Kalau aman tanpa risiko tentu tidak, karena market tetap ada risiko. Yang bisa dipastikan adalah legalitas dan prosedurnya jelas, lalu risikonya harus dipahami dari awal."
 
 ---
 
 User: sistemnya gimana?
 Jawaban:
-"Sistemnya ada alurnya, jadi nggak langsung dilepas. Biasanya dijelaskan step by step dulu sebelum mulai."
+"Untuk Mini ada alur awal yang jelas, jadi bukan langsung masuk tanpa arahan. Biasanya dimulai dari penjelasan singkat, data awal, lalu verifikasi prosesnya."
 
 ---
 
 User: bisa profit terus?
 Jawaban:
-"Nggak ada yang bisa jamin itu, karena market berubah terus. Biasanya yang ditekankan justru cara jalaninnya dulu."
+"Nggak ada yang bisa jamin profit terus. Fokus yang benar itu paham cara kerja dan pengelolaan risikonya dulu."
 
 ---
 
 User: minimal berapa?
 Jawaban:
-"Biasanya bisa mulai dari nominal kecil dulu, tujuannya biar belajar tanpa tekanan besar."
+"Mini account mulai dari Rp5 juta. Kalau itu sesuai kesiapan kakak, next step-nya saya bisa jelaskan proses awalnya."
 
 ---
 
 User: kalau rugi gimana?
 Jawaban:
-"Rugi itu bagian dari proses juga. Makanya biasanya mulai dari kecil dulu supaya lebih siap secara mental."
+"Risiko rugi tetap ada karena ini market. Karena itu jangan mulai dengan ekspektasi pasti untung, tapi mulai dengan proses dan kontrol yang jelas."
 
 ---
 
 User: ini beda apa sama yang lain?
 Jawaban:
-"Kalau dilihat sekilas mungkin mirip, tapi biasanya beda di cara pendekatan dan pendampingannya."
-
----
-
-User: apakah ini trading?
-Jawaban:
-"Iya berkaitan dengan market, tapi biasanya lebih difokuskan ke cara memahami dan menjalankannya dulu, bukan langsung hasil."
+"Untuk Mini, fokusnya di langkah awal yang lebih ringan dan pendampingan dasarnya. Jadi bukan sekadar masuk, tapi dibantu paham dulu prosesnya."

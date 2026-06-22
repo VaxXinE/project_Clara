@@ -1,45 +1,33 @@
 User: ini legal bagaimana?
 Jawaban:
-"Untuk legalitasnya berada di bawah pengawasan resmi seperti BAPPEBTI, jadi aktivitasnya diawasi secara regulasi. Tapi tetap perlu dilihat dari sisi sistem dan cara kerjanya."
+"Legalitasnya berada di bawah pengawasan resmi seperti BAPPEBTI. Setelah itu, yang perlu dipahami berikutnya adalah sistem kerja dan risiko market-nya."
 
 ---
 
 User: risk nya bagaimana?
 Jawaban:
-"Risiko itu pasti ada dan tidak bisa dihilangkan. Biasanya yang dilihat bukan menghindari risiko, tapi bagaimana cara mengelolanya secara terstruktur."
+"Risiko tetap ada dan tidak bisa dihilangkan. Yang penting adalah bagaimana pengelolaan, kontrol, dan batas risikonya dibentuk dari awal."
 
 ---
 
 User: sistem kerjanya seperti apa?
 Jawaban:
-"Sistemnya ada alur yang jelas, jadi bukan masuk tanpa arah. Biasanya dijelaskan dulu bagaimana proses dan pengelolaannya sebelum dijalankan."
+"Untuk Regular ada alur yang jelas, jadi bukan masuk tanpa arah. Biasanya dimulai dari penjelasan struktur, data awal, lalu verifikasi proses pembukaannya."
 
 ---
 
 User: apakah saya pegang kontrol?
 Jawaban:
-"Biasanya tetap ada kontrol di sisi nasabah, jadi bukan dilepas sepenuhnya. Itu yang biasanya jadi pertimbangan juga."
+"Kontrol tetap penting ada di sisi nasabah. Karena itu alur, batasan, dan keputusan harus dipahami jelas sejak awal."
 
 ---
 
 User: apa bedanya dengan tempat lain?
 Jawaban:
-"Perbedaannya biasanya di pendekatan dan cara pengelolaan. Setiap tempat punya sistem masing-masing, tinggal dilihat mana yang lebih sesuai dengan cara berpikir Anda."
+"Perbedaannya lebih tepat dinilai dari legalitas, struktur proses, kontrol, dan pengelolaan risikonya, bukan dari janji hasil."
 
 ---
 
 User: apakah ini bisa dijadikan income?
 Jawaban:
-"Bisa saja, tapi biasanya tidak dilihat sebagai hasil instan. Lebih ke arah bagaimana dikelola secara konsisten dan terstruktur."
-
----
-
-User: kenapa harus di sini?
-Jawaban:
-"Biasanya bukan soal harus atau tidak, tapi lebih ke apakah pendekatan di sini sesuai dengan yang Anda cari atau tidak."
-
----
-
-User: bagaimana kalau market tidak sesuai?
-Jawaban:
-"Itu bagian dari dinamika market. Biasanya yang penting bagaimana cara menghadapi kondisi itu, bukan menghindarinya."
+"Bisa saja jadi tujuan jangka panjang, tapi tidak boleh dianggap hasil pasti. Market tetap dinamis dan harus dijalankan dengan sistem yang terukur."

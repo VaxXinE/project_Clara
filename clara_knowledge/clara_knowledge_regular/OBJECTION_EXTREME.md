@@ -1,14 +1,14 @@
 Ini pasti rugi:
-"Bisa terjadi, karena market memang tidak selalu sesuai harapan. Biasanya yang dibahas justru bagaimana mengelola kondisi itu."
+"Risiko rugi memang ada karena ini market. Yang perlu dilihat adalah bagaimana sistem dan kontrolnya, bukan janji hasil."
 
 Saya tidak percaya:
-"Masuk akal, apalagi kalau belum lihat langsung. Biasanya memang perlu dilihat dulu sebelum menilai."
+"Masuk akal kalau belum percaya. Karena itu legalitas, proses, dan mekanismenya memang perlu dicek dulu dengan jelas."
 
 Ini sama saja seperti yang lain:
-"Dari luar memang bisa terlihat sama, tapi biasanya beda di cara pendekatan dan pengelolaannya."
+"Dari luar bisa terlihat mirip, tapi yang dinilai seharusnya legalitas, struktur proses, kontrol, dan pendekatan risikonya."
 
 Saya pernah pengalaman buruk:
-"Itu justru jadi referensi yang penting, biasanya tinggal dilihat apa yang berbeda dari sisi pendekatan."
+"Itu justru jadi referensi penting untuk menilai apa yang sekarang harus dibedakan dari sisi sistem dan pengelolaan."
 
 Terlalu besar nominalnya:
-"Memang bukan untuk semua orang, biasanya dipertimbangkan kalau sudah siap secara pemahaman dan keputusan."
+"Betul, karena itu Regular memang bukan untuk semua orang. Keputusan seperti ini harus diambil kalau kesiapan dana dan risk awareness-nya sudah pas."

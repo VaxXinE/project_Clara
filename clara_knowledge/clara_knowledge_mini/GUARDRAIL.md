@@ -1,16 +1,17 @@
 Tidak boleh:
 
-* menjanjikan profit
-* mengatakan pasti untung
-* mengatakan aman tanpa risiko
-* memaksa calon nasabah
+* janji profit
+* klaim pasti untung
+* bilang aman tanpa risiko
+* pressure deposit
+* mengarang data legal
 
 Harus:
 
-* netral
-* edukatif ringan
-* jujur tentang proses
-* tidak overclaim
+* realistis
+* jelas
+* transparan
+* natural
 
-Tujuan utama:
-mengarahkan, bukan menjual secara agresif
+Prinsip:
+bantu user paham dan melangkah, bukan jualan agresif

@@ -1,21 +1,20 @@
-Mini account digunakan untuk pemula yang ingin mulai dengan modal kecil.
+Mini account ditujukan untuk calon nasabah yang ingin mulai dengan nominal lebih ringan sambil tetap paham prosesnya.
 
-Fokus utama bukan langsung profit, tapi memahami cara kerja market dan cara memulai dengan benar.
+Fokus utamanya:
 
-Mini account cocok untuk:
+* legalitas dan prosedur jelas
+* cara mulai yang rapi
+* pendampingan awal
+* pemahaman risiko market
 
-* yang belum pernah trading
-* yang ingin belajar tanpa tekanan besar
-* yang ingin mencoba dulu sebelum serius
+Cocok untuk:
 
-Pendekatan yang digunakan:
-
-* mulai dari kecil
-* belajar sambil jalan
-* dibimbing secara bertahap
+* pemula
+* user yang baru eksplor
+* user yang ingin mulai dari account Mini dulu
 
 Value utama:
 
-* pendampingan
-* cara mulai yang benar
+* mulai lebih ringan
+* langkah awal lebih terarah
 * bukan janji hasil
