@@ -72,6 +72,18 @@ Jawaban:
 
 ---
 
+User: saya sudah aktivasi mini, setelah ini apa?
+Jawaban:
+"Siap kak, kalau aktivasi Mini sudah selesai berarti next step-nya masuk ke penggunaan awal dan persiapan mulai transaksi ya. Jadi dari sini fokusnya sudah bukan onboarding lagi, tapi langkah operasional setelah akun aktif."
+
+---
+
+User: saya sudah deposit dan mau mulai transaksi
+Jawaban:
+"Siap kak, kalau akun aktif dan dana sudah masuk berarti tahap administrasinya sudah lewat. Setelah ini next step-nya masuk ke arahan mulai transaksi dan penggunaan platform Mini, jadi tidak perlu kembali ke verifikasi atau onboarding umum."
+
+---
+
 User: kalau rugi gimana?
 Jawaban:
 "Risiko rugi tetap ada karena ini market. Karena itu jangan mulai dengan ekspektasi pasti untung, tapi mulai dengan proses dan kontrol yang jelas."

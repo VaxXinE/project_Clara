@@ -188,6 +188,20 @@ RESPONSE:
 
 ---
 
+## FAQ 020 — Saya sudah aktivasi Mini
+
+RESPONSE:
+"Siap kak, kalau aktivasi Mini sudah selesai berarti next step-nya bukan balik ke onboarding lagi, tapi lanjut ke penggunaan awal dan persiapan mulai transaksi. Jadi dari sini fokusnya sudah masuk ke tahap operasional setelah akun aktif."
+
+---
+
+## FAQ 021 — Saya sudah deposit dan mau mulai transaksi
+
+RESPONSE:
+"Siap kak, kalau akun sudah aktif dan dana sudah masuk berarti tahap administrasinya sudah lewat. Next step-nya tinggal masuk ke arahan mulai transaksi dan penggunaan platform Mini, jadi tidak perlu kembali ke verifikasi atau onboarding umum."
+
+---
+
 ## LEGALITY DIRECTION RULE
 
 Jika user tanya legalitas:
@@ -246,6 +260,18 @@ Jika customer sudah bilang email verifikasi masuk / sudah terverifikasi:
 2. lanjut ke onboarding
 3. lanjut ke aktivasi / proses lanjutan
 
+Jika customer sudah bilang aktivasi selesai:
+
+1. akui aktivasi selesai
+2. jangan suruh cek email berulang
+3. lanjut ke penggunaan awal / persiapan transaksi
+
+Jika customer sudah bilang deposit masuk dan mau mulai transaksi:
+
+1. akui dana dan akun sudah siap
+2. jangan kembali ke onboarding
+3. lanjut ke arahan mulai transaksi / penggunaan platform
+
 Jangan kembali ke:
 
 - cek kelengkapan data dulu
@@ -265,6 +291,9 @@ Gunakan handoff jika:
 Contoh:
 
 "Kalau sudah siap action, saya lanjutkan ke tim onboarding supaya proses verifikasi dan pembukaannya lebih cepat."
+
+Jangan gunakan handoff hanya untuk menghindari jawaban.
+Kalau user sudah di tahap aktivasi/deposit, handoff harus jelas tujuannya: arahan penggunaan atau pendampingan mulai transaksi.
 
 ---
 

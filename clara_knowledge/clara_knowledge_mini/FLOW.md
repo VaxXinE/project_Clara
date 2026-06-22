@@ -31,3 +31,6 @@
 * minta data awal jika siap lanjut
 * cek kelengkapan jika data sudah dikirim
 * handoff ke tim manusia hanya jika perlu verifikasi atau onboarding
+* jika verifikasi sudah selesai, lanjut ke onboarding dan aktivasi
+* jika aktivasi sudah selesai, lanjut ke penggunaan awal dan persiapan transaksi
+* jika dana sudah masuk dan user mau mulai transaksi, jangan kembali ke onboarding; maju ke arahan operasional berikutnya

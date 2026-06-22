@@ -2,6 +2,11 @@
 /sales-command-center/
 /docs/assets/
 /docs/
+/clara_knowledge/AGENTS.md
+/clara-backend/AGENTS.md
+/clara-frontend/AGENTS.md
+/clara-extensions/AGENTS.md
+AGENTS.md
 TEST_CONVERSATIONS_CLARA.md
 MANUAL_TEST_CASES_CLARA.md
 sales-command-center

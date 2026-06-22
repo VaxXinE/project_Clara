@@ -40,6 +40,8 @@ HOT
 * jangan edukasi ulang
 * kasih instruksi konkret
 * arahkan ke data, verifikasi, atau handoff
+* jika user sudah aktivasi, arahkan ke penggunaan awal
+* jika user sudah deposit dan mau mulai transaksi, arahkan ke langkah operasional setelah akun aktif
 
 ---
 

@@ -5,6 +5,24 @@ const DEFAULT_CHAT_SNAPSHOT_PROXY_URL = "http://127.0.0.1:9898/chat-snapshots"
 const DEFAULT_CLARA_API_BASE_URL = "http://127.0.0.1:8000"
 const DEFAULT_CLARA_DASHBOARD_URL = "http://localhost:3000"
 const DEFAULT_AUTH_COOKIE_NAME = "clara_access_token"
+const DEFAULT_DEV_FALLBACK_FLAG = "false"
+
+const isProductionBuild = () => process.env.NODE_ENV === "production"
+
+export const isDevFallbackAllowed = () => {
+  if (isProductionBuild()) {
+    return false
+  }
+
+  return (
+    (
+      process.env.PLASMO_PUBLIC_CLARA_ALLOW_DEV_FALLBACK ||
+      DEFAULT_DEV_FALLBACK_FLAG
+    )
+      .trim()
+      .toLowerCase() === "true"
+  )
+}
 
 const buildClaraApiUrl = (apiBaseUrl: string, routePath: string) => {
   const normalizedBaseUrl = (apiBaseUrl || DEFAULT_CLARA_API_BASE_URL).trim()
@@ -29,7 +47,9 @@ export const getConfiguredClaraApiBaseUrl = () =>
   (process.env.PLASMO_PUBLIC_CLARA_API_BASE_URL || "").trim()
 
 export const getConfiguredClaraApiToken = () =>
-  (process.env.PLASMO_PUBLIC_CLARA_API_TOKEN || "").trim()
+  isDevFallbackAllowed()
+    ? (process.env.PLASMO_PUBLIC_CLARA_API_TOKEN || "").trim()
+    : ""
 
 export const getConfiguredClaraDashboardUrl = () =>
   (
@@ -154,6 +174,10 @@ export const getSnapshotSyncCandidates = () => {
     return getProxyCandidates(claraSnapshotUrl)
   }
 
+  if (!isDevFallbackAllowed()) {
+    return []
+  }
+
   return getProxyCandidates(DEFAULT_CHAT_SNAPSHOT_PROXY_URL)
 }
 
@@ -162,6 +186,10 @@ export const getReplySuggestionCandidates = () => {
 
   if (claraReplySuggestionsUrl) {
     return getProxyCandidates(claraReplySuggestionsUrl)
+  }
+
+  if (!isDevFallbackAllowed()) {
+    return []
   }
 
   return getProxyCandidates(getConfiguredProxyUrl())

@@ -27,8 +27,16 @@ Teknik:
 6. Post-Verification Close
    "Kalau email verifikasinya sudah masuk, berarti tahap itu sudah selesai ya kak. Setelah ini tinggal lanjut ke onboarding dan aktivasi proses Mini."
 
+7. Post-Activation Close
+   "Kalau aktivasi Mini sudah selesai, berarti next step-nya bukan balik ke onboarding lagi ya kak, tapi lanjut ke penggunaan awal dan persiapan mulai transaksinya."
+
+8. Post-Deposit Close
+   "Kalau dana sudah masuk dan akun Mini sudah aktif, next step-nya tinggal masuk ke arahan mulai transaksi, jadi tidak perlu kembali ke tahap administrasi awal."
+
 Larangan:
 
 * jangan muter di "lihat dulu step"
 * jangan tutup dengan edukasi umum saat user sudah HOT
 * jangan handoff tanpa menjelaskan kenapa
+* jangan suruh cek email berulang kalau customer sudah aktivasi atau sudah deposit
+* jangan kembali ke onboarding umum kalau customer sudah bilang mau mulai transaksi

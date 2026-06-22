@@ -55,6 +55,102 @@ MAX_KNOWLEDGE_ENTRIES_FOR_ULTRA_FAST_REPLY = 1
 MAX_KNOWLEDGE_ENTRIES_FOR_FAST_REPLY = 2
 
 
+def _normalize_json_text(raw_text: str) -> str:
+    text = raw_text.strip()
+    if text.startswith("```"):
+        text = re.sub(
+            r"^```(?:json|javascript|typescript)?\s*",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+        text = re.sub(r"\s*```$", "", text, flags=re.MULTILINE)
+    return text.strip()
+
+
+def _extract_json_candidate(raw_text: str) -> str:
+    normalized = _normalize_json_text(raw_text)
+
+    for candidate in (normalized, normalized.strip("\n\t ")):
+        if not candidate:
+            continue
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
+
+    for start_marker, end_marker in (("{", "}"), ("[", "]")):
+        start = normalized.find(start_marker)
+        end = normalized.rfind(end_marker)
+        if start != -1 and end > start:
+            candidate = normalized[start : end + 1]
+            try:
+                json.loads(candidate)
+                return candidate
+            except json.JSONDecodeError:
+                pass
+
+    object_match = re.search(r"(\{.*\})", normalized, flags=re.DOTALL)
+    if object_match:
+        candidate = object_match.group(1)
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
+
+    raise json.JSONDecodeError(
+        "Expecting value",
+        normalized,
+        0,
+    )
+
+
+def _iter_response_text_candidates(response: object):
+    seen = set()
+
+    def add_text(text: str | None):
+        if not isinstance(text, str):
+            return
+        cleaned = text.strip()
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            yield cleaned
+
+    def walk(node: object):
+        if node is None:
+            return
+
+        if isinstance(node, str):
+            yield from add_text(node)
+            return
+
+        if isinstance(node, list):
+            for item in node:
+                yield from walk(item)
+            return
+
+        if isinstance(node, dict):
+            for value in node.values():
+                yield from walk(value)
+            return
+
+        for attr in ("output_text", "text", "content", "output", "parsed"):
+            value = getattr(node, attr, None)
+            if attr == "content" and isinstance(value, list):
+                for item in value:
+                    yield from walk(item)
+            elif attr == "output" and isinstance(value, (list, dict)):
+                yield from walk(value)
+            elif attr in ("output_text", "text"):
+                yield from add_text(value)
+            elif attr == "parsed" and isinstance(value, dict):
+                yield from walk(value)
+
+    yield from walk(response)
+
+
 def _extract_reply_payload_from_response(response: object) -> dict:
     output_parsed = getattr(response, "output_parsed", None)
     if isinstance(output_parsed, dict):
@@ -72,9 +168,12 @@ def _extract_reply_payload_from_response(response: object) -> dict:
                 if isinstance(parsed, dict):
                     return parsed
 
-    output_text = getattr(response, "output_text", None)
-    if isinstance(output_text, str) and output_text.strip():
-        return json.loads(output_text)
+    candidate_texts = list(_iter_response_text_candidates(response))
+    for candidate_text in candidate_texts:
+        try:
+            return json.loads(_extract_json_candidate(candidate_text))
+        except (json.JSONDecodeError, TypeError):
+            continue
 
     raise ReplySuggestionError("OpenAI returned empty structured output.")
 
@@ -298,6 +397,39 @@ VERIFICATION_STATUS_REQUEST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+ACTIVATION_COMPLETE_PATTERN = re.compile(
+    r"\b("
+    r"sudah\s+aktivasi|"
+    r"udah\s+aktivasi|"
+    r"aktivasi(?:\s+\w+){0,3}\s+sudah\s+selesai|"
+    r"aktivasi(?:\s+\w+){0,3}\s+sudah\s+beres|"
+    r"akun(?:\s+\w+){0,3}\s+sudah\s+aktif|"
+    r"sudah\s+aktif(?:kan)?\s+mini|"
+    r"mini(?:\s+\w+){0,3}\s+sudah\s+aktif"
+    r")\b",
+    re.IGNORECASE,
+)
+
+TRADING_READY_PATTERN = re.compile(
+    r"\b("
+    r"sudah\s+deposit|"
+    r"udah\s+deposit|"
+    r"sudah\s+transfer|"
+    r"udah\s+transfer|"
+    r"sudah\s+top\s*up|"
+    r"udah\s+top\s*up|"
+    r"sudah\s+isi\s+dana|"
+    r"udah\s+isi\s+dana|"
+    r"mau\s+mulai\s+transaksi|"
+    r"siap\s+mulai\s+transaksi|"
+    r"mulai\s+transaksi|"
+    r"mulai\s+trading|"
+    r"siap\s+trading|"
+    r"mau\s+trading"
+    r")\b",
+    re.IGNORECASE,
+)
+
 VAGUE_NEXT_STEP_PATTERN = re.compile(
     r"\b("
     r"cek(?:kan)?\s+alurnya\s+dulu|"
@@ -515,6 +647,10 @@ def infer_latest_customer_intent(latest_customer_message: str) -> str:
     if not message:
         return "general"
 
+    if TRADING_READY_PATTERN.search(message):
+        return "trading_ready"
+    if ACTIVATION_COMPLETE_PATTERN.search(message):
+        return "activation_complete"
     if VERIFICATION_COMPLETE_PATTERN.search(message):
         return "verification_complete"
     if VERIFICATION_STATUS_REQUEST_PATTERN.search(message):
@@ -599,6 +735,16 @@ def get_intent_guidance(latest_customer_intent: str) -> str:
             "- Jangan minta ulang nama/HP/domisili.\n"
             "- Lanjutkan ke onboarding, aktivasi, atau handoff ke tim senior secara konkret."
         ),
+        "activation_complete": (
+            "- Customer menyatakan aktivasi sudah selesai atau akun sudah aktif.\n"
+            "- Jangan mundur lagi ke onboarding umum atau sekadar menyuruh cek email berulang.\n"
+            "- Lanjutkan ke arahan penggunaan awal, persiapan transaksi, atau handoff operasional yang konkret."
+        ),
+        "trading_ready": (
+            "- Customer menyatakan sudah deposit/transfer dan ingin mulai transaksi.\n"
+            "- Jangan kembali ke onboarding umum atau pengenalan produk.\n"
+            "- Jawab dengan langkah operasional setelah akun aktif dan dana siap."
+        ),
         "next_step": (
             "- Customer sedang meminta langkah awal / next step.\n"
             "- Jawab dalam urutan langkah konkret, singkat, dan mudah diikuti.\n"
@@ -665,6 +811,14 @@ def get_answer_shape_guidance(latest_customer_intent: str) -> str:
         "timing": (
             "- Pola jawaban: akui bahwa durasi tergantung kelengkapan/proses -> jangan janji angka tanpa dasar -> arahkan ke tim yang pegang verifikasi/onboarding."
         ),
+        "activation_complete": (
+            "- Pola jawaban: akui aktivasi selesai -> arahkan penggunaan awal / persiapan transaksi -> tutup dengan bantuan operasional yang relevan.\n"
+            "- Jangan suruh cek email lagi kalau tidak menambah langkah nyata."
+        ),
+        "trading_ready": (
+            "- Pola jawaban: akui dana dan akun sudah siap -> arahkan ke langkah mulai transaksi -> jangan kembali ke onboarding.\n"
+            "- Customer harus merasa jawabannya maju ke action, bukan stuck di administrasi."
+        ),
         "next_step": (
             "- Pola jawaban: urutkan 2-4 langkah nyata.\n"
             "- Gunakan penanda seperti 'pertama', 'kedua', 'setelah itu'.\n"
@@ -708,6 +862,8 @@ def infer_answer_commitment_level(
         "safety",
         "minimum_capital",
         "timing",
+        "activation_complete",
+        "trading_ready",
         "next_step",
         "identity_submission",
         "setup_scalping",
@@ -1196,6 +1352,22 @@ def build_runtime_rule_brief(
         )
         rules.append(
             "- Setelah customer menyatakan verifikasi selesai, jangan mundur lagi ke 'cek kelengkapan data' atau 'verifikasi data dulu'. Langsung maju ke onboarding, aktivasi, atau proses lanjutan."
+        )
+
+    if latest_customer_intent == "activation_complete":
+        rules.append(
+            "- Customer menyatakan aktivasi akun sudah selesai. Jangan kembali ke onboarding umum atau sekadar menyuruh cek email lagi."
+        )
+        rules.append(
+            "- Langkah berikutnya harus maju ke penggunaan awal, persiapan transaksi, atau arahan operasional sesudah akun aktif."
+        )
+
+    if latest_customer_intent == "trading_ready":
+        rules.append(
+            "- Customer sudah deposit/transfer dan ingin mulai transaksi. Jangan ulang onboarding, verifikasi, atau pengenalan produk."
+        )
+        rules.append(
+            "- Jawaban wajib fokus ke langkah operasional setelah akun aktif dan dana siap, misalnya arahan mulai transaksi, penggunaan platform, atau handoff ke pendamping yang relevan."
         )
 
     if latest_customer_intent == "identity_submission":
@@ -2378,6 +2550,8 @@ def response_is_vague_after_identity_submission(
         "next_step",
         "verification_status",
         "verification_complete",
+        "activation_complete",
+        "trading_ready",
     }:
         return False
 
@@ -2402,7 +2576,61 @@ def response_is_vague_after_identity_submission(
     ):
         return True
 
+    if latest_customer_intent in {"activation_complete", "trading_ready"} and re.search(
+        r"\b(cek\s+email|instruksi\s+lanjutan\s+yang\s+sudah\s+dikirim|onboarding|verifikasi\s+data\s+dulu|cek\s+kelengkapan)\b",
+        normalized,
+        re.I,
+    ):
+        if latest_customer_intent == "trading_ready":
+            return True
+        if re.search(
+            r"\b(mulai\s+transaksi|penggunaan|langkah\s+awal|siap\s+pakai|platform)\b",
+            normalized,
+            re.I,
+        ):
+            return False
+        return True
+
     return not bool(CONCRETE_HANDOFF_OR_ONBOARDING_PATTERN.search(normalized))
+
+
+def response_stays_stuck_in_onboarding_after_milestone(
+    text: str,
+    latest_customer_intent: str,
+) -> bool:
+    if latest_customer_intent not in {"activation_complete", "trading_ready"}:
+        return False
+
+    normalized = _compact_whitespace(text)
+    if not normalized:
+        return True
+
+    repeats_admin_step = bool(
+        re.search(
+            r"\b(cek\s+email|instruksi\s+lanjutan|onboarding|aktivasi|verifikasi)\b",
+            normalized,
+            re.I,
+        )
+    )
+    mentions_operational_next = bool(
+        re.search(
+            r"\b(mulai\s+transaksi|penggunaan|pakai\s+platform|masuk\s+ke\s+platform|step\s+mulai|arahan\s+mulai|persiapan\s+transaksi|entry)\b",
+            normalized,
+            re.I,
+        )
+    )
+    has_concrete_operational_direction = bool(
+        re.search(
+            r"\b(login|masuk\s+aplikasi|masuk\s+platform|download\s+platform|panduan\s+entry|arah\s+entry|bantu\s+step\s+awal\s+transaksi|siapkan\s+rencana\s+transaksi|pilih\s+produk|jam\s+transaksi)\b",
+            normalized,
+            re.I,
+        )
+    )
+
+    if repeats_admin_step and not has_concrete_operational_direction:
+        return True
+
+    return False if mentions_operational_next else repeats_admin_step
 
 
 def response_uses_abstract_data_requirement(
@@ -2752,6 +2980,24 @@ def response_misses_latest_customer_intent(
             )
         )
 
+    if latest_customer_intent == "activation_complete":
+        return not bool(
+            re.search(
+                r"\b(penggunaan|platform|mulai pakai|mulai transaksi|persiapan transaksi|langkah berikutnya|selanjutnya)\b",
+                normalized,
+                re.I,
+            )
+        )
+
+    if latest_customer_intent == "trading_ready":
+        return not bool(
+            re.search(
+                r"\b(mulai transaksi|platform|arah mulai|persiapan transaksi|langkah berikutnya|selanjutnya|penggunaan)\b",
+                normalized,
+                re.I,
+            )
+        )
+
     if latest_customer_intent == "next_step":
         return not bool(
             re.search(
@@ -2816,6 +3062,8 @@ def response_starts_too_generic(
         "minimum_capital": r"\b(minimal|minimum|modal|deposit|rp)\b",
         "verification_status": r"\b(status|verifikasi|onboarding|langkah berikutnya)\b",
         "verification_complete": r"\b(verifikasi|onboarding|aktivasi|selanjutnya|langkah berikutnya)\b",
+        "activation_complete": r"\b(aktivasi|penggunaan|platform|mulai|langkah berikutnya)\b",
+        "trading_ready": r"\b(deposit|transaksi|platform|mulai|langkah berikutnya)\b",
         "next_step": r"\b(pertama|langkah|mulai|setelah itu|berikutnya)\b",
         "setup_scalping": r"\b(entry|setup|arah market|risiko|stop loss|take profit)\b",
         "mechanism": r"\b(sistem|cara kerja|alur|proses)\b",
@@ -3070,6 +3318,10 @@ def call_openai_for_reply_suggestion(
                 customer_has_identity_submission=customer_has_identity_submission,
                 customer_has_verification_completion=customer_has_verification_completion,
             )
+            or response_stays_stuck_in_onboarding_after_milestone(
+                primary_text,
+                latest_customer_intent,
+            )
             or response_breaks_followup_topic(
                 primary_text,
                 latest_customer_message,
@@ -3136,6 +3388,10 @@ def call_openai_for_reply_suggestion(
                 customer_has_variant_commitment=customer_has_variant_commitment,
                 customer_has_identity_submission=customer_has_identity_submission,
                 customer_has_verification_completion=customer_has_verification_completion,
+            )
+            or response_stays_stuck_in_onboarding_after_milestone(
+                primary_text,
+                latest_customer_intent,
             )
             or response_breaks_followup_topic(
                 primary_text,
@@ -3210,6 +3466,10 @@ def call_openai_for_reply_suggestion(
                 customer_has_variant_commitment=customer_has_variant_commitment,
                 customer_has_identity_submission=customer_has_identity_submission,
                 customer_has_verification_completion=customer_has_verification_completion,
+            )
+            or response_stays_stuck_in_onboarding_after_milestone(
+                primary_text,
+                latest_customer_intent,
             )
             or response_breaks_followup_topic(
                 primary_text,

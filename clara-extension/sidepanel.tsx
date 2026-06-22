@@ -20,6 +20,7 @@ import {
   getConfiguredClaraAuthCookieName,
   getConfiguredProxyUrl,
   getCurrentClaraSessionUser,
+  isDevFallbackAllowed,
   getProxyCandidates,
   getSnapshotSyncCandidates
 } from "~/utils/proxy"
@@ -1568,8 +1569,15 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
 
 const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
   let lastFetchError = ""
+  const snapshotCandidates = getSnapshotSyncCandidates()
 
-  for (const proxyUrl of getSnapshotSyncCandidates()) {
+  if (snapshotCandidates.length === 0) {
+    throw new Error(
+      "PLASMO_PUBLIC_CLARA_API_BASE_URL belum diisi. Fallback proxy lokal hanya aktif untuk development bila diizinkan eksplisit."
+    )
+  }
+
+  for (const proxyUrl of snapshotCandidates) {
     try {
       const response = await fetch(proxyUrl, {
         body: JSON.stringify({
@@ -1607,14 +1615,19 @@ const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
   }
 
   throw new Error(
-    `Gagal menghubungi API snapshot di ${CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
+    `Gagal menghubungi API snapshot di ${snapshotCandidates[0] || CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
   )
 }
 
 const clearChatSnapshotInProxy = async () => {
   let lastFetchError = ""
+  const snapshotCandidates = getSnapshotSyncCandidates()
 
-  for (const proxyUrl of getSnapshotSyncCandidates()) {
+  if (snapshotCandidates.length === 0) {
+    return
+  }
+
+  for (const proxyUrl of snapshotCandidates) {
     try {
       const response = await fetch(proxyUrl, {
         body: JSON.stringify({
@@ -1644,7 +1657,7 @@ const clearChatSnapshotInProxy = async () => {
   }
 
   throw new Error(
-    `Gagal menghubungi API snapshot di ${CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
+    `Gagal menghubungi API snapshot di ${snapshotCandidates[0] || CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
   )
 }
 
@@ -1654,6 +1667,11 @@ const fetchSuggestionsFromClaraBackendOnly = async (
   const claraReplySuggestionsUrl = getClaraReplySuggestionsUrl()
 
   if (!claraReplySuggestionsUrl) {
+    if (!isDevFallbackAllowed()) {
+      throw new Error(
+        "Endpoint backend Clara untuk reply suggestion belum dikonfigurasi. Fallback proxy lokal diblokir di mode non-development."
+      )
+    }
     return null
   }
 

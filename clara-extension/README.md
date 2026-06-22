@@ -6,25 +6,27 @@ Target integrasi saat ini:
 - membaca chat aktif di WhatsApp Web
 - mengirim snapshot chat ke backend Clara
 - meminta reply suggestion ke backend Clara
-- tetap bisa memakai proxy lokal sebagai fallback kalau endpoint Clara belum tersedia
+- fallback proxy lokal hanya untuk development dan harus diaktifkan eksplisit
 
 ## Konfigurasi env utama
 
 Mulai dari [`.env.example`](./.env.example) lalu isi minimal:
 
 ```env
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=OPENAI_API_KEY_PLACEHOLDER
 OPENAI_MODEL=gpt-5.4-mini
 PORT=9898
 PLASMO_PUBLIC_OPENAI_PROXY_URL=http://127.0.0.1:9898/reply-suggestions
 PLASMO_PUBLIC_CLARA_API_BASE_URL=http://127.0.0.1:8000
 PLASMO_PUBLIC_CLARA_DASHBOARD_URL=http://localhost:3000
+PLASMO_PUBLIC_CLARA_ALLOW_DEV_FALLBACK=false
 ```
 
 Catatan:
 - `PLASMO_PUBLIC_CLARA_API_BASE_URL` dipakai untuk sync snapshot dan generate reply suggestion via backend Clara
 - `PLASMO_PUBLIC_CLARA_DASHBOARD_URL` dipakai extension untuk membuka halaman login dashboard Clara
-- `PLASMO_PUBLIC_OPENAI_PROXY_URL` sekarang menjadi fallback lokal kalau reply suggestion Clara sedang tidak dipakai atau gagal
+- `PLASMO_PUBLIC_OPENAI_PROXY_URL` hanya dipakai jika fallback development diaktifkan eksplisit
+- `PLASMO_PUBLIC_CLARA_ALLOW_DEV_FALLBACK=true` hanya untuk development lokal, jangan dipakai pada build production
 
 ### Flow login extension
 
@@ -44,13 +46,13 @@ Jadi account extension sekarang otomatis mengikuti account dashboard yang sedang
 Agar user tidak perlu memasukkan OpenAI token di popup extension, project ini sekarang memakai proxy server kecil:
 
 1. Extension membaca chat aktif dari WhatsApp Web.
-2. Extension mengirim snapshot chat ke backend Clara kalau `PLASMO_PUBLIC_CLARA_API_BASE_URL` diisi. Kalau belum, extension fallback ke API lokal `/chat-snapshots`.
+2. Extension mengirim snapshot chat ke backend Clara kalau `PLASMO_PUBLIC_CLARA_API_BASE_URL` diisi.
 3. Extension mencoba memanggil endpoint Clara `/extension/whatsapp/reply-suggestions`.
 4. Backend Clara akan:
    - sync/update conversation mirror dari snapshot chat
    - jalankan AI extraction
    - generate 3 draft reply berbasis product knowledge Clara
-5. Kalau endpoint Clara tidak tersedia, extension fallback ke proxy lokal `/reply-suggestions`.
+5. Hanya saat development dan `PLASMO_PUBLIC_CLARA_ALLOW_DEV_FALLBACK=true`, extension boleh fallback ke proxy lokal `/reply-suggestions`.
 
 OpenAI sendiri menyarankan API key tidak diekspos di kode client-side/browser apps.
 
@@ -59,10 +61,11 @@ OpenAI sendiri menyarankan API key tidak diekspos di kode client-side/browser ap
 1. Buat file `.env` di root project dengan isi seperti ini:
 
 ```env
-OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=OPENAI_API_KEY_PLACEHOLDER
 OPENAI_MODEL=gpt-5.4-mini
 PORT=9898
 PLASMO_PUBLIC_OPENAI_PROXY_URL=http://127.0.0.1:9898/reply-suggestions
+PLASMO_PUBLIC_CLARA_ALLOW_DEV_FALLBACK=true
 ```
 
 Kamu juga bisa mulai dari file [`.env.example`](</d:/Website JS/sg-extension/.env.example>).

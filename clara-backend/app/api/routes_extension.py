@@ -124,11 +124,37 @@ def send_whatsapp_reply_suggestion_endpoint(
             detail=str(exc),
         ) from exc
     except ReplySuggestionError as exc:
+        create_audit_log(
+            db=db,
+            action="extension.whatsapp.reply_suggestion_send_failed",
+            resource_type="reply_suggestion",
+            resource_id=str(reply_suggestion_id),
+            current_user=current_user,
+            request=request,
+            metadata={
+                "reply_suggestion_id": str(reply_suggestion_id),
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
     except Exception as exc:
+        create_audit_log(
+            db=db,
+            action="extension.whatsapp.reply_suggestion_send_failed",
+            resource_type="reply_suggestion",
+            resource_id=str(reply_suggestion_id),
+            current_user=current_user,
+            request=request,
+            metadata={
+                "reply_suggestion_id": str(reply_suggestion_id),
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unexpected extension reply send error.",
@@ -171,16 +197,52 @@ def generate_whatsapp_reply_suggestions_endpoint(
 
         return result
     except ExtensionSnapshotError as exc:
+        create_audit_log(
+            db=db,
+            action="extension.whatsapp.reply_suggestions_generate_failed",
+            resource_type="conversation",
+            resource_id=None,
+            current_user=current_user,
+            request=request,
+            metadata={
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
     except ReplySuggestionError as exc:
+        create_audit_log(
+            db=db,
+            action="extension.whatsapp.reply_suggestions_generate_failed",
+            resource_type="conversation",
+            resource_id=None,
+            current_user=current_user,
+            request=request,
+            metadata={
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
     except Exception as exc:
+        create_audit_log(
+            db=db,
+            action="extension.whatsapp.reply_suggestions_generate_failed",
+            resource_type="conversation",
+            resource_id=None,
+            current_user=current_user,
+            request=request,
+            metadata={
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unexpected extension reply generation error.",

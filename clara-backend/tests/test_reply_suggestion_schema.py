@@ -17,6 +17,7 @@ from app.schemas.ai_extraction_schema import (
 )
 from app.services.clara_playbook_service import get_selected_playbook_filenames
 from app.services.reply_suggestion_service import (
+    _extract_reply_payload_from_response,
     build_grounded_knowledge_context,
     build_prioritized_knowledge_brief,
     format_conversation_for_reply,
@@ -31,6 +32,7 @@ from app.services.reply_suggestion_service import (
     response_defers_answer_with_question,
     response_misses_latest_customer_intent,
     response_is_vague_after_identity_submission,
+    response_stays_stuck_in_onboarding_after_milestone,
     response_opens_with_source_dump,
     response_starts_too_generic,
     response_unnecessarily_mentions_product_variants,
@@ -120,6 +122,47 @@ def test_reply_suggestion_json_schema_can_be_configured_for_single_draft() -> No
     assert schema["properties"]["suggested_replies"]["maxItems"] == 1
 
 
+def test_extract_reply_payload_from_response_handles_fenced_json() -> None:
+    response = SimpleNamespace(
+        output_parsed=None,
+        output=[],
+        output_text=(
+            "```json\n"
+            '{"suggested_replies":[{"tone":"friendly","text":"Halo kak","reasoning":"Menjawab langsung."}]}\n'
+            "```"
+        ),
+    )
+
+    payload = _extract_reply_payload_from_response(response)
+
+    assert payload["suggested_replies"][0]["text"] == "Halo kak"
+
+
+def test_extract_reply_payload_from_response_falls_back_to_nested_content_text() -> None:
+    response = SimpleNamespace(
+        output_parsed=None,
+        output=[
+            SimpleNamespace(
+                content=[
+                    SimpleNamespace(
+                        type="output_text",
+                        text=(
+                            "```json\n"
+                            '{"suggested_replies":[{"tone":"friendly","text":"Halo kak","reasoning":"Menjawab langsung."}]}\n'
+                            "```"
+                        ),
+                    )
+                ]
+            )
+        ],
+        output_text="",
+    )
+
+    payload = _extract_reply_payload_from_response(response)
+
+    assert payload["suggested_replies"][0]["text"] == "Halo kak"
+
+
 def test_infer_latest_customer_intent_detects_product_options() -> None:
     assert (
         infer_latest_customer_intent("Solid ini ada produk apa aja kak?")
@@ -166,6 +209,24 @@ def test_infer_latest_customer_intent_detects_verification_status() -> None:
     assert (
         infer_latest_customer_intent("Apakah sudah kak untuk verifikasinya?")
         == "verification_status"
+    )
+
+
+def test_infer_latest_customer_intent_detects_activation_complete() -> None:
+    assert (
+        infer_latest_customer_intent(
+            "Oke kak saya sudah aktivasi mini, langkah selanjutnya apa?"
+        )
+        == "activation_complete"
+    )
+
+
+def test_infer_latest_customer_intent_detects_trading_ready_after_deposit() -> None:
+    assert (
+        infer_latest_customer_intent(
+            "Saya sudah deposit 10 juta ya kak, dan saya mau mulai transaksi"
+        )
+        == "trading_ready"
     )
 
 
@@ -277,6 +338,30 @@ def test_response_is_vague_after_verification_complete_flags_backward_verificati
         customer_has_variant_commitment=True,
         customer_has_identity_submission=True,
         customer_has_verification_completion=True,
+    )
+
+
+def test_response_is_vague_after_activation_complete_flags_email_loop() -> None:
+    assert response_is_vague_after_identity_submission(
+        "Siap kak, setelah aktivasi silakan cek email atau instruksi lanjutan yang sudah dikirim dulu ya.",
+        latest_customer_intent="activation_complete",
+        customer_has_variant_commitment=True,
+        customer_has_identity_submission=True,
+        customer_has_verification_completion=True,
+    )
+
+
+def test_response_stays_stuck_in_onboarding_after_trading_ready_flags_wrong_direction() -> None:
+    assert response_stays_stuck_in_onboarding_after_milestone(
+        "Siap kak, untuk mulai transaksi next step-nya ikuti onboarding dan cek email lanjutan dulu ya.",
+        "trading_ready",
+    )
+
+
+def test_response_stays_stuck_in_onboarding_after_trading_ready_accepts_operational_step() -> None:
+    assert not response_stays_stuck_in_onboarding_after_milestone(
+        "Siap kak, kalau akun aktif dan dana sudah masuk berarti next step-nya masuk ke arahan penggunaan platform dan persiapan mulai transaksi pertamanya.",
+        "trading_ready",
     )
 
 
