@@ -28,6 +28,7 @@ from app.schemas.ai_extraction_schema import (
 from app.services.ai_extraction_service import format_conversation_for_ai
 from app.services.business_segmentation_service import normalize_account_category
 from app.services.clara_playbook_service import load_clara_response_playbook
+from app.services.official_source_service import get_official_source_entries
 from app.services.policy_engine import decide_reply_action
 from app.services.product_knowledge_service import (
     get_active_product_knowledge_for_organization,
@@ -1446,6 +1447,30 @@ def _score_knowledge_entry(
     if include_all_variants and _classify_product_variant(category, title, content):
         score += 4
 
+    if source_type == "official_source_bappebti":
+        score += 8
+        if latest_customer_intent in {"legality", "safety"}:
+            score += 20
+
+    if source_type == "official_source_sg":
+        score += 6
+        if latest_customer_intent in {
+            "mechanism",
+            "next_step",
+            "minimum_capital",
+            "product_options",
+            "timing",
+            "safety",
+        }:
+            score += 16
+
+    if re.search(
+        r"\b(spread|spa|jfx|live quote|karakteristik produk|registrasi|penarikan|withdraw)\b",
+        latest_customer_message,
+        re.IGNORECASE,
+    ) and source_type == "official_source_sg":
+        score += 24
+
     return score
 
 
@@ -1950,8 +1975,10 @@ def build_grounded_knowledge_context(
         account_category=account_category,
         include_all_variants=include_all_variants,
     )
+    official_entries = get_official_source_entries()
+    combined_entries = [*entries, *official_entries]
 
-    if not entries:
+    if not combined_entries:
         fallback = (
             "- Tidak ada knowledge base produk yang tersimpan.\n"
             "- Untuk detail harga, promo, legalitas, refund, garansi, atau klaim hasil:"
@@ -1962,7 +1989,7 @@ def build_grounded_knowledge_context(
 
     serialized_entries = tuple(
         _serialize_knowledge_entry(entry)
-        for entry in entries
+        for entry in combined_entries
     )
 
     return _build_cached_grounded_knowledge_context(

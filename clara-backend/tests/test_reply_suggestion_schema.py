@@ -17,6 +17,7 @@ from app.schemas.ai_extraction_schema import (
 )
 from app.services.clara_playbook_service import get_selected_playbook_filenames
 from app.services.reply_suggestion_service import (
+    build_grounded_knowledge_context,
     build_prioritized_knowledge_brief,
     format_conversation_for_reply,
     get_reply_suggestion_json_schema,
@@ -33,6 +34,11 @@ from app.services.reply_suggestion_service import (
     response_starts_too_generic,
     response_unnecessarily_mentions_product_variants,
     response_uses_vague_legality_deflection,
+)
+from app.services.official_source_service import (
+    OFFICIAL_BAPPEBTI_URL,
+    OFFICIAL_SOLID_URL,
+    get_official_source_entries,
 )
 
 
@@ -238,6 +244,60 @@ def test_response_is_vague_after_verification_complete_accepts_onboarding_handof
         customer_has_identity_submission=True,
         customer_has_verification_completion=True,
     )
+
+
+def test_official_source_entries_include_bappebti_and_solid_urls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.official_source_service.fetch_official_source_text",
+        lambda url: "",
+    )
+    entries = get_official_source_entries()
+
+    contents = " ".join(entry.content for entry in entries)
+    source_types = {entry.source_type for entry in entries}
+
+    assert OFFICIAL_BAPPEBTI_URL in contents
+    assert OFFICIAL_SOLID_URL in contents
+    assert "official_source_bappebti" in source_types
+    assert "official_source_sg" in source_types
+
+
+def test_build_grounded_knowledge_context_includes_official_legality_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.reply_suggestion_service.get_active_product_knowledge_for_organization",
+        lambda **_: [],
+    )
+    monkeypatch.setattr(
+        "app.services.official_source_service.fetch_official_source_text",
+        lambda url: "",
+    )
+
+    conversation = SimpleNamespace(
+        organization_id=None,
+        lead=SimpleNamespace(account_category="mini"),
+        messages=[
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Kak ini legalitasnya gimana?",
+            )
+        ],
+    )
+
+    grounded_knowledge, prioritized_brief = build_grounded_knowledge_context(
+        conversation=conversation,
+        db=None,
+        latest_customer_message="Kak ini legalitasnya gimana?",
+        latest_customer_intent="legality",
+        desired_count=1,
+    )
+
+    assert OFFICIAL_BAPPEBTI_URL in grounded_knowledge
+    assert "official_legality_source" in grounded_knowledge
+    assert "BAPPEBTI" in prioritized_brief
 
 
 def test_response_misses_latest_customer_intent_accepts_timing_answer() -> None:
