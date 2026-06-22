@@ -11,6 +11,7 @@ from app.core.security import require_roles
 from app.models.user import User
 from app.services.access_control_service import apply_sales_user_scope_filter
 from app.services.conversation_lifecycle_service import is_conversation_auto_archived
+from app.services.dashboard_service import dedupe_timeline_messages
 from app.services.role_service import is_superadmin_like
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
@@ -81,6 +82,6 @@ def get_conversation(
             detail="Conversation not found.",
         )
 
-    conversation.messages.sort(key=lambda message: message.message_timestamp)
+    conversation.messages = dedupe_timeline_messages(conversation.messages)
 
     return conversation

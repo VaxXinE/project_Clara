@@ -193,8 +193,6 @@ def ensure_conversation_lead(
             )
             if preferred_reusable_lead is not None:
                 conversation.lead_id = preferred_reusable_lead.id
-                db.add(conversation)
-                db.flush()
                 create_lead_activity_event(
                     db=db,
                     lead=preferred_reusable_lead,
@@ -226,8 +224,6 @@ def ensure_conversation_lead(
     db.flush()
 
     conversation.lead_id = lead.id
-    db.add(conversation)
-    db.flush()
     create_lead_activity_event(
         db=db,
         lead=lead,

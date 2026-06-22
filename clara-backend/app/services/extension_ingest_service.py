@@ -55,6 +55,9 @@ class NormalizedSnapshotMessage:
     timestamp_label: str
 
 
+SYNTHETIC_SALES_MATCH_WINDOW = timedelta(minutes=10)
+
+
 def build_snapshot_signature(
     chat_title: str,
     chat_subtitle: str,
@@ -169,6 +172,13 @@ def normalize_snapshot_messages(
     return normalized_messages
 
 
+def ensure_aware_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
+
+
 def get_existing_extension_conversation(
     db: Session,
     *,
@@ -272,6 +282,12 @@ def sync_extension_messages(
         existing_message = existing_by_external_id.get(external_message_id)
 
         if existing_message is None:
+            existing_message = find_matching_synthetic_sales_message(
+                existing_messages=existing_messages,
+                incoming_message=message,
+            )
+
+        if existing_message is None:
             existing_message = Message(
                 conversation_id=conversation.id,
                 external_message_id=external_message_id,
@@ -282,12 +298,69 @@ def sync_extension_messages(
             )
             db.add(existing_message)
             db.flush()
+            existing_messages.append(existing_message)
         else:
+            existing_message.external_message_id = external_message_id
             existing_message.sender_name = message.author
             existing_message.sender_type = message.sender_type
             existing_message.message_text = message.text
             existing_message.message_timestamp = message.timestamp
             db.add(existing_message)
+
+        existing_by_external_id[external_message_id] = existing_message
+
+
+def find_matching_synthetic_sales_message(
+    *,
+    existing_messages: list[Message],
+    incoming_message: NormalizedSnapshotMessage,
+) -> Message | None:
+    if incoming_message.sender_type != "sales":
+        return None
+
+    normalized_text = incoming_message.text.strip()
+    if not normalized_text:
+        return None
+
+    incoming_timestamp = ensure_aware_utc(incoming_message.timestamp)
+
+    exact_text_candidates = [
+        message
+        for message in existing_messages
+        if message.external_message_id is None
+        and message.sender_type == "sales"
+        and message.message_text.strip() == normalized_text
+    ]
+
+    candidates = [
+        message
+        for message in exact_text_candidates
+        if message.message_timestamp is not None
+        and abs(ensure_aware_utc(message.message_timestamp) - incoming_timestamp)
+        <= SYNTHETIC_SALES_MATCH_WINDOW
+    ]
+
+    if not candidates:
+        recent_fallback_candidates = [
+            message
+            for message in exact_text_candidates
+            if abs(
+                ensure_aware_utc(message.created_at) - datetime.now(timezone.utc)
+            )
+            <= SYNTHETIC_SALES_MATCH_WINDOW
+        ]
+
+        if len(recent_fallback_candidates) == 1:
+            return recent_fallback_candidates[0]
+
+        return None
+
+    return min(
+        candidates,
+        key=lambda message: abs(
+            ensure_aware_utc(message.message_timestamp) - incoming_timestamp
+        ),
+    )
 
 def is_extension_cache_fresh(
     *,
@@ -389,14 +462,20 @@ def sync_whatsapp_extension_snapshot(
         normalized_messages=normalized_messages,
     )
 
+    db.commit()
+    db.refresh(conversation)
+
     customer_messages = [
         message for message in normalized_messages if message.sender_type == "customer"
     ]
-    ensure_conversation_lead(
-        db=db,
-        conversation=conversation,
-        preferred_name=customer_messages[0].author if customer_messages else snapshot.chat_title,
-    )
+    with db.no_autoflush:
+        ensure_conversation_lead(
+            db=db,
+            conversation=conversation,
+            preferred_name=(
+                customer_messages[0].author if customer_messages else snapshot.chat_title
+            ),
+        )
 
     db.commit()
     db.refresh(conversation)
@@ -439,10 +518,10 @@ def build_extension_reply_suggestions_response(
         message_count=snapshot_result.message_count,
         suggestions=[item.text for item in suggestion_details[:1]],
         suggestion_details=suggestion_details[:1],
-        risk_level=None,
-        action_mode=None,
-        next_best_action=None,
-        customer_summary=None,
+        risk_level=suggestion.risk_level or extraction.risk_level,
+        action_mode=suggestion.action_mode,
+        next_best_action=extraction.next_best_action,
+        customer_summary=extraction.customer_summary,
     )
 
 
@@ -602,6 +681,12 @@ def confirm_extension_reply_sent(
 
     db.add(sent_message)
     db.flush()
+    latest_known_message_at = ensure_aware_utc(conversation.last_message_at)
+    synthetic_message_timestamp = (
+        latest_known_message_at + timedelta(seconds=1)
+        if latest_known_message_at is not None
+        else sent_message.sent_at
+    )
     conversation.last_message_at = sent_message.sent_at
     db.add(
         Message(
@@ -610,7 +695,7 @@ def confirm_extension_reply_sent(
             sender_type="sales",
             external_message_id=None,
             message_text=suggestion.final_reply_text,
-            message_timestamp=sent_message.sent_at,
+            message_timestamp=synthetic_message_timestamp,
         )
     )
     db.add(conversation)

@@ -291,7 +291,7 @@ def sync_customer_profile_temperature(
         profile.temperature = next_temperature
         profile.temperature_source = source
         db.add(profile)
-        db.flush()
+        db.flush([profile])
     return profile
 
 
@@ -436,7 +436,7 @@ def ensure_customer_profile_for_lead(
             last_contact_at=lead.last_contact_at,
         )
         db.add(existing_profile)
-        db.flush()
+        db.flush([existing_profile])
     else:
         existing_profile.assigned_user_id = lead.assigned_user_id
         lead_last_contact = ensure_aware_utc(lead.last_contact_at)
@@ -458,11 +458,11 @@ def ensure_customer_profile_for_lead(
         existing_profile.identity_confidence = max(existing_profile.identity_confidence, identity_confidence)
         existing_profile.match_strategy = match_strategy
         db.add(existing_profile)
-        db.flush()
+        db.flush([existing_profile])
 
     lead.customer_profile_id = existing_profile.id
     db.add(lead)
-    db.flush()
+    db.flush([lead])
     sync_customer_profile_temperature(db=db, profile=existing_profile)
     return existing_profile
 

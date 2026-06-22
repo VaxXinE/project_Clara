@@ -492,10 +492,12 @@ def test_extension_reply_suggestions_endpoint_generates_clara_suggestions(
     assert payload["next_best_action"] == (
         "Berikan penjelasan legalitas dan dokumen pendukung resmi."
     )
-    assert len(payload["suggestions"]) == 3
+    assert len(payload["suggestions"]) == 1
     assert payload["suggestions"][0] == (
         "Siap kak, saya jelaskan legalitasnya pelan-pelan ya."
     )
+    assert len(payload["suggestion_details"]) == 1
+    assert payload["suggestion_details"][0]["tone"] == "friendly"
 
     db = db_session_factory()
     conversation_id = UUID(payload["conversation_id"])
@@ -776,23 +778,128 @@ def test_extension_reply_suggestions_endpoint_uses_cache_for_duplicate_snapshot(
     assert extraction_calls["count"] == 1
     assert reply_calls["count"] == 1
 
+
+def test_extension_snapshot_sync_reuses_synthetic_sales_message_after_send(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+
+    monkeypatch.setattr(
+        "app.services.ai_extraction_service.call_openai_for_extraction",
+        lambda _conversation_text: AIExtractionCreate(
+            lead_temperature="warm",
+            pipeline_stage="objection",
+            buying_intent="medium",
+            sentiment="cautious",
+            risk_level="medium",
+            main_objections=["legalitas"],
+            budget_signal={
+                "detected": False,
+                "amount_text": None,
+                "notes": "Belum ada sinyal budget spesifik.",
+            },
+            recommended_reply_strategy={
+                "tone": "professional",
+                "key_points": ["jelaskan legalitas"],
+                "avoid_topics": ["janji hasil"],
+            },
+            customer_summary="Customer bertanya soal legalitas.",
+            next_best_action="Jawab legalitas dan lanjutkan arahan.",
+            content_insight="Customer butuh kepastian legalitas.",
+            internal_notes="Aman untuk follow-up singkat.",
+            confidence_score=0.91,
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.reply_suggestion_service.call_openai_for_reply_suggestion",
+        lambda **_kwargs: ReplySuggestionCreate(
+            suggested_replies=[
+                {
+                    "tone": "best",
+                    "text": "Iya kak, legal dan diawasi BAPPEBTI.",
+                    "reasoning": "Jawaban singkat langsung ke inti.",
+                }
+            ]
+        ),
+    )
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    initial_payload = {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:00:00.000Z",
+            "chatTitle": "Leoni Customer",
+            "chatSubtitle": "online",
+            "messages": [
+                {
+                    "id": "09.00-0",
+                    "author": "Leoni",
+                    "direction": "incoming",
+                    "text": "Ini legal tidak ya kak?",
+                    "timestampLabel": "09.00",
+                }
+            ],
+        }
+    }
+
+    suggestion_response = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json=initial_payload,
+        headers=csrf_headers(client),
+    )
+    assert suggestion_response.status_code == 201, suggestion_response.text
+    suggestion_payload = suggestion_response.json()
+
+    send_response = client.post(
+        f"/extension/whatsapp/reply-suggestions/{suggestion_payload['reply_suggestion_id']}/send",
+        json={
+            "selectedReplyText": "Iya kak, legal dan diawasi BAPPEBTI.",
+            "finalReplyText": "Iya kak, legal dan diawasi BAPPEBTI.",
+            "sentByName": "Marketing Alpha",
+        },
+        headers=csrf_headers(client),
+    )
+    assert send_response.status_code == 201, send_response.text
+
+    updated_snapshot = {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:01:00.000Z",
+            "chatTitle": "Leoni Customer",
+            "chatSubtitle": "online",
+            "messages": [
+                *initial_payload["chatData"]["messages"],
+                {
+                    "id": "09.01-1",
+                    "author": "Arya",
+                    "direction": "outgoing",
+                    "text": "Iya kak, legal dan diawasi BAPPEBTI.",
+                    "timestampLabel": "09.01",
+                },
+            ],
+        }
+    }
+
+    sync_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=updated_snapshot,
+        headers=csrf_headers(client),
+    )
+    assert sync_response.status_code == 201, sync_response.text
+
     db = db_session_factory()
-    conversation_id = UUID(second_payload["conversation_id"])
-    extraction_count = len(
-        list(
-            db.scalars(
-                select(AIExtraction).where(AIExtraction.conversation_id == conversation_id)
-            ).all()
-        )
+    conversation_id = UUID(suggestion_payload["conversation_id"])
+    timeline_messages = list(
+        db.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.message_timestamp.asc(), Message.created_at.asc())
+        ).all()
     )
-    suggestion_count = len(
-        list(
-            db.scalars(
-                select(ReplySuggestion).where(
-                    ReplySuggestion.conversation_id == conversation_id
-                )
-            ).all()
-        )
-    )
-    assert extraction_count == 1
-    assert suggestion_count == 1
+    assert len(timeline_messages) == 2
+    assert timeline_messages[0].sender_type == "customer"
+    assert timeline_messages[1].sender_type == "sales"
+    assert timeline_messages[1].message_text == "Iya kak, legal dan diawasi BAPPEBTI."
+    assert timeline_messages[1].external_message_id is not None
