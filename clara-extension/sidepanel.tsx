@@ -1471,6 +1471,33 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     )
   }
 
+  const splitReplyAwareMessageText = (candidates: string[]) => {
+    if (candidates.length === 0) {
+      return ""
+    }
+
+    if (candidates.length > 1) {
+      return candidates[candidates.length - 1]
+    }
+
+    const singleCandidate = candidates[0]
+    const lines = singleCandidate
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    if (lines.length >= 2) {
+      const replyContext = lines.slice(0, -1).join(" ").trim()
+      const bodyText = lines[lines.length - 1]?.trim() || ""
+
+      if (replyContext.length >= 18 && bodyText) {
+        return bodyText
+      }
+    }
+
+    return singleCandidate
+  }
+
   const getMessageText = (container: HTMLElement) => {
     const primaryCandidates = getPreferredMessageTexts(
       Array.from(
@@ -1488,7 +1515,7 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
       primaryCandidates.length > 0 ? primaryCandidates : fallbackCandidates
 
     if (candidates.length > 0) {
-      return candidates[0]
+      return splitReplyAwareMessageText(candidates)
     }
 
     const mediaLabel = container

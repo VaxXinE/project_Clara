@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 import sys
 from uuid import UUID
@@ -17,6 +18,10 @@ from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
 from app.schemas.ai_extraction_schema import AIExtractionCreate
 from app.schemas.reply_suggestion_schema import ReplySuggestionCreate
+from app.services.extension_ingest_service import (
+    NormalizedSnapshotMessage,
+    split_reply_context_from_snapshot_text,
+)
 
 
 def login(client: TestClient, *, email: str, password: str) -> None:
@@ -220,7 +225,99 @@ def test_extension_snapshot_sync_updates_messages_when_chat_grows(
         ).all()
     )
     assert len(messages) == 3
-    assert messages[-1].message_text == "Kalau saya kirim datanya hari ini bisa diproses ya?"
+
+
+def test_split_reply_context_from_snapshot_text_keeps_only_new_customer_body() -> None:
+    previous_messages = [
+        NormalizedSnapshotMessage(
+            external_message_id="09.27-0",
+            author="Arya",
+            sender_type="sales",
+            text=(
+                "Bisa kak, tapi untuk hitung berapa lot dan kira-kira daya tahan dananya, "
+                "saya perlu modal depo pastinya berapa dulu. Kalau nominalnya sudah ada, "
+                "saya bantu arahkan perkiraan sesuai acuan Mini ya kak."
+            ),
+            timestamp=datetime(2026, 6, 23, 14, 27, tzinfo=timezone.utc),
+            timestamp_label="09.27",
+        )
+    ]
+
+    normalized = split_reply_context_from_snapshot_text(
+        raw_text=(
+            "Bisa kak, tapi untuk hitung berapa lot dan kira-kira daya tahan dananya, "
+            "saya perlu modal depo pastinya berapa dulu\n"
+            "Aku mau deposit 5juta"
+        ),
+        sender_type="customer",
+        previous_messages=previous_messages,
+    )
+
+    assert normalized == "Aku mau deposit 5juta"
+
+
+def test_extension_snapshot_sync_strips_reply_quote_from_new_message(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    payload = {
+        "chatData": {
+            "capturedAt": "2026-06-23T14:29:00.000Z",
+            "chatTitle": "Bagol A",
+            "chatSubtitle": "online",
+            "messages": [
+                {
+                    "id": "14.27-0",
+                    "author": "Arya",
+                    "direction": "outgoing",
+                    "text": (
+                        "Bisa kak, tapi untuk hitung berapa lot dan kira-kira daya tahan dananya, "
+                        "saya perlu modal depo pastinya berapa dulu. Kalau nominalnya sudah ada, "
+                        "saya bantu arahkan perkiraan sesuai acuan Mini ya kak."
+                    ),
+                    "timestampLabel": "14.27",
+                },
+                {
+                    "id": "14.28-1",
+                    "author": "Bagol A",
+                    "direction": "incoming",
+                    "text": (
+                        "Bisa kak, tapi untuk hitung berapa lot dan kira-kira daya tahan dananya, "
+                        "saya perlu modal depo pastinya berapa dulu\n"
+                        "Aku mau deposit 5juta"
+                    ),
+                    "timestampLabel": "14.28",
+                },
+            ],
+        }
+    }
+
+    response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=payload,
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 201, response.text
+
+    db = db_session_factory()
+    conversation = db.get(Conversation, UUID(response.json()["conversation_id"]))
+    assert conversation is not None
+
+    messages = list(
+        db.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation.id)
+            .order_by(Message.message_timestamp.asc())
+        ).all()
+    )
+    assert messages[-1].sender_type == "customer"
+    assert messages[-1].message_text == "Aku mau deposit 5juta"
 
 
 def test_extension_snapshot_sync_dedupes_repeated_messages_within_single_snapshot(

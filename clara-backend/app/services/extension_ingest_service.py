@@ -56,6 +56,7 @@ class NormalizedSnapshotMessage:
 
 
 SYNTHETIC_SALES_MATCH_WINDOW = timedelta(minutes=10)
+REPLY_CONTEXT_MIN_LENGTH = 18
 
 
 def build_snapshot_signature(
@@ -158,12 +159,18 @@ def normalize_snapshot_messages(
         )
         previous_timestamp = timestamp
 
+        cleaned_text = split_reply_context_from_snapshot_text(
+            raw_text=message.text,
+            sender_type="sales" if message.direction == "outgoing" else "customer",
+            previous_messages=normalized_messages,
+        )
+
         normalized_messages.append(
             NormalizedSnapshotMessage(
                 external_message_id=message.id.strip(),
                 author=message.author.strip(),
                 sender_type="sales" if message.direction == "outgoing" else "customer",
-                text=message.text.strip(),
+                text=cleaned_text,
                 timestamp=timestamp,
                 timestamp_label=message.timestamp_label.strip(),
             )
@@ -192,6 +199,94 @@ def dedupe_normalized_snapshot_messages(
         deduped.append(message)
 
     return deduped
+
+
+def normalize_extension_message_text(value: str) -> str:
+    return "\n".join(
+        line.strip()
+        for line in (value or "").splitlines()
+        if line.strip()
+    ).strip()
+
+
+def _normalize_extension_similarity_text(value: str) -> str:
+    normalized = normalize_extension_message_text(value).lower()
+    normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _reply_excerpt_matches_previous_message(
+    excerpt: str,
+    previous_message_text: str,
+) -> bool:
+    normalized_excerpt = _normalize_extension_similarity_text(excerpt)
+    normalized_previous = _normalize_extension_similarity_text(previous_message_text)
+
+    if (
+        not normalized_excerpt
+        or not normalized_previous
+        or len(normalized_excerpt) < REPLY_CONTEXT_MIN_LENGTH
+    ):
+        return False
+
+    if normalized_excerpt in normalized_previous:
+        return True
+
+    excerpt_tokens = [
+        token for token in normalized_excerpt.split() if len(token) >= 4
+    ]
+    previous_tokens = {
+        token for token in normalized_previous.split() if len(token) >= 4
+    }
+
+    if not excerpt_tokens or not previous_tokens:
+        return False
+
+    overlap = sum(1 for token in excerpt_tokens if token in previous_tokens)
+    return overlap >= max(3, len(excerpt_tokens) // 2)
+
+
+def split_reply_context_from_snapshot_text(
+    *,
+    raw_text: str,
+    sender_type: str,
+    previous_messages: list[NormalizedSnapshotMessage],
+) -> str:
+    normalized_text = normalize_extension_message_text(raw_text)
+    if not normalized_text:
+        return ""
+
+    lines = [line.strip() for line in normalized_text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return normalized_text
+
+    relevant_previous_messages = [
+        message
+        for message in previous_messages[-6:]
+        if message.text.strip()
+        and message.sender_type != sender_type
+    ]
+    if not relevant_previous_messages:
+        return normalized_text
+
+    for split_index in range(1, len(lines)):
+        reply_context = "\n".join(lines[:split_index]).strip()
+        body_text = "\n".join(lines[split_index:]).strip()
+
+        if not reply_context or not body_text:
+            continue
+
+        if len(reply_context) < REPLY_CONTEXT_MIN_LENGTH:
+            continue
+
+        if any(
+            _reply_excerpt_matches_previous_message(reply_context, previous.text)
+            for previous in relevant_previous_messages
+        ):
+            return body_text
+
+    return normalized_text
 
 
 def ensure_aware_utc(value: datetime) -> datetime:
