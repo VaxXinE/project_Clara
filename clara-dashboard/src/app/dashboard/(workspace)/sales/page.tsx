@@ -244,6 +244,7 @@ export default function SalesInboxPage() {
     currentUser !== null && currentUser.role === "superadmin";
   const canAccessAdminOps =
     currentUser !== null && currentUser.role === "superadmin";
+  const isSalesWorkspace = currentUser?.role === "sales";
 
   const analyzedCount = inboxItems.filter(
     (item) => item.latest_ai_extraction !== null,
@@ -377,12 +378,12 @@ export default function SalesInboxPage() {
       currentUser={currentUser}
       eyebrow="Operational inbox"
       title="Chat Masuk"
-      description="Semua percakapan penting dikumpulkan di satu tempat. User tidak perlu menebak mana yang harus dibalas dulu karena Clara sudah menyorot prioritas, risiko, dan langkah berikutnya."
+      description="Tempat paling cepat untuk lihat chat yang harus dibaca, dianalisis, lalu dibalas."
       backHref="/dashboard"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
         <>
-          {canAccessMarketing && (
+          {canAccessMarketing && !isSalesWorkspace && (
             <Link
               href="/dashboard/marketing"
               className="clara-button clara-button-ghost"
@@ -394,21 +395,23 @@ export default function SalesInboxPage() {
             href="/dashboard/crm"
             className="clara-button clara-button-ghost"
           >
-            Lead Management
+            Leads
           </Link>
           <Link
             href="/dashboard/follow-up"
             className="clara-button clara-button-ghost"
           >
-            Action Center
+            Tindak Lanjut
           </Link>
-          <Link
-            href="/dashboard/approvals"
-            className="clara-button clara-button-ghost"
-          >
-            Chat Review Center
-          </Link>
-          {canAccessKnowledge && (
+          {!isSalesWorkspace && (
+            <Link
+              href="/dashboard/approvals"
+              className="clara-button clara-button-ghost"
+            >
+              Chat Review Center
+            </Link>
+          )}
+          {canAccessKnowledge && !isSalesWorkspace && (
             <Link
               href="/dashboard/knowledge"
               className="clara-button clara-button-ghost"
@@ -433,17 +436,19 @@ export default function SalesInboxPage() {
             href="/dashboard/upload"
             className="clara-button clara-button-primary"
           >
-            Lead Capture
+            Input Chat
           </Link>
-          <button
-            type="button"
-            onClick={() => {
-              void handleLogout();
-            }}
-            className="clara-button clara-button-ghost"
-          >
-            Logout
-          </button>
+          {!isSalesWorkspace && (
+            <button
+              type="button"
+              onClick={() => {
+                void handleLogout();
+              }}
+              className="clara-button clara-button-ghost"
+            >
+              Logout
+            </button>
+          )}
         </>
       }
     >
@@ -466,21 +471,44 @@ export default function SalesInboxPage() {
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <section className="clara-card rounded-[30px] p-6">
+              <p className="clara-kicker text-xs">Ringkasan cepat</p>
+              <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-3xl">
+                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                    Mulai dari chat yang paling butuh respons
+                  </h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    {highRiskCount > 0
+                      ? `Ada ${highRiskCount} chat risiko tinggi yang sebaiknya dicek lebih dulu. Setelah itu lanjut ke chat yang belum dianalisis atau belum punya draft.`
+                      : analyzedCount < inboxItems.length
+                        ? `Masih ada ${inboxItems.length - analyzedCount} chat yang belum selesai dibaca AI. Jalankan analisis dulu supaya balasan tidak dimulai dari nol.`
+                        : `Mayoritas chat sudah siap diproses. Lanjutkan ke conversation yang belum dibalas atau yang masih menunggu follow-up.`}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    href="/dashboard/follow-up"
+                    className="clara-button clara-button-ghost justify-center"
+                  >
+                    Buka Tindak Lanjut
+                  </Link>
+                  <Link
+                    href="/dashboard/upload"
+                    className="clara-button clara-button-primary justify-center"
+                  >
+                    Input Chat
+                  </Link>
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-3">
               <OverviewTile
-                label="Total Percakapan"
-                value={String(inboxItems.length)}
-                tone="slate"
-              />
-              <OverviewTile
-                label="Sudah Dianalisis"
-                value={String(analyzedCount)}
+                label="Perlu Analisis"
+                value={String(inboxItems.length - analyzedCount)}
                 tone="blue"
-              />
-              <OverviewTile
-                label="Sudah Terkirim"
-                value={String(sentCount)}
-                tone="green"
               />
               <OverviewTile
                 label="Risiko Tinggi"
@@ -488,156 +516,84 @@ export default function SalesInboxPage() {
                 tone="amber"
               />
               <OverviewTile
-                label="Archived"
-                value={String(archivedCount)}
-                tone="slate"
+                label="Menunggu Customer"
+                value={String(sentCount)}
+                tone="green"
               />
             </section>
 
-            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
-              <div className="space-y-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-4 backdrop-blur-sm">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="max-w-2xl">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                      Kontrol Queue
-                    </p>
-                    <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
-                      Atur queue kerja dari satu toolbar
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-[#e3c990]">
-                      Atur scope conversation, channel, pencarian, dan bucket
-                      kerja dari satu tempat supaya scanning queue lebih cepat.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <QueueMetaPill
-                      label="Scope"
-                      value={
-                        archiveScope === "active"
-                          ? "Aktif"
-                          : archiveScope === "archived"
-                            ? "Archived"
-                            : "Semua"
-                      }
-                    />
-                    <QueueMetaPill
-                      label="Channel"
-                      value={
-                        SOURCE_CHANNEL_OPTIONS.find(
-                          (option) => option.value === sourceChannelFilter,
-                        )?.label ?? "Semua Channel"
-                      }
-                    />
-                    <QueueMetaPill
-                      label="Bucket"
-                      value={
-                        QUEUE_BUCKET_OPTIONS.find(
-                          (option) => option.value === queueBucketFilter,
-                        )?.label ?? "Semua queue"
-                      }
-                    />
-                  </div>
+            <section className="clara-card rounded-[30px] p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="max-w-2xl">
+                  <p className="clara-kicker text-xs">Filter kerja</p>
+                  <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                    Cari dan rapikan antrean chat
+                  </h2>
+                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                    Gunakan pencarian dan filter sederhana supaya cepat ketemu chat yang harus dikerjakan duluan.
+                  </p>
                 </div>
-
-                <div className="grid gap-4 xl:grid-cols-[1.05fr_1.25fr]">
-                  <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
-                      Scope Conversation
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {ARCHIVE_SCOPE_OPTIONS.map((option) => {
-                        const isActive = archiveScope === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => {
-                              setArchiveScope(option.value);
-                            }}
-                            className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                              isActive
-                                ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-                                : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
-                            }`}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
-                      Filter Cepat
-                    </p>
-                    <div className="mt-3 grid gap-3 lg:grid-cols-2">
-                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                        <span>Channel</span>
-                        <select
-                          value={sourceChannelFilter}
-                          onChange={(event) =>
-                            setSourceChannelFilter(event.target.value)
-                          }
-                          className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
-                        >
-                          {SOURCE_CHANNEL_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                        <span>Bucket kerja</span>
-                        <select
-                          value={queueBucketFilter}
-                          onChange={(event) =>
-                            setQueueBucketFilter(event.target.value)
-                          }
-                          className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
-                        >
-                          {QUEUE_BUCKET_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Cari conversation</span>
-                    <input
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      placeholder="Cari nama, isi pesan, owner, atau next action..."
-                      className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
-                    />
-                  </label>
+                <div className="rounded-full bg-[#f0cb73]/10 px-4 py-2 text-sm text-[#f0cb73]">
+                  Menampilkan <span className="font-semibold">{filteredInboxItems.length}</span> dari{" "}
+                  <span className="font-semibold">{inboxItems.length}</span> chat
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[22px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] px-4 py-3 text-sm text-[#d8bc84] shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
-                <span className="rounded-full bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
-                  Hasil
-                </span>
-                <span>
-                  Menampilkan{" "}
-                  <span className="font-semibold text-[#fff0c9]">
-                    {filteredInboxItems.length}
-                  </span>{" "}
-                  dari{" "}
-                  <span className="font-semibold text-[#fff0c9]">
-                    {inboxItems.length}
-                  </span>{" "}
-                  conversation.
-                </span>
+              <div className="mt-5 grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                  <span>Cari chat</span>
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Cari nama atau isi pesan..."
+                    className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
+                  />
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                  <span>Status chat</span>
+                  <select
+                    value={archiveScope}
+                    onChange={(event) => setArchiveScope(event.target.value)}
+                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                  >
+                    {ARCHIVE_SCOPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                  <span>Channel</span>
+                  <select
+                    value={sourceChannelFilter}
+                    onChange={(event) => setSourceChannelFilter(event.target.value)}
+                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                  >
+                    {SOURCE_CHANNEL_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                  <span>Prioritas</span>
+                  <select
+                    value={queueBucketFilter}
+                    onChange={(event) => setQueueBucketFilter(event.target.value)}
+                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                  >
+                    {QUEUE_BUCKET_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
             </section>
 
@@ -694,10 +650,10 @@ export default function SalesInboxPage() {
                             {section.config.label}
                           </p>
                           <h2 className="mt-1 text-2xl font-bold text-slate-950">
-                            {section.items.length} conversation
+                            {section.items.length} chat
                           </h2>
                         </div>
-                        <p className="max-w-2xl text-sm leading-6 text-slate-500">
+                        <p className="max-w-xl text-sm leading-6 text-slate-500">
                           {section.config.description}
                         </p>
                       </div>
@@ -749,7 +705,7 @@ export default function SalesInboxPage() {
                         </div>
                       ) : null}
 
-                      <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {paginatedItems.map((item) => {
                           const extraction = item.latest_ai_extraction;
                           const canAnalyze = extraction === null;
@@ -821,7 +777,7 @@ export default function SalesInboxPage() {
                                     )}
                                   </div>
 
-                                  <p className="min-h-[6rem] text-sm leading-6 text-slate-600 line-clamp-4">
+                                  <p className="text-sm leading-6 text-slate-600 line-clamp-3">
                                     {item.latest_message
                                       ? item.latest_message.message_text
                                       : "Belum ada pesan."}
@@ -844,9 +800,7 @@ export default function SalesInboxPage() {
                                       </span>
                                     </div>
                                     <div className="flex flex-wrap gap-x-2 gap-y-1">
-                                      <span>
-                                        Priority: {item.priority_score}
-                                      </span>
+                                      <span>Priority: {item.priority_score}</span>
                                       <span>
                                         Status:{" "}
                                         {formatStatusLabel(item.ui_status)}
@@ -864,11 +818,11 @@ export default function SalesInboxPage() {
                                   <p className="clara-kicker text-[11px]">
                                     Langkah berikutnya
                                   </p>
-                                  <p className="mt-2 min-h-[5.5rem] text-sm leading-6 text-slate-700 line-clamp-4">
+                                  <p className="mt-2 text-sm leading-6 text-slate-700 line-clamp-3">
                                     {extraction?.next_best_action ??
                                       "Belum dianalisis. Jalankan AI analysis dulu."}
                                   </p>
-                                  <div className="mt-4 flex flex-wrap gap-2">
+                                  <div className="mt-3 flex flex-wrap gap-2">
                                     <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
                                       {formatStatusLabel(item.ui_status)}
                                     </span>
@@ -898,7 +852,7 @@ export default function SalesInboxPage() {
                                       }}
                                       className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
                                     >
-                                      {isActing ? "Analyzing..." : "Analyze"}
+                                      {isActing ? "Menganalisis..." : "Analisis AI"}
                                     </button>
                                   ) : null}
 
@@ -914,8 +868,8 @@ export default function SalesInboxPage() {
                                       className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                       {isActing
-                                        ? "Generating..."
-                                        : "Generate Draft"}
+                                        ? "Membuat..."
+                                        : "Buat Draft"}
                                     </button>
                                   ) : null}
 
@@ -923,7 +877,7 @@ export default function SalesInboxPage() {
                                     href={`/dashboard/sales/conversations/${item.conversation_id}`}
                                     className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
                                   >
-                                    Buka Chat
+                                    Buka Percakapan
                                   </Link>
                                 </div>
                               </div>
@@ -940,17 +894,6 @@ export default function SalesInboxPage() {
         )}
       </div>
     </WorkspaceShell>
-  );
-}
-
-function QueueMetaPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-full border border-[#f0cb73]/18 bg-[#1d150d] px-3.5 py-2 shadow-[0_8px_18px_rgba(0,0,0,0.14)]">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b58d43]">
-        {label}
-      </span>
-      <span className="ml-2 text-sm font-semibold text-[#f0cb73]">{value}</span>
-    </div>
   );
 }
 

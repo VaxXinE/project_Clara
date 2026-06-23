@@ -9,6 +9,7 @@
     "build": "npm run build:dashboard && npm run build:extension",
     "build:dashboard": "npm run build --prefix clara-dashboard",
     "build:extension": "npm run build --prefix clara-extension",
+    "uat:smoke": "sh scripts/uat-smoke.sh",
     "package:extension": "npm run package --prefix clara-extension",
     "start": "npm run start:dashboard",
     "start:dashboard": "npm run start --prefix clara-dashboard",

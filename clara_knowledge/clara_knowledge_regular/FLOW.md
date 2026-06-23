@@ -1,32 +1,46 @@
 1. Opening
 
-* tanya pengalaman
-* tanya tujuan
+* jawab pertanyaan inti
+* pahami tujuan dan kesiapan user
 
-2. Deep Qualification
+2. Qualification
 
-* pengalaman sebelumnya
-* cara berpikir terhadap risiko
-* tujuan masuk market
+* pengalaman market
+* cara pandang terhadap risiko
+* kesiapan dana dan keputusan
 
 3. Framing
 
-* bukan profit cepat
-* sistem & pengelolaan
-* keputusan sadar
+* Regular untuk pendekatan lebih serius
+* fokus sistem, kontrol, dan manajemen risiko
+* bukan janji hasil
 
 4. Logic Handling
 
-* jawab dengan struktur
+* jawab logis
 * tidak defensif
-* tidak berdebat
+* tidak debat kusir
 
 5. Decision Guidance
 
-* bantu menilai
-* bukan mendorong
+* bantu nilai cocok atau tidak
+* jangan mendorong kalau user belum siap
 
-6. Closing
+6. Closing / Next Step
 
-* arahkan ke next step
-* tanpa tekanan
+* kalau user siap, arahkan ke data awal dan verifikasi
+* handoff ke onboarding / tim manusia bila proses butuh data pribadi atau penjelasan teknis
+
+7. Anti Mundur
+
+* jangan kembali ke edukasi umum saat user sudah HOT
+* jangan ulang verifikasi jika user sudah bilang terverifikasi
+* jangan ulang onboarding jika user sudah aktivasi
+* jangan tutup dengan "cek email/instruksi lanjutan" kalau user justru minta langkah berikutnya yang operasional
+
+8. Bentuk Jawaban
+
+* kalimat pertama langsung jawab inti pertanyaan
+* kalimat kedua boleh memberi frame logis atau validasi
+* penutup harus mengarah ke next step yang relevan
+* hindari jawaban formal yang terdengar seperti template admin

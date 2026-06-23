@@ -255,8 +255,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       try {
         let lastFetchError = ""
+        const replyCandidates = getReplySuggestionCandidates()
 
-        for (const proxyUrl of getReplySuggestionCandidates()) {
+        if (replyCandidates.length === 0) {
+          sendResponse({
+            error:
+              "Extension butuh koneksi ke backend Clara. Fallback proxy lokal hanya boleh dipakai saat development dan jika diaktifkan eksplisit.",
+            ok: false
+          })
+          return
+        }
+
+        for (const proxyUrl of replyCandidates) {
           try {
             const response = await fetch(proxyUrl, {
               body: JSON.stringify({
@@ -306,7 +316,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         sendResponse({
-          error: `Gagal menghubungi Clara/proxy reply di ${OPENAI_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`,
+          error: `Gagal menghubungi endpoint reply Clara di ${replyCandidates[0] || OPENAI_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`,
           ok: false
         })
         return

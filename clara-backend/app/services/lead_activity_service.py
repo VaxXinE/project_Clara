@@ -48,7 +48,7 @@ def create_lead_activity_event(
         to_value=to_value,
     )
     db.add(event)
-    db.flush()
+    db.flush([event])
     return event
 
 

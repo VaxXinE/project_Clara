@@ -20,6 +20,8 @@ const parsePrePlainText = (value: string) => {
   }
 }
 
+const SELF_AUTHOR_PATTERN = /^(you|anda|me|saya)$/i
+
 const getChatRoot = () => {
   const selectors = [
     '#main[data-testid="conversation-panel-wrapper"]',
@@ -75,23 +77,169 @@ const getConversationSubtitle = (chatRoot: HTMLElement) => {
   return ""
 }
 
-const getMessageDirection = (container: HTMLElement): WhatsAppMessageDirection => {
-  const bubble = container.closest(".message-out, .message-in")
+const queryUniqueMessageContainers = (root: ParentNode) => {
+  const panelRoot =
+    root.querySelector<HTMLElement>('[data-testid="conversation-panel-messages"]') ||
+    root
 
-  return bubble?.classList.contains("message-out") ? "outgoing" : "incoming"
+  return Array.from(
+    new Set(
+      Array.from(
+        panelRoot.querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
+      )
+    )
+  )
 }
 
-const getLeafTextCandidates = (nodes: HTMLElement[]) => {
-  return nodes.filter(
-    (node) => !nodes.some((otherNode) => otherNode !== node && node.contains(otherNode))
+const getMessageDirection = (container: HTMLElement): WhatsAppMessageDirection => {
+  const metaSource =
+    container
+      .querySelector<HTMLElement>("[data-pre-plain-text]")
+      ?.getAttribute("data-pre-plain-text") || ""
+  const parsedMeta = parsePrePlainText(metaSource)
+    const directionNode =
+    container.matches(".message-out, .message-in")
+      ? container
+      : container.querySelector<HTMLElement>(".message-out, .message-in") ||
+        container.closest<HTMLElement>(".message-out, .message-in") ||
+        container.parentElement?.closest<HTMLElement>(".message-out, .message-in") ||
+        null
+
+  if (directionNode?.classList.contains("message-out")) {
+    return "outgoing"
+  }
+
+  if (directionNode?.classList.contains("message-in")) {
+    return "incoming"
+  }
+
+  if (
+    container.querySelector(
+      '[data-icon="msg-check"], [data-icon="msg-dblcheck"], [data-icon="status-dblcheck"], [data-icon="msg-time"]'
+    ) &&
+    SELF_AUTHOR_PATTERN.test(parsedMeta.author)
+  ) {
+    return "outgoing"
+  }
+
+  if (SELF_AUTHOR_PATTERN.test(parsedMeta.author)) {
+    return "outgoing"
+  }
+
+  const alignmentNodes = [
+    container,
+    container.parentElement,
+    container.parentElement?.parentElement
+  ].filter((node): node is HTMLElement => Boolean(node))
+
+  for (const node of alignmentNodes) {
+    const computedStyle = window.getComputedStyle(node)
+
+    if (computedStyle.justifyContent === "flex-end") {
+      return "outgoing"
+    }
+
+    if (computedStyle.justifyContent === "flex-start") {
+      return "incoming"
+    }
+
+    if (node.classList.contains("xuk3077")) {
+      return "outgoing"
+    }
+
+    if (node.classList.contains("x1cy8zhl")) {
+      return "incoming"
+    }
+  }
+
+  const rect = container.getBoundingClientRect()
+  const leftSpace = rect.left
+  const rightSpace = window.innerWidth - rect.right
+
+  if (rightSpace < leftSpace) {
+    return "outgoing"
+  }
+
+  return "incoming"
+}
+
+const normalizeMessageBlockText = (value: string) =>
+  value
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
+    .trim()
+
+const getPreferredMessageTexts = (nodes: HTMLElement[]) => {
+  const uniqueTexts = Array.from(
+    new Set(
+      nodes
+        .map((node) => normalizeMessageBlockText(node.innerText || ""))
+        .filter(Boolean)
+    )
   )
+
+  return uniqueTexts.filter(
+    (text) =>
+      !uniqueTexts.some(
+        (otherText) =>
+          otherText !== text &&
+          otherText.length > text.length &&
+          otherText.includes(text)
+      )
+  )
+}
+
+type ParsedReplyAwareMessage = {
+  replyContextSenderName?: string
+  replyContextSenderType?: "incoming" | "outgoing" | "unknown"
+  replyContextText?: string
+  text: string
+}
+
+const splitReplyAwareMessageText = (candidates: string[]) => {
+  if (candidates.length === 0) {
+    return {
+      text: ""
+    } satisfies ParsedReplyAwareMessage
+  }
+
+  if (candidates.length > 1) {
+    return {
+      replyContextText: candidates.slice(0, -1).join("\n"),
+      text: candidates[candidates.length - 1]
+    } satisfies ParsedReplyAwareMessage
+  }
+
+  const singleCandidate = candidates[0]
+  const lines = singleCandidate
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (lines.length >= 2) {
+    const replyContext = lines.slice(0, -1).join(" ").trim()
+    const bodyText = lines[lines.length - 1]?.trim() || ""
+
+    if (replyContext.length >= 18 && bodyText) {
+      return {
+        replyContextText: replyContext,
+        text: bodyText
+      } satisfies ParsedReplyAwareMessage
+    }
+  }
+
+  return {
+    text: singleCandidate
+  } satisfies ParsedReplyAwareMessage
 }
 
 const getMessageText = (container: HTMLElement) => {
-  const primaryCandidates = getLeafTextCandidates(
+  const primaryCandidates = getPreferredMessageTexts(
     Array.from(container.querySelectorAll<HTMLElement>('[data-testid="msg-text"]'))
   )
-  const fallbackCandidates = getLeafTextCandidates(
+  const fallbackCandidates = getPreferredMessageTexts(
     Array.from(
       container.querySelectorAll<HTMLElement>(
         '[data-testid="selectable-text"], .copyable-text'
@@ -101,23 +249,32 @@ const getMessageText = (container: HTMLElement) => {
   const candidates =
     primaryCandidates.length > 0 ? primaryCandidates : fallbackCandidates
 
-  const uniqueTexts = Array.from(
-    new Set(
-      candidates
-        .map((node) => node.innerText.replace(/\s+/g, " ").trim())
-        .filter(Boolean)
-    )
-  )
-
-  if (uniqueTexts.length > 0) {
-    return uniqueTexts.join("\n")
+  if (candidates.length > 0) {
+    const parsed = splitReplyAwareMessageText(candidates)
+    if (parsed.replyContextText) {
+      const direction = getMessageDirection(container)
+      const replyContextSenderType = direction === "outgoing" ? "incoming" : "outgoing"
+      return {
+        replyContextSenderName: undefined,
+        replyContextSenderType,
+        replyContextText: parsed.replyContextText,
+        text: parsed.text
+      } satisfies ParsedReplyAwareMessage
+    }
+    return parsed
   }
 
   const mediaLabel = container
     .querySelector<HTMLElement>('[data-testid="media-caption"], [aria-label]')
-    ?.innerText?.trim()
+    ?.innerText
 
-  return mediaLabel || ""
+  const normalizedMediaLabel = mediaLabel
+    ? normalizeMessageBlockText(mediaLabel)
+    : ""
+
+  return {
+    text: normalizedMediaLabel || ""
+  } satisfies ParsedReplyAwareMessage
 }
 
 const getComposeBox = () => {
@@ -138,8 +295,66 @@ const getComposeBox = () => {
   return null
 }
 
+const getComposeFooter = () => getComposeBox()?.closest("footer") || document
+
 const getComposeText = (composeBox: HTMLElement) =>
   composeBox.innerText.replace(/\s+/g, " ").trim()
+
+const clickElement = (node: HTMLElement) => {
+  node.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+      view: window
+    })
+  )
+  node.dispatchEvent(
+    new MouseEvent("mouseup", {
+      bubbles: true,
+      cancelable: true,
+      view: window
+    })
+  )
+  node.click()
+}
+
+const getSendButtonTarget = (): HTMLElement | null => {
+  const searchRoot = getComposeFooter()
+  const selectors = [
+    '[data-testid="compose-btn-send"]',
+    'button[aria-label="Send"]',
+    'button[aria-label="Kirim"]',
+    '[aria-label="Send"]',
+    '[aria-label="Kirim"]',
+    '[data-icon="send"]'
+  ]
+
+  for (const selector of selectors) {
+    const node = searchRoot.querySelector<HTMLElement>(selector)
+
+    if (!node) {
+      continue
+    }
+
+    const clickableTarget =
+      node.tagName === "BUTTON"
+        ? node
+        : node.closest<HTMLElement>('button, [role="button"], [tabindex]')
+
+    const target = clickableTarget || node
+
+    if (
+      target instanceof HTMLButtonElement &&
+      (target.disabled || target.hasAttribute("disabled"))
+    ) {
+      continue
+    }
+
+    return target
+  }
+
+  return null
+}
 
 export const readOpenChat = (): WhatsAppReadResponse => {
   const chatRoot = getChatRoot()
@@ -160,11 +375,7 @@ export const readOpenChat = (): WhatsAppReadResponse => {
     }
   }
 
-  const messageContainers = Array.from(
-    chatRoot.querySelectorAll<HTMLElement>(
-      '[data-testid="conversation-panel-messages"] [data-testid="msg-container"], [data-testid="msg-container"]'
-    )
-  )
+  const messageContainers = queryUniqueMessageContainers(chatRoot)
 
   const messages: WhatsAppMessage[] = messageContainers
     .map((container, index) => {
@@ -173,18 +384,44 @@ export const readOpenChat = (): WhatsAppReadResponse => {
           .querySelector<HTMLElement>("[data-pre-plain-text]")
           ?.getAttribute("data-pre-plain-text") || ""
       const parsedMeta = parsePrePlainText(metaSource)
-      const text = getMessageText(container)
+      const parsedMessage = getMessageText(container)
+      const text = parsedMessage.text
 
       if (!text) {
         return null
       }
 
       return {
-        author:
+        authorName:
           parsedMeta.author ||
           (getMessageDirection(container) === "outgoing" ? "Anda" : chatTitle),
         direction: getMessageDirection(container),
+        parsedMessage,
+        parsedMeta,
+        text
+      }
+    })
+    .map((entry, index) => {
+      if (!entry) {
+        return null
+      }
+
+      const { authorName, direction, parsedMessage, parsedMeta, text } = entry
+      const replyContextSenderName = parsedMessage.replyContextText
+        ? direction === "outgoing"
+          ? chatTitle
+          : "Anda"
+        : undefined
+
+      return {
+        author:
+          authorName,
+        direction,
         id: `${parsedMeta.timestampLabel}-${index}`,
+        replyContextSenderName:
+          parsedMessage.replyContextSenderName || replyContextSenderName,
+        replyContextSenderType: parsedMessage.replyContextSenderType,
+        replyContextText: parsedMessage.replyContextText,
         text,
         timestampLabel: parsedMeta.timestampLabel
       }
@@ -316,35 +553,102 @@ export const insertReplyIntoComposeBox = (
   }
 }
 
-export const sendReplyThroughComposeBox = (
+const wait = (ms: number) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+
+const normalizeMessageText = (value: string) =>
+  value.replace(/\s+/g, " ").trim().toLowerCase()
+
+const getMessageContainers = () => {
+  const chatRoot = getChatRoot()
+
+  if (!chatRoot) {
+    return []
+  }
+
+  return Array.from(
+    queryUniqueMessageContainers(chatRoot)
+  )
+}
+
+const getLatestOutgoingMessageSnapshot = () => {
+  const outgoingMessages = getMessageContainers()
+    .map((container, index) => ({
+      direction: getMessageDirection(container),
+      index,
+      text: getMessageText(container)
+    }))
+    .filter((message) => message.direction === "outgoing" && message.text.trim())
+
+  const latestOutgoingMessage = outgoingMessages[outgoingMessages.length - 1]
+
+  return {
+    count: outgoingMessages.length,
+    text: latestOutgoingMessage?.text.trim() || ""
+  }
+}
+
+const waitForOutgoingMessageConfirmation = async (expectedText: string) => {
+  const normalizedExpected = normalizeMessageText(expectedText)
+  const beforeSendSnapshot = getLatestOutgoingMessageSnapshot()
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await wait(250)
+
+    const composeBox = getComposeBox()
+    const composeText = composeBox ? getComposeText(composeBox) : ""
+    const afterSendSnapshot = getLatestOutgoingMessageSnapshot()
+    const normalizedLatestOutgoing = normalizeMessageText(afterSendSnapshot.text)
+
+    const outgoingMessageAppended =
+      afterSendSnapshot.count > beforeSendSnapshot.count &&
+      normalizedLatestOutgoing === normalizedExpected
+
+    const latestOutgoingReplaced =
+      afterSendSnapshot.count === beforeSendSnapshot.count &&
+      afterSendSnapshot.text !== beforeSendSnapshot.text &&
+      normalizedLatestOutgoing === normalizedExpected
+
+    if (outgoingMessageAppended || latestOutgoingReplaced) {
+      return true
+    }
+
+    if (!composeText.trim() && normalizedLatestOutgoing === normalizedExpected) {
+      return true
+    }
+  }
+
+  return false
+}
+
+export const sendReplyThroughComposeBox = async (
   text: string
-): WhatsAppActionResponse => {
+): Promise<WhatsAppActionResponse> => {
   const insertResult = insertReplyIntoComposeBox(text)
 
   if (!insertResult.ok) {
     return insertResult
   }
 
-  const sendButtonSelectors = [
-    '[data-testid="compose-btn-send"]',
-    'button[aria-label="Send"]',
-    'button[aria-label="Kirim"]',
-    'span[data-icon="send"]'
-  ]
+  const sendButtonTarget = getSendButtonTarget()
 
-  for (const selector of sendButtonSelectors) {
-    const node = document.querySelector<HTMLElement>(selector)
-    const button =
-      node?.tagName === "BUTTON"
-        ? (node as HTMLButtonElement)
-        : node?.closest("button")
+  if (sendButtonTarget) {
+    clickElement(sendButtonTarget)
 
-    if (button && !button.hasAttribute("disabled")) {
-      button.click()
+    const isConfirmed = await waitForOutgoingMessageConfirmation(text)
 
+    if (!isConfirmed) {
       return {
-        ok: true
+        error:
+          "Tombol kirim sudah ditekan, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
+        ok: false
       }
+    }
+
+    return {
+      ok: true
     }
   }
 
@@ -374,6 +678,16 @@ export const sendReplyThroughComposeBox = (
       code: "Enter"
     })
   )
+
+  const isConfirmed = await waitForOutgoingMessageConfirmation(text)
+
+  if (!isConfirmed) {
+    return {
+      error:
+        "Enter sudah dipicu, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
+      ok: false
+    }
+  }
 
   return {
     ok: true

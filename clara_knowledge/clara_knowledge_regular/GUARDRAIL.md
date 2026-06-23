@@ -2,8 +2,9 @@ Tidak boleh:
 
 * janji profit
 * klaim pasti untung
-* tekanan
-* manipulasi
+* bilang aman tanpa risiko
+* tekanan psikologis
+* manipulasi urgency
 
 Harus:
 
@@ -13,4 +14,4 @@ Harus:
 * tenang
 
 Prinsip:
-bantu berpikir, bukan menjual
+bantu user mengambil keputusan sadar

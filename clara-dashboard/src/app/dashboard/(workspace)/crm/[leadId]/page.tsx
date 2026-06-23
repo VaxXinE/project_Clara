@@ -15,6 +15,11 @@ import {
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
+import {
+  isHeadRole,
+  isManagerRole,
+  normalizeWorkspaceRole,
+} from "@/lib/roles";
 import type {
   CurrentUser,
   LeadDealItem,
@@ -216,6 +221,11 @@ export default function LeadDetailPage() {
   const [expectedCloseDateInput, setExpectedCloseDateInput] = useState("");
   const [dealClosedAtInput, setDealClosedAtInput] = useState("");
   const [dealNotesInput, setDealNotesInput] = useState("");
+  const workspaceRole = currentUser ? normalizeWorkspaceRole(currentUser.role) : null;
+  const isSalesWorkspace = workspaceRole === "sales";
+  const isManagerWorkspace = isManagerRole(currentUser?.role);
+  const isHeadWorkspace = isHeadRole(currentUser?.role);
+  const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;
 
   const canReassignLead =
     currentUser?.role === "head" || currentUser?.role === "superadmin";
@@ -361,6 +371,68 @@ export default function LeadDetailPage() {
     ? Math.max(1, Math.ceil(lead.timeline.length / timelinePageSize))
     : 1;
   const effectiveTimelinePage = Math.min(timelinePage, timelineTotalPages);
+  const salesLeadFocus = useMemo(() => {
+    if (!lead) {
+      return {
+        headline: "Lead belum dimuat.",
+        helper: "Muat detail lead dulu untuk melihat konteks kerja berikutnya.",
+      };
+    }
+
+    if (lead.next_follow_up_at) {
+      return {
+        headline: `Follow-up berikutnya ${formatDateTime(lead.next_follow_up_at)}.`,
+        helper: "Pastikan step berikutnya jelas supaya lead tidak berhenti di status saja.",
+      };
+    }
+
+    if ((lead.tasks ?? []).some((task) => task.status === "open")) {
+      return {
+        headline: "Lead ini masih punya tugas terbuka.",
+        helper: "Bereskan task yang masih aktif atau set jadwal follow-up berikutnya.",
+      };
+    }
+
+    return {
+      headline: "Lead ini belum punya jadwal follow-up berikutnya.",
+      helper: "Isi next follow-up supaya alur kerja sales tetap rapi dan lead tidak hilang dari radar.",
+    };
+  }, [lead]);
+  const leadershipLeadFocus = useMemo(() => {
+    if (!lead) {
+      return {
+        headline: "Lead belum dimuat.",
+        helper: isHeadWorkspace
+          ? "Muat detail lead dulu untuk melihat konteks tim, owner, dan keputusan apa yang mungkin perlu diambil."
+          : "Muat detail lead dulu untuk melihat konteks tim dan next action lead ini.",
+      };
+    }
+
+    if (lead.next_follow_up_at) {
+      return {
+        headline: `Lead ini punya next follow-up di ${formatDateTime(lead.next_follow_up_at)}.`,
+        helper: isHeadWorkspace
+          ? "Head cukup cek apakah owner, stage, dan arah follow-up-nya sudah selaras sebelum turun ke bagian detail lain."
+          : "Manager cukup cek apakah owner, stage, dan arah follow-up-nya sudah masuk akal sebelum turun ke detail lain.",
+      };
+    }
+
+    if ((lead.tasks ?? []).some((task) => task.status === "open")) {
+      return {
+        headline: "Lead ini masih punya task terbuka tetapi belum punya jadwal follow-up.",
+        helper: isHeadWorkspace
+          ? "Ini sinyal bahwa ritme tim belum rapi. Head cukup validasi apakah ini perlu arahan, eskalasi, atau cukup dibenahi oleh manager."
+          : "Ini sinyal bahwa eksekusi sales belum rapi. Pastikan task dan jadwal follow-up saling nyambung.",
+      };
+    }
+
+    return {
+      headline: "Lead ini belum punya next follow-up yang jelas.",
+      helper: isHeadWorkspace
+        ? "Head sebaiknya mulai dari sini: cek owner, cek stage, lalu pastikan memang ada next step yang jelas sebelum lead ini makin tertinggal."
+        : "Manager sebaiknya mulai dari sini: cek owner, cek stage, lalu pastikan ada step lanjutan yang benar-benar terjadwal.",
+    };
+  }, [isHeadWorkspace, lead]);
   const visibleTimeline = useMemo(() => {
     if (!lead) {
       return [];
@@ -578,19 +650,50 @@ export default function LeadDetailPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="CRM maturity"
-      title={lead?.display_name ?? "Lead Detail"}
-      description="Halaman ini dipakai untuk merapikan konteks lead, menyetel follow-up berikutnya, dan membuat task yang benar-benar persisten."
+      eyebrow="Detail lead"
+      title={lead?.display_name ?? "Detail Lead"}
+      description={
+        isSalesWorkspace
+          ? "Halaman ini dipakai untuk melihat status lead, mengatur follow-up berikutnya, dan menyimpan catatan kerja tanpa pindah-pindah halaman."
+          : isHeadWorkspace
+            ? "Halaman head untuk validasi satu lead secara cepat: owner, stage, follow-up, risiko eksekusi, dan apakah perlu arahan atau eskalasi."
+            : isLeadershipWorkspace
+            ? "Halaman manager untuk membaca kondisi satu lead dengan cepat: owner, stage, follow-up, risiko eksekusi, dan keputusan berikutnya."
+            : "Halaman ini dipakai untuk merapikan konteks lead, menyetel follow-up berikutnya, dan membuat task yang benar-benar persisten."
+      }
       backHref="/dashboard/crm"
-      backLabel="Kembali ke Lead Management"
+      backLabel="Kembali ke daftar lead"
       actions={
         <div className="flex flex-wrap gap-3">
+          {isHeadWorkspace ? (
+            <>
+              <Link
+                href="/dashboard/notifications"
+                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              >
+                Buka Alert Tim
+              </Link>
+              <Link
+                href="/dashboard/approvals"
+                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              >
+                Buka Arahan Tim
+              </Link>
+            </>
+          ) : isLeadershipWorkspace ? (
+            <Link
+              href="/dashboard/manager-insights"
+              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+            >
+              Monitor Tim
+            </Link>
+          ) : null}
           {lead?.customer_profile_id ? (
             <Link
               href={`/dashboard/customers/${lead.customer_profile_id}`}
               className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
             >
-              Buka Customer Profile
+              Buka Profil Customer
             </Link>
           ) : null}
           {lead?.latest_conversation_id ? (
@@ -598,7 +701,7 @@ export default function LeadDetailPage() {
               href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
               className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
             >
-              Buka Conversation
+              Buka Percakapan
             </Link>
           ) : null}
         </div>
@@ -620,43 +723,96 @@ export default function LeadDetailPage() {
         {lead && !isLoading && !errorMessage && (
           <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
             <section className="space-y-6">
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                  {isHeadWorkspace
+                    ? "Prioritas head"
+                    : isLeadershipWorkspace
+                      ? "Prioritas manager"
+                      : "Fokus kerja lead ini"}
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#fff3cf]">
+                  {isLeadershipWorkspace
+                    ? leadershipLeadFocus.headline
+                    : salesLeadFocus.headline}
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-[#e3c990]">
+                  {isLeadershipWorkspace
+                    ? leadershipLeadFocus.helper
+                    : salesLeadFocus.helper}
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#e9d4a0]">
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                    Stage: <span className="font-semibold text-[#fff3cf]">{formatStageLabel(lead.current_stage)}</span>
+                  </span>
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                    Suhu lead: <span className="font-semibold text-[#fff3cf]">{lead.lead_temperature.toUpperCase()}</span>
+                  </span>
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                    Owner: <span className="font-semibold text-[#fff3cf]">{lead.assigned_user_name ?? "Belum ada"}</span>
+                  </span>
+                  {lead.needs_deal_sync ? (
+                    <span className="rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-3 py-1.5">
+                      Sinkron KPI: <span className="font-semibold text-[#fff3cf]">Perlu dicek</span>
+                    </span>
+                  ) : null}
+                </div>
+              </section>
+
               <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
-                    Kategori akun:{" "}
-                    {formatAccountCategory(lead.account_category)}
-                  </span>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                      lead.lead_temperature,
-                    )}`}
-                  >
-                    {lead.lead_temperature.toUpperCase()}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                    {lead.current_stage.replaceAll("_", " ")}
-                  </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                    Owner: {lead.assigned_user_name ?? "Belum ada"}
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      Snapshot lead
+                    </p>
+                    <h2 className="mt-2 text-xl font-semibold text-slate-950">
+                      {isHeadWorkspace
+                        ? "Kondisi inti yang perlu dibaca head"
+                        : isLeadershipWorkspace
+                          ? "Kondisi inti yang perlu dibaca manager"
+                        : "Kondisi inti lead ini"}
+                    </h2>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                      Kategori akun:{" "}
+                      {formatAccountCategory(lead.account_category)}
+                    </span>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
+                        lead.lead_temperature,
+                      )}`}
+                    >
+                      {lead.lead_temperature.toUpperCase()}
+                    </span>
+                  </div>
                 </div>
 
-                <dl className="mt-5 grid gap-4 md:grid-cols-3">
+                <dl className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <Metric
                     label="Kategori akun"
                     value={formatAccountCategory(lead.account_category)}
                   />
                   <Metric
-                    label="Last contact"
+                    label="Kontak terakhir"
                     value={formatDateTime(lead.last_contact_at)}
                   />
                   <Metric
-                    label="Next follow-up"
+                    label="Follow-up berikutnya"
                     value={formatDateTime(lead.next_follow_up_at)}
                   />
                   <Metric
-                    label="Conversation count"
+                    label="Jumlah percakapan"
                     value={String(lead.conversation_count)}
+                  />
+                  <Metric
+                    label="Owner"
+                    value={lead.assigned_user_name ?? "Belum ada"}
+                  />
+                  <Metric
+                    label="Deal status"
+                    value={lead.deal?.status ?? "Belum diisi"}
                   />
                 </dl>
               </div>
@@ -668,10 +824,22 @@ export default function LeadDetailPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold text-slate-950">
-                      Lead Context
+                      {isSalesWorkspace
+                        ? "Update Status Lead"
+                        : isHeadWorkspace
+                          ? "Validasi Konteks Lead"
+                          : isLeadershipWorkspace
+                          ? "Kontrol Konteks Lead"
+                          : "Lead Context"}
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Update summary, notes, follow-up date, dan ownership lead.
+                      {isSalesWorkspace
+                        ? "Rapikan kategori akun, stage, suhu lead, ringkasan, dan jadwal follow-up dari satu form."
+                        : isHeadWorkspace
+                          ? "Head cukup cek field yang memengaruhi keputusan: owner, stage, suhu lead, ringkasan, dan jadwal follow-up."
+                          : isLeadershipWorkspace
+                          ? "Manager cukup cek field penting yang memengaruhi keputusan: stage, suhu lead, owner, summary, dan jadwal follow-up."
+                          : "Update summary, notes, follow-up date, dan ownership lead."}
                     </p>
                   </div>
                   {successMessage && (
@@ -718,23 +886,24 @@ export default function LeadDetailPage() {
                     />
                   </Field>
 
-                  <Field label="Assigned user">
-                    <select
-                      value={assignedUserInput}
-                      onChange={(event) =>
-                        setAssignedUserInput(event.target.value)
-                      }
-                      disabled={!canReassignLead}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400 disabled:bg-slate-100"
-                    >
-                      <option value="">Belum ada assignee</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name} • {user.role}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+                  {canReassignLead ? (
+                    <Field label="Assigned user">
+                      <select
+                        value={assignedUserInput}
+                        onChange={(event) =>
+                          setAssignedUserInput(event.target.value)
+                        }
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400 disabled:bg-slate-100"
+                      >
+                        <option value="">Belum ada assignee</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} • {user.role}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  ) : null}
                 </div>
 
                 <div className="mt-5 grid gap-5">
@@ -752,6 +921,11 @@ export default function LeadDetailPage() {
                       value={notesInput}
                       onChange={(event) => setNotesInput(event.target.value)}
                       rows={5}
+                      placeholder={
+                        isSalesWorkspace
+                          ? "Tulis konteks singkat: kebutuhan customer, keberatan utama, dan arah follow-up berikutnya."
+                          : undefined
+                      }
                       className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
                     />
                   </Field>
@@ -763,7 +937,7 @@ export default function LeadDetailPage() {
                     disabled={isSaving}
                     className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+                    {isSaving ? "Menyimpan..." : "Simpan Update Lead"}
                   </button>
                 </div>
               </form>
@@ -772,12 +946,22 @@ export default function LeadDetailPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-semibold text-slate-950">
-                      Daily Discipline Log
+                      {isSalesWorkspace
+                        ? "Catatan Follow-up Harian"
+                        : isHeadWorkspace
+                          ? "Jejak Follow-up Tim"
+                          : isLeadershipWorkspace
+                          ? "Jejak Eksekusi Sales"
+                          : "Daily Discipline Log"}
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Catat hasil aktivitas harian sales langsung dari halaman
-                      lead supaya manager bisa membaca ritme kerja, objection,
-                      dan follow-up tanpa menebak.
+                      {isSalesWorkspace
+                        ? "Catat hasil follow-up harian supaya lead ini punya jejak kerja yang jelas dan follow-up berikutnya tidak hilang."
+                        : isHeadWorkspace
+                          ? "Bagian ini dipakai head untuk melihat apakah follow-up benar-benar jalan, objection utamanya apa, dan apakah ritme tim perlu diintervensi."
+                          : isLeadershipWorkspace
+                          ? "Bagian ini dipakai manager untuk melihat apakah follow-up sales benar-benar tercatat, apa objection utamanya, dan apakah next step-nya jelas."
+                          : "Catat hasil aktivitas harian sales langsung dari halaman lead supaya manager bisa membaca ritme kerja, objection, dan follow-up tanpa menebak."}
                     </p>
                   </div>
                   {disciplineSuccessMessage ? (
@@ -795,21 +979,21 @@ export default function LeadDetailPage() {
 
                 <div className="mt-5 grid gap-4 md:grid-cols-4">
                   <Metric
-                    label="Compliance"
+                    label={isSalesWorkspace ? "Status catatan" : "Compliance"}
                     value={formatDisciplineStatus(
                       lead.discipline_summary.compliance_status,
                     )}
                   />
                   <Metric
-                    label="Latest log"
+                    label={isSalesWorkspace ? "Catatan terakhir" : "Latest log"}
                     value={lead.discipline_summary.latest_log_date ?? "-"}
                   />
                   <Metric
-                    label="Logs today"
+                    label={isSalesWorkspace ? "Catatan hari ini" : "Logs today"}
                     value={String(lead.discipline_summary.logs_today_count)}
                   />
                   <Metric
-                    label="Total logs"
+                    label={isSalesWorkspace ? "Total catatan" : "Total logs"}
                     value={String(lead.discipline_summary.log_count)}
                   />
                 </div>
@@ -931,7 +1115,7 @@ export default function LeadDetailPage() {
                       >
                         {isPrefillingDisciplineLog
                           ? "Clara sedang mengisi..."
-                          : "Prefill dengan Clara"}
+                          : "Isi dengan bantuan Clara"}
                       </button>
                       <button
                         type="submit"
@@ -940,7 +1124,7 @@ export default function LeadDetailPage() {
                       >
                         {isCreatingDisciplineLog
                           ? "Menyimpan log..."
-                          : "Simpan Discipline Log"}
+                          : "Simpan Catatan"}
                       </button>
                     </div>
                   </div>
@@ -998,16 +1182,26 @@ export default function LeadDetailPage() {
 
             <aside className="space-y-6">
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-                <div>
-                  <h2 className="text-xl font-semibold text-slate-950">
-                    Unified Customer Identity
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Clara sekarang mengikat banyak lead lintas channel ke satu
-                    profil customer agar konteks tidak pecah antara WhatsApp dan
-                    Telegram.
-                  </p>
-                </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-950">
+                      {isSalesWorkspace
+                        ? "Profil Customer Terkait"
+                        : isHeadWorkspace
+                          ? "Customer dan Lead Terkait"
+                          : isLeadershipWorkspace
+                          ? "Customer yang Terkait dengan Lead Ini"
+                          : "Unified Customer Identity"}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {isSalesWorkspace
+                        ? "Kalau customer ini pernah muncul di channel atau lead lain, Clara akan tampilkan keterkaitannya di sini."
+                        : isHeadWorkspace
+                          ? "Head bisa cek apakah lead ini berdiri sendiri atau sebenarnya bagian dari konteks customer yang lebih besar di tim lain atau channel lain."
+                          : isLeadershipWorkspace
+                          ? "Manager bisa cek apakah lead ini berdiri sendiri atau ternyata terkait ke lead dan percakapan lain dari customer yang sama."
+                          : "Clara sekarang mengikat banyak lead lintas channel ke satu profil customer agar konteks tidak pecah antara WhatsApp dan Telegram."}
+                    </p>
+                  </div>
 
                 {lead.customer_profile ? (
                   <div className="mt-5 space-y-4">
@@ -1033,17 +1227,17 @@ export default function LeadDetailPage() {
 
                       <div className="mt-4 grid gap-3 md:grid-cols-3">
                         <Metric
-                          label="Total Leads"
+                          label="Total lead"
                           value={String(lead.customer_profile.lead_count)}
                         />
                         <Metric
-                          label="Total Conversations"
+                          label="Total percakapan"
                           value={String(
                             lead.customer_profile.conversation_count,
                           )}
                         />
                         <Metric
-                          label="Last contact"
+                          label="Kontak terakhir"
                           value={formatDateTime(
                             lead.customer_profile.last_contact_at,
                           )}
@@ -1093,7 +1287,7 @@ export default function LeadDetailPage() {
                                 )}
                               />
                               <Metric
-                                label="Last contact"
+                                label="Kontak terakhir"
                                 value={formatDateTime(
                                   relatedLead.last_contact_at,
                                 )}
@@ -1131,11 +1325,22 @@ export default function LeadDetailPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold text-slate-950">
-                      Deal Metrics
+                      {isSalesWorkspace
+                        ? "Nilai Deal"
+                        : isHeadWorkspace
+                          ? "Sinkron KPI dan Nilai Deal"
+                          : isLeadershipWorkspace
+                          ? "KPI dan Nilai Deal"
+                          : "Deal Metrics"}
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
-                      Isi angka bisnis lead ini supaya KPI owner tidak cuma
-                      berhenti di pipeline health.
+                      {isSalesWorkspace
+                        ? "Isi nilai bisnis lead ini supaya progressnya bukan cuma status, tapi juga punya gambaran potensi deal."
+                        : isHeadWorkspace
+                          ? "Head bisa pakai bagian ini untuk memastikan stage, status deal, dan angka KPI utama tidak saling bertabrakan."
+                          : isLeadershipWorkspace
+                          ? "Manager bisa pakai bagian ini untuk memastikan stage lead sudah sinkron dengan status deal dan angka KPI utamanya."
+                          : "Isi angka bisnis lead ini supaya KPI owner tidak cuma berhenti di pipeline health."}
                     </p>
                   </div>
                   {dealSuccessMessage && (
@@ -1276,29 +1481,40 @@ export default function LeadDetailPage() {
                   </div>
 
                   <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={isSavingDeal}
-                      className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isSavingDeal
-                        ? "Menyimpan deal..."
-                        : "Simpan Deal Metrics"}
-                    </button>
-                  </div>
-                </form>
+                  <button
+                    type="submit"
+                    disabled={isSavingDeal}
+                    className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isSavingDeal
+                      ? "Menyimpan deal..."
+                      : "Simpan Nilai Deal"}
+                  </button>
+                </div>
+              </form>
               </section>
 
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-950">
-                    Follow-up Tasks
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Task disimpan permanen, jadi worklist sales sekarang tidak
-                    hanya derived dari conversation.
-                  </p>
-                </div>
+                    <h2 className="text-xl font-semibold text-slate-950">
+                      {isSalesWorkspace
+                        ? "Tugas Follow-up"
+                        : isHeadWorkspace
+                          ? "Task Aktif pada Lead Ini"
+                          : isLeadershipWorkspace
+                          ? "Task yang Masih Berjalan"
+                          : "Follow-up Tasks"}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {isSalesWorkspace
+                        ? "Simpan tugas yang benar-benar perlu dikerjakan supaya follow-up tidak hanya bergantung ke ingatan."
+                        : isHeadWorkspace
+                          ? "Head bisa cek apakah task yang aktif memang mendorong lead maju atau justru hanya menumpuk tanpa owner yang jelas."
+                          : isLeadershipWorkspace
+                          ? "Manager bisa cek task yang masih aktif dan menilai apakah pekerjaan sales benar-benar bergerak atau cuma berhenti di status."
+                          : "Task disimpan permanen, jadi worklist sales sekarang tidak hanya derived dari conversation."}
+                    </p>
+                  </div>
 
                 {taskErrorMessage && (
                   <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -1309,7 +1525,7 @@ export default function LeadDetailPage() {
                 <div className="mt-5 space-y-3">
                   {openTasks.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                      Belum ada task terbuka untuk lead ini.
+                      Belum ada tugas terbuka untuk lead ini.
                     </div>
                   ) : (
                     openTasks.map((task) => (
@@ -1323,7 +1539,7 @@ export default function LeadDetailPage() {
                               {task.title}
                             </h3>
                             <p className="mt-1 text-xs text-slate-500">
-                              Due: {formatDateTime(task.due_at)}
+                              Jatuh tempo: {formatDateTime(task.due_at)}
                             </p>
                           </div>
                           <select
@@ -1395,7 +1611,7 @@ export default function LeadDetailPage() {
                     disabled={isCreatingTask}
                     className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {isCreatingTask ? "Membuat task..." : "Tambah Task"}
+                    {isCreatingTask ? "Membuat tugas..." : "Tambah Tugas"}
                   </button>
                 </form>
               </section>
@@ -1403,12 +1619,22 @@ export default function LeadDetailPage() {
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-950">
-                    Activity Timeline
+                    {isSalesWorkspace
+                      ? "Riwayat Aktivitas"
+                      : isHeadWorkspace
+                        ? "Riwayat Lead dan Keputusan"
+                        : isLeadershipWorkspace
+                        ? "Riwayat Perubahan Lead"
+                        : "Activity Timeline"}
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Semua perubahan penting di lead ini dicatat supaya
-                    perpindahan stage, follow-up, task, dan deal bisa diaudit
-                    dengan enak.
+                    {isSalesWorkspace
+                      ? "Semua perubahan penting di lead ini dicatat di sini supaya sales bisa cepat lihat histori kerja dan perubahan status."
+                      : isHeadWorkspace
+                        ? "Timeline ini dipakai head untuk audit cepat: stage berubah kapan, follow-up diisi siapa, task dibuat kapan, dan apakah arah lead butuh keputusan tambahan."
+                        : isLeadershipWorkspace
+                        ? "Timeline ini dipakai manager untuk audit cepat: stage berubah kapan, follow-up diisi siapa, task dibuat kapan, dan arah lead bergerak ke mana."
+                        : "Semua perubahan penting di lead ini dicatat supaya perpindahan stage, follow-up, task, dan deal bisa diaudit dengan enak."}
                   </p>
                 </div>
 

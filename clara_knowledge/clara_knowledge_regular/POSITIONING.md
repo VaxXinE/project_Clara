@@ -1,18 +1,20 @@
-Regular account ditujukan untuk nasabah yang ingin menjalankan aktivitas trading secara lebih serius dan terstruktur.
+Regular account ditujukan untuk calon nasabah yang ingin menjalankan aktivitas market secara lebih serius dan terstruktur.
 
-Fokus utama bukan sekadar masuk market, tetapi bagaimana mengelola aktivitas dengan pendekatan yang lebih jelas dan terarah.
+Fokus utama:
+
+* legalitas dan prosedur yang jelas
+* sistem kerja dan kontrol
+* manajemen risiko
+* keputusan yang sadar
 
 Cocok untuk:
 
-* yang sudah punya pemahaman dasar
-* yang ingin lebih serius
-* yang mempertimbangkan dari sisi sistem dan pengelolaan
+* user yang lebih siap secara dana
+* user yang ingin pendekatan lebih rapi
+* user yang ingin membahas sistem, bukan janji hasil
 
-Pendekatan:
+Value utama:
 
-* berbasis pemahaman, bukan spekulasi
-* memperhatikan risiko dan pengelolaan
-* tidak berorientasi hasil instan
-
-Tujuan:
-membantu calon nasabah mengambil keputusan yang lebih sadar dan terstruktur
+* struktur lebih serius
+* penekanan pada kontrol dan risk management
+* bukan untuk spekulasi tanpa arah

@@ -51,8 +51,22 @@ class NormalizedSnapshotMessage:
     author: str
     sender_type: str
     text: str
+    reply_context_text: str | None
+    reply_context_sender_name: str | None
+    reply_context_sender_type: str | None
     timestamp: datetime
     timestamp_label: str
+
+
+@dataclass(frozen=True)
+class ReplyContextMatch:
+    text: str
+    sender_name: str
+    sender_type: str
+
+
+SYNTHETIC_SALES_MATCH_WINDOW = timedelta(minutes=10)
+REPLY_CONTEXT_MIN_LENGTH = 18
 
 
 def build_snapshot_signature(
@@ -155,18 +169,171 @@ def normalize_snapshot_messages(
         )
         previous_timestamp = timestamp
 
+        current_sender_type = "sales" if message.direction == "outgoing" else "customer"
+        explicit_reply_context = None
+        if message.reply_context_text and message.reply_context_text.strip():
+            explicit_reply_context = ReplyContextMatch(
+                text=message.reply_context_text.strip(),
+                sender_name=(message.reply_context_sender_name or "").strip()
+                or (
+                    snapshot.chat_title
+                    if message.reply_context_sender_type == "incoming"
+                    else "Anda"
+                ),
+                sender_type=(
+                    "customer"
+                    if message.reply_context_sender_type == "incoming"
+                    else "sales"
+                    if message.reply_context_sender_type == "outgoing"
+                    else "unknown"
+                ),
+            )
+
+        body_text, inferred_reply_context = split_reply_context_from_snapshot_text(
+            raw_text=message.text,
+            sender_type=current_sender_type,
+            previous_messages=normalized_messages,
+        )
+        reply_context = explicit_reply_context or inferred_reply_context
+
         normalized_messages.append(
             NormalizedSnapshotMessage(
                 external_message_id=message.id.strip(),
                 author=message.author.strip(),
-                sender_type="sales" if message.direction == "outgoing" else "customer",
-                text=message.text.strip(),
+                sender_type=current_sender_type,
+                text=body_text,
+                reply_context_text=reply_context.text if reply_context else None,
+                reply_context_sender_name=(
+                    reply_context.sender_name if reply_context else None
+                ),
+                reply_context_sender_type=(
+                    reply_context.sender_type if reply_context else None
+                ),
                 timestamp=timestamp,
                 timestamp_label=message.timestamp_label.strip(),
             )
         )
 
-    return normalized_messages
+    return dedupe_normalized_snapshot_messages(normalized_messages)
+
+
+def dedupe_normalized_snapshot_messages(
+    messages: list[NormalizedSnapshotMessage],
+) -> list[NormalizedSnapshotMessage]:
+    deduped: list[NormalizedSnapshotMessage] = []
+    seen_keys: set[tuple[str, str, str, str]] = set()
+
+    for message in messages:
+        key = (
+            message.sender_type,
+            message.author.strip().lower(),
+            message.text.strip(),
+            message.timestamp_label.strip(),
+        )
+        if key in seen_keys:
+            continue
+
+        seen_keys.add(key)
+        deduped.append(message)
+
+    return deduped
+
+
+def normalize_extension_message_text(value: str) -> str:
+    return "\n".join(
+        line.strip()
+        for line in (value or "").splitlines()
+        if line.strip()
+    ).strip()
+
+
+def _normalize_extension_similarity_text(value: str) -> str:
+    normalized = normalize_extension_message_text(value).lower()
+    normalized = re.sub(r"[^a-z0-9\s]", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _reply_excerpt_matches_previous_message(
+    excerpt: str,
+    previous_message_text: str,
+) -> bool:
+    normalized_excerpt = _normalize_extension_similarity_text(excerpt)
+    normalized_previous = _normalize_extension_similarity_text(previous_message_text)
+
+    if (
+        not normalized_excerpt
+        or not normalized_previous
+        or len(normalized_excerpt) < REPLY_CONTEXT_MIN_LENGTH
+    ):
+        return False
+
+    if normalized_excerpt in normalized_previous:
+        return True
+
+    excerpt_tokens = [
+        token for token in normalized_excerpt.split() if len(token) >= 4
+    ]
+    previous_tokens = {
+        token for token in normalized_previous.split() if len(token) >= 4
+    }
+
+    if not excerpt_tokens or not previous_tokens:
+        return False
+
+    overlap = sum(1 for token in excerpt_tokens if token in previous_tokens)
+    return overlap >= max(3, len(excerpt_tokens) // 2)
+
+
+def split_reply_context_from_snapshot_text(
+    *,
+    raw_text: str,
+    sender_type: str,
+    previous_messages: list[NormalizedSnapshotMessage],
+) -> tuple[str, ReplyContextMatch | None]:
+    normalized_text = normalize_extension_message_text(raw_text)
+    if not normalized_text:
+        return "", None
+
+    lines = [line.strip() for line in normalized_text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return normalized_text, None
+
+    relevant_previous_messages = [
+        message
+        for message in previous_messages[-6:]
+        if message.text.strip()
+        and message.sender_type != sender_type
+    ]
+    if not relevant_previous_messages:
+        return normalized_text, None
+
+    for split_index in range(1, len(lines)):
+        reply_context = "\n".join(lines[:split_index]).strip()
+        body_text = "\n".join(lines[split_index:]).strip()
+
+        if not reply_context or not body_text:
+            continue
+
+        if len(reply_context) < REPLY_CONTEXT_MIN_LENGTH:
+            continue
+
+        for previous in relevant_previous_messages:
+            if _reply_excerpt_matches_previous_message(reply_context, previous.text):
+                return body_text, ReplyContextMatch(
+                    text=previous.text,
+                    sender_name=previous.author,
+                    sender_type=previous.sender_type,
+                )
+
+    return normalized_text, None
+
+
+def ensure_aware_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc)
 
 
 def get_existing_extension_conversation(
@@ -272,22 +439,95 @@ def sync_extension_messages(
         existing_message = existing_by_external_id.get(external_message_id)
 
         if existing_message is None:
+            existing_message = find_matching_synthetic_sales_message(
+                existing_messages=existing_messages,
+                incoming_message=message,
+            )
+
+        if existing_message is None:
             existing_message = Message(
                 conversation_id=conversation.id,
                 external_message_id=external_message_id,
                 sender_name=message.author,
                 sender_type=message.sender_type,
                 message_text=message.text,
+                reply_context_text=message.reply_context_text,
+                reply_context_sender_name=message.reply_context_sender_name,
+                reply_context_sender_type=message.reply_context_sender_type,
                 message_timestamp=message.timestamp,
             )
             db.add(existing_message)
             db.flush()
+            existing_messages.append(existing_message)
         else:
+            existing_message.external_message_id = external_message_id
             existing_message.sender_name = message.author
             existing_message.sender_type = message.sender_type
             existing_message.message_text = message.text
+            existing_message.reply_context_text = message.reply_context_text
+            existing_message.reply_context_sender_name = (
+                message.reply_context_sender_name
+            )
+            existing_message.reply_context_sender_type = (
+                message.reply_context_sender_type
+            )
             existing_message.message_timestamp = message.timestamp
             db.add(existing_message)
+
+        existing_by_external_id[external_message_id] = existing_message
+
+
+def find_matching_synthetic_sales_message(
+    *,
+    existing_messages: list[Message],
+    incoming_message: NormalizedSnapshotMessage,
+) -> Message | None:
+    if incoming_message.sender_type != "sales":
+        return None
+
+    normalized_text = incoming_message.text.strip()
+    if not normalized_text:
+        return None
+
+    incoming_timestamp = ensure_aware_utc(incoming_message.timestamp)
+
+    exact_text_candidates = [
+        message
+        for message in existing_messages
+        if message.external_message_id is None
+        and message.sender_type == "sales"
+        and message.message_text.strip() == normalized_text
+    ]
+
+    candidates = [
+        message
+        for message in exact_text_candidates
+        if message.message_timestamp is not None
+        and abs(ensure_aware_utc(message.message_timestamp) - incoming_timestamp)
+        <= SYNTHETIC_SALES_MATCH_WINDOW
+    ]
+
+    if not candidates:
+        recent_fallback_candidates = [
+            message
+            for message in exact_text_candidates
+            if abs(
+                ensure_aware_utc(message.created_at) - datetime.now(timezone.utc)
+            )
+            <= SYNTHETIC_SALES_MATCH_WINDOW
+        ]
+
+        if len(recent_fallback_candidates) == 1:
+            return recent_fallback_candidates[0]
+
+        return None
+
+    return min(
+        candidates,
+        key=lambda message: abs(
+            ensure_aware_utc(message.message_timestamp) - incoming_timestamp
+        ),
+    )
 
 def is_extension_cache_fresh(
     *,
@@ -389,14 +629,20 @@ def sync_whatsapp_extension_snapshot(
         normalized_messages=normalized_messages,
     )
 
+    db.commit()
+    db.refresh(conversation)
+
     customer_messages = [
         message for message in normalized_messages if message.sender_type == "customer"
     ]
-    ensure_conversation_lead(
-        db=db,
-        conversation=conversation,
-        preferred_name=customer_messages[0].author if customer_messages else snapshot.chat_title,
-    )
+    with db.no_autoflush:
+        ensure_conversation_lead(
+            db=db,
+            conversation=conversation,
+            preferred_name=(
+                customer_messages[0].author if customer_messages else snapshot.chat_title
+            ),
+        )
 
     db.commit()
     db.refresh(conversation)
@@ -437,9 +683,9 @@ def build_extension_reply_suggestions_response(
         conversation_id=snapshot_result.conversation_id,
         reply_suggestion_id=suggestion.id,
         message_count=snapshot_result.message_count,
-        suggestions=[item.text for item in suggestion_details[:3]],
-        suggestion_details=suggestion_details[:3],
-        risk_level=suggestion.risk_level,
+        suggestions=[item.text for item in suggestion_details[:1]],
+        suggestion_details=suggestion_details[:1],
+        risk_level=suggestion.risk_level or extraction.risk_level,
         action_mode=suggestion.action_mode,
         next_best_action=extraction.next_best_action,
         customer_summary=extraction.customer_summary,
@@ -498,6 +744,7 @@ def generate_extension_reply_suggestions(
     suggestion = create_reply_suggestion(
         db=db,
         conversation_id=snapshot_result.conversation_id,
+        desired_count=1,
     )
 
     return build_extension_reply_suggestions_response(
@@ -601,6 +848,12 @@ def confirm_extension_reply_sent(
 
     db.add(sent_message)
     db.flush()
+    latest_known_message_at = ensure_aware_utc(conversation.last_message_at)
+    synthetic_message_timestamp = (
+        latest_known_message_at + timedelta(seconds=1)
+        if latest_known_message_at is not None
+        else sent_message.sent_at
+    )
     conversation.last_message_at = sent_message.sent_at
     db.add(
         Message(
@@ -609,7 +862,7 @@ def confirm_extension_reply_sent(
             sender_type="sales",
             external_message_id=None,
             message_text=suggestion.final_reply_text,
-            message_timestamp=sent_message.sent_at,
+            message_timestamp=synthetic_message_timestamp,
         )
     )
     db.add(conversation)

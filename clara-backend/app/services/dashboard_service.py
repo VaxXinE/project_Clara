@@ -108,6 +108,55 @@ from app.services.source_intelligence_service import (
 from app.services.role_service import is_head_like, is_sales_like, is_superadmin_like
 
 
+def dedupe_timeline_messages(messages: list[Message]) -> list[Message]:
+    sorted_messages = sorted(
+        messages,
+        key=lambda message: (
+            message.message_timestamp or datetime.min.replace(tzinfo=timezone.utc),
+            str(message.id),
+        ),
+    )
+
+    deduped_messages: list[Message] = []
+
+    for message in sorted_messages:
+        if not deduped_messages:
+            deduped_messages.append(message)
+            continue
+
+        previous = deduped_messages[-1]
+        previous_text = (previous.message_text or "").strip()
+        current_text = (message.message_text or "").strip()
+        previous_timestamp = previous.message_timestamp
+        current_timestamp = message.message_timestamp
+
+        is_synthetic_sales_duplicate = (
+            previous.sender_type == "sales"
+            and message.sender_type == "sales"
+            and previous_text
+            and previous_text == current_text
+            and previous_timestamp is not None
+            and current_timestamp is not None
+            and abs((current_timestamp - previous_timestamp).total_seconds()) <= 600
+            and (
+                previous.external_message_id is None
+                or message.external_message_id is None
+            )
+        )
+
+        if not is_synthetic_sales_duplicate:
+            deduped_messages.append(message)
+            continue
+
+        deduped_messages[-1] = (
+            message
+            if message.external_message_id and not previous.external_message_id
+            else previous
+        )
+
+    return deduped_messages
+
+
 def build_ai_summary(
     extraction: AIExtraction | None,
 ) -> DashboardAIExtractionSummary | None:
@@ -810,10 +859,7 @@ def get_sales_conversation_detail(
     latest_extraction = get_latest_extraction(conversation)
     latest_suggestion = get_latest_reply_suggestion(conversation)
 
-    sorted_messages = sorted(
-        conversation.messages,
-        key=lambda message: message.message_timestamp,
-    )
+    sorted_messages = dedupe_timeline_messages(conversation.messages)
 
     sorted_sent_messages = sorted(
         conversation.sent_messages,
@@ -842,6 +888,9 @@ def get_sales_conversation_detail(
                 "sender_name": message.sender_name,
                 "sender_type": message.sender_type,
                 "message_text": message.message_text,
+                "reply_context_text": message.reply_context_text,
+                "reply_context_sender_name": message.reply_context_sender_name,
+                "reply_context_sender_type": message.reply_context_sender_type,
                 "message_timestamp": message.message_timestamp.isoformat(),
             }
             for message in sorted_messages

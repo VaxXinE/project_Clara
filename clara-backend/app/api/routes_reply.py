@@ -35,6 +35,7 @@ router = APIRouter(tags=["reply-suggestions"])
 )
 def create_reply_suggestion_endpoint(
     conversation_id: UUID,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
@@ -45,8 +46,41 @@ def create_reply_suggestion_endpoint(
             current_user=current_user,
         )
 
-        return create_reply_suggestion(db=db, conversation_id=conversation_id)
+        suggestion = create_reply_suggestion(db=db, conversation_id=conversation_id)
+
+        create_audit_log(
+            db=db,
+            action="reply_suggestion.generate",
+            resource_type="reply_suggestion",
+            resource_id=str(suggestion.id),
+            current_user=current_user,
+            request=request,
+            metadata={
+                "conversation_id": str(suggestion.conversation_id),
+                "ai_extraction_id": str(suggestion.ai_extraction_id),
+                "approval_status": suggestion.approval_status,
+                "risk_level": suggestion.risk_level,
+                "action_mode": suggestion.action_mode,
+                "suggestion_count": len(suggestion.suggested_replies),
+                "policy_reason_count": len(suggestion.policy_reasons),
+            },
+        )
+
+        return suggestion
     except ReplySuggestionError as exc:
+        create_audit_log(
+            db=db,
+            action="reply_suggestion.generate_failed",
+            resource_type="conversation",
+            resource_id=str(conversation_id),
+            current_user=current_user,
+            request=request,
+            metadata={
+                "conversation_id": str(conversation_id),
+                "error_type": type(exc).__name__,
+                "error_message": str(exc)[:500],
+            },
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),

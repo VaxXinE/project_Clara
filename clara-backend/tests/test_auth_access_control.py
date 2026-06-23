@@ -69,6 +69,20 @@ def test_authenticated_user_can_issue_bearer_access_token_for_extension(
     assert len(payload["access_token"]) > 20
 
 
+def test_cookie_auth_mutating_request_without_csrf_token_is_rejected(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    owner = seeded_data["owner"]
+
+    login(client, email=owner.email, password="OwnerPass123!")
+
+    response = client.post("/auth/access-token")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "CSRF validation failed."
+
+
 def test_inactive_user_cannot_login(
     client: TestClient,
     seeded_data: dict[str, object],

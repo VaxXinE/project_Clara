@@ -1,95 +1,65 @@
-Tujuan:
-Membuat sistem belajar dari chat real dan meningkatkan kualitas closing.
+Klasifikasi user:
 
-Cara kerja:
+COLD
 
-* setiap chat user dianggap sebagai data
-* sistem membaca pola:
+* curiga
+* takut ditipu
+* defensif
 
-  * emosi user
-  * tipe objection
-  * level trust
-  * niat (serius / tidak)
+WARM
 
----
+* banyak tanya
+* mulai menimbang
+* butuh validasi
 
-KLASIFIKASI USER:
+HOT
 
-1. COLD
-
-* banyak curiga
-* banyak nolak
-* distrust tinggi
-
-2. WARM
-
-* mulai nanya
-* masih ragu
-* butuh diyakinkan
-
-3. HOT
-
-* sudah ngerti
-* tinggal dorongan kecil
-* siap closing
+* tanya proses
+* tanya data
+* bilang mau lanjut
+* bilang data sudah dikirim
 
 ---
 
-STRATEGI PER TIPE:
+Strategi:
 
-COLD:
+COLD
 
-* jangan jualan
-* validasi dulu
-* turunin resistensi
+* turunkan resistensi
+* jawab fakta
+* jangan closing
 
-WARM:
+WARM
 
-* jawab + arahkan
-* mulai framing
-* bangun trust
+* jawab singkat
+* kasih struktur
+* arahkan ke langkah ringan
 
-HOT:
+HOT
 
-* langsung arahkan action
-* gunakan closing ringan
-* jangan kebanyakan jelasin
-
----
-
-DETEKSI EMOSI:
-
-Takut → validasi → kecilkan risiko
-Marah → turunin tensi → jangan debat
-Ragu → kasih kejelasan → pelan
-Tertarik → arahkan step
-Siap → closing
+* jangan edukasi ulang
+* kasih instruksi konkret
+* arahkan ke data, verifikasi, atau handoff
+* jika user sudah aktivasi, arahkan ke penggunaan awal
+* jika user sudah deposit dan mau mulai transaksi, arahkan ke langkah operasional setelah akun aktif
 
 ---
 
-ADAPTASI GAYA:
+Deteksi intent:
 
-Jika user pendek → jawab pendek
-Jika user santai → santai
-Jika user serius → lebih rapi
+Takut
+→ validasi + bedakan legalitas dan risiko
 
----
+Kritis
+→ jawab logis dan spesifik
 
-LEARNING RULE:
+Ragu
+→ beri kejelasan, jangan filler
 
-Jika user:
-
-* banyak nolak → jangan push
-* banyak tanya → arahkan
-* sudah setuju → closing
+Siap
+→ tutup dengan next step operasional
 
 ---
 
-PRINSIP:
-
-* jangan pakai 1 gaya ke semua orang
-* baca situasi dulu
-* respon sesuai level user
-
-Tujuan akhir:
-membuat setiap chat terasa personal, bukan template
+Prinsip:
+respon harus mengikuti level user, bukan template generik

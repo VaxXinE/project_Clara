@@ -111,7 +111,7 @@ export default function NotificationsPage() {
       setNotifications(data);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat notification center."
+        error instanceof Error ? error.message : "Gagal memuat alert center."
       );
     } finally {
       setIsLoading(false);
@@ -138,7 +138,7 @@ export default function NotificationsPage() {
       } catch (error) {
         if (!isCancelled) {
           setErrorMessage(
-            error instanceof Error ? error.message : "Gagal memuat notification center.",
+            error instanceof Error ? error.message : "Gagal memuat alert center.",
           );
         }
       } finally {
@@ -309,27 +309,38 @@ export default function NotificationsPage() {
   const isActiveStatusView = statusFilter === "active";
   const showActiveEmptyState =
     hasAnyNotifications && isActiveStatusView && filteredNotifications.length === 0;
+  const headPrimaryAlert = isHeadMonitorView ? roleScopedNotifications[0] ?? null : null;
+  const headAlertSummary = isHeadMonitorView
+    ? scopedCounts.active > 0
+      ? `Ada ${scopedCounts.active} alert aktif yang sudah masuk radar Head. Mulai dari yang paling berisiko, lalu putuskan apakah cukup dipantau, perlu ditekan ke manager, atau harus dinaikkan levelnya.`
+      : scopedCounts.resolved > 0
+        ? "Tidak ada alert aktif saat ini. Kalau perlu, buka histori selesai untuk membaca pola masalah yang baru lewat."
+        : "Belum ada sinyal lintas tim yang cukup besar untuk masuk radar Head."
+    : "";
+  const filterSummaryText = isHeadMonitorView
+    ? `Menampilkan ${paginatedNotifications.length} dari ${filteredNotifications.length} alert yang relevan untuk keputusan Head.`
+    : `Menampilkan ${paginatedNotifications.length} dari ${filteredNotifications.length} alert`;
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow={
         isHeadMonitorView
-          ? "Head follow-up"
+          ? "Alert Tim"
           : isOversightAlertView
             ? "Manager follow-up"
             : "Operational orchestration"
       }
-      title="Alert Center"
+      title={isHeadMonitorView ? "Alert Tim" : "Alert Center"}
       description={
         isHeadMonitorView
-          ? "Halaman ini dipakai Head untuk memantau follow-up tim, membaca lead yang mulai berisiko, lalu menentukan area mana yang harus segera ditekan ke Sales."
+          ? "Halaman ini dipakai Head untuk membaca alert lintas tim yang paling penting, lalu cepat memutuskan area mana yang perlu dipantau, ditekan, atau dinaikkan eskalasinya."
           : isOversightAlertView
-            ? "Halaman ini dipakai manager untuk mengecek follow-up sales yang mulai overdue, hot lead yang belum ditindak, dan titik follow-up yang perlu ditekan ke tim."
+            ? "Halaman ini dipakai manager untuk mengecek follow-up sales yang mulai overdue, lead yang belum ditindak, dan titik yang perlu segera ditekan ke tim."
           : "Tempat untuk melihat sinyal operasional yang harus segera ditindak: follow-up overdue, chat review kritis, dan alert KPI yang relevan dengan role Anda."
       }
       backHref="/dashboard"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
         <>
           {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
@@ -344,14 +355,14 @@ export default function NotificationsPage() {
               href={isHeadMonitorView ? "/dashboard/crm" : "/dashboard/manager-insights"}
               className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
             >
-              {isHeadMonitorView ? "Lead Management" : "Manager Insights"}
+              {isHeadMonitorView ? "Buka Lead Tim" : "Monitor Tim"}
             </Link>
           )}
           <Link
             href="/dashboard/approvals"
             className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
           >
-            {isHeadMonitorView ? "Follow-up Center" : "Chat Review Center"}
+            {isHeadMonitorView ? "Buka Arahan Tim" : "Review Sales"}
           </Link>
         </>
       }
@@ -359,7 +370,7 @@ export default function NotificationsPage() {
       <div className="space-y-6">
         {isLoading && (
           <div className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
-            Loading notifications...
+            Loading alert center...
           </div>
         )}
 
@@ -371,21 +382,86 @@ export default function NotificationsPage() {
 
         {notifications && !isLoading && !errorMessage && (
           <>
+            {isHeadMonitorView ? (
+              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="max-w-3xl">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                      Ringkasan hari ini
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold text-[#fff0c9]">
+                      Prioritaskan alert yang benar-benar butuh keputusan Head
+                    </h2>
+                    <p className="mt-3 text-sm leading-7 text-[#e3c990]">
+                      {headAlertSummary}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      href="/dashboard/manager-insights"
+                      className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                    >
+                      Buka Head Insight
+                    </Link>
+                    <Link
+                      href="/dashboard/approvals"
+                      className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
+                    >
+                      Buka Arahan Tim
+                    </Link>
+                  </div>
+                </div>
+
+                {headPrimaryAlert ? (
+                  <div className="mt-5 rounded-[24px] border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                      Alert teratas untuk dibaca dulu
+                    </p>
+                    <p className="mt-2 text-base font-semibold text-[#fff0c9]">
+                      {headPrimaryAlert.lead_name ?? headPrimaryAlert.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
+                      {headPrimaryAlert.body}
+                    </p>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
             {hasAnyNotifications ? (
               <>
                 {!showActiveEmptyState ? (
                   <>
                     <section className="grid gap-4 md:grid-cols-3">
                       <MetricCard
-                        label={isOversightAlertView ? "Perlu Follow-up" : "Active"}
+                        label={
+                          isHeadMonitorView
+                            ? "Butuh keputusan"
+                            : isOversightAlertView
+                              ? "Perlu Follow-up"
+                              : "Active"
+                        }
                         value={String(scopedCounts.active)}
                       />
                       <MetricCard
-                        label={isOversightAlertView ? "Sudah Dicek" : "Acknowledged"}
+                        label={
+                          isHeadMonitorView
+                            ? "Sudah ditinjau"
+                            : isOversightAlertView
+                              ? "Sudah Dicek"
+                              : "Acknowledged"
+                        }
                         value={String(scopedCounts.acknowledged)}
                       />
                       <MetricCard
-                        label={isOversightAlertView ? "Selesai" : "Resolved"}
+                        label={
+                          isHeadMonitorView
+                            ? "Sudah ditutup"
+                            : isOversightAlertView
+                              ? "Selesai"
+                              : "Resolved"
+                        }
                         value={String(scopedCounts.resolved)}
                       />
                     </section>
@@ -395,11 +471,11 @@ export default function NotificationsPage() {
                         className={`grid gap-4 ${isOversightAlertView ? "md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-4"}`}
                       >
                         <MetricCard
-                          label="Escalated"
+                          label={isHeadMonitorView ? "Naik level" : "Escalated"}
                           value={String(scopedCounts.escalated)}
                         />
                         <MetricCard
-                          label="Generated"
+                          label={isHeadMonitorView ? "Data terakhir" : "Generated"}
                           value={formatDateTime(notifications.generated_at)}
                         />
                         {!isOversightAlertView ? (
@@ -429,20 +505,22 @@ export default function NotificationsPage() {
                         </p>
                         <h3 className="mt-2 text-lg font-semibold text-[#fff0c9]">
                           {isOversightAlertView
-                            ? "Tidak ada follow-up sales yang perlu ditekan sekarang"
+                            ? isHeadMonitorView
+                              ? "Belum ada area tim yang perlu ditekan sekarang"
+                              : "Tidak ada follow-up sales yang perlu ditekan sekarang"
                             : "Tidak ada sinyal operasional yang perlu ditangani sekarang"}
                         </h3>
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-[#e3c990]">
                           {isOversightAlertView
                             ? isHeadMonitorView
-                              ? "Kalau area ini kosong, berarti belum ada sales yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead management, Head Insights, atau histori alert follow-up yang sudah selesai."
-                              : "Kalau area ini kosong, berarti belum ada sales yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead management, manager insights, atau histori alert follow-up yang sudah selesai."
+                              ? "Kalau area ini kosong, berarti belum ada tim yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead tim, monitor tim, atau histori alert yang sudah selesai."
+                              : "Kalau area ini kosong, berarti belum ada sales yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead tim, monitor tim, atau histori alert follow-up yang sudah selesai."
                             : `Fokus halaman ini adalah alert aktif. Karena sekarang kosong, lanjutkan kerja dari ${
                                 canAccessQueue
                                   ? "Action Center, Queue, atau Lead Management"
                                   : isHeadMonitorView
-                                    ? "Head Insights, Lead Management, atau Follow-up Center"
-                                    : "Manager Insights atau Chat Review Center"
+                                    ? "Head Insight, Lead Tim, atau Arahan Tim"
+                                    : "Monitor Tim atau Review Sales"
                               }.`}
                           {scopedCounts.resolved > 0
                             ? ` Ada ${scopedCounts.resolved} alert resolved yang bisa dibuka kalau kamu butuh melihat histori.`
@@ -473,22 +551,34 @@ export default function NotificationsPage() {
                           {canAccessQueue
                             ? "Buka Action Center"
                             : isHeadMonitorView
-                              ? "Buka Head Insights"
-                              : "Buka Manager Insights"}
+                              ? "Buka Head Insight"
+                              : "Buka Monitor Tim"}
                         </Link>
                       </div>
                     </div>
                     <div className="mt-5 grid gap-4 md:grid-cols-3">
-                      <MetricCard
-                        label={isOversightAlertView ? "Perlu Follow-up" : "Active"}
+                        <MetricCard
+                        label={
+                          isHeadMonitorView
+                            ? "Butuh keputusan"
+                            : isOversightAlertView
+                              ? "Perlu Follow-up"
+                              : "Active"
+                        }
                         value={String(scopedCounts.active)}
                       />
                       <MetricCard
-                        label={isOversightAlertView ? "Selesai" : "Resolved"}
+                        label={
+                          isHeadMonitorView
+                            ? "Sudah ditutup"
+                            : isOversightAlertView
+                              ? "Selesai"
+                              : "Resolved"
+                        }
                         value={String(scopedCounts.resolved)}
                       />
                       <MetricCard
-                        label="Generated"
+                        label={isHeadMonitorView ? "Data terakhir" : "Generated"}
                         value={formatDateTime(notifications.generated_at)}
                       />
                     </div>
@@ -496,6 +586,19 @@ export default function NotificationsPage() {
                 )}
 
                 <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+                  <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
+                        {isHeadMonitorView ? "Saring radar head" : "Saring alert"}
+                      </p>
+                      <h3 className="mt-1 text-lg font-semibold text-[#fff0c9]">
+                        {isHeadMonitorView
+                          ? "Tampilkan hanya alert yang memang perlu dibaca Head dulu"
+                          : "Tampilkan hanya alert yang memang ingin Anda baca dulu"}
+                      </h3>
+                    </div>
+                    <p className="text-sm text-[#d8bc84]">{filterSummaryText}</p>
+                  </div>
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <label className="space-y-2 text-sm font-medium text-[#e3c990]">
                       <span>Filter status</span>
@@ -532,11 +635,12 @@ export default function NotificationsPage() {
                     </label>
 
                     <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4 xl:col-span-2">
-                      <p className="text-sm text-[#d8bc84]">
-                        Menampilkan {paginatedNotifications.length} dari {filteredNotifications.length} alert
-                      </p>
+                      <p className="text-sm text-[#d8bc84]">{filterSummaryText}</p>
                       <p className="mt-2 text-sm text-[#d8bc84]">
                         Halaman {effectiveNotificationPage} dari {totalNotificationPages}
+                        {isHeadMonitorView
+                          ? " • pakai status aktif kalau mau fokus ke keputusan hari ini"
+                          : ""}
                       </p>
                     </div>
                   </div>
@@ -556,7 +660,7 @@ export default function NotificationsPage() {
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0cb73]/12 pb-4">
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
-                              Sales Owner
+                              {isHeadMonitorView ? "PIC sales" : "Sales Owner"}
                             </p>
                             <h2 className="mt-2 text-lg font-semibold text-[#fff0c9]">
                               {group.ownerName}
@@ -620,8 +724,8 @@ export default function NotificationsPage() {
                                         ) as string
                                       }
                                       className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
-                                    >
-                                      Buka Follow-up
+                                  >
+                                      {isHeadMonitorView ? "Buka konteks" : "Buka Follow-up"}
                                     </Link>
                                   ) : null}
                                   {item.status === "active" ? (
@@ -634,7 +738,7 @@ export default function NotificationsPage() {
                                         }}
                                         className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
                                       >
-                                        {updatingId === item.id ? "Memproses..." : "Sudah Dicek"}
+                                        {updatingId === item.id ? "Memproses..." : isHeadMonitorView ? "Tandai dibaca" : "Sudah Dicek"}
                                       </button>
                                       <button
                                         type="button"
@@ -644,7 +748,7 @@ export default function NotificationsPage() {
                                         }}
                                         className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-70"
                                       >
-                                        Tandai Selesai
+                                        {isHeadMonitorView ? "Tandai selesai" : "Tandai Selesai"}
                                       </button>
                                     </>
                                   ) : null}
@@ -821,8 +925,8 @@ export default function NotificationsPage() {
                 </p>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-[#e3c990]">
                   {isHeadMonitorView
-                    ? "Saat Alert Center kosong, itu artinya follow-up tim sales sedang relatif aman. Untuk role head, langkah berikutnya biasanya memantau Head Insights, Lead Management, dan pipeline lead yang masih tertahan."
-                    : "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role manager, langkah berikutnya biasanya memantau disiplin tim, coaching review, atau status lead yang masih tertahan."}
+                    ? "Saat Alert Tim kosong, itu artinya follow-up tim sedang relatif aman. Untuk role Head, langkah berikutnya biasanya lanjut ke Head Insight, Lead Tim, lalu cek pipeline yang masih tertahan."
+                    : "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role manager, langkah berikutnya biasanya memantau tim, review balasan sales, atau cek lead yang masih tertahan."}
                 </p>
                 <div className="mt-5 flex flex-wrap gap-3">
                   {isHeadMonitorView ? (
@@ -830,27 +934,27 @@ export default function NotificationsPage() {
                       href="/dashboard/manager-insights"
                       className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
                     >
-                      Buka Head Insights
+                      Buka Head Insight
                     </Link>
                   ) : (
                     <Link
                       href="/dashboard/manager-insights"
                       className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
                     >
-                      Buka Manager Insights
+                      Buka Head Insight
                     </Link>
                   )}
                   <Link
                     href="/dashboard/approvals"
                     className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                   >
-                    {isHeadMonitorView ? "Buka Follow-up Center" : "Buka Chat Review Center"}
+                    {isHeadMonitorView ? "Buka Arahan Tim" : "Buka Review Sales"}
                   </Link>
                   <Link
                     href="/dashboard/crm"
                     className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
                   >
-                    Buka Lead Management
+                    Buka Lead Tim
                   </Link>
                   {isHeadMonitorView ? (
                     null

@@ -35,6 +35,8 @@ from app.services.customer_profile_service import (
     customer_profile_load_only_columns,
     build_customer_profile_summary,
     ensure_customer_profile_for_lead,
+    normalize_customer_identity_name,
+    resolve_customer_profile_name,
     sync_customer_profile_temperature,
 )
 from app.services.lead_discipline_service import (
@@ -148,6 +150,63 @@ def ensure_conversation_lead(
         if lead is not None:
             return lead
 
+    resolved_customer_name = resolve_customer_profile_name(
+        conversation=conversation,
+        preferred_name=preferred_name,
+    )
+    resolved_canonical_key = normalize_customer_identity_name(resolved_customer_name)
+
+    if resolved_canonical_key != "unknown-customer":
+        existing_profile = db.scalars(
+            select(CustomerProfile)
+            .where(
+                CustomerProfile.organization_id == conversation.organization_id,
+                CustomerProfile.canonical_key == resolved_canonical_key,
+                CustomerProfile.merged_into_profile_id.is_(None),
+            )
+            .order_by(
+                desc(CustomerProfile.last_contact_at),
+                desc(CustomerProfile.created_at),
+            )
+            .options(load_only(*customer_profile_load_only_columns(db)))
+        ).first()
+
+        if existing_profile is not None:
+            reusable_leads = list(
+                db.scalars(
+                    select(Lead)
+                    .where(
+                        Lead.organization_id == conversation.organization_id,
+                        Lead.customer_profile_id == existing_profile.id,
+                        Lead.assigned_user_id == conversation.sales_user_id,
+                    )
+                    .order_by(desc(Lead.last_contact_at), desc(Lead.created_at))
+                ).all()
+            )
+            preferred_reusable_lead = next(
+                (
+                    candidate
+                    for candidate in reusable_leads
+                    if candidate.current_stage not in {"won", "lost"}
+                ),
+                reusable_leads[0] if reusable_leads else None,
+            )
+            if preferred_reusable_lead is not None:
+                conversation.lead_id = preferred_reusable_lead.id
+                create_lead_activity_event(
+                    db=db,
+                    lead=preferred_reusable_lead,
+                    event_type="conversation_linked",
+                    title="Conversation baru dihubungkan ke lead yang sudah ada",
+                    description=(
+                        "Clara menemukan customer profile yang sama dari percakapan "
+                        "baru dan memakai lead existing agar tidak membuat duplikasi."
+                    ),
+                    actor_user_id=conversation.sales_user_id,
+                    to_value=conversation.title.strip() or resolved_customer_name,
+                )
+                return preferred_reusable_lead
+
     lead = Lead(
         organization_id=conversation.organization_id,
         assigned_user_id=conversation.sales_user_id,
@@ -165,8 +224,6 @@ def ensure_conversation_lead(
     db.flush()
 
     conversation.lead_id = lead.id
-    db.add(conversation)
-    db.flush()
     create_lead_activity_event(
         db=db,
         lead=lead,

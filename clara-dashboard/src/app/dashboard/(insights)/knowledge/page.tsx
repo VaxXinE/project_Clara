@@ -286,21 +286,36 @@ export default function ProductKnowledgePage() {
     items.find((item) => item.id === effectiveSelectedKnowledgeId) ??
     items[0] ??
     null;
+  const selectedKnowledgeStats = selectedKnowledge
+    ? buildKnowledgeContentStats(selectedKnowledge.content)
+    : null;
+  const roleActionHref =
+    currentUser?.role === "head"
+      ? "/dashboard/approvals"
+      : currentUser?.role === "manager"
+        ? "/dashboard/manager-insights"
+        : "/dashboard/sales";
+  const roleActionLabel =
+    currentUser?.role === "head"
+      ? "Buka Arahan Tim"
+      : currentUser?.role === "manager"
+        ? "Buka Monitor Tim"
+        : "Buka Inbox";
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow="Knowledge base"
-      title="Product Knowledge"
-      description="Kelola sumber fakta resmi untuk menjaga jawaban Clara tetap akurat, aman, dan grounded."
+      title="Knowledge Base"
+      description="Satu tempat untuk membaca, menyaring, dan merapikan sumber fakta resmi supaya jawaban Clara tetap konsisten dan tidak ngawur."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
         <Link
-          href="/dashboard/sales"
+          href={roleActionHref}
           className="clara-button clara-button-ghost"
         >
-          Buka Inbox
+          {roleActionLabel}
         </Link>
       }
     >
@@ -436,7 +451,13 @@ export default function ProductKnowledgePage() {
           </section>
         )}
 
-        <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <section
+          className={
+            canManageKnowledge
+              ? "grid gap-6 lg:grid-cols-[0.95fr_1.05fr]"
+              : "space-y-4"
+          }
+        >
           {canManageKnowledge && (
             <form
               onSubmit={handleSubmit}
@@ -587,16 +608,38 @@ export default function ProductKnowledgePage() {
 
           <section className="space-y-4">
             <div className="clara-card rounded-[30px] p-5">
-              <h2 className="text-lg font-semibold text-slate-950">
-                Current Knowledge Entries
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Entry aktif akan ikut menjadi grounding context untuk AI reply.
-              </p>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-2xl">
+                  <h2 className="text-lg font-semibold text-slate-950">
+                    Current Knowledge Entries
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    Cari dulu entry yang relevan, lalu baca detailnya di panel
+                    kanan. Mode ini lebih enak untuk scan cepat daripada scroll
+                    semua knowledge dari atas ke bawah.
+                  </p>
+                </div>
+                {selectedKnowledge && selectedKnowledgeStats ? (
+                  <div className="flex flex-wrap gap-3">
+                    <QuickStat
+                      label="Entry dipilih"
+                      value={selectedKnowledge.title}
+                    />
+                    <QuickStat
+                      label="Status baca"
+                      value={selectedKnowledgeStats.label}
+                    />
+                    <QuickStat
+                      label="Sumber"
+                      value={selectedKnowledge.source_type}
+                    />
+                  </div>
+                ) : null}
+              </div>
 
               <form
                 onSubmit={handleApplyFilters}
-                className="mt-5 grid gap-3 md:grid-cols-[1.5fr_1fr_auto_auto]"
+                className="mt-5 grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_220px_180px_auto]"
               >
                 <input
                   value={filters.q ?? ""}
@@ -644,7 +687,7 @@ export default function ProductKnowledgePage() {
                   <option value="false">Inactive only</option>
                 </select>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="submit"
                     className="clara-button clara-button-primary"
@@ -661,14 +704,6 @@ export default function ProductKnowledgePage() {
                 </div>
               </form>
             </div>
-
-            {!isLoading && items.length > 0 && (
-              <div className="rounded-[22px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-                Pilih satu entry di daftar untuk membaca isi lengkapnya di panel
-                detail. Ini lebih cepat daripada scroll semua knowledge dari
-                atas ke bawah.
-              </div>
-            )}
 
             {!canManageKnowledge && errorMessage && (
               <div className="clara-alert clara-alert-danger">
@@ -700,10 +735,11 @@ export default function ProductKnowledgePage() {
             )}
 
             {!isLoading && items.length > 0 && (
-              <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-                <div className="space-y-3 xl:max-h-[78vh] xl:overflow-y-auto xl:pr-1 clara-scrollbar">
+              <section className="grid gap-5 2xl:grid-cols-[380px_minmax(0,1fr)]">
+                <div className="space-y-3 2xl:max-h-[78vh] 2xl:overflow-y-auto 2xl:pr-1 clara-scrollbar">
                   {items.map((item) => {
                     const isSelected = item.id === selectedKnowledge?.id;
+                    const contentStats = buildKnowledgeContentStats(item.content);
 
                     return (
                       <button
@@ -718,7 +754,7 @@ export default function ProductKnowledgePage() {
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <h3
-                            className={`text-base font-semibold ${
+                            className={`text-[1.05rem] font-semibold leading-7 ${
                               isSelected ? "text-white" : "text-slate-950"
                             }`}
                           >
@@ -747,15 +783,38 @@ export default function ProductKnowledgePage() {
                             {item.is_active ? "active" : "inactive"}
                           </span>
                         </div>
+                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]">
+                          <span
+                            className={
+                              isSelected ? "text-slate-300" : "text-slate-500"
+                            }
+                          >
+                            {contentStats.sectionCount} blok
+                          </span>
+                          <span
+                            className={
+                              isSelected ? "text-slate-400" : "text-slate-400"
+                            }
+                          >
+                            •
+                          </span>
+                          <span
+                            className={
+                              isSelected ? "text-slate-300" : "text-slate-500"
+                            }
+                          >
+                            {contentStats.lineCount} baris
+                          </span>
+                        </div>
                         <p
                           className={`mt-3 text-sm leading-6 ${
                             isSelected ? "text-slate-200" : "text-slate-600"
                           }`}
                         >
-                          {buildPreviewText(item.content, 150)}
+                          {buildPreviewText(item.content, 175)}
                         </p>
                         <div
-                          className={`mt-3 flex flex-wrap gap-2 text-xs ${
+                          className={`mt-4 flex flex-wrap gap-2 text-xs ${
                             isSelected ? "text-slate-300" : "text-slate-500"
                           }`}
                         >
@@ -769,9 +828,9 @@ export default function ProductKnowledgePage() {
                 </div>
 
                 {selectedKnowledge ? (
-                  <article className="clara-card rounded-[30px] p-5 xl:sticky xl:top-28">
+                  <article className="clara-card rounded-[30px] p-6 2xl:sticky 2xl:top-28">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div>
+                      <div className="max-w-3xl">
                         <div className="flex flex-wrap items-center gap-2">
                           <h2 className="text-xl font-semibold text-slate-950">
                             {selectedKnowledge.title}
@@ -801,9 +860,10 @@ export default function ProductKnowledgePage() {
                           </span>
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-600">
-                          Detail lengkap knowledge yang sedang dipilih. Pakai
-                          panel ini saat benar-benar ingin membaca isi penuh
-                          atau melakukan edit.
+                          Fokus baca ada di sini. Isi knowledge dipecah per blok
+                          supaya kamu bisa scan cepat: lihat judul dulu, ambil
+                          fakta yang relevan, lalu lanjut ke blok berikutnya
+                          tanpa tenggelam di satu paragraf panjang.
                         </p>
                       </div>
 
@@ -832,27 +892,37 @@ export default function ProductKnowledgePage() {
                       ) : null}
                     </div>
 
-                    <div className="mt-5 grid gap-3 md:grid-cols-3">
+                    <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                       <MetaPill
                         label="Source"
                         value={selectedKnowledge.source_type}
                       />
                       <MetaPill
-                        label="Created by"
+                        label="Dibuat oleh"
                         value={selectedKnowledge.created_by_user_name ?? "-"}
                       />
                       <MetaPill
-                        label="Updated"
+                        label="Terakhir update"
                         value={formatDateTime(selectedKnowledge.updated_at)}
+                      />
+                      <MetaPill
+                        label="Peta baca"
+                        value={selectedKnowledgeStats?.label ?? "0 blok • 0 baris"}
                       />
                     </div>
 
                     <div className="mt-5 rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                        Isi Knowledge
-                      </p>
-                      <div className="clara-scrollbar mt-4 max-h-[52vh] overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-slate-700">
-                        {selectedKnowledge.content}
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                          Isi Knowledge
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          Mode baca dibuat polos supaya isi knowledge lebih enak
+                          discan dan tidak terasa seperti baca tumpukan kartu.
+                        </p>
+                      </div>
+                      <div className="clara-scrollbar mt-4 max-h-[60vh] overflow-y-auto pr-1">
+                        {renderKnowledgeContent(selectedKnowledge.content)}
                       </div>
                     </div>
                   </article>
@@ -886,15 +956,146 @@ function InfoCard({
   );
 }
 
+function QuickStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-[160px] flex-1 rounded-[20px] border border-slate-200 bg-white/80 px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function MetaPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold text-slate-950">{value}</p>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-950">
+        {value}
+      </p>
     </div>
   );
+}
+
+function renderKnowledgeContent(content: string) {
+  const blocks = content
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  const cleanedBlocks = blocks.filter(
+    (block) => !/^[-=*_•]{3,}$/.test(block.replace(/\s+/g, "")),
+  );
+
+  return (
+    <article className="space-y-6 text-[15px] leading-8 text-slate-700">
+      {cleanedBlocks.map((block, blockIndex) => {
+        const lines = block
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .filter((line) => line !== "---");
+
+        const titleLine = lines[0] ?? "";
+        const hasStructuredLead =
+          /^user\s*:/i.test(titleLine) ||
+          /^jawaban\s*:/i.test(titleLine) ||
+          /^q\s*:/i.test(titleLine) ||
+          /^a\s*:/i.test(titleLine);
+
+        return (
+          <section
+            key={`${blockIndex}-${block.slice(0, 40)}`}
+            className="border-b border-slate-200/80 pb-6 last:border-b-0 last:pb-0"
+          >
+            <div className="space-y-3">
+              {lines.map((line, lineIndex) => {
+                const isLabelLine =
+                  /^user\s*:/i.test(line) ||
+                  /^jawaban\s*:/i.test(line) ||
+                  /^q\s*:/i.test(line) ||
+                  /^a\s*:/i.test(line);
+
+                const isHeading =
+                  (lineIndex === 0 && !hasStructuredLead && line.length <= 90) ||
+                  /:$/.test(line);
+
+                if (/^[-*•]\s+/.test(line)) {
+                  return (
+                    <div
+                      key={`${blockIndex}-${lineIndex}`}
+                      className="flex gap-3 pl-1"
+                    >
+                      <span className="mt-3 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                      <p>{line.replace(/^[-*•]\s+/, "")}</p>
+                    </div>
+                  );
+                }
+
+                if (isLabelLine) {
+                  const [label, ...rest] = line.split(":");
+
+                  return (
+                    <p key={`${blockIndex}-${lineIndex}`}>
+                      <span className="font-semibold text-slate-950">
+                        {label}:
+                      </span>{" "}
+                      {rest.join(":").trim()}
+                    </p>
+                  );
+                }
+
+                if (isHeading) {
+                  return (
+                    <p
+                      key={`${blockIndex}-${lineIndex}`}
+                      className="text-base font-semibold tracking-tight text-slate-950"
+                    >
+                      {line}
+                    </p>
+                  );
+                }
+
+                return <p key={`${blockIndex}-${lineIndex}`}>{line}</p>;
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </article>
+  );
+}
+
+function buildKnowledgeContentStats(content: string) {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return {
+      sectionCount: 0,
+      lineCount: 0,
+      label: "0 blok • 0 baris",
+    };
+  }
+
+  const sectionCount = trimmed
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .filter((block) => !/^[-=*_•]{3,}$/.test(block.replace(/\s+/g, ""))).length;
+  const lineCount = trimmed
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean).length;
+
+  return {
+    sectionCount,
+    lineCount,
+    label: `${sectionCount} blok • ${lineCount} baris`,
+  };
 }
 
 function buildPreviewText(value: string, maxLength: number) {

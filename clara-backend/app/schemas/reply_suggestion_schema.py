@@ -6,13 +6,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class SuggestedReply(BaseModel):
-    tone: Literal["friendly", "professional", "empathetic", "urgent"]
+    tone: Literal["friendly", "professional", "empathetic", "urgent", "best"]
     text: str = Field(min_length=1, max_length=2000)
     reasoning: str = Field(min_length=1, max_length=1000)
 
 
 class ReplySuggestionCreate(BaseModel):
-    suggested_replies: list[SuggestedReply] = Field(min_length=3, max_length=3)
+    suggested_replies: list[SuggestedReply] = Field(min_length=1, max_length=3)
 
 
 class ReplySuggestionResponse(BaseModel):

@@ -21,6 +21,24 @@ const SOURCE_CHANNEL_OPTIONS = [
   { value: "telegram", label: "Telegram" },
 ] as const;
 
+type StatusBadgeTone = "good" | "warning" | "critical" | "neutral";
+
+type OpsStatusCard = {
+  label: string;
+  title: string;
+  description: string;
+  tone: StatusBadgeTone;
+};
+
+type OpsPriorityItem = {
+  label: string;
+  title: string;
+  description: string;
+  href: string | null;
+  cta: string;
+  tone: StatusBadgeTone;
+};
+
 function numberOrZero(value: number | undefined | null): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
@@ -186,9 +204,14 @@ export default function KpiCommandCenterPage() {
 
   const topSales = kpi?.sales_performance.slice(0, 3) ?? [];
   const topSources = kpi?.source_performance.slice(0, 4) ?? [];
-  const topOrganizations = kpi?.organization_performance.slice(0, 6) ?? [];
+  const topOrganizations = kpi?.organization_performance.slice(0, 3) ?? [];
   const activeAlerts = alertHistory?.items.slice(0, 6) ?? [];
   const latestSnapshots = snapshotHistory?.items.slice(0, 6) ?? [];
+  const urgentLiveAlerts = kpi?.alerts.slice(0, 3) ?? [];
+  const topRecommendations = kpi?.recommendations.slice(0, 3) ?? [];
+  const topObservations = kpi?.key_observations.slice(0, 3) ?? [];
+  const opsStatus = buildOpsStatus(kpi);
+  const opsPriorities = buildOpsPriorities(kpi);
 
   return (
     <WorkspaceShell
@@ -201,8 +224,13 @@ export default function KpiCommandCenterPage() {
       actions={
         <div className="flex flex-wrap items-center gap-3">
           {kpi ? (
-            <div className="rounded-full border border-[#f0cb73]/18 bg-[#1d150d] px-4 py-2.5 text-sm text-[#d6bb84]">
-              Generated: {formatDateTime(kpi.generated_at)}
+            <div className="rounded-[20px] border border-[#f0cb73]/18 bg-[#1d150d] px-4 py-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b89a62]">
+                Snapshot terakhir
+              </p>
+              <p className="mt-1 text-sm text-[#fff0c9]">
+                {formatDateTime(kpi.generated_at)}
+              </p>
             </div>
           ) : null}
           <button
@@ -218,7 +246,7 @@ export default function KpiCommandCenterPage() {
         </div>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-8">
         {isLoading ? (
           <div className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
             Loading KPI command center...
@@ -233,40 +261,95 @@ export default function KpiCommandCenterPage() {
 
         {kpi && !isLoading && !errorMessage ? (
           <>
-            <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
               <SectionPanel
-                eyebrow="Executive Summary"
-                title="Health snapshot"
-                description="Pandangan pertama untuk membaca tekanan operasional, risiko momentum, dan kualitas eksekusi tim."
-                action={<Badge label={kpi.scope_type} />}
+                eyebrow="Status Hari Ini"
+                title={opsStatus.title}
+                description={opsStatus.description}
+                action={
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusBadge tone={opsStatus.tone} label={opsStatus.label} />
+                    <Badge label={kpi.scope_type} />
+                  </div>
+                }
               >
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <MetricCard
-                    label="Total Leads"
-                    value={String(kpi.summary.total_leads)}
-                    hint="Lead yang sudah tercatat di CRM."
-                    tone="highlight"
+                    label="Overdue Follow-up"
+                    value={String(kpi.summary.overdue_follow_ups)}
+                    hint="Item yang paling cepat mengganggu ritme tim."
+                    tone={kpi.summary.overdue_follow_ups > 0 ? "highlight" : "default"}
                   />
                   <MetricCard
                     label="Hot Leads"
                     value={String(kpi.summary.hot_leads)}
-                    hint="Prospect yang perlu digerakkan cepat."
+                    hint="Prospect yang harus dijaga momentumnya."
                     tone="highlight"
                   />
                   <MetricCard
                     label="Reply Sent Rate"
                     value={formatPercent(kpi.summary.reply_sent_rate)}
-                    hint="Conversation yang sudah punya reply final."
+                    hint="Conversation yang sudah berhasil dikirim final."
                   />
                   <MetricCard
-                    label="Overdue Follow-up"
-                    value={String(kpi.summary.overdue_follow_ups)}
-                    hint="Follow-up yang sudah lewat jadwal."
+                    label="Active Alerts"
+                    value={String(kpi.alerts.length)}
+                    hint="Jumlah sinyal yang sekarang perlu perhatian."
                   />
                 </div>
 
-                <div className="mt-5 grid gap-5 lg:grid-cols-[0.88fr_1.12fr]">
-                  <div className="space-y-3">
+                <div className="mt-6 grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
+                  <div className="rounded-[24px] border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(26,19,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] p-5">
+                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
+                      Prioritas Utama
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[#b89a62]">
+                      Tiga jalur baca paling aman sebelum turun ke panel yang lebih detail.
+                    </p>
+                    <div className="mt-4 space-y-3">
+                      {opsPriorities.map((item) => (
+                        <article
+                          key={item.title}
+                          className="flex flex-col gap-3 rounded-2xl border border-[#f0cb73]/12 bg-[#1b130c] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.16)]"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusBadge tone={item.tone} label={item.label} />
+                            <p className="text-sm font-semibold text-[#fff0c9]">
+                              {item.title}
+                            </p>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
+                            {item.description}
+                          </p>
+                          {item.href ? (
+                            <Link
+                              href={item.href}
+                              className="mt-1 inline-flex w-fit rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                            >
+                              {item.cta}
+                            </Link>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[24px] border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(25,18,13,0.94)_0%,rgba(16,12,9,0.96)_100%)] p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
+                          Bacaan Cepat
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-[#b89a62]">
+                          Angka pendukung untuk memastikan konteks sebelum ambil keputusan.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                    <SummaryRow
+                      label="Generated"
+                      value={formatDateTime(kpi.generated_at)}
+                    />
                     <SummaryRow
                       label="Organizations"
                       value={String(kpi.summary.total_organizations)}
@@ -287,29 +370,6 @@ export default function KpiCommandCenterPage() {
                       label="Approved reply rate"
                       value={formatPercent(kpi.summary.approved_reply_rate)}
                     />
-                    <SummaryRow
-                      label="Win rate"
-                      value={formatPercent(kpi.summary.win_rate)}
-                    />
-                  </div>
-
-                  <div className="rounded-[24px] border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(26,19,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] p-5">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
-                      Observations
-                    </p>
-                    <div className="mt-4 space-y-3">
-                      {kpi.key_observations.length === 0 ? (
-                        <EmptyState text="Belum ada observasi utama yang cukup kuat untuk ditampilkan." />
-                      ) : (
-                        kpi.key_observations.map((item) => (
-                          <div
-                            key={item}
-                            className="rounded-2xl border border-[#f0cb73]/12 bg-[#1b130c] p-4 text-sm leading-6 text-[#fff0c9]"
-                          >
-                            {item}
-                          </div>
-                        ))
-                      )}
                     </div>
                   </div>
                 </div>
@@ -317,9 +377,9 @@ export default function KpiCommandCenterPage() {
 
               <div className="space-y-6">
                 <SectionPanel
-                  eyebrow="Control Rail"
-                  title="Filter and actions"
-                  description="Gunakan rail ini untuk mengganti scope channel, refresh snapshot, dan lompat ke area eksekusi terkait."
+                  eyebrow="Rail Kontrol"
+                  title="Filter dan jalur aksi"
+                  description="Ganti scope channel, lalu lompat cepat ke area kerja yang paling relevan."
                 >
                   <div className="space-y-5">
                     <div>
@@ -351,20 +411,20 @@ export default function KpiCommandCenterPage() {
 
                     <div className="grid gap-3 sm:grid-cols-2">
                       <SummaryTile
-                        label="Pipeline Value"
-                        value={formatIdr(kpi.summary.pipeline_value)}
+                        label="Alerts"
+                        value={String(kpi.alerts.length)}
                       />
                       <SummaryTile
-                        label="Won Value"
-                        value={formatIdr(kpi.summary.won_value)}
-                      />
-                      <SummaryTile
-                        label="Deposit"
-                        value={formatIdr(kpi.summary.deposit_amount)}
-                      />
-                      <SummaryTile
-                        label="Exec Actions"
+                        label="Recommendations"
                         value={String(kpi.recommendations.length)}
+                      />
+                      <SummaryTile
+                        label="Top Sources"
+                        value={String(kpi.source_performance.length)}
+                      />
+                      <SummaryTile
+                        label="Snapshots"
+                        value={String(snapshotHistory?.items.length ?? 0)}
                       />
                     </div>
 
@@ -389,37 +449,126 @@ export default function KpiCommandCenterPage() {
                 </SectionPanel>
 
                 <SectionPanel
-                  eyebrow="Marketing Attribution"
-                  title="Attribution pulse"
-                  description="Membaca kontribusi marketing terhadap lead, won value, dan deposit."
+                  eyebrow="Observasi Cepat"
+                  title="Yang paling perlu dibaca"
+                  description="Ringkas dulu tiga pembacaan utama sebelum turun ke panel performa dan histori."
                 >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <SummaryTile
-                      label="Leads Generated"
-                      value={String(
-                        kpi.marketing_execution_summary.leads_generated,
-                      )}
-                    />
-                    <SummaryTile
-                      label="Won Leads"
-                      value={String(kpi.marketing_execution_summary.won_leads)}
-                    />
-                    <SummaryTile
-                      label="Attributed Won"
-                      value={formatIdr(
-                        kpi.marketing_execution_summary.attributed_won_value,
-                      )}
-                    />
-                    <SummaryTile
-                      label="Attributed Deposit"
-                      value={formatIdr(
-                        kpi.marketing_execution_summary
-                          .attributed_deposit_amount,
-                      )}
-                    />
+                  <div className="space-y-3">
+                    {topObservations.length === 0 ? (
+                      <EmptyState text="Belum ada observasi utama yang cukup kuat untuk ditampilkan." />
+                    ) : (
+                      topObservations.map((item, index) => (
+                        <div
+                          key={item}
+                          className="rounded-2xl border border-[#f0cb73]/12 bg-[#1b130c] p-4"
+                        >
+                          <div className="flex gap-3">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#f0cb73]/14 bg-[#22190f] text-xs font-semibold text-[#f0cb73]">
+                              {index + 1}
+                            </span>
+                            <p className="text-sm leading-6 text-[#fff0c9]">{item}</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </SectionPanel>
               </div>
+            </section>
+
+            <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+              <SectionPanel
+                eyebrow="Live Alerts"
+                title="Anomali yang perlu perhatian"
+                description="Tiga alert teratas ditaruh di depan supaya layar pertama langsung menunjukkan apa yang harus dicek."
+              >
+                <div className="space-y-4">
+                  {urgentLiveAlerts.length === 0 ? (
+                    <EmptyState text="Belum ada alert yang cukup kuat untuk ditampilkan." />
+                  ) : (
+                    urgentLiveAlerts.map((alert) => (
+                      <article
+                        key={`${alert.severity}-${alert.title}`}
+                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.16)]"
+                      >
+                        <div className="flex flex-wrap items-center gap-3">
+                          <StatusBadge
+                            tone={alert.severity === "high" ? "critical" : "warning"}
+                            label={alert.severity}
+                          />
+                          <h3 className="text-base font-semibold text-[#fff0c9]">
+                            {alert.title}
+                          </h3>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
+                          {alert.description}
+                        </p>
+                        <div className="mt-4 rounded-2xl bg-[#1d150d] p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
+                            Recommended action
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
+                            {alert.recommended_action}
+                          </p>
+                        </div>
+                        {alert.target_href ? (
+                          <Link
+                            href={alert.target_href}
+                            className="mt-4 inline-flex rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                          >
+                            Buka area terkait
+                          </Link>
+                        ) : null}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </SectionPanel>
+
+              <SectionPanel
+                eyebrow="Executive Actions"
+                title="Tindakan prioritas"
+                description="Tiga langkah terdekat yang paling masuk akal untuk superadmin dan head."
+              >
+                <div className="space-y-4">
+                  {topRecommendations.length === 0 ? (
+                    <EmptyState text="Belum ada rekomendasi aksi yang cukup kuat." />
+                  ) : (
+                    topRecommendations.map((recommendation) => (
+                      <article
+                        key={`${recommendation.owner_role}-${recommendation.title}`}
+                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.16)]"
+                      >
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Badge label={recommendation.owner_role} />
+                          <h3 className="text-base font-semibold text-[#fff0c9]">
+                            {recommendation.title}
+                          </h3>
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
+                          {recommendation.rationale}
+                        </p>
+                        <div className="mt-4 rounded-2xl bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-4 text-[#fff0c9]">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
+                            Next step
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
+                            {recommendation.next_step}
+                          </p>
+                        </div>
+                        {recommendation.target_href ? (
+                          <Link
+                            href={recommendation.target_href}
+                            className="mt-4 inline-flex rounded-xl border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
+                          >
+                            Jalankan sekarang
+                          </Link>
+                        ) : null}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </SectionPanel>
             </section>
 
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -544,105 +693,39 @@ export default function KpiCommandCenterPage() {
               </SectionPanel>
 
               <SectionPanel
-                eyebrow="Executive Actions"
-                title="Tindakan prioritas"
-                description="Rekomendasi yang bisa langsung dijalankan oleh superadmin dan head."
+                eyebrow="Marketing Attribution"
+                title="Attribution pulse"
+                description="Kontribusi marketing tetap penting, tapi dibaca setelah status operasional dan alert utama sudah jelas."
               >
-                <div className="space-y-4">
-                  {kpi.recommendations.length === 0 ? (
-                    <EmptyState text="Belum ada rekomendasi aksi yang cukup kuat." />
-                  ) : (
-                    kpi.recommendations.map((recommendation) => (
-                      <article
-                        key={`${recommendation.owner_role}-${recommendation.title}`}
-                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
-                      >
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Badge label={recommendation.owner_role} />
-                          <h3 className="text-base font-semibold text-[#fff0c9]">
-                            {recommendation.title}
-                          </h3>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
-                          {recommendation.rationale}
-                        </p>
-                        <div className="mt-4 rounded-2xl bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-4 text-[#fff0c9]">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
-                            Next step
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
-                            {recommendation.next_step}
-                          </p>
-                        </div>
-                        {recommendation.target_href ? (
-                          <Link
-                            href={recommendation.target_href}
-                            className="mt-4 inline-flex rounded-xl border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
-                          >
-                            Jalankan sekarang
-                          </Link>
-                        ) : null}
-                      </article>
-                    ))
-                  )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <SummaryTile
+                    label="Leads Generated"
+                    value={String(
+                      kpi.marketing_execution_summary.leads_generated,
+                    )}
+                  />
+                  <SummaryTile
+                    label="Won Leads"
+                    value={String(kpi.marketing_execution_summary.won_leads)}
+                  />
+                  <SummaryTile
+                    label="Attributed Won"
+                    value={formatIdr(
+                      kpi.marketing_execution_summary.attributed_won_value,
+                    )}
+                  />
+                  <SummaryTile
+                    label="Attributed Deposit"
+                    value={formatIdr(
+                      kpi.marketing_execution_summary
+                        .attributed_deposit_amount,
+                    )}
+                  />
                 </div>
               </SectionPanel>
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <SectionPanel
-                eyebrow="Live Alerts"
-                title="Anomali yang perlu perhatian"
-                description="Alert real-time dari snapshot aktif, sebelum masuk ke histori persistent."
-              >
-                <div className="space-y-4">
-                  {kpi.alerts.length === 0 ? (
-                    <EmptyState text="Belum ada alert yang cukup kuat untuk ditampilkan." />
-                  ) : (
-                    kpi.alerts.map((alert) => (
-                      <article
-                        key={`${alert.severity}-${alert.title}`}
-                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
-                      >
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
-                              alert.severity === "high"
-                                ? "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
-                                : "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]"
-                            }`}
-                          >
-                            {alert.severity}
-                          </span>
-                          <h3 className="text-base font-semibold text-[#fff0c9]">
-                            {alert.title}
-                          </h3>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
-                          {alert.description}
-                        </p>
-                        <div className="mt-4 rounded-2xl bg-[#1d150d] p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
-                            Recommended action
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
-                            {alert.recommended_action}
-                          </p>
-                        </div>
-                        {alert.target_href ? (
-                          <Link
-                            href={alert.target_href}
-                            className="mt-4 inline-flex rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
-                          >
-                            Buka area terkait
-                          </Link>
-                        ) : null}
-                      </article>
-                    ))
-                  )}
-                </div>
-              </SectionPanel>
-
               <SectionPanel
                 eyebrow="Source Performance"
                 title="Per source dan channel"
@@ -703,9 +786,7 @@ export default function KpiCommandCenterPage() {
                   )}
                 </div>
               </SectionPanel>
-            </section>
 
-            <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
               <SectionPanel
                 eyebrow="Persistent Alerts"
                 title="Riwayat alert yang tersimpan"
@@ -838,7 +919,9 @@ export default function KpiCommandCenterPage() {
                   )}
                 </div>
               </SectionPanel>
+            </section>
 
+            <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
               <SectionPanel
                 eyebrow="Snapshot History"
                 title="Jejak KPI yang tersimpan"
@@ -987,6 +1070,77 @@ export default function KpiCommandCenterPage() {
   );
 }
 
+function buildOpsStatus(kpi: KpiCommandCenterResponse | null): OpsStatusCard {
+  if (!kpi) {
+    return {
+      label: "Loading",
+      title: "Menyiapkan status operasional",
+      description: "Snapshot sedang dimuat.",
+      tone: "neutral" as const,
+    };
+  }
+
+  if (kpi.summary.overdue_follow_ups > 0 || kpi.alerts.length >= 3) {
+    return {
+      label: "Perlu perhatian",
+      title: "Ada beberapa titik operasional yang harus dibaca dulu",
+      description:
+        "Mulai dari overdue follow-up dan alert aktif, lalu turun ke area yang ritmenya paling bocor.",
+      tone: "warning" as const,
+    };
+  }
+
+  return {
+    label: "Relatif aman",
+    title: "Kondisi operasional cukup stabil untuk saat ini",
+    description:
+      "Tidak ada tekanan besar yang langsung mendesak. Fokus berikutnya adalah menjaga ritme follow-up dan kualitas eksekusi.",
+    tone: "good" as const,
+  };
+}
+
+function buildOpsPriorities(
+  kpi: KpiCommandCenterResponse | null,
+): OpsPriorityItem[] {
+  if (!kpi) {
+    return [];
+  }
+
+  return [
+    {
+      label: "Prioritas 1",
+      title: "Cek follow-up yang sudah overdue",
+      description:
+        kpi.summary.overdue_follow_ups > 0
+          ? `${kpi.summary.overdue_follow_ups} follow-up sudah lewat jadwal dan berisiko bikin pipeline melambat.`
+          : "Belum ada overdue besar, tapi area ini tetap jadi pembacaan pertama untuk menjaga ritme tim.",
+      href: "/dashboard/follow-up",
+      cta: "Buka Worklist",
+      tone: kpi.summary.overdue_follow_ups > 0 ? "critical" : "neutral",
+    },
+    {
+      label: "Prioritas 2",
+      title: "Baca alert yang sekarang aktif",
+      description:
+        kpi.alerts.length > 0
+          ? `${kpi.alerts.length} alert aktif sudah cukup untuk menentukan area mana yang perlu intervensi cepat.`
+          : "Belum ada alert besar sekarang, jadi halaman alert bisa dipakai untuk validasi bahwa kondisi tetap aman.",
+      href: "/dashboard/notifications",
+      cta: "Buka Notification Center",
+      tone: kpi.alerts.length > 0 ? "warning" : "neutral",
+    },
+    {
+      label: "Prioritas 3",
+      title: "Bandingkan performa organisasi dan source",
+      description:
+        "Setelah tahu area yang mendesak, baru lihat apakah hambatannya datang dari tim tertentu, source tertentu, atau pola market yang lebih luas.",
+      href: "/dashboard/marketing",
+      cta: "Buka Marketing Insights",
+      tone: "good" as const,
+    },
+  ];
+}
+
 function SectionPanel({
   eyebrow,
   title,
@@ -1025,7 +1179,7 @@ function SectionPanel({
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
-      <div className={`mt-5 ${bodyClassName ?? ""}`.trim()}>{children}</div>
+      <div className={`mt-6 ${bodyClassName ?? ""}`.trim()}>{children}</div>
     </section>
   );
 }
@@ -1070,7 +1224,7 @@ function MetricCard({
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="clara-card-soft flex items-center justify-between rounded-2xl px-4 py-3">
+    <div className="clara-card-soft flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
       <span className="text-sm text-[#d6bb84]">{label}</span>
       <span className="text-sm font-semibold text-[#fff0c9]">{value}</span>
     </div>
@@ -1100,7 +1254,7 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="block rounded-[22px] border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.98)_100%)] p-4 hover:border-[#f0cb73]/26"
+      className="block rounded-[22px] border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.98)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.12)] hover:border-[#f0cb73]/26"
     >
       <p className="text-sm font-semibold text-[#fff0c9]">{label}</p>
       <p className="mt-1 text-sm leading-6 text-[#d6bb84]">{description}</p>
@@ -1111,6 +1265,31 @@ function QuickLink({
 function Badge({ label }: { label: string }) {
   return (
     <span className="clara-chip clara-chip-neutral px-3 py-1 text-xs">
+      {label}
+    </span>
+  );
+}
+
+function StatusBadge({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: StatusBadgeTone;
+}) {
+  const className =
+    tone === "good"
+      ? "border border-emerald-400/30 bg-emerald-500/12 text-emerald-200"
+      : tone === "warning"
+        ? "border border-amber-400/30 bg-amber-500/12 text-amber-100"
+        : tone === "critical"
+          ? "border border-red-400/30 bg-red-500/12 text-red-100"
+          : "border border-[#f0cb73]/18 bg-[#22190f] text-[#f0cb73]";
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${className}`}
+    >
       {label}
     </span>
   );

@@ -29,7 +29,15 @@ from app.services.ai_extraction_service import (
     call_openai_for_extraction,
 )
 from app.services.policy_engine import PolicyDecision, decide_reply_action
-from app.services.reply_suggestion_service import call_openai_for_reply_suggestion
+from app.services.reply_suggestion_service import (
+    build_product_option_summary,
+    call_openai_for_reply_suggestion,
+    get_preferred_reply_register,
+    infer_answer_commitment_level,
+    infer_latest_customer_intent,
+    infer_product_variant_response_mode,
+    should_message_ask_product_options,
+)
 
 
 def _format_timestamp(timestamp: datetime | None) -> str:
@@ -97,6 +105,36 @@ def build_sgcc_grounded_knowledge(
     return "\n".join(f"- {snippet}" for snippet in cleaned_snippets)
 
 
+def _get_latest_message_text(
+    payload: SGCCReplySuggestionRequest,
+    sender_type: str,
+) -> str:
+    for message in reversed(payload.messages):
+        if message.sender_type != sender_type:
+            continue
+
+        cleaned = message.message_text.replace("\x00", "").strip()
+        if cleaned:
+            return cleaned
+
+    return ""
+
+
+def _build_sgcc_prioritized_knowledge_brief(
+    payload: SGCCReplySuggestionRequest,
+) -> str:
+    cleaned_snippets = [
+        snippet.strip()
+        for snippet in payload.knowledge_snippets
+        if snippet and snippet.strip()
+    ][:5]
+
+    if not cleaned_snippets:
+        return "- Tidak ada fakta prioritas tambahan dari SGCC."
+
+    return "\n".join(f"- {snippet}" for snippet in cleaned_snippets)
+
+
 def generate_sgcc_reply_suggestions(
     payload: SGCCReplySuggestionRequest,
 ) -> tuple[AIExtractionCreate, PolicyDecision, ReplySuggestionCreate]:
@@ -104,12 +142,78 @@ def generate_sgcc_reply_suggestions(
     policy_decision = decide_reply_action(analysis)
     transcript = format_sgcc_transcript(payload)
     grounded_knowledge = build_sgcc_grounded_knowledge(payload)
+    prioritized_knowledge_brief = _build_sgcc_prioritized_knowledge_brief(payload)
+    latest_customer_message = _get_latest_message_text(payload, "customer")
+    latest_sales_message = _get_latest_message_text(payload, "sales")
+    latest_customer_intent = infer_latest_customer_intent(latest_customer_message)
+    preferred_reply_register = get_preferred_reply_register(
+        latest_customer_message
+    )
+    must_answer_with_product_options = should_message_ask_product_options(
+        latest_customer_message
+    )
+    answer_commitment_level = infer_answer_commitment_level(
+        latest_customer_message,
+        latest_sales_message,
+        latest_customer_intent,
+    )
+    include_all_variants = payload.account_category is None
+    variant_response_mode = infer_product_variant_response_mode(
+        latest_customer_message=latest_customer_message,
+        extraction=analysis,
+        current_account_category=payload.account_category,
+        include_all_variants=include_all_variants,
+        latest_customer_intent=latest_customer_intent,
+    )
+    avoid_product_variant_locking = (
+        must_answer_with_product_options and payload.account_category is None
+    )
+    must_give_concrete_steps = bool(
+        latest_customer_message
+        and re.search(
+            r"\b(langkah|step|tahapan|cara mulai|gimana caranya|alur)\b",
+            latest_customer_message,
+            re.IGNORECASE,
+        )
+    )
+    must_give_detailed_explanation = bool(
+        latest_customer_message
+        and re.search(
+            r"\b(detail|detailnya|jelasin semuanya|lengkap|secara rinci)\b",
+            latest_customer_message,
+            re.IGNORECASE,
+        )
+    )
+    discusses_scalping_context = bool(
+        re.search(
+            r"\b(scalping|setup|entry|stop loss|take profit|arah market)\b",
+            " ".join([latest_customer_message, latest_sales_message]),
+            re.IGNORECASE,
+        )
+    )
+    product_option_summary = build_product_option_summary(grounded_knowledge)
 
     suggestions = call_openai_for_reply_suggestion(
         conversation_text=transcript,
         extraction=analysis,
         action_mode=policy_decision.action_mode,
         grounded_knowledge=grounded_knowledge,
+        account_category=payload.account_category,
+        include_all_variants=include_all_variants,
+        latest_customer_message=latest_customer_message,
+        latest_sales_message=latest_sales_message,
+        avoid_product_variant_locking=avoid_product_variant_locking,
+        preferred_reply_register=preferred_reply_register,
+        must_answer_with_product_options=must_answer_with_product_options,
+        should_avoid_repeating_sales_reply=False,
+        product_option_summary=product_option_summary,
+        must_give_concrete_steps=must_give_concrete_steps,
+        must_give_detailed_explanation=must_give_detailed_explanation,
+        discusses_scalping_or_setup=discusses_scalping_context,
+        latest_customer_intent=latest_customer_intent,
+        prioritized_knowledge_brief=prioritized_knowledge_brief,
+        answer_commitment_level=answer_commitment_level,
+        variant_response_mode=variant_response_mode,
     )
 
     return analysis, policy_decision, suggestions

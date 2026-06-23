@@ -1,25 +1,28 @@
 Tujuan:
-mengarahkan user ke keputusan tanpa tekanan
+mengarahkan user ke keputusan dan next step tanpa tekanan.
 
 Teknik:
 
-1. Reflective Closing
-   "Jadi lebih ke arah, apakah ini sesuai dengan yang Anda cari atau tidak"
+1. Reflective Close
+   "Dari pertanyaannya, yang sedang Anda nilai sekarang lebih ke kecocokan pendekatan dan kesiapan risikonya ya pak."
 
-2. Structured Direction
-   "Biasanya langkahnya dilihat dulu secara menyeluruh, baru diputuskan"
+2. Structured Close
+   "Kalau mau lanjut, step awalnya saya cek dulu data pembukaan dan verifikasi supaya prosesnya rapi."
 
 3. Controlled Decision
-   "Tidak harus sekarang, yang penting jelas dulu gambaran besarnya"
+   "Regular tidak perlu diputuskan buru-buru, tapi kalau Anda sudah cukup jelas saya bisa arahkan ke proses awalnya."
 
-4. Logic Anchor
-   "Kalau dilihat dari cara berpikirnya, ini lebih ke kecocokan pendekatan"
+4. Onboarding Close
+   "Kalau sudah siap action, saya lanjutkan ke tim onboarding supaya penjelasan teknis dan verifikasinya tidak miss."
 
-5. Soft Commitment
-   "Bisa dilihat dulu step awalnya, nanti diputuskan setelah itu"
+5. Data Close
+   "Untuk awal siapkan data identitas, nomor telepon aktif, dan domisili ya pak."
+
+6. Post-Verification Close
+   "Kalau email verifikasinya sudah masuk, berarti tahap itu sudah selesai pak. Setelah ini tinggal lanjut ke onboarding dan aktivasi proses Regular."
 
 Larangan:
 
-* tidak memaksa
-* tidak mendorong berlebihan
-* tidak membuat urgency palsu
+* jangan tutup dengan kalimat abstrak
+* jangan handoff tanpa konteks
+* jangan kembali ke edukasi umum saat user sudah HOT

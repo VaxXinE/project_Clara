@@ -40,7 +40,7 @@ export default function StartHerePage() {
       title="Workflow Guide"
       description="Panduan singkat alur Sales, Manager, dan Head."
       backHref="/dashboard"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
         <>
           {(() => {
@@ -56,11 +56,11 @@ export default function StartHerePage() {
             const label = isSuperadminRole(currentUser?.role)
               ? "Buka Ops Dashboard"
               : isHeadRole(currentUser?.role)
-                ? "Buka Head Insights"
+                ? "Buka Monitor Tim"
                 : currentUser &&
                     isManagerRole(currentUser.role) &&
                     !canAccessQueueAndActionCenter(currentUser.role)
-                  ? "Lihat Progress Prospect"
+                  ? "Buka Monitor Tim"
                   : "Buka Action Center";
             const secondaryHref = isSuperadminRole(currentUser?.role)
               ? "/dashboard/marketing"
@@ -72,9 +72,9 @@ export default function StartHerePage() {
             const secondaryLabel = isSuperadminRole(currentUser?.role)
               ? "Buka Chat Insight"
               : isHeadRole(currentUser?.role)
-                ? "Buka Chat Review Center"
+                ? "Buka Arahan Tim"
                 : isManagerRole(currentUser?.role)
-                  ? "Buka Chat Review Center"
+                  ? "Buka Review Sales"
                   : "Buka Lead Capture";
 
             return (

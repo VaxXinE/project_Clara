@@ -21,6 +21,60 @@ PLAYBOOK_FILES = (
     "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
 )
 
+SYSTEM_PLAYBOOK_FILES = (
+    "INSTRUCTION.md",
+    "GUARDRAIL.md",
+    "FLOW.md",
+    "PERSONALITY_MODE.md",
+    "AUTO_ADAPT.md",
+)
+
+SUPPORTING_PLAYBOOK_FILES = tuple(
+    filename
+    for filename in PLAYBOOK_FILES
+    if filename not in SYSTEM_PLAYBOOK_FILES
+)
+
+INTENT_PLAYBOOK_FILES: dict[str, tuple[str, ...]] = {
+    "product_options": (
+        "POSITIONING.md",
+        "SALES_KNOWLEDGE_BRIDGE_MINI.md",
+        "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
+        "KB_ADDON_BULLETPROOF_SOLID_PRIME.md",
+        "KB_ADDON_BULLETPROOF_SOLID_REGULAR.md",
+    ),
+    "legality": (
+        "OBJECTION.md",
+        "OBJECTION_EXTREME.md",
+        "KB_ADDON_BULLETPROOF_SOLID_PRIME.md",
+        "KB_ADDON_BULLETPROOF_SOLID_REGULAR.md",
+    ),
+    "safety": (
+        "OBJECTION.md",
+        "OBJECTION_EXTREME.md",
+        "CONVERSION_BEHAVIOR_ENGINE.md",
+    ),
+    "minimum_capital": (
+        "POSITIONING.md",
+        "SALES_KNOWLEDGE_BRIDGE_MINI.md",
+        "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
+    ),
+    "next_step": (
+        "CONVERSION_LAYER.md",
+        "CLOSING_ENGINE.md",
+    ),
+    "setup_scalping": (
+        "OBJECTION.md",
+    ),
+    "mechanism": (
+        "POSITIONING.md",
+    ),
+    "beginner": (
+        "POSITIONING.md",
+        "SALES_KNOWLEDGE_BRIDGE_MINI.md",
+    ),
+}
+
 
 def get_clara_knowledge_root_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "clara_knowledge"
@@ -36,6 +90,24 @@ def get_clara_knowledge_variant_dir(account_category: str | None) -> Path:
     return root_dir / "clara_knowledge_regular"
 
 
+def get_clara_knowledge_variant_dirs(
+    account_category: str | None,
+    *,
+    include_all_variants: bool = False,
+) -> list[Path]:
+    root_dir = get_clara_knowledge_root_dir()
+    normalized_category = normalize_account_category(account_category)
+
+    if include_all_variants or normalized_category == "unknown":
+        return [
+            root_dir / "clara_knowledge_mini",
+            root_dir / "clara_knowledge_regular",
+        ]
+
+    return [get_clara_knowledge_variant_dir(account_category)]
+
+
+@lru_cache(maxsize=128)
 def read_markdown_file(path: Path) -> str:
     if not path.exists():
         return ""
@@ -43,26 +115,131 @@ def read_markdown_file(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
-@lru_cache(maxsize=4)
-def load_clara_response_playbook(account_category: str | None = None) -> str:
-    knowledge_dir = get_clara_knowledge_variant_dir(account_category)
+@lru_cache(maxsize=32)
+def get_selected_supporting_playbook_filenames(
+    *,
+    latest_customer_intent: str | None = None,
+    desired_count: int = 3,
+    latency_profile: str = "standard",
+) -> tuple[str, ...]:
+    if desired_count != 1:
+        return SUPPORTING_PLAYBOOK_FILES
+
+    if latency_profile == "ultra_fast":
+        ultra_fast_map = {
+            "product_options": (
+                "POSITIONING.md",
+                "SALES_KNOWLEDGE_BRIDGE_MINI.md",
+                "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
+            ),
+            "legality": ("OBJECTION.md",),
+            "safety": ("OBJECTION.md",),
+            "minimum_capital": ("POSITIONING.md",),
+            "beginner": ("POSITIONING.md",),
+            "mechanism": ("POSITIONING.md",),
+        }
+        return ultra_fast_map.get(
+            latest_customer_intent or "",
+            ("POSITIONING.md",),
+        )
+
+    if latency_profile == "fast":
+        extra_files = INTENT_PLAYBOOK_FILES.get(
+            latest_customer_intent or "",
+            ("POSITIONING.md",),
+        )
+        return tuple(dict.fromkeys(extra_files))
+
+    extra_files = INTENT_PLAYBOOK_FILES.get(
+        latest_customer_intent or "",
+        ("POSITIONING.md", "OBJECTION.md"),
+    )
+    return tuple(dict.fromkeys(extra_files))
+
+
+@lru_cache(maxsize=32)
+def get_selected_playbook_filenames(
+    *,
+    latest_customer_intent: str | None = None,
+    desired_count: int = 3,
+    latency_profile: str = "standard",
+) -> tuple[str, ...]:
+    return get_selected_supporting_playbook_filenames(
+        latest_customer_intent=latest_customer_intent,
+        desired_count=desired_count,
+        latency_profile=latency_profile,
+    )
+
+
+def _load_playbook_sections(
+    knowledge_dirs: list[Path],
+    selected_filenames: tuple[str, ...],
+    *,
+    include_remaining_files: bool,
+) -> str:
     sections: list[str] = []
 
-    ordered_files = []
-    available_filenames = {path.name for path in knowledge_dir.glob("*.md")}
-    for filename in PLAYBOOK_FILES:
-        if filename in available_filenames:
-            ordered_files.append(filename)
+    for knowledge_dir in knowledge_dirs:
+        ordered_files = []
+        available_filenames = {path.name for path in knowledge_dir.glob("*.md")}
+        for filename in selected_filenames:
+            if filename in available_filenames:
+                ordered_files.append(filename)
 
-    remaining_files = sorted(available_filenames - set(ordered_files))
+        remaining_files = (
+            sorted(available_filenames - set(ordered_files))
+            if include_remaining_files
+            else []
+        )
 
-    for filename in [*ordered_files, *remaining_files]:
-        file_path = knowledge_dir / filename
-        content = read_markdown_file(file_path)
+        for filename in [*ordered_files, *remaining_files]:
+            file_path = knowledge_dir / filename
+            content = read_markdown_file(file_path)
 
-        if not content:
-            continue
+            if not content:
+                continue
 
-        sections.append(f"## {filename}\n{content}")
+            sections.append(f"## {knowledge_dir.name}/{filename}\n{content}")
 
     return "\n\n".join(sections).strip()
+
+
+@lru_cache(maxsize=8)
+def load_clara_system_instruction_playbook(
+    account_category: str | None = None,
+    *,
+    include_all_variants: bool = False,
+) -> str:
+    knowledge_dirs = get_clara_knowledge_variant_dirs(
+        account_category,
+        include_all_variants=include_all_variants,
+    )
+    return _load_playbook_sections(
+        knowledge_dirs,
+        SYSTEM_PLAYBOOK_FILES,
+        include_remaining_files=False,
+    )
+
+
+@lru_cache(maxsize=8)
+def load_clara_response_playbook(
+    account_category: str | None = None,
+    include_all_variants: bool = False,
+    latest_customer_intent: str | None = None,
+    desired_count: int = 3,
+    latency_profile: str = "standard",
+) -> str:
+    knowledge_dirs = get_clara_knowledge_variant_dirs(
+        account_category,
+        include_all_variants=include_all_variants,
+    )
+    selected_filenames = get_selected_supporting_playbook_filenames(
+        latest_customer_intent=latest_customer_intent,
+        desired_count=desired_count,
+        latency_profile=latency_profile,
+    )
+    return _load_playbook_sections(
+        knowledge_dirs,
+        selected_filenames,
+        include_remaining_files=desired_count != 1,
+    )

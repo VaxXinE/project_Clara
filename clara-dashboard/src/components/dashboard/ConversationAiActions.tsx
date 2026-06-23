@@ -65,12 +65,12 @@ export function ConversationAiActions({
 
   return (
     <div className="clara-card rounded-[30px] p-5">
-      <p className="clara-kicker">AI Actions</p>
+      <p className="clara-kicker">Aksi Clara</p>
       <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-        Jalankan analisis dan draft
+        Siapkan konteks dan jawaban
       </h2>
       <p className="mt-2 text-sm text-slate-600">
-        Jalankan analysis dan generate draft balasan langsung dari dashboard.
+        Jalankan pembacaan chat lalu buat jawaban terbaik langsung dari halaman ini.
       </p>
 
       {analysisNeedsRefresh || replyNeedsRefresh ? (
@@ -89,12 +89,12 @@ export function ConversationAiActions({
           className="clara-button clara-button-primary"
         >
           {isAnalyzing
-            ? "Analyzing..."
+            ? "Menganalisis..."
             : analysisNeedsRefresh
-              ? "Analyze Ulang karena Ada Chat Baru"
+              ? "Analisis Ulang karena Ada Chat Baru"
               : hasAiExtraction
-                ? "Run AI Analysis Again"
-              : "Analyze Conversation"}
+                ? "Jalankan Analisis Lagi"
+              : "Analisis Percakapan"}
         </button>
 
         <button
@@ -104,17 +104,17 @@ export function ConversationAiActions({
           className="clara-button clara-button-ghost"
         >
           {isGeneratingReply
-            ? "Generating..."
+            ? "Membuat jawaban..."
             : replyNeedsRefresh
-              ? "Generate Draft Ulang"
+              ? "Buat Ulang Jawaban"
               : hasReplySuggestion
-                ? "Generate New Reply Suggestion"
-              : "Generate Reply Suggestion"}
+                ? "Buat Jawaban Baru"
+              : "Buat Jawaban Terbaik"}
         </button>
 
         {!hasAiExtraction && (
           <p className="clara-helper">
-            Jalankan AI analysis dulu sebelum generate reply suggestion.
+            Jalankan analisis dulu sebelum membuat jawaban terbaik.
           </p>
         )}
       </div>

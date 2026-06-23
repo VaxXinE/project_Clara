@@ -1,4 +1,5 @@
 import json
+import re
 from uuid import UUID
 
 from openai import OpenAI
@@ -19,6 +20,27 @@ class AIExtractionError(RuntimeError):
 
 
 MAX_MESSAGES_FOR_ANALYSIS = 80
+MINI_CATEGORY_SIGNAL_PATTERN = re.compile(
+    r"\b("
+    r"tentang mini|soal mini|tanya mini|mau tanya mini|"
+    r"mini kak|mini ini|mini dulu|mini aja|lanjut mini|"
+    r"pilih mini|mau mini|ambil mini|fokus mini|"
+    r"micro account|mini account"
+    r")\b",
+    re.IGNORECASE,
+)
+REGULAR_CATEGORY_SIGNAL_PATTERN = re.compile(
+    r"\b("
+    r"tentang reguler|tentang regular|soal reguler|soal regular|"
+    r"tanya reguler|tanya regular|mau tanya reguler|mau tanya regular|"
+    r"reguler kak|regular kak|reguler ini|regular ini|"
+    r"reguler dulu|regular dulu|reguler aja|regular aja|"
+    r"lanjut reguler|lanjut regular|pilih reguler|pilih regular|"
+    r"mau reguler|mau regular|ambil reguler|ambil regular|"
+    r"regular account|reguler account"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def format_conversation_for_ai(conversation: Conversation) -> str:
@@ -60,7 +82,9 @@ Aturan penting:
 - Jangan menaruh nomor HP, email, alamat, atau data pribadi sensitif di field ringkasan bebas.
 - Nomor HP, email, alamat, dan nama customer hanya boleh diisi pada field
   `customer_profile_autofill` jika memang tertulis eksplisit di chat.
-- Jika kategori akun mini atau reguler tidak jelas, set ke unknown.
+- Jika customer berulang kali menyebut Mini/Micro Account secara eksplisit, set `account_category_prediction.value` ke `mini`.
+- Jika customer berulang kali menyebut Regular/Reguler Account secara eksplisit, set `account_category_prediction.value` ke `reguler`.
+- Jika kategori akun mini atau reguler memang tidak jelas, baru set ke unknown.
 - Jangan pernah menebak data profil customer. Jika ragu, isi null.
 - Jawab HANYA dalam JSON valid sesuai schema.
 - Gunakan bahasa Indonesia.
@@ -280,6 +304,22 @@ def call_openai_for_extraction(conversation_text: str) -> AIExtractionCreate:
         raise AIExtractionError(f"Invalid AI extraction output: {exc}") from exc
 
 
+def infer_account_category_from_conversation_text(conversation_text: str) -> str | None:
+    normalized = conversation_text.replace("\x00", " ").strip()
+    if not normalized:
+        return None
+
+    mini_hits = len(MINI_CATEGORY_SIGNAL_PATTERN.findall(normalized))
+    regular_hits = len(REGULAR_CATEGORY_SIGNAL_PATTERN.findall(normalized))
+
+    if mini_hits >= 1 and regular_hits == 0:
+        return "mini"
+    if regular_hits >= 1 and mini_hits == 0:
+        return "reguler"
+
+    return None
+
+
 def analyze_conversation(
     db: Session,
     conversation_id: UUID,
@@ -332,6 +372,14 @@ def analyze_conversation(
     inferred_account_category = None
     if extraction_data.account_category_prediction.confidence_score >= 0.8:
         inferred_account_category = extraction_data.account_category_prediction.value
+    elif extraction_data.account_category_prediction.value == "unknown":
+        inferred_account_category = infer_account_category_from_conversation_text(
+            conversation_text
+        )
+    elif extraction_data.account_category_prediction.value in {"mini", "reguler"}:
+        inferred_account_category = infer_account_category_from_conversation_text(
+            conversation_text
+        ) or extraction_data.account_category_prediction.value
 
     lead = sync_lead_from_conversation(
         db=db,

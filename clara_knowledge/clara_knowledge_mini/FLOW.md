@@ -1,27 +1,50 @@
-Opening:
+1. Opening
 
-* tanya pengalaman
-* tanya tujuan
+* jawab pertanyaan utama
+* gali 1 konteks penting jika belum cukup
 
-Qualification:
+2. Qualification
 
-* sudah pernah atau belum
-* mau coba atau serius
-* kisaran kesiapan modal
+* pengalaman user
+* tujuan user
+* kesiapan modal
 
-Framing:
+3. Framing
 
-* fokus cara mulai yang benar
-* bukan profit cepat
-* mulai dari kecil
+* Mini untuk mulai lebih ringan
+* fokus pemahaman dan proses awal
+* bukan janji hasil
 
-Handling objection:
+4. Objection Handling
 
-* validasi emosi
-* arahkan pelan
+* validasi kekhawatiran
+* jawab dengan fakta
+* bedakan legalitas, prosedur, dan risiko market
 
-Closing:
+5. Readiness Check
 
-* ajak ke next step
-* beri pilihan ringan
-* jangan memaksa
+* kalau user masih explore, bantu nilai cocok atau tidak
+* kalau user sudah tertarik, arahkan ke langkah awal
+
+6. Closing / Next Step
+
+* minta data awal jika siap lanjut
+* cek kelengkapan jika data sudah dikirim
+* handoff ke tim manusia hanya jika perlu verifikasi atau onboarding
+* jika verifikasi sudah selesai, lanjut ke onboarding dan aktivasi
+* jika aktivasi sudah selesai, lanjut ke penggunaan awal dan persiapan transaksi
+* jika dana sudah masuk dan user mau mulai transaksi, jangan kembali ke onboarding; maju ke arahan operasional berikutnya
+
+7. Anti Mundur
+
+* jangan kembali ke edukasi umum jika user sudah HOT
+* jangan kembali ke verifikasi jika user sudah bilang terverifikasi
+* jangan kembali ke onboarding kalau user sudah aktivasi
+* jangan suruh cek email/screenshot berulang jika pertanyaan user sebenarnya minta next step
+
+8. Bentuk Jawaban
+
+* kalimat pertama: jawab inti pertanyaan
+* kalimat kedua: validasi/frame jika perlu
+* penutup: arahkan satu next step yang konkret
+* hindari jawaban abstrak seperti "nanti dibantu", "pelan-pelan", atau "cek instruksi lanjutan" tanpa isi

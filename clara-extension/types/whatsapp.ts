@@ -5,6 +5,9 @@ export interface WhatsAppMessage {
   author: string
   direction: WhatsAppMessageDirection
   text: string
+  replyContextSenderName?: string
+  replyContextSenderType?: "incoming" | "outgoing" | "unknown"
+  replyContextText?: string
   timestampLabel: string
 }
 

@@ -1,27 +1,23 @@
 User: takut rugi
 Respon:
-"Wajar kok, hampir semua yang baru mulai pasti kepikiran itu. Justru karena itu biasanya disarankan mulai dari nominal kecil dulu, jadi bisa belajar tanpa tekanan besar."
+"Wajar kak, karena market memang ada risiko. Untuk Mini biasanya fokus awalnya bukan ngejar hasil dulu, tapi mulai dengan nominal yang lebih ringan sambil paham cara jalannya."
 
 User: takut ditipu
 Respon:
-"Make sense kalau ada kekhawatiran ke situ. Makanya penting cek legalitas dan alurnya jelas, biar dari awal sudah ngerti sistemnya seperti apa."
+"Wajar kalau hati-hati. PT Solid Gold Berjangka diawasi BAPPEBTI, jadi legalitasnya jelas, lalu tinggal pastikan juga alur dan prosesnya memang Anda pahami."
 
 User: belum paham
 Respon:
-"Justru itu normal di awal. Biasanya nanti dijelasin step by step dulu, jadi nggak dilepas gitu aja."
+"Nggak apa-apa kak, justru banyak yang mulai dari tahap itu. Yang penting saya jelaskan alur dasarnya dengan singkat supaya kakak kebayang cara mulainya."
 
 User: mahal
 Respon:
-"Kalau dibandingkan, memang bukan yang paling murah. Tapi biasanya fokusnya di pendampingan dan cara mulainya, bukan sekadar masuk aja."
+"Kalau untuk Mini justru dibuat lebih ringan untuk tahap awal. Tapi tetap yang penting bukan nominalnya saja, melainkan kesiapan dan pemahaman prosesnya."
 
 User: mikir dulu
 Respon:
-"Siap, nggak harus buru-buru juga. Yang penting sudah dapat gambaran dulu, nanti kalau sudah siap baru lanjut."
+"Siap kak, boleh dipertimbangkan dulu. Kalau mau, saya bisa ringkas poin penting Mini dan step awalnya supaya lebih gampang dinilai."
 
 User: pernah rugi
 Respon:
-"Biasanya yang pernah rugi justru lebih cepat ngerti kedepannya. Tinggal dibenerin cara mulainya aja biar nggak keulang."
-
-User: marah / negatif
-Respon:
-"Gapapa, wajar kalau ada pengalaman kurang enak sebelumnya. Justru penting pelan-pelan dulu biar lebih paham sebelum lanjut lagi."
+"Wajar jadi lebih hati-hati. Kalau mau mulai lagi, fokusnya sebaiknya di cara masuk, pengelolaan risiko, dan disiplin prosesnya, bukan buru-buru hasil."

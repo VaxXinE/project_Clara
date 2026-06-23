@@ -5,6 +5,40 @@ const DEFAULT_CHAT_SNAPSHOT_PROXY_URL = "http://127.0.0.1:9898/chat-snapshots"
 const DEFAULT_CLARA_API_BASE_URL = "http://127.0.0.1:8000"
 const DEFAULT_CLARA_DASHBOARD_URL = "http://localhost:3000"
 const DEFAULT_AUTH_COOKIE_NAME = "clara_access_token"
+const DEFAULT_DEV_FALLBACK_FLAG = "false"
+
+const isProductionBuild = () => process.env.NODE_ENV === "production"
+
+export const isDevFallbackAllowed = () => {
+  if (isProductionBuild()) {
+    return false
+  }
+
+  return (
+    (
+      process.env.PLASMO_PUBLIC_CLARA_ALLOW_DEV_FALLBACK ||
+      DEFAULT_DEV_FALLBACK_FLAG
+    )
+      .trim()
+      .toLowerCase() === "true"
+  )
+}
+
+const buildClaraApiUrl = (apiBaseUrl: string, routePath: string) => {
+  const normalizedBaseUrl = (apiBaseUrl || DEFAULT_CLARA_API_BASE_URL).trim()
+  const normalizedRoutePath = routePath.startsWith("/")
+    ? routePath
+    : `/${routePath}`
+
+  const url = new URL(normalizedBaseUrl)
+  const basePath = url.pathname.replace(/\/+$/, "")
+
+  url.pathname = `${basePath}${normalizedRoutePath}` || normalizedRoutePath
+  url.search = ""
+  url.hash = ""
+
+  return url.toString()
+}
 
 export const getConfiguredProxyUrl = () =>
   (process.env.PLASMO_PUBLIC_OPENAI_PROXY_URL || DEFAULT_PROXY_URL).trim()
@@ -13,7 +47,9 @@ export const getConfiguredClaraApiBaseUrl = () =>
   (process.env.PLASMO_PUBLIC_CLARA_API_BASE_URL || "").trim()
 
 export const getConfiguredClaraApiToken = () =>
-  (process.env.PLASMO_PUBLIC_CLARA_API_TOKEN || "").trim()
+  isDevFallbackAllowed()
+    ? (process.env.PLASMO_PUBLIC_CLARA_API_TOKEN || "").trim()
+    : ""
 
 export const getConfiguredClaraDashboardUrl = () =>
   (
@@ -80,12 +116,7 @@ export const getClaraSnapshotSyncUrl = (
   }
 
   try {
-    const url = new URL(apiBaseUrl.trim() || DEFAULT_CLARA_API_BASE_URL)
-    url.pathname = "/extension/whatsapp/snapshots"
-    url.search = ""
-    url.hash = ""
-
-    return url.toString()
+    return buildClaraApiUrl(apiBaseUrl, "/extension/whatsapp/snapshots")
   } catch (_error) {
     return ""
   }
@@ -99,12 +130,7 @@ export const getClaraReplySuggestionsUrl = (
   }
 
   try {
-    const url = new URL(apiBaseUrl.trim() || DEFAULT_CLARA_API_BASE_URL)
-    url.pathname = "/extension/whatsapp/reply-suggestions"
-    url.search = ""
-    url.hash = ""
-
-    return url.toString()
+    return buildClaraApiUrl(apiBaseUrl, "/extension/whatsapp/reply-suggestions")
   } catch (_error) {
     return ""
   }
@@ -119,12 +145,10 @@ export const getClaraSendReplyUrl = (
   }
 
   try {
-    const url = new URL(apiBaseUrl.trim() || DEFAULT_CLARA_API_BASE_URL)
-    url.pathname = `/extension/whatsapp/reply-suggestions/${replySuggestionId.trim()}/send`
-    url.search = ""
-    url.hash = ""
-
-    return url.toString()
+    return buildClaraApiUrl(
+      apiBaseUrl,
+      `/extension/whatsapp/reply-suggestions/${replySuggestionId.trim()}/send`
+    )
   } catch (_error) {
     return ""
   }
@@ -150,6 +174,10 @@ export const getSnapshotSyncCandidates = () => {
     return getProxyCandidates(claraSnapshotUrl)
   }
 
+  if (!isDevFallbackAllowed()) {
+    return []
+  }
+
   return getProxyCandidates(DEFAULT_CHAT_SNAPSHOT_PROXY_URL)
 }
 
@@ -157,10 +185,11 @@ export const getReplySuggestionCandidates = () => {
   const claraReplySuggestionsUrl = getClaraReplySuggestionsUrl()
 
   if (claraReplySuggestionsUrl) {
-    return [
-      ...getProxyCandidates(claraReplySuggestionsUrl),
-      ...getProxyCandidates(getConfiguredProxyUrl())
-    ]
+    return getProxyCandidates(claraReplySuggestionsUrl)
+  }
+
+  if (!isDevFallbackAllowed()) {
+    return []
   }
 
   return getProxyCandidates(getConfiguredProxyUrl())
@@ -216,7 +245,7 @@ export const getCurrentClaraSessionUser =
       return null
     }
 
-    const meUrl = new URL("/auth/me", apiBaseUrl).toString()
+    const meUrl = buildClaraApiUrl(apiBaseUrl, "/auth/me")
     const response = await fetch(meUrl, {
       headers
     })

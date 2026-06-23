@@ -118,17 +118,33 @@ const handleRuntimeMessage = (
 ) => {
   if (message?.type === "READ_WHATSAPP_CHAT") {
     sendResponse(readOpenChat())
-    return
+    return false
   }
 
   if (message?.type === "INSERT_WHATSAPP_REPLY") {
     sendResponse(insertReplyIntoComposeBox(String(message?.text || "")))
-    return
+    return false
   }
 
   if (message?.type === "SEND_WHATSAPP_REPLY") {
-    sendResponse(sendReplyThroughComposeBox(String(message?.text || "")))
+    sendReplyThroughComposeBox(String(message?.text || ""))
+      .then((result) => {
+        sendResponse(result)
+      })
+      .catch((error) => {
+        sendResponse({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Terjadi kendala saat mengirim balasan ke WhatsApp.",
+          ok: false
+        })
+      })
+
+    return true
   }
+
+  return false
 }
 
 const contentWindow = window as typeof window & {

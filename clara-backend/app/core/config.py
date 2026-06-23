@@ -9,6 +9,10 @@ PLACEHOLDER_ENV_VALUES = {
     "OPENAI_API_KEY_KAMU",
     "YOUR_OPENAI_API_KEY",
     "test-key",
+    "OPENAI_API_KEY_PLACEHOLDER",
+    "SGCC_INTEGRATION_API_KEY_PLACEHOLDER",
+    "CHANGE_ME_TO_A_LONG_RANDOM_SECRET",
+    "CHANGE_ME_TEMP_OWNER_PASSWORD",
 }
 
 
@@ -46,6 +50,11 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
+    openai_fast_reply_model: str = "gpt-4.1-mini"
+    openai_ultra_fast_reply_model: str = "gpt-4.1-mini"
+    openai_ultra_fast_reply_max_output_tokens: int = 120
+    openai_fast_reply_max_output_tokens: int = 180
+    openai_single_reply_max_output_tokens: int = 260
 
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
@@ -87,6 +96,13 @@ class Settings(BaseSettings):
 
         if is_placeholder_env_value(self.openai_api_key):
             object.__setattr__(self, "openai_api_key", None)
+
+        if self.app_env.lower() == "production" and is_placeholder_env_value(
+            self.jwt_secret_key
+        ):
+            raise ValueError(
+                "JWT_SECRET_KEY tidak boleh memakai placeholder saat APP_ENV=production."
+            )
 
     @property
     def allowed_origins_list(self) -> list[str]:

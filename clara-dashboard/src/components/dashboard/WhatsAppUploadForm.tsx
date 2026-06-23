@@ -14,8 +14,8 @@ import type {
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 const INPUT_MODE_OPTIONS = [
-  { value: "file", label: "Upload File" },
-  { value: "paste", label: "Paste Chat" },
+  { value: "file", label: "Upload file .txt" },
+  { value: "paste", label: "Paste chat langsung" },
 ] as const;
 
 export function WhatsAppUploadForm() {
@@ -234,6 +234,19 @@ export function WhatsAppUploadForm() {
       onSubmit={handleUpload}
       className="clara-card space-y-5 rounded-[30px] p-5 sm:p-6"
     >
+      <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+          Form input chat
+        </p>
+        <h2 className="mt-2 text-xl font-bold tracking-tight text-[#fff3cf]">
+          Isi data seperlunya, lalu proses
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-[#e3c990]">
+          Clara butuh tiga hal inti: channel, nama customer, dan isi chat.
+          Sisanya biarkan sesederhana mungkin supaya sales bisa cepat lanjut kerja.
+        </p>
+      </div>
+
       {isContinueMode ? (
         <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-semibold">Mode chat lanjutan aktif.</p>
@@ -256,92 +269,93 @@ export function WhatsAppUploadForm() {
         </div>
       ) : null}
 
-      <div>
-        <label
-          htmlFor="channelType"
-          className="text-sm font-semibold text-slate-900"
-        >
-          Channel
-        </label>
-        <select
-          id="channelType"
-          value={selectedChannel}
-          onChange={(event) => {
-            setSelectedChannel(event.target.value);
-            setDetectionMessage("");
-          }}
-          className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
-        >
-          {channelOptions.map((option) => (
-            <option key={option.key} value={option.key}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        {activeChannel ? (
-          <p className="mt-2 text-xs leading-5 text-slate-500">
-            {activeChannel.description}
-          </p>
-        ) : null}
-      </div>
-
-      <div>
-        <label
-          htmlFor="conversationTitle"
-          className="text-sm font-semibold text-slate-900"
-        >
-          Nama Customer / Judul Conversation
-        </label>
-        <input
-          id="conversationTitle"
-          type="text"
-          value={conversationTitle}
-          onChange={(event) => {
-            setConversationTitle(event.target.value);
-          }}
-          placeholder="Contoh: Rina Pratama"
-          className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
-        />
-        <p className="mt-2 text-xs text-slate-500">
-          Wajib diisi dengan nama customer. Nilai ini akan dipakai sebagai
-          judul conversation dan nama awal customer di Clara.
-          {isContinueMode
-            ? " Kalau judul diganti, Clara bisa menganggap ini conversation baru."
-            : ""}
-        </p>
-      </div>
-
-      <div>
-        <label htmlFor="whatsappFile" className="clara-label">
-          Input Mode
-        </label>
-        <select
-          id="inputMode"
-          value={inputMode}
-          onChange={(event) => {
-            setInputMode(
-              event.target
-                .value as (typeof INPUT_MODE_OPTIONS)[number]["value"],
-            );
-            setErrorMessage("");
-          }}
-          className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
-        >
-          {INPUT_MODE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {inputMode === "file" ? (
+      <section className="grid gap-4 lg:grid-cols-3">
         <div>
           <label
-            htmlFor="whatsappFile"
+            htmlFor="channelType"
             className="text-sm font-semibold text-slate-900"
           >
-            File Chat .txt
+            1. Pilih channel
+          </label>
+          <select
+            id="channelType"
+            value={selectedChannel}
+            onChange={(event) => {
+              setSelectedChannel(event.target.value);
+              setDetectionMessage("");
+            }}
+            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+          >
+            {channelOptions.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {activeChannel ? (
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {activeChannel.description}
+            </p>
+          ) : null}
+        </div>
+
+        <div>
+          <label
+            htmlFor="conversationTitle"
+            className="text-sm font-semibold text-slate-900"
+          >
+            2. Isi nama customer
+          </label>
+          <input
+            id="conversationTitle"
+            type="text"
+            value={conversationTitle}
+            onChange={(event) => {
+              setConversationTitle(event.target.value);
+            }}
+            placeholder="Contoh: Rina Pratama"
+            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+          />
+          <p className="mt-2 text-xs text-slate-500">
+            Nama ini dipakai sebagai judul percakapan dan identitas awal customer.
+            {isContinueMode
+              ? " Kalau diganti, Clara bisa menganggap ini percakapan baru."
+              : ""}
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="inputMode" className="clara-label">
+            3. Pilih cara input
+          </label>
+          <select
+            id="inputMode"
+            value={inputMode}
+            onChange={(event) => {
+              setInputMode(
+                event.target
+                  .value as (typeof INPUT_MODE_OPTIONS)[number]["value"],
+              );
+              setErrorMessage("");
+            }}
+            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+          >
+            {INPUT_MODE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      {inputMode === "file" ? (
+        <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+          <label
+            htmlFor="whatsappFile"
+            className="text-sm font-semibold text-[#fff3cf]"
+          >
+            Upload file chat .txt
           </label>
 
           <input
@@ -350,22 +364,21 @@ export function WhatsAppUploadForm() {
             type="file"
             accept=".txt,text/plain"
             onChange={handleFileChange}
-            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+            className="mt-2 block w-full rounded-xl border border-[#4a3618] bg-[#1a130d] p-3 text-sm text-[#f7e7b7] file:mr-4 file:rounded-lg file:border-0 file:bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#140f08]"
           />
 
-          <p className="mt-2 text-xs text-slate-500">
-            Maksimal 5MB. Pilih channel yang sesuai sebelum upload supaya parser
-            Clara memakai format yang benar.
+          <p className="mt-2 text-xs text-[#c8ab70]">
+            Maksimal 5MB. Cocok kalau chat sudah diexport sebagai file dan tinggal dimasukkan ke Clara.
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-4">
           <div>
             <label
               htmlFor="pastedText"
-              className="text-sm font-semibold text-slate-900"
+              className="text-sm font-semibold text-[#fff3cf]"
             >
-              Paste Chat
+              Paste isi chat
             </label>
             <textarea
               id="pastedText"
@@ -375,7 +388,7 @@ export function WhatsAppUploadForm() {
                 setDetectionMessage("");
               }}
               placeholder="Paste export chat di sini..."
-              className="mt-2 min-h-[220px] w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+              className="mt-2 min-h-[220px] w-full rounded-xl border border-[#4a3618] bg-[#1a130d] p-3 text-sm text-[#f7e7b7] placeholder:text-[#907953]"
             />
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
@@ -384,12 +397,12 @@ export function WhatsAppUploadForm() {
                   void handleDetectChannel();
                 }}
                 disabled={isDetectingChannel}
-                className="rounded-full border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-3.5 py-2 text-xs font-semibold text-[#f0cb73] hover:bg-[#2b1f13] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isDetectingChannel ? "Mendeteksi..." : "Auto-Detect Channel"}
+                {isDetectingChannel ? "Mendeteksi..." : "Deteksi channel otomatis"}
               </button>
-              <p className="text-xs text-slate-500">
-                Cocok untuk user yang tidak ingin menyimpan file .txt dulu.
+              <p className="text-xs text-[#c8ab70]">
+                Cocok kalau sales mau cepat tempel chat tanpa bikin file dulu.
               </p>
             </div>
             {detectionMessage ? (
@@ -404,10 +417,10 @@ export function WhatsAppUploadForm() {
       {selectedFile && (
         <div className="clara-card-soft rounded-[24px] p-4 text-sm text-slate-700">
           <p>
-            <span className="font-semibold">Selected:</span> {selectedFile.name}
+            <span className="font-semibold">File terpilih:</span> {selectedFile.name}
           </p>
           <p>
-            <span className="font-semibold">Size:</span>{" "}
+            <span className="font-semibold">Ukuran:</span>{" "}
             {(selectedFile.size / 1024).toFixed(1)} KB
           </p>
         </div>
@@ -430,10 +443,10 @@ export function WhatsAppUploadForm() {
         className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isUploading
-          ? "Uploading..."
+          ? "Memproses chat..."
           : inputMode === "file"
-            ? "Upload Chat"
-            : "Proses Paste Chat"}
+            ? "Proses File Chat"
+            : "Proses Chat Paste"}
       </button>
     </form>
   );

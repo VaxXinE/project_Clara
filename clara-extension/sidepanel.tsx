@@ -7,7 +7,6 @@ import type {
   WhatsAppMessage,
   WhatsAppMessageDirection,
   WhatsAppReadResponse,
-  WhatsAppSuggestionDetail,
   WhatsAppSuggestionResult
 } from "~/types/whatsapp"
 import {
@@ -21,8 +20,8 @@ import {
   getConfiguredClaraAuthCookieName,
   getConfiguredProxyUrl,
   getCurrentClaraSessionUser,
+  isDevFallbackAllowed,
   getProxyCandidates,
-  getReplySuggestionCandidates,
   getSnapshotSyncCandidates
 } from "~/utils/proxy"
 
@@ -32,7 +31,6 @@ const OPENAI_PROXY_URL = getConfiguredProxyUrl()
 const CHAT_SNAPSHOT_PROXY_URL = getChatSnapshotProxyUrl(OPENAI_PROXY_URL)
 const INSERT_LOCK_KEY = "__sgExtensionSidePanelInsertLock__"
 const AUTO_REFRESH_INTERVAL_MS = 2500
-const SUGGESTION_TONE_LABELS = ["Friendly", "Casual", "Profesional"] as const
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
@@ -238,6 +236,39 @@ const panelCss = `
     margin-top: 4px;
   }
 
+  .clara-pane__actions {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clara-action-bridge {
+    align-items: center;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr auto 1fr;
+    margin: -2px 0;
+  }
+
+  .clara-action-bridge__line {
+    background: linear-gradient(
+      90deg,
+      rgba(240, 203, 115, 0),
+      rgba(240, 203, 115, 0.18),
+      rgba(240, 203, 115, 0)
+    );
+    height: 1px;
+    width: 100%;
+  }
+
+  .clara-action-bridge__actions {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: min(100%, 420px);
+    width: min(100%, 420px);
+  }
+
   .clara-chip {
     align-items: center;
     border-radius: 999px;
@@ -306,6 +337,10 @@ const panelCss = `
 
   .clara-button--block {
     width: 100%;
+  }
+
+  .clara-button--compact {
+    min-height: 40px;
   }
 
   .clara-button--primary {
@@ -494,6 +529,33 @@ const panelCss = `
     overflow-wrap: anywhere;
   }
 
+  .clara-thread-message__reply-context {
+    background: rgba(255, 240, 201, 0.06);
+    border: 1px solid rgba(240, 203, 115, 0.14);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    padding: 6px 7px;
+  }
+
+  .clara-thread-message__reply-label {
+    color: #d6bb84;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.3;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .clara-thread-message__reply-text {
+    color: #efd8a2;
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
   .clara-thread-message__text {
     color: #f7e7b7;
     font-size: 12px;
@@ -514,6 +576,19 @@ const panelCss = `
 
   .clara-thread-message--out .clara-thread-message__author {
     color: rgba(20, 15, 8, 0.68);
+  }
+
+  .clara-thread-message--out .clara-thread-message__reply-context {
+    background: rgba(20, 15, 8, 0.08);
+    border-color: rgba(20, 15, 8, 0.12);
+  }
+
+  .clara-thread-message--out .clara-thread-message__reply-label {
+    color: rgba(20, 15, 8, 0.65);
+  }
+
+  .clara-thread-message--out .clara-thread-message__reply-text {
+    color: rgba(20, 15, 8, 0.88);
   }
 
   .clara-thread-message--out .clara-thread-message__text {
@@ -708,6 +783,21 @@ const panelCss = `
     .clara-draft__actions {
       grid-template-columns: 1fr;
     }
+
+    .clara-action-bridge {
+      grid-template-columns: 1fr;
+    }
+
+    .clara-action-bridge__line {
+      display: none;
+    }
+
+    .clara-action-bridge__actions,
+    .clara-pane__actions {
+      grid-template-columns: 1fr;
+      min-width: 0;
+      width: 100%;
+    }
   }
 
   @media (max-width: 380px) {
@@ -858,8 +948,66 @@ const insertReplyIntoPage = (text: string): WhatsAppActionResponse => {
     return null
   }
 
-  const getComposeText = (composeBox: HTMLElement) =>
-    composeBox.innerText.replace(/\s+/g, " ").trim()
+const getComposeText = (composeBox: HTMLElement) =>
+  composeBox.innerText.replace(/\s+/g, " ").trim()
+
+const getComposeFooter = () => getComposeBox()?.closest("footer") || document
+
+const clickElement = (node: HTMLElement) => {
+  node.dispatchEvent(
+    new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+      view: window
+    })
+  )
+  node.dispatchEvent(
+    new MouseEvent("mouseup", {
+      bubbles: true,
+      cancelable: true,
+      view: window
+    })
+  )
+  node.click()
+}
+
+const getSendButtonTarget = (): HTMLElement | null => {
+  const searchRoot = getComposeFooter()
+  const selectors = [
+    '[data-testid="compose-btn-send"]',
+    'button[aria-label="Send"]',
+    'button[aria-label="Kirim"]',
+    '[aria-label="Send"]',
+    '[aria-label="Kirim"]',
+    '[data-icon="send"]'
+  ]
+
+  for (const selector of selectors) {
+    const node = searchRoot.querySelector<HTMLElement>(selector)
+
+    if (!node) {
+      continue
+    }
+
+    const clickableTarget =
+      node.tagName === "BUTTON"
+        ? node
+        : node.closest<HTMLElement>('button, [role="button"], [tabindex]')
+
+    const target = clickableTarget || node
+
+    if (
+      target instanceof HTMLButtonElement &&
+      (target.disabled || target.hasAttribute("disabled"))
+    ) {
+      continue
+    }
+
+    return target
+  }
+
+  return null
+}
 
   const chatRoot = getChatRoot()
 
@@ -978,33 +1126,108 @@ const insertReplyIntoPage = (text: string): WhatsAppActionResponse => {
   }
 }
 
-const sendReplyFromPanel = (text: string): WhatsAppActionResponse => {
+const sendReplyFromPanel = async (
+  text: string
+): Promise<WhatsAppActionResponse> => {
+  const wait = (ms: number) =>
+    new Promise((resolve) => {
+      window.setTimeout(resolve, ms)
+    })
+
+  const normalizeMessageText = (value: string) =>
+    value.replace(/\s+/g, " ").trim().toLowerCase()
+
+  const getMessageContainers = () =>
+    Array.from(
+      new Set(
+        Array.from(
+          (
+            document.querySelector<HTMLElement>(
+              '[data-testid="conversation-panel-messages"]'
+            ) || document
+          ).querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
+        )
+      )
+    )
+
+  const getLatestOutgoingMessageSnapshot = () => {
+    const outgoingMessages = getMessageContainers()
+      .map((container, index) => ({
+        direction: getMessageDirection(container),
+        index,
+        text: getMessageText(container)
+      }))
+      .filter((message) => message.direction === "outgoing" && message.text.trim())
+
+    const latestOutgoingMessage = outgoingMessages[outgoingMessages.length - 1]
+
+    return {
+      count: outgoingMessages.length,
+      text: latestOutgoingMessage?.text.trim() || ""
+    }
+  }
+
+  const waitForOutgoingMessageConfirmation = async (expectedText: string) => {
+    const normalizedExpected = normalizeMessageText(expectedText)
+    const beforeSendSnapshot = getLatestOutgoingMessageSnapshot()
+
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      await wait(250)
+
+      const composeBox = document.querySelector<HTMLElement>(
+        '[data-testid="conversation-compose-box-input"][contenteditable="true"], [contenteditable="true"][data-lexical-editor="true"], footer [contenteditable="true"][role="textbox"]'
+      )
+      const composeText =
+        composeBox?.innerText.replace(/\s+/g, " ").trim() || ""
+      const afterSendSnapshot = getLatestOutgoingMessageSnapshot()
+      const normalizedLatestOutgoing = normalizeMessageText(
+        afterSendSnapshot.text
+      )
+
+      const outgoingMessageAppended =
+        afterSendSnapshot.count > beforeSendSnapshot.count &&
+        normalizedLatestOutgoing === normalizedExpected
+
+      const latestOutgoingReplaced =
+        afterSendSnapshot.count === beforeSendSnapshot.count &&
+        afterSendSnapshot.text !== beforeSendSnapshot.text &&
+        normalizedLatestOutgoing === normalizedExpected
+
+      if (outgoingMessageAppended || latestOutgoingReplaced) {
+        return true
+      }
+
+      if (!composeText.trim() && normalizedLatestOutgoing === normalizedExpected) {
+        return true
+      }
+    }
+
+    return false
+  }
+
   const insertResult = insertReplyIntoPage(text)
 
   if (!insertResult.ok) {
     return insertResult
   }
 
-  const selectors = [
-    '[data-testid="compose-btn-send"]',
-    'button[aria-label="Send"]',
-    'button[aria-label="Kirim"]',
-    'span[data-icon="send"]'
-  ]
+  const sendButtonTarget = getSendButtonTarget()
 
-  for (const selector of selectors) {
-    const node = document.querySelector<HTMLElement>(selector)
-    const button =
-      node?.tagName === "BUTTON"
-        ? (node as HTMLButtonElement)
-        : node?.closest("button")
+  if (sendButtonTarget) {
+    clickElement(sendButtonTarget)
 
-    if (button && !button.hasAttribute("disabled")) {
-      button.click()
+    const isConfirmed = await waitForOutgoingMessageConfirmation(text)
 
+    if (!isConfirmed) {
       return {
-        ok: true
+        error:
+          "Tombol kirim sudah ditekan, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
+        ok: false
       }
+    }
+
+    return {
+      ok: true
     }
   }
 
@@ -1037,6 +1260,16 @@ const sendReplyFromPanel = (text: string): WhatsAppActionResponse => {
     })
   )
 
+  const isConfirmed = await waitForOutgoingMessageConfirmation(text)
+
+  if (!isConfirmed) {
+    return {
+      error:
+        "Enter sudah dipicu, tapi WhatsApp belum menampilkan pesan baru. Pesan belum dianggap terkirim.",
+      ok: false
+    }
+  }
+
   return {
     ok: true
   }
@@ -1048,29 +1281,6 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
         (item: unknown): item is string =>
           typeof item === "string" && item.trim().length > 0
       )
-    : []
-
-  const suggestionDetails = Array.isArray(payload?.suggestion_details)
-    ? payload.suggestion_details
-        .filter(
-          (item: unknown): item is WhatsAppSuggestionDetail =>
-            Boolean(item) &&
-            typeof item === "object" &&
-            typeof (item as { text?: unknown }).text === "string" &&
-            (item as { text: string }).text.trim().length > 0
-        )
-        .map((item) => ({
-          reasoning:
-            typeof item.reasoning === "string" &&
-            item.reasoning.trim().length > 0
-              ? item.reasoning
-              : undefined,
-          text: item.text,
-          tone:
-            typeof item.tone === "string" && item.tone.trim().length > 0
-              ? item.tone
-              : undefined
-        }))
     : []
 
   return {
@@ -1112,8 +1322,7 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
         : typeof payload?.risk_level === "string"
           ? payload.risk_level
           : undefined,
-    suggestionDetails,
-    suggestions: suggestions.slice(0, 3)
+    suggestions: suggestions.slice(0, 1)
   }
 }
 
@@ -1127,6 +1336,8 @@ const getActiveTab = async () => {
 }
 
 const readWhatsAppFromPage = (): WhatsAppReadResponse => {
+  const SELF_AUTHOR_PATTERN = /^(you|anda|me|saya)$/i
+
   const parsePrePlainText = (value: string) => {
     const trimmedValue = value.trim()
     const match = trimmedValue.match(
@@ -1199,27 +1410,158 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
   const getMessageDirection = (
     container: HTMLElement
   ): WhatsAppMessageDirection => {
-    const bubble = container.closest(".message-out, .message-in")
+    const metaSource =
+      container
+        .querySelector<HTMLElement>("[data-pre-plain-text]")
+        ?.getAttribute("data-pre-plain-text") || ""
+    const parsedMeta = parsePrePlainText(metaSource)
+    const directionNode =
+      container.matches(".message-out, .message-in")
+        ? container
+        : container.querySelector<HTMLElement>(".message-out, .message-in") ||
+          container.closest<HTMLElement>(".message-out, .message-in") ||
+          container.parentElement?.closest<HTMLElement>(
+            ".message-out, .message-in"
+          ) ||
+          null
 
-    return bubble?.classList.contains("message-out") ? "outgoing" : "incoming"
+    if (directionNode?.classList.contains("message-out")) {
+      return "outgoing"
+    }
+
+    if (directionNode?.classList.contains("message-in")) {
+      return "incoming"
+    }
+
+    if (
+      container.querySelector(
+        '[data-icon="msg-check"], [data-icon="msg-dblcheck"], [data-icon="status-dblcheck"], [data-icon="msg-time"]'
+      ) &&
+      SELF_AUTHOR_PATTERN.test(parsedMeta.author)
+    ) {
+      return "outgoing"
+    }
+
+    if (SELF_AUTHOR_PATTERN.test(parsedMeta.author)) {
+      return "outgoing"
+    }
+
+    const alignmentNodes = [
+      container,
+      container.parentElement,
+      container.parentElement?.parentElement
+    ].filter((node): node is HTMLElement => Boolean(node))
+
+    for (const node of alignmentNodes) {
+      const computedStyle = window.getComputedStyle(node)
+
+      if (computedStyle.justifyContent === "flex-end") {
+        return "outgoing"
+      }
+
+      if (computedStyle.justifyContent === "flex-start") {
+        return "incoming"
+      }
+
+      if (node.classList.contains("xuk3077")) {
+        return "outgoing"
+      }
+
+      if (node.classList.contains("x1cy8zhl")) {
+        return "incoming"
+      }
+    }
+
+    const rect = container.getBoundingClientRect()
+    const leftSpace = rect.left
+    const rightSpace = window.innerWidth - rect.right
+
+    if (rightSpace < leftSpace) {
+      return "outgoing"
+    }
+
+    return "incoming"
   }
 
-  const getLeafTextCandidates = (nodes: HTMLElement[]) => {
-    return nodes.filter(
-      (node) =>
-        !nodes.some(
-          (otherNode) => otherNode !== node && node.contains(otherNode)
+  const normalizeMessageBlockText = (value: string) =>
+    value
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join("\n")
+      .trim()
+
+  const getPreferredMessageTexts = (nodes: HTMLElement[]) => {
+    const uniqueTexts = Array.from(
+      new Set(
+        nodes
+          .map((node) => normalizeMessageBlockText(node.innerText || ""))
+          .filter(Boolean)
+      )
+    )
+
+    return uniqueTexts.filter(
+      (text) =>
+        !uniqueTexts.some(
+          (otherText) =>
+            otherText !== text &&
+            otherText.length > text.length &&
+            otherText.includes(text)
         )
     )
   }
 
+  type ParsedReplyAwareMessage = {
+    replyContextSenderName?: string
+    replyContextSenderType?: "incoming" | "outgoing" | "unknown"
+    replyContextText?: string
+    text: string
+  }
+
+  const splitReplyAwareMessageText = (candidates: string[]) => {
+    if (candidates.length === 0) {
+      return {
+        text: ""
+      } satisfies ParsedReplyAwareMessage
+    }
+
+    if (candidates.length > 1) {
+      return {
+        replyContextText: candidates.slice(0, -1).join("\n"),
+        text: candidates[candidates.length - 1]
+      } satisfies ParsedReplyAwareMessage
+    }
+
+    const singleCandidate = candidates[0]
+    const lines = singleCandidate
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    if (lines.length >= 2) {
+      const replyContext = lines.slice(0, -1).join(" ").trim()
+      const bodyText = lines[lines.length - 1]?.trim() || ""
+
+      if (replyContext.length >= 18 && bodyText) {
+        return {
+          replyContextText: replyContext,
+          text: bodyText
+        } satisfies ParsedReplyAwareMessage
+      }
+    }
+
+    return {
+      text: singleCandidate
+    } satisfies ParsedReplyAwareMessage
+  }
+
   const getMessageText = (container: HTMLElement) => {
-    const primaryCandidates = getLeafTextCandidates(
+    const primaryCandidates = getPreferredMessageTexts(
       Array.from(
         container.querySelectorAll<HTMLElement>('[data-testid="msg-text"]')
       )
     )
-    const fallbackCandidates = getLeafTextCandidates(
+    const fallbackCandidates = getPreferredMessageTexts(
       Array.from(
         container.querySelectorAll<HTMLElement>(
           '[data-testid="selectable-text"], .copyable-text'
@@ -1229,23 +1571,32 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     const candidates =
       primaryCandidates.length > 0 ? primaryCandidates : fallbackCandidates
 
-    const uniqueTexts = Array.from(
-      new Set(
-        candidates
-          .map((node) => node.innerText.replace(/\s+/g, " ").trim())
-          .filter(Boolean)
-      )
-    )
-
-    if (uniqueTexts.length > 0) {
-      return uniqueTexts.join("\n")
+    if (candidates.length > 0) {
+      const parsed = splitReplyAwareMessageText(candidates)
+      if (parsed.replyContextText) {
+        const direction = getMessageDirection(container)
+        const replyContextSenderType = direction === "outgoing" ? "incoming" : "outgoing"
+        return {
+          replyContextSenderName: undefined,
+          replyContextSenderType,
+          replyContextText: parsed.replyContextText,
+          text: parsed.text
+        } satisfies ParsedReplyAwareMessage
+      }
+      return parsed
     }
 
     const mediaLabel = container
       .querySelector<HTMLElement>('[data-testid="media-caption"], [aria-label]')
-      ?.innerText?.trim()
+      ?.innerText
 
-    return mediaLabel || ""
+    const normalizedMediaLabel = mediaLabel
+      ? normalizeMessageBlockText(mediaLabel)
+      : ""
+
+    return {
+      text: normalizedMediaLabel || ""
+    } satisfies ParsedReplyAwareMessage
   }
 
   const chatRoot = getChatRoot()
@@ -1266,8 +1617,14 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
   }
 
   const messageContainers = Array.from(
-    chatRoot.querySelectorAll<HTMLElement>(
-      '[data-testid="conversation-panel-messages"] [data-testid="msg-container"], [data-testid="msg-container"]'
+    new Set(
+      Array.from(
+        (
+          chatRoot.querySelector<HTMLElement>(
+            '[data-testid="conversation-panel-messages"]'
+          ) || chatRoot
+        ).querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
+      )
     )
   )
 
@@ -1278,18 +1635,44 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
           .querySelector<HTMLElement>("[data-pre-plain-text]")
           ?.getAttribute("data-pre-plain-text") || ""
       const parsedMeta = parsePrePlainText(metaSource)
-      const text = getMessageText(container)
+      const parsedMessage = getMessageText(container)
+      const text = parsedMessage.text
 
       if (!text) {
         return null
       }
 
       return {
-        author:
+        authorName:
           parsedMeta.author ||
           (getMessageDirection(container) === "outgoing" ? "Anda" : chatTitle),
         direction: getMessageDirection(container),
+        parsedMessage,
+        parsedMeta,
+        text
+      }
+    })
+    .map((entry, index) => {
+      if (!entry) {
+        return null
+      }
+
+      const { authorName, direction, parsedMessage, parsedMeta, text } = entry
+      const replyContextSenderName = parsedMessage.replyContextText
+        ? direction === "outgoing"
+          ? chatTitle
+          : "Anda"
+        : undefined
+
+      return {
+        author:
+          authorName,
+        direction,
         id: `${parsedMeta.timestampLabel}-${index}`,
+        replyContextSenderName:
+          parsedMessage.replyContextSenderName || replyContextSenderName,
+        replyContextSenderType: parsedMessage.replyContextSenderType,
+        replyContextText: parsedMessage.replyContextText,
         text,
         timestampLabel: parsedMeta.timestampLabel
       }
@@ -1307,56 +1690,17 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
   }
 }
 
-const fetchSuggestionsFromProxyDirectly = async (
-  chatData: WhatsAppChatSnapshot
-) => {
-  let lastFetchError = ""
-
-  for (const proxyUrl of getReplySuggestionCandidates()) {
-    try {
-      const response = await fetch(proxyUrl, {
-        body: JSON.stringify({
-          chatData
-        }),
-        headers: {
-          "Content-Type": "application/json",
-          ...(await getClaraAuthHeaders())
-        },
-        method: "POST"
-      })
-
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(
-          payload?.error ||
-            `API Clara/proxy gagal memproses permintaan saran jawaban di ${proxyUrl}.`
-        )
-      }
-
-      const normalized = normalizeSuggestionPayload(payload)
-      const suggestions = normalized.suggestions
-
-      if (suggestions.length === 0) {
-        throw new Error("Proxy tidak mengembalikan saran jawaban.")
-      }
-
-      return normalized
-    } catch (error) {
-      lastFetchError =
-        error instanceof Error ? error.message : "Failed to fetch"
-    }
-  }
-
-  throw new Error(
-    `Gagal menghubungi Clara/proxy reply di ${OPENAI_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
-  )
-}
-
 const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
   let lastFetchError = ""
+  const snapshotCandidates = getSnapshotSyncCandidates()
 
-  for (const proxyUrl of getSnapshotSyncCandidates()) {
+  if (snapshotCandidates.length === 0) {
+    throw new Error(
+      "PLASMO_PUBLIC_CLARA_API_BASE_URL belum diisi. Fallback proxy lokal hanya aktif untuk development bila diizinkan eksplisit."
+    )
+  }
+
+  for (const proxyUrl of snapshotCandidates) {
     try {
       const response = await fetch(proxyUrl, {
         body: JSON.stringify({
@@ -1394,14 +1738,19 @@ const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
   }
 
   throw new Error(
-    `Gagal menghubungi API snapshot di ${CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
+    `Gagal menghubungi API snapshot di ${snapshotCandidates[0] || CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
   )
 }
 
 const clearChatSnapshotInProxy = async () => {
   let lastFetchError = ""
+  const snapshotCandidates = getSnapshotSyncCandidates()
 
-  for (const proxyUrl of getSnapshotSyncCandidates()) {
+  if (snapshotCandidates.length === 0) {
+    return
+  }
+
+  for (const proxyUrl of snapshotCandidates) {
     try {
       const response = await fetch(proxyUrl, {
         body: JSON.stringify({
@@ -1431,12 +1780,9 @@ const clearChatSnapshotInProxy = async () => {
   }
 
   throw new Error(
-    `Gagal menghubungi API snapshot di ${CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
+    `Gagal menghubungi API snapshot di ${snapshotCandidates[0] || CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
   )
 }
-
-const hasClaraInsight = (result: Partial<WhatsAppSuggestionResult>) =>
-  Boolean(result.customerSummary || result.nextBestAction || result.riskLevel)
 
 const fetchSuggestionsFromClaraBackendOnly = async (
   chatData: WhatsAppChatSnapshot
@@ -1444,6 +1790,11 @@ const fetchSuggestionsFromClaraBackendOnly = async (
   const claraReplySuggestionsUrl = getClaraReplySuggestionsUrl()
 
   if (!claraReplySuggestionsUrl) {
+    if (!isDevFallbackAllowed()) {
+      throw new Error(
+        "Endpoint backend Clara untuk reply suggestion belum dikonfigurasi. Fallback proxy lokal diblokir di mode non-development."
+      )
+    }
     return null
   }
 
@@ -1486,7 +1837,7 @@ const fetchSuggestionsFromClaraBackendOnly = async (
   }
 
   throw new Error(
-    `Gagal menghubungi backend Clara untuk mengambil insight. Detail: ${lastFetchError || "Failed to fetch"}`
+    `Gagal menghubungi backend Clara untuk mengambil jawaban terbaik. Detail: ${lastFetchError || "Failed to fetch"}`
   )
 }
 
@@ -1496,44 +1847,6 @@ const shouldClearSnapshotForError = (message: string) =>
     "Buka WhatsApp Web dulu di tab aktif.",
     "Panel chat WhatsApp Web belum ditemukan."
   ].some((pattern) => message.includes(pattern))
-
-const requestSuggestionCandidates = async (chatData: WhatsAppChatSnapshot) => {
-  try {
-    const response = (await chrome.runtime.sendMessage({
-      chatData,
-      type: "GENERATE_REPLY_SUGGESTIONS"
-    })) as
-      | {
-          actionMode?: string
-          cached?: boolean
-          customerSummary?: string
-          error?: string
-          nextBestAction?: string
-          ok: boolean
-          riskLevel?: string
-          suggestionDetails?: WhatsAppSuggestionDetail[]
-          suggestions?: string[]
-        }
-      | undefined
-
-    if (!response?.ok || !response.suggestions) {
-      throw new Error(
-        response?.error ||
-          "Background worker gagal mengambil saran jawaban dari Clara/proxy."
-      )
-    }
-
-    return normalizeSuggestionPayload(response)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-
-    if (!message.includes("Receiving end does not exist")) {
-      throw error
-    }
-
-    return fetchSuggestionsFromProxyDirectly(chatData)
-  }
-}
 
 function ClaraSidePanel() {
   const [chatData, setChatData] = useState<WhatsAppChatSnapshot | null>(null)
@@ -1551,16 +1864,9 @@ function ClaraSidePanel() {
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [draftSuggestions, setDraftSuggestions] = useState<string[]>([])
-  const [suggestionDetails, setSuggestionDetails] = useState<
-    WhatsAppSuggestionDetail[]
-  >([])
   const [editingSuggestionIndex, setEditingSuggestionIndex] = useState<
     number | null
   >(null)
-  const [customerSummary, setCustomerSummary] = useState("")
-  const [nextBestAction, setNextBestAction] = useState("")
-  const [riskLevel, setRiskLevel] = useState("")
-  const [actionMode, setActionMode] = useState("")
   const [replySuggestionId, setReplySuggestionId] = useState("")
   const [tabUrl, setTabUrl] = useState("")
 
@@ -1573,6 +1879,8 @@ function ClaraSidePanel() {
         : null,
     [chatData]
   )
+  const primarySuggestion = suggestions[0] || ""
+  const primaryDraftSuggestion = draftSuggestions[0] || primarySuggestion
 
   const chatSignature = useMemo(
     () =>
@@ -1787,11 +2095,9 @@ function ClaraSidePanel() {
     setError("")
     setFeedback("")
     setSuggestions([])
-    setSuggestionDetails([])
-    setCustomerSummary("")
-    setNextBestAction("")
-    setRiskLevel("")
-    setActionMode("")
+    setDraftSuggestions([])
+    setEditingSuggestionIndex(null)
+    setReplySuggestionId("")
 
     try {
       const data = await readChatFromActiveTab()
@@ -1914,54 +2220,34 @@ function ClaraSidePanel() {
     setFeedback("")
 
     try {
-      let currentChatData: WhatsAppChatSnapshot
-
-      try {
-        // Always re-read the active chat before generating suggestions so
-        // customer replies that just arrived are included in the latest insight.
-        currentChatData = await readChatFromActiveTab()
-      } catch (readError) {
-        if (chatData && chatData.messages.length > 0) {
-          currentChatData = chatData
-        } else {
-          throw readError
-        }
-      }
+      const currentChatData =
+        chatData && chatData.messages.length > 0
+          ? chatData
+          : await readChatFromActiveTab()
 
       if (currentChatData.messages.length === 0) {
         throw new Error(
-          "Chat aktif belum punya pesan teks yang bisa dipakai untuk saran."
+          "Chat aktif belum punya pesan teks yang bisa dipakai untuk generate jawaban."
         )
       }
 
       setChatData(currentChatData)
+      const suggestionResult =
+        await fetchSuggestionsFromClaraBackendOnly(currentChatData)
+      const bestSuggestion = suggestionResult?.suggestions[0]?.trim()
 
-      syncChatSnapshotToProxy(currentChatData).catch(() => {
-        // Suggestion flow should continue even when snapshot sync is unavailable.
-      })
+      if (!bestSuggestion) {
+        throw new Error("Clara belum mengembalikan jawaban terbaik.")
+      }
 
-      const nextSuggestionResult =
-        await requestSuggestionCandidates(currentChatData)
-      const hydratedSuggestionResult =
-        hasClaraInsight(nextSuggestionResult) &&
-        nextSuggestionResult.replySuggestionId
-          ? nextSuggestionResult
-          : (await fetchSuggestionsFromClaraBackendOnly(currentChatData).catch(
-              () => null
-            )) || nextSuggestionResult
-
-      setSuggestions(hydratedSuggestionResult.suggestions)
-      setDraftSuggestions(hydratedSuggestionResult.suggestions)
-      setSuggestionDetails(hydratedSuggestionResult.suggestionDetails || [])
-      setCustomerSummary(hydratedSuggestionResult.customerSummary || "")
-      setNextBestAction(hydratedSuggestionResult.nextBestAction || "")
-      setRiskLevel(hydratedSuggestionResult.riskLevel || "")
-      setActionMode(hydratedSuggestionResult.actionMode || "")
-      setReplySuggestionId(hydratedSuggestionResult.replySuggestionId || "")
+      setSuggestions([bestSuggestion])
+      setDraftSuggestions([bestSuggestion])
+      setEditingSuggestionIndex(null)
+      setReplySuggestionId(suggestionResult.replySuggestionId || "")
       setFeedback(
-        hydratedSuggestionResult.cached
-          ? "Saran balasan Clara tetap sama karena snapshot chat belum berubah."
-          : "Saran balasan Clara sudah diperbarui dari chat terbaru."
+        suggestionResult.cached
+          ? "Jawaban terbaik tetap sama karena isi chat belum berubah."
+          : "Jawaban terbaik Clara sudah siap dipakai."
       )
     } catch (err) {
       const message =
@@ -1971,11 +2257,7 @@ function ClaraSidePanel() {
 
       setSuggestions([])
       setDraftSuggestions([])
-      setSuggestionDetails([])
-      setCustomerSummary("")
-      setNextBestAction("")
-      setRiskLevel("")
-      setActionMode("")
+      setEditingSuggestionIndex(null)
       setReplySuggestionId("")
       setError(message)
     } finally {
@@ -2236,10 +2518,10 @@ function ClaraSidePanel() {
     .filter(Boolean)
     .join(" | ")
   const draftStatusLabel = suggestions.length
-    ? `${suggestions.length} draft siap`
+    ? "Jawaban terbaik siap"
     : isSuggesting
-      ? "Sedang menyusun draft"
-      : "Belum ada draft"
+      ? "Sedang menyusun jawaban"
+      : "Belum ada jawaban"
 
   return (
     <div className="clara-panel">
@@ -2311,17 +2593,6 @@ function ClaraSidePanel() {
                 </div>
               </div>
 
-              <button
-                className="clara-button clara-button--primary clara-button--block"
-                disabled={isLoading}
-                onClick={handleReadChat}>
-                {isLoading
-                  ? "Membaca chat..."
-                  : chatData
-                    ? "Perbarui Isi Chat"
-                    : "Baca Chat Aktif"}
-              </button>
-
               {!isWhatsAppTab && !chatData && (
                 <div className="clara-note clara-note--warn">
                   Tab aktif saat ini bukan WhatsApp Web. Buka{" "}
@@ -2373,6 +2644,21 @@ function ClaraSidePanel() {
                                 {message.author || "Tanpa nama"}
                               </div>
                             ) : null}
+                            {message.replyContextText ? (
+                              <div className="clara-thread-message__reply-context">
+                                <div className="clara-thread-message__reply-label">
+                                  Membalas{" "}
+                                  {message.replyContextSenderType === "outgoing"
+                                    ? "pesan sales"
+                                    : message.replyContextSenderType === "incoming"
+                                      ? "pesan customer"
+                                      : "pesan sebelumnya"}
+                                </div>
+                                <div className="clara-thread-message__reply-text">
+                                  {message.replyContextText}
+                                </div>
+                              </div>
+                            ) : null}
                             <div className="clara-thread-message__text">
                               {message.text}
                             </div>
@@ -2396,21 +2682,45 @@ function ClaraSidePanel() {
                   <div className="clara-empty__meta">
                     Buka dulu chat di WhatsApp Web, lalu klik{" "}
                     <strong>Baca Chat Aktif</strong>. Setelah itu isi percakapan
-                    akan muncul di area ini seperti tampilan chat.
+                    akan muncul di area ini dan tombol generate bisa langsung
+                    dipakai di sebelahnya.
                   </div>
                 </div>
               )}
             </section>
+
+            <div className="clara-action-bridge">
+              <div className="clara-action-bridge__line" />
+              <div className="clara-action-bridge__actions">
+                <button
+                  className="clara-button clara-button--ghost clara-button--block clara-button--compact"
+                  disabled={isLoading}
+                  onClick={handleReadChat}>
+                  {isLoading
+                    ? "Membaca chat..."
+                    : chatData
+                      ? "Refresh Chat"
+                      : "Baca Chat Aktif"}
+                </button>
+                <button
+                  className="clara-button clara-button--primary clara-button--block clara-button--compact"
+                  disabled={isSuggesting || isLoading || !chatData}
+                  onClick={handleSuggestReplies}>
+                  {isSuggesting ? "Generate..." : "Generate Jawaban"}
+                </button>
+              </div>
+              <div className="clara-action-bridge__line" />
+            </div>
 
             <section className="clara-pane clara-pane--reply">
               <div className="clara-pane__header">
                 <div>
                   <div className="clara-pane__eyebrow">Balasan AI</div>
                   <div className="clara-pane__title">
-                    Pilih jawaban yang paling nyaman dipakai
+                    Satu jawaban terbaik yang siap dipakai
                   </div>
                   <p className="clara-pane__copy">
-                    Clara menyiapkan beberapa versi balasan untuk dipilih.
+                    Clara fokus kasih satu hasil generate terbaik biar lebih cepat dan praktis.
                   </p>
                 </div>
 
@@ -2419,157 +2729,95 @@ function ClaraSidePanel() {
                 </div>
               </div>
 
-              <button
-                className="clara-button clara-button--ghost clara-button--block"
-                disabled={isSuggesting || isLoading}
-                onClick={handleSuggestReplies}>
-                {isSuggesting ? "Menyusun balasan..." : "Buat Saran Jawaban"}
-              </button>
-
-              {suggestions.length > 0 ? (
+              {primarySuggestion ? (
                 <>
-                  <div className="clara-brief">
-                    <div className="clara-brief__title">Insight Clara</div>
-
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {riskLevel ? (
-                        <div className="clara-chip clara-chip--warn">
-                          Risk: {riskLevel}
-                        </div>
-                      ) : null}
-                      {actionMode ? (
-                        <div className="clara-chip clara-chip--good">
-                          {actionMode}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    {customerSummary || nextBestAction || riskLevel ? (
-                      <div className="clara-brief__grid">
-                        {customerSummary && (
-                          <div className="clara-brief__text">
-                            <strong>Ringkasan customer:</strong>{" "}
-                            {customerSummary}
-                          </div>
-                        )}
-                        {nextBestAction && (
-                          <div className="clara-brief__text">
-                            <strong>Aksi berikutnya:</strong> {nextBestAction}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="clara-brief__text">
-                        Insight Clara belum tersedia untuk percakapan ini, tapi
-                        draft balasan tetap berhasil dibuat.
-                      </div>
-                    )}
-                  </div>
-
                   <div className="clara-draft-list">
-                    {suggestions.map((suggestion, index) => (
-                      <article
-                        className="clara-draft"
-                        key={`${suggestion}-${index}`}>
-                        <div className="clara-draft__head">
-                          <div>
-                            <div className="clara-draft__number">
-                              Draft {String(index + 1).padStart(2, "0")}
-                            </div>
-                            <div className="clara-draft__tone">
-                              {SUGGESTION_TONE_LABELS[index] ||
-                                `Saran ${index + 1}`}
-                            </div>
+                    <article className="clara-draft">
+                      <div className="clara-draft__head">
+                        <div>
+                          <div className="clara-draft__number">
+                            Jawaban Terbaik
                           </div>
+                          <div className="clara-draft__tone">
+                            Siap dipakai langsung
+                          </div>
+                        </div>
 
                         <div className="clara-draft__hint">
-                          Bisa dipakai langsung
+                          Hasil tercepat Clara
                         </div>
                       </div>
 
-                        {editingSuggestionIndex === index ? (
+                      {editingSuggestionIndex === 0 ? (
                           <div className="clara-draft__editor">
                             <textarea
                               className="clara-input clara-input--textarea"
                               onChange={(event) =>
-                                handleDraftSuggestionChange(
-                                  index,
-                                  event.target.value
-                                )
+                                handleDraftSuggestionChange(0, event.target.value)
                               }
                               rows={6}
-                              value={draftSuggestions[index] ?? suggestion}
+                              value={primaryDraftSuggestion}
                             />
                             <div className="clara-draft__actions">
                               <button
                                 className="clara-button clara-button--ghost"
-                                onClick={() =>
-                                  handleCancelEditingSuggestion(index)
-                                }>
+                                onClick={() => handleCancelEditingSuggestion(0)}>
                                 Batal
                               </button>
                               <button
                                 className="clara-button clara-button--insert"
-                                onClick={() => handleSaveEditedSuggestion(index)}>
+                                onClick={() => handleSaveEditedSuggestion(0)}>
                                 Simpan
                               </button>
                             </div>
                           </div>
                         ) : (
-                          <div className="clara-draft__text">{suggestion}</div>
+                        <div className="clara-draft__text">
+                          {primarySuggestion}
+                        </div>
                         )}
 
-                        {suggestionDetails[index]?.reasoning && (
-                          <div className="clara-draft__reason">
-                            <strong>Kenapa draft ini:</strong>{" "}
-                            {suggestionDetails[index]?.reasoning}
-                          </div>
-                        )}
-
-                        {editingSuggestionIndex !== index ? (
+                      {editingSuggestionIndex !== 0 ? (
                           <div className="clara-draft__actions">
                             <button
                               className="clara-button clara-button--ghost"
-                              onClick={() =>
-                                handleStartEditingSuggestion(index)
-                              }>
+                              onClick={() => handleStartEditingSuggestion(0)}>
                               Edit
                             </button>
                             <button
                               className="clara-button clara-button--insert"
-                              disabled={isInsertingIndex === index}
+                              disabled={isInsertingIndex === 0}
                               onClick={() =>
-                                handleInsertSuggestion(suggestion, index)
+                                handleInsertSuggestion(primarySuggestion, 0)
                               }>
-                              {isInsertingIndex === index
+                              {isInsertingIndex === 0
                                 ? "Memasukkan..."
                                 : "Masukkan ke Chat"}
                             </button>
                             <button
                               className="clara-button clara-button--send"
-                              disabled={isInsertingIndex === index}
+                              disabled={isInsertingIndex === 0}
                               onClick={() =>
-                                handleSendSuggestion(suggestion, index)
+                                handleSendSuggestion(primarySuggestion, 0)
                               }>
-                              {isInsertingIndex === index
+                              {isInsertingIndex === 0
                                 ? "Mengirim..."
                                 : "Kirim Sekarang"}
                             </button>
                           </div>
                         ) : null}
-                      </article>
-                    ))}
+                    </article>
                   </div>
                 </>
               ) : (
                 <div className="clara-empty">
                   <div className="clara-empty__title">
-                    Belum ada draft balasan
+                    Belum ada jawaban terbaik
                   </div>
                   <div className="clara-empty__meta">
                     Setelah isi chat berhasil dibaca, klik{" "}
-                    <strong>Buat Saran Jawaban</strong> supaya Clara menyiapkan
-                    beberapa opsi yang bisa langsung kamu pakai.
+                    <strong>Generate Jawaban</strong> supaya Clara menyiapkan
+                    satu balasan terbaik yang bisa langsung kamu pakai.
                   </div>
                 </div>
               )}
