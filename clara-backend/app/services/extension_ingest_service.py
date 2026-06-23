@@ -51,8 +51,18 @@ class NormalizedSnapshotMessage:
     author: str
     sender_type: str
     text: str
+    reply_context_text: str | None
+    reply_context_sender_name: str | None
+    reply_context_sender_type: str | None
     timestamp: datetime
     timestamp_label: str
+
+
+@dataclass(frozen=True)
+class ReplyContextMatch:
+    text: str
+    sender_name: str
+    sender_type: str
 
 
 SYNTHETIC_SALES_MATCH_WINDOW = timedelta(minutes=10)
@@ -159,18 +169,46 @@ def normalize_snapshot_messages(
         )
         previous_timestamp = timestamp
 
-        cleaned_text = split_reply_context_from_snapshot_text(
+        current_sender_type = "sales" if message.direction == "outgoing" else "customer"
+        explicit_reply_context = None
+        if message.reply_context_text and message.reply_context_text.strip():
+            explicit_reply_context = ReplyContextMatch(
+                text=message.reply_context_text.strip(),
+                sender_name=(message.reply_context_sender_name or "").strip()
+                or (
+                    snapshot.chat_title
+                    if message.reply_context_sender_type == "incoming"
+                    else "Anda"
+                ),
+                sender_type=(
+                    "customer"
+                    if message.reply_context_sender_type == "incoming"
+                    else "sales"
+                    if message.reply_context_sender_type == "outgoing"
+                    else "unknown"
+                ),
+            )
+
+        body_text, inferred_reply_context = split_reply_context_from_snapshot_text(
             raw_text=message.text,
-            sender_type="sales" if message.direction == "outgoing" else "customer",
+            sender_type=current_sender_type,
             previous_messages=normalized_messages,
         )
+        reply_context = explicit_reply_context or inferred_reply_context
 
         normalized_messages.append(
             NormalizedSnapshotMessage(
                 external_message_id=message.id.strip(),
                 author=message.author.strip(),
-                sender_type="sales" if message.direction == "outgoing" else "customer",
-                text=cleaned_text,
+                sender_type=current_sender_type,
+                text=body_text,
+                reply_context_text=reply_context.text if reply_context else None,
+                reply_context_sender_name=(
+                    reply_context.sender_name if reply_context else None
+                ),
+                reply_context_sender_type=(
+                    reply_context.sender_type if reply_context else None
+                ),
                 timestamp=timestamp,
                 timestamp_label=message.timestamp_label.strip(),
             )
@@ -252,14 +290,14 @@ def split_reply_context_from_snapshot_text(
     raw_text: str,
     sender_type: str,
     previous_messages: list[NormalizedSnapshotMessage],
-) -> str:
+) -> tuple[str, ReplyContextMatch | None]:
     normalized_text = normalize_extension_message_text(raw_text)
     if not normalized_text:
-        return ""
+        return "", None
 
     lines = [line.strip() for line in normalized_text.splitlines() if line.strip()]
     if len(lines) < 2:
-        return normalized_text
+        return normalized_text, None
 
     relevant_previous_messages = [
         message
@@ -268,7 +306,7 @@ def split_reply_context_from_snapshot_text(
         and message.sender_type != sender_type
     ]
     if not relevant_previous_messages:
-        return normalized_text
+        return normalized_text, None
 
     for split_index in range(1, len(lines)):
         reply_context = "\n".join(lines[:split_index]).strip()
@@ -280,13 +318,15 @@ def split_reply_context_from_snapshot_text(
         if len(reply_context) < REPLY_CONTEXT_MIN_LENGTH:
             continue
 
-        if any(
-            _reply_excerpt_matches_previous_message(reply_context, previous.text)
-            for previous in relevant_previous_messages
-        ):
-            return body_text
+        for previous in relevant_previous_messages:
+            if _reply_excerpt_matches_previous_message(reply_context, previous.text):
+                return body_text, ReplyContextMatch(
+                    text=previous.text,
+                    sender_name=previous.author,
+                    sender_type=previous.sender_type,
+                )
 
-    return normalized_text
+    return normalized_text, None
 
 
 def ensure_aware_utc(value: datetime) -> datetime:
@@ -411,6 +451,9 @@ def sync_extension_messages(
                 sender_name=message.author,
                 sender_type=message.sender_type,
                 message_text=message.text,
+                reply_context_text=message.reply_context_text,
+                reply_context_sender_name=message.reply_context_sender_name,
+                reply_context_sender_type=message.reply_context_sender_type,
                 message_timestamp=message.timestamp,
             )
             db.add(existing_message)
@@ -421,6 +464,13 @@ def sync_extension_messages(
             existing_message.sender_name = message.author
             existing_message.sender_type = message.sender_type
             existing_message.message_text = message.text
+            existing_message.reply_context_text = message.reply_context_text
+            existing_message.reply_context_sender_name = (
+                message.reply_context_sender_name
+            )
+            existing_message.reply_context_sender_type = (
+                message.reply_context_sender_type
+            )
             existing_message.message_timestamp = message.timestamp
             db.add(existing_message)
 

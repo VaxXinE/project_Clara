@@ -2401,6 +2401,20 @@ def format_conversation_for_reply(
         timestamp = message.message_timestamp.isoformat()
         sender_type = message.sender_type
         sender_name = message.sender_name
+        reply_context_text = _truncate_message_text(
+            getattr(message, "reply_context_text", "") or "",
+            min(char_limit, 180),
+        )
+        if reply_context_text:
+            reply_context_sender_name = (
+                getattr(message, "reply_context_sender_name", None) or "pesan sebelumnya"
+            )
+            reply_context_sender_type = (
+                getattr(message, "reply_context_sender_type", None) or "unknown"
+            )
+            lines.append(
+                f"[{timestamp}] {sender_type} ({sender_name}) membalas {reply_context_sender_type} ({reply_context_sender_name}): {reply_context_text}"
+            )
         lines.append(f"[{timestamp}] {sender_type} ({sender_name}): {text}")
 
     return "\n".join(lines)

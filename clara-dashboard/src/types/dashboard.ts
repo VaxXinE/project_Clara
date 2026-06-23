@@ -107,6 +107,9 @@ export type SalesConversationMessage = {
   sender_name: string;
   sender_type: string;
   message_text: string;
+  reply_context_text?: string | null;
+  reply_context_sender_name?: string | null;
+  reply_context_sender_type?: string | null;
   message_timestamp: string;
 };
 

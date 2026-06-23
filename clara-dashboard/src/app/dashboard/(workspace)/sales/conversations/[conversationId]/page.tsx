@@ -1049,6 +1049,28 @@ function ConversationDetailContent({
                       {message.sender_name}
                     </p>
                   ) : null}
+                  {message.reply_context_text ? (
+                    <div
+                      className={`mb-3 rounded-[18px] border px-3 py-2 text-xs leading-6 ${
+                        isSales
+                          ? "border-[#7d5316]/24 bg-[rgba(95,62,17,0.12)] text-[#5f3910]"
+                          : "border-[#f0cb73]/16 bg-[rgba(255,240,201,0.06)] text-[#dcbf86]"
+                      }`}
+                    >
+                      <p className="mb-1 font-semibold">
+                        Membalas{" "}
+                        {message.reply_context_sender_type === "sales"
+                          ? "pesan sales"
+                          : "pesan customer"}
+                        {message.reply_context_sender_name
+                          ? ` · ${message.reply_context_sender_name}`
+                          : ""}
+                      </p>
+                      <p className="whitespace-pre-wrap opacity-90">
+                        {message.reply_context_text}
+                      </p>
+                    </div>
+                  ) : null}
                   <p className="whitespace-pre-wrap text-[15px] leading-7">
                     {message.message_text}
                   </p>

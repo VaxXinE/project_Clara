@@ -529,6 +529,33 @@ const panelCss = `
     overflow-wrap: anywhere;
   }
 
+  .clara-thread-message__reply-context {
+    background: rgba(255, 240, 201, 0.06);
+    border: 1px solid rgba(240, 203, 115, 0.14);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    padding: 6px 7px;
+  }
+
+  .clara-thread-message__reply-label {
+    color: #d6bb84;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.3;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .clara-thread-message__reply-text {
+    color: #efd8a2;
+    font-size: 11px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
   .clara-thread-message__text {
     color: #f7e7b7;
     font-size: 12px;
@@ -549,6 +576,19 @@ const panelCss = `
 
   .clara-thread-message--out .clara-thread-message__author {
     color: rgba(20, 15, 8, 0.68);
+  }
+
+  .clara-thread-message--out .clara-thread-message__reply-context {
+    background: rgba(20, 15, 8, 0.08);
+    border-color: rgba(20, 15, 8, 0.12);
+  }
+
+  .clara-thread-message--out .clara-thread-message__reply-label {
+    color: rgba(20, 15, 8, 0.65);
+  }
+
+  .clara-thread-message--out .clara-thread-message__reply-text {
+    color: rgba(20, 15, 8, 0.88);
   }
 
   .clara-thread-message--out .clara-thread-message__text {
@@ -1471,13 +1511,25 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     )
   }
 
+  type ParsedReplyAwareMessage = {
+    replyContextSenderName?: string
+    replyContextSenderType?: "incoming" | "outgoing" | "unknown"
+    replyContextText?: string
+    text: string
+  }
+
   const splitReplyAwareMessageText = (candidates: string[]) => {
     if (candidates.length === 0) {
-      return ""
+      return {
+        text: ""
+      } satisfies ParsedReplyAwareMessage
     }
 
     if (candidates.length > 1) {
-      return candidates[candidates.length - 1]
+      return {
+        replyContextText: candidates.slice(0, -1).join("\n"),
+        text: candidates[candidates.length - 1]
+      } satisfies ParsedReplyAwareMessage
     }
 
     const singleCandidate = candidates[0]
@@ -1491,11 +1543,16 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
       const bodyText = lines[lines.length - 1]?.trim() || ""
 
       if (replyContext.length >= 18 && bodyText) {
-        return bodyText
+        return {
+          replyContextText: replyContext,
+          text: bodyText
+        } satisfies ParsedReplyAwareMessage
       }
     }
 
-    return singleCandidate
+    return {
+      text: singleCandidate
+    } satisfies ParsedReplyAwareMessage
   }
 
   const getMessageText = (container: HTMLElement) => {
@@ -1515,7 +1572,18 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
       primaryCandidates.length > 0 ? primaryCandidates : fallbackCandidates
 
     if (candidates.length > 0) {
-      return splitReplyAwareMessageText(candidates)
+      const parsed = splitReplyAwareMessageText(candidates)
+      if (parsed.replyContextText) {
+        const direction = getMessageDirection(container)
+        const replyContextSenderType = direction === "outgoing" ? "incoming" : "outgoing"
+        return {
+          replyContextSenderName: undefined,
+          replyContextSenderType,
+          replyContextText: parsed.replyContextText,
+          text: parsed.text
+        } satisfies ParsedReplyAwareMessage
+      }
+      return parsed
     }
 
     const mediaLabel = container
@@ -1526,7 +1594,9 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
       ? normalizeMessageBlockText(mediaLabel)
       : ""
 
-    return normalizedMediaLabel || ""
+    return {
+      text: normalizedMediaLabel || ""
+    } satisfies ParsedReplyAwareMessage
   }
 
   const chatRoot = getChatRoot()
@@ -1565,18 +1635,44 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
           .querySelector<HTMLElement>("[data-pre-plain-text]")
           ?.getAttribute("data-pre-plain-text") || ""
       const parsedMeta = parsePrePlainText(metaSource)
-      const text = getMessageText(container)
+      const parsedMessage = getMessageText(container)
+      const text = parsedMessage.text
 
       if (!text) {
         return null
       }
 
       return {
-        author:
+        authorName:
           parsedMeta.author ||
           (getMessageDirection(container) === "outgoing" ? "Anda" : chatTitle),
         direction: getMessageDirection(container),
+        parsedMessage,
+        parsedMeta,
+        text
+      }
+    })
+    .map((entry, index) => {
+      if (!entry) {
+        return null
+      }
+
+      const { authorName, direction, parsedMessage, parsedMeta, text } = entry
+      const replyContextSenderName = parsedMessage.replyContextText
+        ? direction === "outgoing"
+          ? chatTitle
+          : "Anda"
+        : undefined
+
+      return {
+        author:
+          authorName,
+        direction,
         id: `${parsedMeta.timestampLabel}-${index}`,
+        replyContextSenderName:
+          parsedMessage.replyContextSenderName || replyContextSenderName,
+        replyContextSenderType: parsedMessage.replyContextSenderType,
+        replyContextText: parsedMessage.replyContextText,
         text,
         timestampLabel: parsedMeta.timestampLabel
       }
@@ -2546,6 +2642,21 @@ function ClaraSidePanel() {
                             {message.direction !== "outgoing" ? (
                               <div className="clara-thread-message__author">
                                 {message.author || "Tanpa nama"}
+                              </div>
+                            ) : null}
+                            {message.replyContextText ? (
+                              <div className="clara-thread-message__reply-context">
+                                <div className="clara-thread-message__reply-label">
+                                  Membalas{" "}
+                                  {message.replyContextSenderType === "outgoing"
+                                    ? "pesan sales"
+                                    : message.replyContextSenderType === "incoming"
+                                      ? "pesan customer"
+                                      : "pesan sebelumnya"}
+                                </div>
+                                <div className="clara-thread-message__reply-text">
+                                  {message.replyContextText}
+                                </div>
                               </div>
                             ) : null}
                             <div className="clara-thread-message__text">

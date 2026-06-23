@@ -888,6 +888,9 @@ def get_sales_conversation_detail(
                 "sender_name": message.sender_name,
                 "sender_type": message.sender_type,
                 "message_text": message.message_text,
+                "reply_context_text": message.reply_context_text,
+                "reply_context_sender_name": message.reply_context_sender_name,
+                "reply_context_sender_type": message.reply_context_sender_type,
                 "message_timestamp": message.message_timestamp.isoformat(),
             }
             for message in sorted_messages

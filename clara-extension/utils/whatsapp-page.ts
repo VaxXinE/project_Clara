@@ -191,13 +191,25 @@ const getPreferredMessageTexts = (nodes: HTMLElement[]) => {
   )
 }
 
+type ParsedReplyAwareMessage = {
+  replyContextSenderName?: string
+  replyContextSenderType?: "incoming" | "outgoing" | "unknown"
+  replyContextText?: string
+  text: string
+}
+
 const splitReplyAwareMessageText = (candidates: string[]) => {
   if (candidates.length === 0) {
-    return ""
+    return {
+      text: ""
+    } satisfies ParsedReplyAwareMessage
   }
 
   if (candidates.length > 1) {
-    return candidates[candidates.length - 1]
+    return {
+      replyContextText: candidates.slice(0, -1).join("\n"),
+      text: candidates[candidates.length - 1]
+    } satisfies ParsedReplyAwareMessage
   }
 
   const singleCandidate = candidates[0]
@@ -211,11 +223,16 @@ const splitReplyAwareMessageText = (candidates: string[]) => {
     const bodyText = lines[lines.length - 1]?.trim() || ""
 
     if (replyContext.length >= 18 && bodyText) {
-      return bodyText
+      return {
+        replyContextText: replyContext,
+        text: bodyText
+      } satisfies ParsedReplyAwareMessage
     }
   }
 
-  return singleCandidate
+  return {
+    text: singleCandidate
+  } satisfies ParsedReplyAwareMessage
 }
 
 const getMessageText = (container: HTMLElement) => {
@@ -233,7 +250,18 @@ const getMessageText = (container: HTMLElement) => {
     primaryCandidates.length > 0 ? primaryCandidates : fallbackCandidates
 
   if (candidates.length > 0) {
-    return splitReplyAwareMessageText(candidates)
+    const parsed = splitReplyAwareMessageText(candidates)
+    if (parsed.replyContextText) {
+      const direction = getMessageDirection(container)
+      const replyContextSenderType = direction === "outgoing" ? "incoming" : "outgoing"
+      return {
+        replyContextSenderName: undefined,
+        replyContextSenderType,
+        replyContextText: parsed.replyContextText,
+        text: parsed.text
+      } satisfies ParsedReplyAwareMessage
+    }
+    return parsed
   }
 
   const mediaLabel = container
@@ -244,7 +272,9 @@ const getMessageText = (container: HTMLElement) => {
     ? normalizeMessageBlockText(mediaLabel)
     : ""
 
-  return normalizedMediaLabel || ""
+  return {
+    text: normalizedMediaLabel || ""
+  } satisfies ParsedReplyAwareMessage
 }
 
 const getComposeBox = () => {
@@ -354,18 +384,44 @@ export const readOpenChat = (): WhatsAppReadResponse => {
           .querySelector<HTMLElement>("[data-pre-plain-text]")
           ?.getAttribute("data-pre-plain-text") || ""
       const parsedMeta = parsePrePlainText(metaSource)
-      const text = getMessageText(container)
+      const parsedMessage = getMessageText(container)
+      const text = parsedMessage.text
 
       if (!text) {
         return null
       }
 
       return {
-        author:
+        authorName:
           parsedMeta.author ||
           (getMessageDirection(container) === "outgoing" ? "Anda" : chatTitle),
         direction: getMessageDirection(container),
+        parsedMessage,
+        parsedMeta,
+        text
+      }
+    })
+    .map((entry, index) => {
+      if (!entry) {
+        return null
+      }
+
+      const { authorName, direction, parsedMessage, parsedMeta, text } = entry
+      const replyContextSenderName = parsedMessage.replyContextText
+        ? direction === "outgoing"
+          ? chatTitle
+          : "Anda"
+        : undefined
+
+      return {
+        author:
+          authorName,
+        direction,
         id: `${parsedMeta.timestampLabel}-${index}`,
+        replyContextSenderName:
+          parsedMessage.replyContextSenderName || replyContextSenderName,
+        replyContextSenderType: parsedMessage.replyContextSenderType,
+        replyContextText: parsedMessage.replyContextText,
         text,
         timestampLabel: parsedMeta.timestampLabel
       }

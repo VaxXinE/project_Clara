@@ -8,6 +8,21 @@ class WhatsAppExtensionMessage(BaseModel):
     author: str = Field(min_length=1, max_length=255)
     direction: str = Field(pattern="^(incoming|outgoing)$")
     text: str = Field(min_length=1, max_length=5000)
+    reply_context_text: str | None = Field(
+        alias="replyContextText",
+        default=None,
+        max_length=5000,
+    )
+    reply_context_sender_name: str | None = Field(
+        alias="replyContextSenderName",
+        default=None,
+        max_length=255,
+    )
+    reply_context_sender_type: str | None = Field(
+        alias="replyContextSenderType",
+        default=None,
+        pattern="^(incoming|outgoing|unknown)$",
+    )
     timestamp_label: str = Field(alias="timestampLabel", default="", max_length=255)
 
 

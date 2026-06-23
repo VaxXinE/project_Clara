@@ -27,6 +27,15 @@ class Message(Base):
         unique=True,
     )
     message_text: Mapped[str] = mapped_column(Text, nullable=False)
+    reply_context_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reply_context_sender_name: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    reply_context_sender_type: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+    )
     message_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

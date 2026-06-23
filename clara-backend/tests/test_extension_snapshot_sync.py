@@ -238,12 +238,15 @@ def test_split_reply_context_from_snapshot_text_keeps_only_new_customer_body() -
                 "saya perlu modal depo pastinya berapa dulu. Kalau nominalnya sudah ada, "
                 "saya bantu arahkan perkiraan sesuai acuan Mini ya kak."
             ),
+            reply_context_text=None,
+            reply_context_sender_name=None,
+            reply_context_sender_type=None,
             timestamp=datetime(2026, 6, 23, 14, 27, tzinfo=timezone.utc),
             timestamp_label="09.27",
         )
     ]
 
-    normalized = split_reply_context_from_snapshot_text(
+    normalized, reply_context = split_reply_context_from_snapshot_text(
         raw_text=(
             "Bisa kak, tapi untuk hitung berapa lot dan kira-kira daya tahan dananya, "
             "saya perlu modal depo pastinya berapa dulu\n"
@@ -254,6 +257,10 @@ def test_split_reply_context_from_snapshot_text_keeps_only_new_customer_body() -
     )
 
     assert normalized == "Aku mau deposit 5juta"
+    assert reply_context is not None
+    assert "daya tahan dananya" in reply_context.text
+    assert reply_context.sender_name == "Arya"
+    assert reply_context.sender_type == "sales"
 
 
 def test_extension_snapshot_sync_strips_reply_quote_from_new_message(
@@ -318,6 +325,9 @@ def test_extension_snapshot_sync_strips_reply_quote_from_new_message(
     )
     assert messages[-1].sender_type == "customer"
     assert messages[-1].message_text == "Aku mau deposit 5juta"
+    assert messages[-1].reply_context_text is not None
+    assert "daya tahan dananya" in messages[-1].reply_context_text
+    assert messages[-1].reply_context_sender_type == "sales"
 
 
 def test_extension_snapshot_sync_dedupes_repeated_messages_within_single_snapshot(

@@ -10,6 +10,9 @@ class DashboardLatestMessage(BaseModel):
     sender_name: str
     sender_type: str
     message_text: str
+    reply_context_text: str | None = None
+    reply_context_sender_name: str | None = None
+    reply_context_sender_type: str | None = None
     message_timestamp: datetime
 
 
