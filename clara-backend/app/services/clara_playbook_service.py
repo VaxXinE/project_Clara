@@ -21,7 +21,7 @@ PLAYBOOK_FILES = (
     "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
 )
 
-CORE_PLAYBOOK_FILES = (
+SYSTEM_PLAYBOOK_FILES = (
     "INSTRUCTION.md",
     "GUARDRAIL.md",
     "FLOW.md",
@@ -29,15 +29,10 @@ CORE_PLAYBOOK_FILES = (
     "AUTO_ADAPT.md",
 )
 
-FAST_CORE_PLAYBOOK_FILES = (
-    "INSTRUCTION.md",
-    "GUARDRAIL.md",
-    "FLOW.md",
-)
-
-ULTRA_FAST_CORE_PLAYBOOK_FILES = (
-    "INSTRUCTION.md",
-    "GUARDRAIL.md",
+SUPPORTING_PLAYBOOK_FILES = tuple(
+    filename
+    for filename in PLAYBOOK_FILES
+    if filename not in SYSTEM_PLAYBOOK_FILES
 )
 
 INTENT_PLAYBOOK_FILES: dict[str, tuple[str, ...]] = {
@@ -65,21 +60,17 @@ INTENT_PLAYBOOK_FILES: dict[str, tuple[str, ...]] = {
         "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
     ),
     "next_step": (
-        "FLOW.md",
         "CONVERSION_LAYER.md",
         "CLOSING_ENGINE.md",
     ),
     "setup_scalping": (
-        "FLOW.md",
         "OBJECTION.md",
     ),
     "mechanism": (
-        "FLOW.md",
         "POSITIONING.md",
     ),
     "beginner": (
         "POSITIONING.md",
-        "AUTO_ADAPT.md",
         "SALES_KNOWLEDGE_BRIDGE_MINI.md",
     ),
 }
@@ -125,67 +116,68 @@ def read_markdown_file(path: Path) -> str:
 
 
 @lru_cache(maxsize=32)
-def get_selected_playbook_filenames(
+def get_selected_supporting_playbook_filenames(
     *,
     latest_customer_intent: str | None = None,
     desired_count: int = 3,
     latency_profile: str = "standard",
 ) -> tuple[str, ...]:
     if desired_count != 1:
-        return PLAYBOOK_FILES
+        return SUPPORTING_PLAYBOOK_FILES
 
     if latency_profile == "ultra_fast":
         ultra_fast_map = {
-            "product_options": ("POSITIONING.md",),
+            "product_options": (
+                "POSITIONING.md",
+                "SALES_KNOWLEDGE_BRIDGE_MINI.md",
+                "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
+            ),
             "legality": ("OBJECTION.md",),
             "safety": ("OBJECTION.md",),
             "minimum_capital": ("POSITIONING.md",),
             "beginner": ("POSITIONING.md",),
-            "mechanism": ("FLOW.md",),
+            "mechanism": ("POSITIONING.md",),
         }
-        extra_files = ultra_fast_map.get(
+        return ultra_fast_map.get(
             latest_customer_intent or "",
             ("POSITIONING.md",),
         )
-        ordered = list(
-            dict.fromkeys([*ULTRA_FAST_CORE_PLAYBOOK_FILES, *extra_files])
-        )
-        return tuple(ordered)
 
     if latency_profile == "fast":
         extra_files = INTENT_PLAYBOOK_FILES.get(
             latest_customer_intent or "",
             ("POSITIONING.md",),
         )
-        ordered = list(dict.fromkeys([*FAST_CORE_PLAYBOOK_FILES, *extra_files]))
-        return tuple(ordered)
+        return tuple(dict.fromkeys(extra_files))
 
     extra_files = INTENT_PLAYBOOK_FILES.get(
         latest_customer_intent or "",
         ("POSITIONING.md", "OBJECTION.md"),
     )
-    ordered = list(dict.fromkeys([*CORE_PLAYBOOK_FILES, *extra_files]))
-    return tuple(ordered)
+    return tuple(dict.fromkeys(extra_files))
 
 
-@lru_cache(maxsize=8)
-def load_clara_response_playbook(
-    account_category: str | None = None,
-    include_all_variants: bool = False,
+@lru_cache(maxsize=32)
+def get_selected_playbook_filenames(
+    *,
     latest_customer_intent: str | None = None,
     desired_count: int = 3,
     latency_profile: str = "standard",
-) -> str:
-    sections: list[str] = []
-    knowledge_dirs = get_clara_knowledge_variant_dirs(
-        account_category,
-        include_all_variants=include_all_variants,
-    )
-    selected_filenames = get_selected_playbook_filenames(
+) -> tuple[str, ...]:
+    return get_selected_supporting_playbook_filenames(
         latest_customer_intent=latest_customer_intent,
         desired_count=desired_count,
         latency_profile=latency_profile,
     )
+
+
+def _load_playbook_sections(
+    knowledge_dirs: list[Path],
+    selected_filenames: tuple[str, ...],
+    *,
+    include_remaining_files: bool,
+) -> str:
+    sections: list[str] = []
 
     for knowledge_dir in knowledge_dirs:
         ordered_files = []
@@ -196,7 +188,7 @@ def load_clara_response_playbook(
 
         remaining_files = (
             sorted(available_filenames - set(ordered_files))
-            if desired_count != 1
+            if include_remaining_files
             else []
         )
 
@@ -207,8 +199,47 @@ def load_clara_response_playbook(
             if not content:
                 continue
 
-            sections.append(
-                f"## {knowledge_dir.name}/{filename}\n{content}"
-            )
+            sections.append(f"## {knowledge_dir.name}/{filename}\n{content}")
 
     return "\n\n".join(sections).strip()
+
+
+@lru_cache(maxsize=8)
+def load_clara_system_instruction_playbook(
+    account_category: str | None = None,
+    *,
+    include_all_variants: bool = False,
+) -> str:
+    knowledge_dirs = get_clara_knowledge_variant_dirs(
+        account_category,
+        include_all_variants=include_all_variants,
+    )
+    return _load_playbook_sections(
+        knowledge_dirs,
+        SYSTEM_PLAYBOOK_FILES,
+        include_remaining_files=False,
+    )
+
+
+@lru_cache(maxsize=8)
+def load_clara_response_playbook(
+    account_category: str | None = None,
+    include_all_variants: bool = False,
+    latest_customer_intent: str | None = None,
+    desired_count: int = 3,
+    latency_profile: str = "standard",
+) -> str:
+    knowledge_dirs = get_clara_knowledge_variant_dirs(
+        account_category,
+        include_all_variants=include_all_variants,
+    )
+    selected_filenames = get_selected_supporting_playbook_filenames(
+        latest_customer_intent=latest_customer_intent,
+        desired_count=desired_count,
+        latency_profile=latency_profile,
+    )
+    return _load_playbook_sections(
+        knowledge_dirs,
+        selected_filenames,
+        include_remaining_files=desired_count != 1,
+    )

@@ -15,11 +15,17 @@ from app.schemas.ai_extraction_schema import (
     CustomerProfileAutofill,
     RecommendedReplyStrategy,
 )
-from app.services.clara_playbook_service import get_selected_playbook_filenames
+from app.services.clara_playbook_service import (
+    get_selected_playbook_filenames,
+    load_clara_system_instruction_playbook,
+)
 from app.services.reply_suggestion_service import (
     _extract_reply_payload_from_response,
+    _normalize_reply_payload,
+    _normalize_reply_tone_value,
     build_grounded_knowledge_context,
     build_prioritized_knowledge_brief,
+    build_reply_system_prompt,
     format_conversation_for_reply,
     get_reply_suggestion_json_schema,
     get_conversation_customer_variant_focus,
@@ -122,6 +128,30 @@ def test_reply_suggestion_json_schema_can_be_configured_for_single_draft() -> No
     assert schema["properties"]["suggested_replies"]["maxItems"] == 1
 
 
+def test_build_reply_system_prompt_contains_behavior_engine_rules() -> None:
+    prompt = build_reply_system_prompt(
+        system_playbook="## clara_knowledge_mini/INSTRUCTION.md\nAtur gaya respons inti.",
+        account_category="mini",
+        latest_customer_intent="minimum_capital",
+        preferred_reply_register="natural",
+        answer_commitment_level="direct_answer_first",
+        variant_response_mode="focus_single_variant",
+        customer_has_variant_commitment=True,
+        conversation_variant_focus="mini",
+        customer_has_identity_submission=False,
+        customer_has_verification_completion=False,
+        desired_count=1,
+    )
+
+    assert "JAWAB -> FRAME -> DIRECTION" in prompt
+    assert "Kamu bukan customer service generik" in prompt
+    assert "Maksimal 1-2 bubble" in prompt
+    assert "Jangan menjanjikan profit" in prompt
+    assert "diawasi BAPPEBTI" in prompt
+    assert "PLAYBOOK INTI WAJIB" in prompt
+    assert "Atur gaya respons inti." in prompt
+
+
 def test_extract_reply_payload_from_response_handles_fenced_json() -> None:
     response = SimpleNamespace(
         output_parsed=None,
@@ -161,6 +191,43 @@ def test_extract_reply_payload_from_response_falls_back_to_nested_content_text()
     payload = _extract_reply_payload_from_response(response)
 
     assert payload["suggested_replies"][0]["text"] == "Halo kak"
+
+
+@pytest.mark.parametrize(
+    ("raw_tone", "expected"),
+    [
+        ("netral_sopan", "professional"),
+        ("formal", "professional"),
+        ("ramah", "friendly"),
+        ("empatik", "empathetic"),
+        ("mendesak", "urgent"),
+        ("siap_kirim", "best"),
+        ("tone_aneh_banget", "best"),
+    ],
+)
+def test_normalize_reply_tone_value_maps_model_variants(
+    raw_tone: str,
+    expected: str,
+) -> None:
+    assert _normalize_reply_tone_value(raw_tone) == expected
+
+
+def test_normalize_reply_payload_coerces_invalid_tone_before_schema_validation() -> None:
+    normalized = _normalize_reply_payload(
+        {
+            "suggested_replies": [
+                {
+                    "tone": "netral_sopan",
+                    "text": "Halo kak, saya bantu jawab ya.",
+                    "reasoning": "Menjawab dengan tone sopan dan netral.",
+                }
+            ]
+        }
+    )
+
+    assert normalized["suggested_replies"][0]["tone"] == "professional"
+    parsed = ReplySuggestionCreate.model_validate(normalized)
+    assert parsed.suggested_replies[0].tone == "professional"
 
 
 def test_infer_latest_customer_intent_detects_product_options() -> None:
@@ -634,7 +701,7 @@ def test_get_selected_playbook_filenames_uses_compact_subset_for_single_reply() 
         desired_count=1,
     )
 
-    assert "INSTRUCTION.md" in filenames
+    assert "INSTRUCTION.md" not in filenames
     assert "POSITIONING.md" in filenames
     assert "SALES_KNOWLEDGE_BRIDGE_MINI.md" in filenames
     assert "SALES_KNOWLEDGE_BRIDGE_REGULAR.md" in filenames
@@ -648,10 +715,10 @@ def test_get_selected_playbook_filenames_uses_faster_subset_for_fast_profile() -
         latency_profile="fast",
     )
 
-    assert "INSTRUCTION.md" in filenames
-    assert "GUARDRAIL.md" in filenames
-    assert "FLOW.md" in filenames
+    assert "POSITIONING.md" in filenames
+    assert "FLOW.md" not in filenames
     assert "PERSONALITY_MODE.md" not in filenames
+    assert "INSTRUCTION.md" not in filenames
 
 
 def test_get_selected_playbook_filenames_uses_ultra_fast_subset() -> None:
@@ -661,10 +728,18 @@ def test_get_selected_playbook_filenames_uses_ultra_fast_subset() -> None:
         latency_profile="ultra_fast",
     )
 
-    assert "INSTRUCTION.md" in filenames
-    assert "GUARDRAIL.md" in filenames
     assert "OBJECTION.md" in filenames
     assert "FLOW.md" not in filenames
+    assert "INSTRUCTION.md" not in filenames
+
+
+def test_load_clara_system_instruction_playbook_contains_core_instruction_files() -> None:
+    playbook = load_clara_system_instruction_playbook("mini")
+
+    assert "clara_knowledge_mini/INSTRUCTION.md" in playbook
+    assert "clara_knowledge_mini/GUARDRAIL.md" in playbook
+    assert "clara_knowledge_mini/FLOW.md" in playbook
+    assert "clara_knowledge_mini/POSITIONING.md" not in playbook
 
 
 def test_infer_latency_profile_prefers_fast_for_simple_single_reply() -> None:

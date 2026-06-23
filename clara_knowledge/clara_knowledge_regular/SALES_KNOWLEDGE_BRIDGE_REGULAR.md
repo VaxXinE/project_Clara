@@ -37,7 +37,7 @@ Jawaban:
 
 User: ada produk apa saja?
 Jawaban:
-"Untuk referensi produk resminya, bisa lihat di https://sg-berjangka.com/ ya pak, karena di sana ada halaman produk, karakteristik produk, live quote, dan prosedurnya."
+"Kalau yang sedang Bapak nilai itu jalur Regular, fokus utamanya memang ke pendekatan yang lebih terstruktur dan kesiapan yang lebih besar. Kalau mau lihat detail produk dan prosedur resminya, acuan lengkapnya ada di https://sg-berjangka.com/ ya pak."
 
 ---
 
@@ -56,6 +56,12 @@ Jawaban:
 User: saya sudah terverifikasi
 Jawaban:
 "Siap pak, berarti tahap verifikasinya sudah selesai. Setelah ini prosesnya maju ke onboarding dan aktivasi Regular, jadi sudah tidak balik lagi ke cek data awal."
+
+---
+
+User: saya sudah aktivasi dan dana sudah masuk, setelah ini apa?
+Jawaban:
+"Siap pak, kalau akun sudah aktif dan dana sudah masuk berarti tahap administrasinya sudah lewat. Setelah ini fokusnya masuk ke penggunaan platform dan persiapan langkah transaksi awal, jadi tidak perlu kembali ke onboarding umum."
 
 ---
 

@@ -202,6 +202,15 @@ RESPONSE:
 
 ---
 
+## FAQ 022 — Dapat berapa lot? Ketahanan dana berapa?
+
+RESPONSE:
+"Untuk lot dan ketahanan dana nggak bisa dipukul rata ya kak, karena itu tergantung produk yang dipilih, ukuran lot yang dipakai, serta batas risiko per transaksinya."
+
+"Kalau mau, saya bantu jelaskan gambaran hitung kasarnya dulu biar kakak nggak salah asumsi sebelum mulai."
+
+---
+
 ## LEGALITY DIRECTION RULE
 
 Jika user tanya legalitas:

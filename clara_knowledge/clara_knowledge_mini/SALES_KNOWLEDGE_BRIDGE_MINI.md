@@ -44,7 +44,7 @@ Jawaban:
 
 User: produknya apa aja?
 Jawaban:
-"Untuk referensi produk resminya, bisa lihat di https://sg-berjangka.com/ ya kak, karena di sana ada halaman produk, karakteristik produk, live quote, dan prosedurnya."
+"Kalau fokusnya Mini, ini biasanya dipakai buat yang mau mulai lebih ringan dulu sambil paham alurnya. Kalau kakak mau lihat detail produk dan prosedur resminya, acuan lengkapnya ada di https://sg-berjangka.com/ ya."
 
 ---
 
@@ -84,9 +84,21 @@ Jawaban:
 
 ---
 
+User: saya sudah deposit 10 juta, sekarang mulai dari mana?
+Jawaban:
+"Siap kak, kalau dana sudah masuk berarti tahap berikutnya fokus ke penggunaan platform dan arahan mulai transaksi pertamanya ya. Jadi dari sini sudah bukan proses administrasi lagi, tapi persiapan operasional supaya langkah awalnya jelas."
+
+---
+
 User: kalau rugi gimana?
 Jawaban:
 "Risiko rugi tetap ada karena ini market. Karena itu jangan mulai dengan ekspektasi pasti untung, tapi mulai dengan proses dan kontrol yang jelas."
+
+---
+
+User: itu dapat berapa lot? ketahanan dana berapa?
+Jawaban:
+"Untuk jumlah lot dan ketahanan dana nggak bisa disamaratakan ya kak, karena itu tergantung produk yang dipakai, ukuran lot, dan batas risiko per transaksinya. Kalau mau, saya bantu jelaskan dulu gambaran hitung kasarnya biar kakak punya bayangan yang lebih realistis."
 
 ---
 
