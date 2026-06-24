@@ -27,6 +27,18 @@ def test_backend_env_example_uses_safe_placeholders() -> None:
 def test_known_placeholder_values_are_treated_as_non_secret() -> None:
     assert is_placeholder_env_value("OPENAI_API_KEY_PLACEHOLDER")
     assert is_placeholder_env_value("SGCC_INTEGRATION_API_KEY_PLACEHOLDER")
+    assert is_placeholder_env_value("sk-REPLACE_ME")
+    assert is_placeholder_env_value("replace_with_your_openai_api_key")
+
+
+def test_production_settings_reject_placeholder_openai_api_key() -> None:
+    with pytest.raises(ValueError):
+        Settings(
+            app_env="production",
+            database_url="sqlite://",
+            jwt_secret_key="SOME_REAL_SECRET_0000000000000000000000000000000000",
+            openai_api_key="sk-REPLACE_ME",
+        )
 
 
 def test_production_settings_reject_placeholder_jwt_secret() -> None:
@@ -35,4 +47,13 @@ def test_production_settings_reject_placeholder_jwt_secret() -> None:
             app_env="production",
             database_url="sqlite://",
             jwt_secret_key="CHANGE_ME_TO_A_LONG_RANDOM_SECRET",
+        )
+
+
+def test_production_settings_reject_missing_openai_api_key() -> None:
+    with pytest.raises(ValueError):
+        Settings(
+            app_env="production",
+            database_url="sqlite://",
+            jwt_secret_key="CHANGE_ME_TO_A_LONG_RANDOM_SECRET_000000000000000000000000000000000000000000",
         )

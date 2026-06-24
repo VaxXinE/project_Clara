@@ -8,6 +8,8 @@ PLACEHOLDER_ENV_VALUES = {
     "API_KEY_KAMU",
     "OPENAI_API_KEY_KAMU",
     "YOUR_OPENAI_API_KEY",
+    "replace_with_your_openai_api_key",
+    "sk-REPLACE_ME",
     "test-key",
     "OPENAI_API_KEY_PLACEHOLDER",
     "SGCC_INTEGRATION_API_KEY_PLACEHOLDER",
@@ -102,6 +104,11 @@ class Settings(BaseSettings):
         ):
             raise ValueError(
                 "JWT_SECRET_KEY tidak boleh memakai placeholder saat APP_ENV=production."
+            )
+
+        if self.app_env.lower() == "production" and not self.openai_api_key:
+            raise ValueError(
+                "OPENAI_API_KEY tidak boleh kosong saat APP_ENV=production."
             )
 
     @property

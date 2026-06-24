@@ -18,6 +18,7 @@ from app.services.access_control_service import (
     get_accessible_reply_suggestion_or_raise,
 )
 from app.services.audit_service import create_audit_log
+from app.services.ai_extraction_service import AIExtractionError
 from app.services.extension_ingest_service import (
     confirm_extension_reply_sent,
     ExtensionSnapshotError,
@@ -213,7 +214,7 @@ def generate_whatsapp_reply_suggestions_endpoint(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    except ReplySuggestionError as exc:
+    except (AIExtractionError, ReplySuggestionError) as exc:
         create_audit_log(
             db=db,
             action="extension.whatsapp.reply_suggestions_generate_failed",
