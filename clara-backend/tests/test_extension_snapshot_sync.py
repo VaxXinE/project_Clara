@@ -84,7 +84,10 @@ def test_extension_snapshot_sync_creates_conversation_and_messages(
     db = db_session_factory()
     conversation = db.get(Conversation, UUID(payload["conversation_id"]))
     assert conversation is not None
+    assert conversation.channel == "whatsapp"
+    assert conversation.provider == "extension"
     assert conversation.source == "whatsapp_extension"
+    assert conversation.external_thread_id is not None
     assert conversation.title == "Leoni Customer"
     assert conversation.sales_user_id == marketing_a.id
 
@@ -96,8 +99,124 @@ def test_extension_snapshot_sync_creates_conversation_and_messages(
         ).all()
     )
     assert len(messages) == 2
+    assert messages[0].channel == "whatsapp"
+    assert messages[0].provider == "extension"
     assert messages[0].sender_type == "customer"
+    assert messages[1].channel == "whatsapp"
+    assert messages[1].provider == "extension"
     assert messages[1].sender_type == "sales"
+
+
+def test_generic_extension_snapshot_endpoint_supports_whatsapp(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    response = client.post(
+        "/extension/whatsapp/snapshots",
+        json={
+            "chatData": {
+                "capturedAt": "2026-05-12T09:00:00.000Z",
+                "chatTitle": "Generic Endpoint Customer",
+                "chatSubtitle": "online",
+                "messages": [
+                    {
+                        "id": "09.00-0",
+                        "author": "Customer",
+                        "direction": "incoming",
+                        "text": "Halo kak, ini generic endpoint ya?",
+                        "timestampLabel": "09.00",
+                    }
+                ],
+            }
+        },
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 201, response.text
+    payload = response.json()
+    assert payload["status"] == "created"
+    assert payload["source"] == "whatsapp_extension"
+
+    db = db_session_factory()
+    conversation = db.get(Conversation, UUID(payload["conversation_id"]))
+    assert conversation is not None
+    assert conversation.channel == "whatsapp"
+    assert conversation.provider == "extension"
+    assert conversation.source == "whatsapp_extension"
+
+
+def test_extension_config_reports_channel_flags(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    response = client.get("/extension/config")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["channels"]["whatsapp"]["enabled"] is True
+    assert payload["channels"]["instagram"]["enabled"] is False
+    assert payload["channels"]["tiktok"]["enabled"] is False
+    assert payload["channels"]["whatsapp"]["provider"] == "extension"
+
+
+def test_generic_extension_snapshot_endpoint_rejects_disabled_instagram_channel(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    response = client.post(
+        "/extension/instagram/snapshots",
+        json={
+            "chatData": {
+                "capturedAt": "2026-05-12T09:00:00.000Z",
+                "chatTitle": "Instagram Customer",
+                "chatSubtitle": "Instagram DM",
+                "messages": [
+                    {
+                        "id": "instagram-1",
+                        "author": "john.doe",
+                        "direction": "incoming",
+                        "text": "Halo dari Instagram",
+                        "timestampLabel": "",
+                    }
+                ],
+            }
+        },
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 403, response.text
+    payload = response.json()
+    assert payload["detail"]["code"] == "FEATURE_DISABLED"
+    assert "Instagram DM" in payload["detail"]["message"]
+
+
+def test_generic_extension_snapshot_endpoint_rejects_unsupported_channel(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    response = client.post(
+        "/extension/telegram/snapshots",
+        json={"chatData": None},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 404, response.text
+    payload = response.json()
+    assert payload["detail"]["code"] == "UNSUPPORTED_CHANNEL"
 
 
 def test_extension_snapshot_sync_detects_duplicate_payload(
@@ -812,6 +931,8 @@ def test_extension_send_endpoint_auto_approves_and_marks_sent(
     db = db_session_factory()
     suggestion = db.get(ReplySuggestion, UUID(reply_suggestion_id))
     assert suggestion is not None
+    assert suggestion.channel == "whatsapp"
+    assert suggestion.provider == "extension"
     assert suggestion.approval_status == "approved"
     assert suggestion.final_reply_text == final_reply_text
 
@@ -830,6 +951,8 @@ def test_extension_send_endpoint_auto_approves_and_marks_sent(
     assert timeline_messages
     assert timeline_messages[-1].sender_type == "sales"
     assert timeline_messages[-1].sender_name == "Marketing Alpha"
+    assert timeline_messages[-1].channel == "whatsapp"
+    assert timeline_messages[-1].provider == "extension"
     assert timeline_messages[-1].message_text == final_reply_text
 
     approval_log = db.scalars(

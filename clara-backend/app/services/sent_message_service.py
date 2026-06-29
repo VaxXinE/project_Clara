@@ -40,6 +40,8 @@ def append_sent_message_to_conversation_timeline(
         conversation_id=conversation.id,
         sender_name=sent_by_name,
         sender_type="sales",
+        channel=conversation.channel,
+        provider=conversation.provider,
         external_message_id=None,
         message_text=message_text,
         message_timestamp=message_timestamp,

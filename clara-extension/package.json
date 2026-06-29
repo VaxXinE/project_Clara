@@ -1,7 +1,7 @@
 {
   "name": "clara-extension",
   "displayName": "Clara Extension",
-  "version": "0.0.27",
+  "version": "0.0.58",
   "description": "Browser extension untuk WhatsApp Web yang terintegrasi dengan Clara.",
   "author": "newsmaker.id",
   "scripts": {
@@ -37,6 +37,8 @@
     "host_permissions": [
       "http://localhost/*",
       "http://127.0.0.1/*",
+      "https://www.instagram.com/*",
+      "https://www.tiktok.com/*",
       "https://web.whatsapp.com/*",
       "https://clara.newsmaker.id/*"
     ]

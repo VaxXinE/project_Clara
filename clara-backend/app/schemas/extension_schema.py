@@ -3,6 +3,15 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class ExtensionChannelConfigItem(BaseModel):
+    enabled: bool
+    provider: str = "extension"
+
+
+class ExtensionConfigResponse(BaseModel):
+    channels: dict[str, ExtensionChannelConfigItem]
+
+
 class WhatsAppExtensionMessage(BaseModel):
     id: str = Field(min_length=1, max_length=255)
     author: str = Field(min_length=1, max_length=255)
@@ -101,3 +110,23 @@ class WhatsAppExtensionSendReplyResponse(BaseModel):
     approval_status: str = "approved"
     auto_approved: bool = False
     already_sent: bool = False
+
+
+class ExtensionSnapshotSyncRequest(WhatsAppExtensionSnapshotSyncRequest):
+    pass
+
+
+class ExtensionSnapshotSyncResponse(WhatsAppExtensionSnapshotSyncResponse):
+    pass
+
+
+class ExtensionReplySuggestionsResponse(WhatsAppExtensionReplySuggestionsResponse):
+    pass
+
+
+class ExtensionSendReplyRequest(WhatsAppExtensionSendReplyRequest):
+    pass
+
+
+class ExtensionSendReplyResponse(WhatsAppExtensionSendReplyResponse):
+    pass

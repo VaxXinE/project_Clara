@@ -21,6 +21,8 @@ class AuditLog(Base):
     actor_user_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     actor_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     actor_role: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    channel: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    provider: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
 
     action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     resource_type: Mapped[str] = mapped_column(String(100), nullable=False)
