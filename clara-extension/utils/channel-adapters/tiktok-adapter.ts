@@ -520,7 +520,31 @@ const getConversationBounds = () => {
   }
 }
 
-const getTitle = () => getPrimaryTitleCandidate(getConversationPane())?.text || "TikTok DM"
+const getActiveConversationTitle = () =>
+  getPrimaryTitleCandidate(getConversationPane())?.text || ""
+
+const hasActiveConversationOpen = () => {
+  const pane = getConversationPane()
+  const composeBox = findComposeBox(pane) || findComposeBox(getRoot())
+  const title = getActiveConversationTitle()
+
+  if (!composeBox || !title) {
+    return false
+  }
+
+  const composeRect = composeBox.getBoundingClientRect()
+  const paneRect = pane.getBoundingClientRect()
+
+  return (
+    composeRect.width >= 160 &&
+    composeRect.height >= 18 &&
+    paneRect.width >= composeRect.width * 0.85 &&
+    paneRect.left <= composeRect.left + 48 &&
+    paneRect.right >= composeRect.right - 48
+  )
+}
+
+const getTitle = () => getActiveConversationTitle() || "TikTok DM"
 
 const getHeaderTextSet = (root: ParentNode = document) => {
   const candidates = getTopRightTextCandidates(root)
@@ -892,11 +916,21 @@ const clickSendButton = (): ChannelActionResponse => {
 }
 
 const buildSnapshot = (): ChannelChatSnapshot => {
-  const chatTitle = getTitle()
+  const pane = getConversationPane()
+  const composeBox = findComposeBox(pane) || findComposeBox(getRoot())
+  const chatTitle = getActiveConversationTitle()
+
+  if (!composeBox || !hasActiveConversationOpen()) {
+    throw new Error("TIKTOK_ACTIVE_CONVERSATION_NOT_OPEN")
+  }
+
+  if (!chatTitle) {
+    throw new Error("TIKTOK_ACTIVE_CONVERSATION_TITLE_NOT_FOUND")
+  }
+
   const bounds = getConversationBounds()
-  const composeBox = findComposeBox(getRoot())
-  const titleCandidates = getTopRightTextCandidates(getRoot())
-  const headerTexts = getHeaderTextSet(getConversationPane())
+  const titleCandidates = getTopRightTextCandidates(pane)
+  const headerTexts = getHeaderTextSet(pane)
   const rawCandidates = readMessageCandidates()
 
   const messages: ChannelMessage[] = rawCandidates
@@ -989,7 +1023,28 @@ export const tiktokAdapter: ChannelAdapter = {
         ok: true,
         data: snapshot
       }
-    } catch (_error) {
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "TIKTOK_ACTIVE_CONVERSATION_NOT_OPEN"
+      ) {
+        return {
+          ok: false,
+          error:
+            "Buka satu percakapan TikTok DM sampai kolom Send a message muncul dulu."
+        }
+      }
+
+      if (
+        error instanceof Error &&
+        error.message === "TIKTOK_ACTIVE_CONVERSATION_TITLE_NOT_FOUND"
+      ) {
+        return {
+          ok: false,
+          error: "Judul percakapan TikTok DM aktif belum berhasil dikenali."
+        }
+      }
+
       return {
         ok: false,
         error: "Gagal membaca TikTok DM."

@@ -34,7 +34,7 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.0.56-instagram-compose-fix-8"
+const EXTENSION_BUILD_LABEL = "v0.0.58-tiktok-active-pane-guard-1"
 
 const panelCss = `
   html,
@@ -1895,7 +1895,9 @@ const shouldClearSnapshotForError = (message: string) =>
   [
     "Belum ada percakapan yang sedang dibuka.",
     "Buka WhatsApp Web dulu di tab aktif.",
-    "Panel chat WhatsApp Web belum ditemukan."
+    "Panel chat WhatsApp Web belum ditemukan.",
+    "Buka satu percakapan TikTok DM sampai kolom Send a message muncul dulu.",
+    "Judul percakapan TikTok DM aktif belum berhasil dikenali."
   ].some((pattern) => message.includes(pattern))
 
 function ClaraSidePanel() {
@@ -1945,16 +1947,26 @@ function ClaraSidePanel() {
     [chatData]
   )
 
-  useEffect(() => {
-    const syncTab = async () => {
-      const tab = await getActiveTab()
-      setTabUrl(tab?.url || "")
-    }
+  const syncActiveTabUrl = async () => {
+    const tab = await getActiveTab()
+    const nextTabUrl = tab?.url || ""
 
-    syncTab().catch(() => {
-      setError("Gagal membaca tab aktif.")
+    setTabUrl((currentTabUrl) =>
+      currentTabUrl === nextTabUrl ? currentTabUrl : nextTabUrl
+    )
+
+    return tab
+  }
+
+  useEffect(() => {
+    syncActiveTabUrl().catch(() => {
+      setTabUrl("")
     })
   }, [])
+
+  useEffect(() => {
+    setHasAutoReadAttempted(false)
+  }, [tabUrl])
 
   const refreshAuthState = async (options?: { silent?: boolean }) => {
     if (!getConfiguredClaraApiBaseUrl()) {
@@ -2233,15 +2245,11 @@ function ClaraSidePanel() {
   }
 
   useEffect(() => {
-    if (hasAutoReadAttempted || isLoading || !tabUrl) {
+    if (hasAutoReadAttempted || isLoading || !isSupportedLiveSyncTabUrl(tabUrl)) {
       return
     }
 
     setHasAutoReadAttempted(true)
-
-    if (!tabUrl.startsWith("https://web.whatsapp.com/")) {
-      return
-    }
 
     handleReadChat().catch(() => {
       // Error state is already handled inside handleReadChat.
@@ -2249,24 +2257,30 @@ function ClaraSidePanel() {
   }, [hasAutoReadAttempted, isLoading, tabUrl])
 
   useEffect(() => {
-    if (!tabUrl.startsWith("https://web.whatsapp.com/")) {
-      return
-    }
-
     const intervalId = window.setInterval(() => {
       if (isLoading || isSuggesting || isInsertingIndex !== null) {
         return
       }
 
-      refreshChatSilently().catch(() => {
-        // Silent refresh should stay silent.
-      })
+      syncActiveTabUrl()
+        .then((tab) => {
+          if (!isSupportedLiveSyncTabUrl(tab?.url)) {
+            return
+          }
+
+          refreshChatSilently().catch(() => {
+            // Silent refresh should stay silent.
+          })
+        })
+        .catch(() => {
+          // Silent refresh should stay silent.
+        })
     }, AUTO_REFRESH_INTERVAL_MS)
 
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [chatSignature, isInsertingIndex, isLoading, isSuggesting, tabUrl])
+  }, [chatSignature, isInsertingIndex, isLoading, isSuggesting])
 
   const handleSuggestReplies = async () => {
     setIsSuggesting(true)
