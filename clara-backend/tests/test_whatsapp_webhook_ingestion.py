@@ -138,8 +138,11 @@ def test_meta_webhook_ingest_creates_conversation_and_segmented_lead(
     db = db_session_factory()
     conversation = db.get(Conversation, UUID(body["conversation_ids"][0]))
     assert conversation is not None
+    assert conversation.channel == "whatsapp"
+    assert conversation.provider == "official_api"
     assert conversation.source == "whatsapp_webhook"
     assert conversation.provider_key == "meta"
+    assert conversation.external_thread_id == "meta:1234567890:628111222333"
     assert conversation.external_thread_key == "meta:1234567890:628111222333"
 
     messages = list(
@@ -148,6 +151,8 @@ def test_meta_webhook_ingest_creates_conversation_and_segmented_lead(
         ).all()
     )
     assert len(messages) == 1
+    assert messages[0].channel == "whatsapp"
+    assert messages[0].provider == "official_api"
     assert messages[0].external_message_id == "wamid.ABC123"
 
     lead = db.get(Lead, conversation.lead_id)

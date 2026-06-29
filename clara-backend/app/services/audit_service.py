@@ -16,6 +16,7 @@ def create_audit_log(
 ) -> AuditLog:
     ip_address = None
     user_agent = None
+    metadata_payload = metadata or {}
 
     if request is not None:
         ip_address = request.client.host if request.client else None
@@ -30,12 +31,14 @@ def create_audit_log(
         actor_user_id=str(current_user.id) if current_user else None,
         actor_email=current_user.email if current_user else None,
         actor_role=current_user.role if current_user else None,
+        channel=metadata_payload.get("channel"),
+        provider=metadata_payload.get("provider"),
         action=action,
         resource_type=resource_type,
         resource_id=resource_id,
         ip_address=ip_address,
         user_agent=user_agent,
-        metadata_json=metadata or {},
+        metadata_json=metadata_payload,
     )
 
     db.add(audit_log)

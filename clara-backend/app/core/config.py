@@ -43,6 +43,10 @@ def read_env_file_value(env_file_path: Path, key: str) -> str | None:
     return None
 
 
+def should_prefer_env_file_value(value: str | None) -> bool:
+    return bool((value or "").strip()) and not is_placeholder_env_value(value)
+
+
 class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str
@@ -81,6 +85,9 @@ class Settings(BaseSettings):
     whatsapp_meta_default_organization_slug: str | None = None
     whatsapp_meta_default_sales_user_email: str | None = None
     conversation_auto_archive_days: int = 7
+    extension_whatsapp_enabled: bool = True
+    extension_instagram_enabled: bool = False
+    extension_tiktok_enabled: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -90,14 +97,37 @@ class Settings(BaseSettings):
     def model_post_init(self, __context: object) -> None:
         env_file_path = Path(self.model_config.get("env_file", ".env"))
         env_file_openai_key = read_env_file_value(env_file_path, "OPENAI_API_KEY")
+        env_file_openai_model = read_env_file_value(env_file_path, "OPENAI_MODEL")
+        env_file_openai_fast_reply_model = read_env_file_value(
+            env_file_path, "OPENAI_FAST_REPLY_MODEL"
+        )
+        env_file_openai_ultra_fast_reply_model = read_env_file_value(
+            env_file_path, "OPENAI_ULTRA_FAST_REPLY_MODEL"
+        )
 
         if is_placeholder_env_value(self.openai_api_key) and env_file_openai_key:
             if not is_placeholder_env_value(env_file_openai_key):
                 object.__setattr__(self, "openai_api_key", env_file_openai_key)
-                return
 
         if is_placeholder_env_value(self.openai_api_key):
             object.__setattr__(self, "openai_api_key", None)
+
+        if should_prefer_env_file_value(env_file_openai_model):
+            object.__setattr__(self, "openai_model", env_file_openai_model.strip())
+
+        if should_prefer_env_file_value(env_file_openai_fast_reply_model):
+            object.__setattr__(
+                self,
+                "openai_fast_reply_model",
+                env_file_openai_fast_reply_model.strip(),
+            )
+
+        if should_prefer_env_file_value(env_file_openai_ultra_fast_reply_model):
+            object.__setattr__(
+                self,
+                "openai_ultra_fast_reply_model",
+                env_file_openai_ultra_fast_reply_model.strip(),
+            )
 
         if self.app_env.lower() == "production" and is_placeholder_env_value(
             self.jwt_secret_key

@@ -17,11 +17,11 @@ from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
 from app.models.user import User
 from app.schemas.extension_schema import (
+    ExtensionReplySuggestionsResponse,
+    ExtensionSendReplyResponse,
+    ExtensionSnapshotSyncResponse,
     WhatsAppExtensionChatSnapshot,
     WhatsAppExtensionReplySuggestionItem,
-    WhatsAppExtensionSendReplyResponse,
-    WhatsAppExtensionReplySuggestionsResponse,
-    WhatsAppExtensionSnapshotSyncResponse,
 )
 from app.services.ai_extraction_service import analyze_conversation
 from app.services.lead_service import ensure_conversation_lead
@@ -29,7 +29,23 @@ from app.services.reply_suggestion_service import create_reply_suggestion
 from app.services.whatsapp_parser import JAKARTA_TZ, parse_whatsapp_datetime
 
 
-EXTENSION_SOURCE = "whatsapp_extension"
+EXTENSION_PROVIDER = "extension"
+DEFAULT_EXTENSION_CHANNEL = "whatsapp"
+EXTENSION_CHAT_SOURCE_BY_CHANNEL = {
+    "whatsapp": "whatsapp_extension",
+    "instagram": "instagram_extension",
+    "tiktok": "tiktok_extension",
+}
+EXTENSION_MESSAGE_KEY_PREFIX_BY_CHANNEL = {
+    "whatsapp": "waext",
+    "instagram": "igext",
+    "tiktok": "tkext",
+}
+EXTENSION_SEND_MODE_BY_CHANNEL = {
+    "whatsapp": "whatsapp_extension",
+    "instagram": "instagram_extension",
+    "tiktok": "tiktok_extension",
+}
 TIME_ONLY_PATTERN = re.compile(
     r"^(?P<hour>\d{1,2})[:.](?P<minute>\d{2})(?:\s?(?P<meridiem>AM|PM|am|pm))?$"
 )
@@ -65,8 +81,40 @@ class ReplyContextMatch:
     sender_type: str
 
 
+@dataclass(frozen=True)
+class ExtensionChannelContext:
+    channel: str
+    provider: str
+    source: str
+    message_key_prefix: str
+    send_mode: str
+
+
 SYNTHETIC_SALES_MATCH_WINDOW = timedelta(minutes=10)
 REPLY_CONTEXT_MIN_LENGTH = 18
+
+
+def get_extension_channel_context(
+    channel: str = DEFAULT_EXTENSION_CHANNEL,
+    provider: str = EXTENSION_PROVIDER,
+) -> ExtensionChannelContext:
+    normalized_channel = (channel or DEFAULT_EXTENSION_CHANNEL).strip().lower()
+    normalized_provider = (provider or EXTENSION_PROVIDER).strip().lower()
+
+    source = EXTENSION_CHAT_SOURCE_BY_CHANNEL.get(normalized_channel)
+    message_key_prefix = EXTENSION_MESSAGE_KEY_PREFIX_BY_CHANNEL.get(normalized_channel)
+    send_mode = EXTENSION_SEND_MODE_BY_CHANNEL.get(normalized_channel)
+
+    if not source or not message_key_prefix or not send_mode:
+        raise ExtensionSnapshotError(f"Unsupported extension channel: {channel}")
+
+    return ExtensionChannelContext(
+        channel=normalized_channel,
+        provider=normalized_provider,
+        source=source,
+        message_key_prefix=message_key_prefix,
+        send_mode=send_mode,
+    )
 
 
 def build_snapshot_signature(
@@ -339,12 +387,13 @@ def ensure_aware_utc(value: datetime) -> datetime:
 def get_existing_extension_conversation(
     db: Session,
     *,
+    channel_context: ExtensionChannelContext,
     current_user: User,
     chat_title: str,
 ) -> Conversation | None:
     statement = (
         select(Conversation)
-        .where(Conversation.source == EXTENSION_SOURCE)
+        .where(Conversation.source == channel_context.source)
         .where(Conversation.sales_user_id == current_user.id)
         .where(Conversation.organization_id == current_user.organization_id)
         .where(Conversation.title == chat_title.strip())
@@ -355,16 +404,31 @@ def get_existing_extension_conversation(
 
 def build_extension_message_key(
     *,
+    channel_context: ExtensionChannelContext,
     current_user: User,
     chat_title: str,
     snapshot_message_id: str,
 ) -> str:
     key_source = (
-        f"waext:{current_user.organization_id}:{current_user.id}:"
+        f"{channel_context.message_key_prefix}:{current_user.organization_id}:{current_user.id}:"
         f"{chat_title.strip().lower()}:{snapshot_message_id.strip()}"
     )
     digest = hashlib.sha256(key_source.encode("utf-8")).hexdigest()
-    return f"waext:{digest}"
+    return f"{channel_context.message_key_prefix}:{digest}"
+
+
+def build_extension_thread_key(
+    *,
+    channel_context: ExtensionChannelContext,
+    current_user: User,
+    chat_title: str,
+) -> str:
+    key_source = (
+        f"{channel_context.message_key_prefix}:thread:{current_user.organization_id}:"
+        f"{current_user.id}:{chat_title.strip().lower()}"
+    )
+    digest = hashlib.sha256(key_source.encode("utf-8")).hexdigest()
+    return f"{channel_context.message_key_prefix}:thread:{digest}"
 
 
 def get_latest_ai_extraction_for_conversation(
@@ -396,12 +460,13 @@ def get_latest_reply_suggestion_for_conversation(
 def get_extension_conversation_or_raise(
     db: Session,
     *,
+    channel_context: ExtensionChannelContext,
     conversation_id: UUID,
 ) -> Conversation:
     statement = (
         select(Conversation)
         .where(Conversation.id == conversation_id)
-        .where(Conversation.source == EXTENSION_SOURCE)
+        .where(Conversation.source == channel_context.source)
         .options(selectinload(Conversation.messages))
     )
     conversation = db.scalars(statement).first()
@@ -415,6 +480,7 @@ def get_extension_conversation_or_raise(
 def sync_extension_messages(
     db: Session,
     *,
+    channel_context: ExtensionChannelContext,
     conversation: Conversation,
     current_user: User,
     chat_title: str,
@@ -432,6 +498,7 @@ def sync_extension_messages(
     }
     for message in normalized_messages:
         external_message_id = build_extension_message_key(
+            channel_context=channel_context,
             current_user=current_user,
             chat_title=chat_title,
             snapshot_message_id=message.external_message_id,
@@ -447,6 +514,8 @@ def sync_extension_messages(
         if existing_message is None:
             existing_message = Message(
                 conversation_id=conversation.id,
+                channel=channel_context.channel,
+                provider=channel_context.provider,
                 external_message_id=external_message_id,
                 sender_name=message.author,
                 sender_type=message.sender_type,
@@ -460,6 +529,8 @@ def sync_extension_messages(
             db.flush()
             existing_messages.append(existing_message)
         else:
+            existing_message.channel = channel_context.channel
+            existing_message.provider = channel_context.provider
             existing_message.external_message_id = external_message_id
             existing_message.sender_name = message.author
             existing_message.sender_type = message.sender_type
@@ -554,17 +625,21 @@ def is_extension_cache_fresh(
     )
 
 
-def sync_whatsapp_extension_snapshot(
+def sync_extension_snapshot(
     db: Session,
     *,
+    channel: str = DEFAULT_EXTENSION_CHANNEL,
+    provider: str = EXTENSION_PROVIDER,
     current_user: User,
     snapshot: WhatsAppExtensionChatSnapshot | None,
-) -> WhatsAppExtensionSnapshotSyncResponse:
+) -> ExtensionSnapshotSyncResponse:
+    channel_context = get_extension_channel_context(channel=channel, provider=provider)
+
     if current_user.organization_id is None:
         raise ExtensionSnapshotError("User has no organization assigned.")
 
     if snapshot is None:
-        return WhatsAppExtensionSnapshotSyncResponse(
+        return ExtensionSnapshotSyncResponse(
             status="cleared",
             duplicate=False,
             conversation_id=None,
@@ -580,17 +655,23 @@ def sync_whatsapp_extension_snapshot(
         chat_subtitle=snapshot.chat_subtitle,
         messages=normalized_messages,
     )
+    external_thread_id = build_extension_thread_key(
+        channel_context=channel_context,
+        current_user=current_user,
+        chat_title=snapshot.chat_title,
+    )
     started_at = normalized_messages[0].timestamp
     last_message_at = normalized_messages[-1].timestamp
 
     conversation = get_existing_extension_conversation(
         db=db,
+        channel_context=channel_context,
         current_user=current_user,
         chat_title=snapshot.chat_title,
     )
 
     if conversation is not None and (conversation.raw_text or "").strip() == transcript:
-        return WhatsAppExtensionSnapshotSyncResponse(
+        return ExtensionSnapshotSyncResponse(
             status="duplicate",
             duplicate=True,
             conversation_id=conversation.id,
@@ -602,7 +683,12 @@ def sync_whatsapp_extension_snapshot(
             organization_id=current_user.organization_id,
             sales_user_id=current_user.id,
             title=snapshot.chat_title.strip(),
-            source=EXTENSION_SOURCE,
+            channel=channel_context.channel,
+            provider=channel_context.provider,
+            provider_key=channel_context.provider,
+            external_thread_id=external_thread_id,
+            external_thread_key=external_thread_id,
+            source=channel_context.source,
             status="synced",
             raw_filename=None,
             raw_text=transcript,
@@ -613,6 +699,14 @@ def sync_whatsapp_extension_snapshot(
         db.flush()
         status_value = "created"
     else:
+        conversation.channel = channel_context.channel
+        conversation.provider = channel_context.provider
+        conversation.external_thread_id = (
+            conversation.external_thread_id or external_thread_id
+        )
+        conversation.external_thread_key = (
+            conversation.external_thread_key or external_thread_id
+        )
         conversation.status = "synced"
         conversation.raw_text = transcript
         conversation.started_at = started_at
@@ -623,6 +717,7 @@ def sync_whatsapp_extension_snapshot(
 
     sync_extension_messages(
         db=db,
+        channel_context=channel_context,
         conversation=conversation,
         current_user=current_user,
         chat_title=snapshot.chat_title,
@@ -647,7 +742,7 @@ def sync_whatsapp_extension_snapshot(
     db.commit()
     db.refresh(conversation)
 
-    return WhatsAppExtensionSnapshotSyncResponse(
+    return ExtensionSnapshotSyncResponse(
         status=status_value,
         duplicate=False,
         conversation_id=conversation.id,
@@ -655,13 +750,28 @@ def sync_whatsapp_extension_snapshot(
     )
 
 
+def sync_whatsapp_extension_snapshot(
+    db: Session,
+    *,
+    current_user: User,
+    snapshot: WhatsAppExtensionChatSnapshot | None,
+) -> ExtensionSnapshotSyncResponse:
+    return sync_extension_snapshot(
+        db=db,
+        channel="whatsapp",
+        provider="extension",
+        current_user=current_user,
+        snapshot=snapshot,
+    )
+
+
 def build_extension_reply_suggestions_response(
     *,
-    snapshot_result: WhatsAppExtensionSnapshotSyncResponse,
+    snapshot_result: ExtensionSnapshotSyncResponse,
     extraction: AIExtraction,
     suggestion: ReplySuggestion,
     cached: bool,
-) -> WhatsAppExtensionReplySuggestionsResponse:
+) -> ExtensionReplySuggestionsResponse:
     suggestion_details = [
         WhatsAppExtensionReplySuggestionItem(
             tone=str(item.get("tone", "")),
@@ -676,7 +786,7 @@ def build_extension_reply_suggestions_response(
     if not suggestion_details:
         raise ExtensionSnapshotError("Reply suggestion output is empty.")
 
-    return WhatsAppExtensionReplySuggestionsResponse(
+    return ExtensionReplySuggestionsResponse(
         status=snapshot_result.status,
         duplicate=snapshot_result.duplicate,
         cached=cached,
@@ -692,14 +802,20 @@ def build_extension_reply_suggestions_response(
     )
 
 
-def generate_extension_reply_suggestions(
+def generate_extension_reply_suggestions_for_channel(
     db: Session,
     *,
+    channel: str = DEFAULT_EXTENSION_CHANNEL,
+    provider: str = EXTENSION_PROVIDER,
     current_user: User,
     snapshot: WhatsAppExtensionChatSnapshot | None,
-) -> WhatsAppExtensionReplySuggestionsResponse:
-    snapshot_result = sync_whatsapp_extension_snapshot(
+) -> ExtensionReplySuggestionsResponse:
+    channel_context = get_extension_channel_context(channel=channel, provider=provider)
+
+    snapshot_result = sync_extension_snapshot(
         db=db,
+        channel=channel_context.channel,
+        provider=channel_context.provider,
         current_user=current_user,
         snapshot=snapshot,
     )
@@ -719,6 +835,7 @@ def generate_extension_reply_suggestions(
     )
     conversation = get_extension_conversation_or_raise(
         db=db,
+        channel_context=channel_context,
         conversation_id=snapshot_result.conversation_id,
     )
 
@@ -755,14 +872,33 @@ def generate_extension_reply_suggestions(
     )
 
 
-def confirm_extension_reply_sent(
+def generate_extension_reply_suggestions(
     db: Session,
     *,
+    current_user: User,
+    snapshot: WhatsAppExtensionChatSnapshot | None,
+) -> ExtensionReplySuggestionsResponse:
+    return generate_extension_reply_suggestions_for_channel(
+        db=db,
+        channel="whatsapp",
+        provider="extension",
+        current_user=current_user,
+        snapshot=snapshot,
+    )
+
+
+def confirm_extension_reply_sent_for_channel(
+    db: Session,
+    *,
+    channel: str = DEFAULT_EXTENSION_CHANNEL,
+    provider: str = EXTENSION_PROVIDER,
     reply_suggestion_id: UUID,
     selected_reply_text: str,
     final_reply_text: str,
     sent_by_name: str,
-) -> WhatsAppExtensionSendReplyResponse:
+) -> ExtensionSendReplyResponse:
+    channel_context = get_extension_channel_context(channel=channel, provider=provider)
+
     suggestion = db.get(ReplySuggestion, reply_suggestion_id)
 
     if suggestion is None:
@@ -776,7 +912,7 @@ def confirm_extension_reply_sent(
     ).first()
 
     if existing_sent_message is not None:
-        return WhatsAppExtensionSendReplyResponse(
+        return ExtensionSendReplyResponse(
             status="already_sent",
             conversation_id=suggestion.conversation_id,
             reply_suggestion_id=suggestion.id,
@@ -840,7 +976,7 @@ def confirm_extension_reply_sent(
     sent_message = SentMessage(
         conversation_id=conversation.id,
         reply_suggestion_id=suggestion.id,
-        send_mode="whatsapp_extension",
+        send_mode=channel_context.send_mode,
         message_text=suggestion.final_reply_text,
         sent_by_name=sent_by_name,
         external_message_id=None,
@@ -860,6 +996,8 @@ def confirm_extension_reply_sent(
             conversation_id=conversation.id,
             sender_name=sent_by_name,
             sender_type="sales",
+            channel=channel_context.channel,
+            provider=channel_context.provider,
             external_message_id=None,
             message_text=suggestion.final_reply_text,
             message_timestamp=synthetic_message_timestamp,
@@ -870,7 +1008,7 @@ def confirm_extension_reply_sent(
     db.refresh(sent_message)
     db.refresh(suggestion)
 
-    return WhatsAppExtensionSendReplyResponse(
+    return ExtensionSendReplyResponse(
         status="sent",
         conversation_id=conversation.id,
         reply_suggestion_id=suggestion.id,
@@ -878,4 +1016,23 @@ def confirm_extension_reply_sent(
         approval_status=suggestion.approval_status,
         auto_approved=auto_approved,
         already_sent=False,
+    )
+
+
+def confirm_extension_reply_sent(
+    db: Session,
+    *,
+    reply_suggestion_id: UUID,
+    selected_reply_text: str,
+    final_reply_text: str,
+    sent_by_name: str,
+) -> ExtensionSendReplyResponse:
+    return confirm_extension_reply_sent_for_channel(
+        db=db,
+        channel="whatsapp",
+        provider="extension",
+        reply_suggestion_id=reply_suggestion_id,
+        selected_reply_text=selected_reply_text,
+        final_reply_text=final_reply_text,
+        sent_by_name=sent_by_name,
     )

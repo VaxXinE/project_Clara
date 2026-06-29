@@ -51,7 +51,10 @@ def test_upload_telegram_txt_creates_conversation_and_lead(
     db = db_session_factory()
     conversation = db.get(Conversation, UUID(payload["conversation_id"]))
     assert conversation is not None
+    assert conversation.channel == "telegram"
+    assert conversation.provider == "manual"
     assert conversation.source == "telegram_txt"
+    assert conversation.external_thread_id is not None
     assert conversation.lead_id is not None
 
     lead = db.get(Lead, conversation.lead_id)
@@ -87,9 +90,12 @@ def test_paste_whatsapp_text_creates_conversation_and_lead(
     db = db_session_factory()
     conversation = db.get(Conversation, UUID(payload["conversation_id"]))
     assert conversation is not None
+    assert conversation.channel == "whatsapp"
+    assert conversation.provider == "manual"
     assert conversation.source == "whatsapp_txt"
     assert conversation.raw_filename is None
     assert conversation.title == "Paste Chat Rani"
+    assert conversation.external_thread_id is not None
 
     lead = db.get(Lead, conversation.lead_id)
     assert lead is not None
@@ -120,8 +126,11 @@ def test_paste_telegram_text_creates_conversation_and_lead(
     db = db_session_factory()
     conversation = db.get(Conversation, UUID(payload["conversation_id"]))
     assert conversation is not None
+    assert conversation.channel == "telegram"
+    assert conversation.provider == "manual"
     assert conversation.source == "telegram_txt"
     assert conversation.raw_filename is None
+    assert conversation.external_thread_id is not None
 
     lead = db.get(Lead, conversation.lead_id)
     assert lead is not None

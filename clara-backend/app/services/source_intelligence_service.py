@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 
+MANUAL_PROVIDER_KEYS = {"manual_upload", "manual", "manual_import"}
+OFFICIAL_API_PROVIDER_KEYS = {"meta", "official_api"}
+
+
 CHANNEL_REGISTRY: dict[str, dict[str, object]] = {
     "whatsapp": {
         "key": "whatsapp",
@@ -49,6 +53,8 @@ def normalize_source_channel(source: str | None) -> str:
         return "telegram"
     if source_key.startswith("instagram") or source_key.startswith("ig_"):
         return "instagram"
+    if source_key.startswith("tiktok") or source_key.startswith("tt_"):
+        return "tiktok"
     if source_key.startswith("email"):
         return "email"
     if "import" in source_key or source_key.startswith("csv"):
@@ -83,6 +89,8 @@ def build_source_label(source: str | None) -> str:
         "telegram_txt": "Telegram TXT Import",
         "telegram_extension": "Telegram Extension",
         "telegram_manual": "Telegram Manual",
+        "instagram_extension": "Instagram Extension",
+        "tiktok_extension": "TikTok Extension",
         "instagram_dm": "Instagram DM",
         "instagram_comment": "Instagram Comment",
         "email_inbox": "Email Inbox",
@@ -107,3 +115,33 @@ def get_channel_definition(channel: str | None) -> dict[str, object] | None:
         return None
     definition = CHANNEL_REGISTRY.get(normalized)
     return definition.copy() if definition else None
+
+
+def infer_provider_from_source(
+    source: str | None,
+    provider_key: str | None = None,
+) -> str:
+    normalized_provider_key = normalize_source_key(provider_key)
+    normalized_source = normalize_source_key(source)
+
+    if normalized_provider_key in MANUAL_PROVIDER_KEYS:
+        return "manual"
+
+    if normalized_provider_key in OFFICIAL_API_PROVIDER_KEYS:
+        return "official_api"
+
+    if normalized_source.endswith("_extension") or "_extension" in normalized_source:
+        return "extension"
+
+    if normalized_source.endswith("_webhook") or "_webhook" in normalized_source:
+        return "official_api"
+
+    if (
+        normalized_source.endswith("_txt")
+        or normalized_source.startswith("manual")
+        or "manual" in normalized_source
+        or "import" in normalized_source
+    ):
+        return "manual"
+
+    return "manual"

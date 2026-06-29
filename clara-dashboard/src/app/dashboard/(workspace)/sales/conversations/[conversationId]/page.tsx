@@ -9,10 +9,16 @@ import { ReplySuggestionActions } from "@/components/dashboard/ReplySuggestionAc
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import {
+  formatChannelLabel,
   formatDateTime,
+  formatProviderLabel,
   formatStatusLabel,
+  getChannelBadgeClass,
   getLeadBadgeClass,
+  getProviderBadgeClass,
   getRiskBadgeClass,
+  inferProviderFromSource,
+  isExperimentalChannel,
 } from "@/lib/format";
 import {
   canAccessQueueAndActionCenter,
@@ -782,6 +788,7 @@ function ConversationDetailHeader({
   const suggestion = detail.latest_reply_suggestion;
   const analysisStale = isAnalysisStale(detail);
   const suggestionStale = isReplySuggestionStale(detail);
+  const provider = inferProviderFromSource(detail.source);
 
   return (
     <section className="clara-card rounded-[30px] p-5 sm:p-6">
@@ -796,6 +803,28 @@ function ConversationDetailHeader({
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getChannelBadgeClass(
+                detail.source_channel,
+              )}`}
+            >
+              {formatChannelLabel(detail.source_channel)}
+            </span>
+
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getProviderBadgeClass(
+                provider,
+              )}`}
+            >
+              {formatProviderLabel(provider)}
+            </span>
+
+            {isExperimentalChannel(detail.source_channel) ? (
+              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-700">
+                Experimental
+              </span>
+            ) : null}
+
             <span
               className={`rounded-full px-3 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
                 detail.account_category,
@@ -855,6 +884,17 @@ function ConversationDetailHeader({
         <div className="clara-card-dark rounded-[26px] p-5">
           <p className="clara-kicker text-[#d4b07b]">Snapshot</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+            <MetaPill
+              label="Channel"
+              value={formatChannelLabel(detail.source_channel)}
+              dark
+            />
+            <MetaPill
+              label="Provider"
+              value={formatProviderLabel(provider)}
+              dark
+            />
+            <MetaPill label="Source" value={detail.source_label} dark />
             <MetaPill
               label="Messages"
               value={String(detail.messages.length)}
@@ -983,6 +1023,7 @@ function ConversationDetailContent({
   const knowledgeProposal = detail.knowledge_update_proposal;
   const analysisStale = isAnalysisStale(detail);
   const suggestionStale = isReplySuggestionStale(detail);
+  const provider = inferProviderFromSource(detail.source);
   const [activePanel, setActivePanel] = useState<
     "ai_reply" | "coaching" | "knowledge" | "sent_logs"
   >("ai_reply");
@@ -1158,6 +1199,27 @@ function ConversationDetailContent({
                       <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
                         Hasil baca percakapan
                       </h2>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span
+                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getChannelBadgeClass(
+                            detail.source_channel,
+                          )}`}
+                        >
+                          Tone channel: {formatChannelLabel(detail.source_channel)}
+                        </span>
+                        <span
+                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getProviderBadgeClass(
+                            provider,
+                          )}`}
+                        >
+                          Suggestion source: {formatProviderLabel(provider)}
+                        </span>
+                      </div>
+                      {isExperimentalChannel(detail.source_channel) ? (
+                        <p className="mt-3 text-xs leading-6 text-slate-500">
+                          Channel ini masih experimental. Untuk Instagram dan TikTok, baca ulang konteks sebelum pakai draft mentah.
+                        </p>
+                      ) : null}
 
                       {extraction ? (
                         <div className="mt-4 space-y-3 text-sm">
