@@ -37,7 +37,11 @@ from app.services.lead_task_service import (
     ensure_queue_task_for_lead,
     upsert_follow_up_task_for_lead,
 )
-from app.services.source_intelligence_service import list_channel_definitions
+from app.services.source_intelligence_service import (
+    infer_provider_from_source,
+    list_channel_definitions,
+    normalize_source_channel,
+)
 from app.services.telegram_parser import TelegramParseError, parse_telegram_txt
 from app.services.whatsapp_parser import WhatsAppParseError, parse_whatsapp_txt
 
@@ -433,6 +437,8 @@ def create_or_update_conversation_from_messages(
     raw_text: str,
     parsed_messages: Sequence,
 ) -> tuple[Conversation, str, int]:
+    channel = normalize_source_channel(source)
+    provider = infer_provider_from_source(source, "manual_upload")
     identity_hints = extract_manual_identity_hints(
         title=title,
         raw_text=raw_text,
@@ -472,6 +478,8 @@ def create_or_update_conversation_from_messages(
                     conversation_id=existing_conversation.id,
                     sender_name=parsed_message.sender_name,
                     sender_type=parsed_message.sender_type,
+                    channel=existing_conversation.channel or channel,
+                    provider=existing_conversation.provider or provider,
                     message_text=parsed_message.message_text,
                     message_timestamp=parsed_message.message_timestamp,
                 )
@@ -498,8 +506,14 @@ def create_or_update_conversation_from_messages(
 
         if external_thread_key and not existing_conversation.external_thread_key:
             existing_conversation.external_thread_key = external_thread_key
+        if external_thread_key and not existing_conversation.external_thread_id:
+            existing_conversation.external_thread_id = external_thread_key
         if not existing_conversation.provider_key:
             existing_conversation.provider_key = "manual_upload"
+        if not existing_conversation.channel:
+            existing_conversation.channel = channel
+        if not existing_conversation.provider:
+            existing_conversation.provider = provider
 
         if new_messages:
             existing_conversation.raw_text = merge_raw_chat_text(
@@ -552,7 +566,10 @@ def create_or_update_conversation_from_messages(
         organization_id=current_user.organization_id,
         sales_user_id=current_user.id,
         title=title,
+        channel=channel,
+        provider=provider,
         provider_key="manual_upload",
+        external_thread_id=external_thread_key,
         external_thread_key=external_thread_key,
         source=source,
         status="uploaded",
@@ -571,6 +588,8 @@ def create_or_update_conversation_from_messages(
                 conversation_id=conversation.id,
                 sender_name=parsed_message.sender_name,
                 sender_type=parsed_message.sender_type,
+                channel=channel,
+                provider=provider,
                 message_text=parsed_message.message_text,
                 message_timestamp=parsed_message.message_timestamp,
             )
@@ -689,6 +708,8 @@ async def upload_whatsapp_txt(
         current_user=current_user,
         request=request,
         metadata={
+            "channel": conversation.channel,
+            "provider": conversation.provider,
             "filename": file.filename,
             "message_count": len(parsed_messages),
             "appended_message_count": appended_message_count,
@@ -767,6 +788,8 @@ async def upload_telegram_txt(
         current_user=current_user,
         request=request,
         metadata={
+            "channel": conversation.channel,
+            "provider": conversation.provider,
             "filename": file.filename,
             "message_count": len(parsed_messages),
             "appended_message_count": appended_message_count,
@@ -831,6 +854,8 @@ async def upload_whatsapp_raw_text(
         current_user=current_user,
         request=request,
         metadata={
+            "channel": conversation.channel,
+            "provider": conversation.provider,
             "message_count": len(parsed_messages),
             "appended_message_count": appended_message_count,
             "upload_status": upload_status,
@@ -895,6 +920,8 @@ async def upload_telegram_raw_text(
         current_user=current_user,
         request=request,
         metadata={
+            "channel": conversation.channel,
+            "provider": conversation.provider,
             "message_count": len(parsed_messages),
             "appended_message_count": appended_message_count,
             "upload_status": upload_status,

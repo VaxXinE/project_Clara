@@ -34,6 +34,7 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
+const EXTENSION_BUILD_LABEL = "v0.0.67-instagram-direction-meta-fix-1"
 
 const panelCss = `
   html,
@@ -135,6 +136,33 @@ const panelCss = `
     display: grid;
     gap: 12px;
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .clara-build-badge {
+    align-self: start;
+    background: rgba(12, 9, 6, 0.72);
+    border: 1px solid rgba(240, 203, 115, 0.28);
+    border-radius: 999px;
+    color: #ffe3a0;
+    font-size: 11px;
+    font-weight: 800;
+    justify-self: start;
+    letter-spacing: 0.08em;
+    padding: 8px 10px;
+    text-transform: uppercase;
+  }
+
+  .clara-debug-box {
+    background: rgba(12, 9, 6, 0.54);
+    border: 1px dashed rgba(240, 203, 115, 0.24);
+    border-radius: 14px;
+    color: rgba(247, 231, 183, 0.84);
+    font-size: 11px;
+    line-height: 1.45;
+    margin-top: 10px;
+    padding: 10px 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 
   .clara-hero__eyebrow {
@@ -1335,6 +1363,28 @@ const getActiveTab = async () => {
   return tab
 }
 
+const isWhatsAppTabUrl = (url: string | undefined) =>
+  Boolean(url?.startsWith("https://web.whatsapp.com/"))
+
+const isInstagramDmTabUrl = (url: string | undefined) =>
+  Boolean(url?.startsWith("https://www.instagram.com/direct/"))
+
+const isTikTokMessagesTabUrl = (url: string | undefined) =>
+  Boolean(url?.startsWith("https://www.tiktok.com/messages"))
+
+const isSupportedLiveSyncTabUrl = (url: string | undefined) =>
+  isWhatsAppTabUrl(url) || isInstagramDmTabUrl(url) || isTikTokMessagesTabUrl(url)
+
+const getSupportedLiveSyncTabMessage = () =>
+  "Buka WhatsApp Web, Instagram DM, atau TikTok Messages dulu di tab aktif."
+
+const getContentScriptUnavailableMessage = (url: string | undefined) =>
+  isInstagramDmTabUrl(url)
+    ? "Content script Clara belum aktif di halaman Instagram ini. Refresh halaman Instagram DM lalu coba lagi."
+    : isTikTokMessagesTabUrl(url)
+      ? "Content script Clara belum aktif di halaman TikTok Messages ini. Refresh halaman lalu coba lagi."
+    : "Content script Clara belum aktif di halaman ini. Refresh tab lalu coba lagi."
+
 const readWhatsAppFromPage = (): WhatsAppReadResponse => {
   const SELF_AUTHOR_PATTERN = /^(you|anda|me|saya)$/i
 
@@ -1692,7 +1742,7 @@ const readWhatsAppFromPage = (): WhatsAppReadResponse => {
 
 const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
   let lastFetchError = ""
-  const snapshotCandidates = getSnapshotSyncCandidates()
+  const snapshotCandidates = getSnapshotSyncCandidates(chatData.channel)
 
   if (snapshotCandidates.length === 0) {
     throw new Error(
@@ -1715,9 +1765,16 @@ const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
 
       const payload = await response.json()
 
+      const backendErrorMessage =
+        (typeof payload?.error === "string" && payload.error.trim()) ||
+        (typeof payload?.detail === "string" && payload.detail.trim()) ||
+        (typeof payload?.detail?.message === "string" &&
+          payload.detail.message.trim()) ||
+        ""
+
       if (!response.ok) {
         throw new Error(
-          payload?.error ||
+          backendErrorMessage ||
             `API snapshot chat gagal memproses data scraping di ${proxyUrl}.`
         )
       }
@@ -1787,7 +1844,7 @@ const clearChatSnapshotInProxy = async () => {
 const fetchSuggestionsFromClaraBackendOnly = async (
   chatData: WhatsAppChatSnapshot
 ) => {
-  const claraReplySuggestionsUrl = getClaraReplySuggestionsUrl()
+  const claraReplySuggestionsUrl = getClaraReplySuggestionsUrl(chatData.channel)
 
   if (!claraReplySuggestionsUrl) {
     if (!isDevFallbackAllowed()) {
@@ -1845,7 +1902,9 @@ const shouldClearSnapshotForError = (message: string) =>
   [
     "Belum ada percakapan yang sedang dibuka.",
     "Buka WhatsApp Web dulu di tab aktif.",
-    "Panel chat WhatsApp Web belum ditemukan."
+    "Panel chat WhatsApp Web belum ditemukan.",
+    "Buka satu percakapan TikTok DM sampai kolom Send a message muncul dulu.",
+    "Judul percakapan TikTok DM aktif belum berhasil dikenali."
   ].some((pattern) => message.includes(pattern))
 
 function ClaraSidePanel() {
@@ -1895,16 +1954,26 @@ function ClaraSidePanel() {
     [chatData]
   )
 
-  useEffect(() => {
-    const syncTab = async () => {
-      const tab = await getActiveTab()
-      setTabUrl(tab?.url || "")
-    }
+  const syncActiveTabUrl = async () => {
+    const tab = await getActiveTab()
+    const nextTabUrl = tab?.url || ""
 
-    syncTab().catch(() => {
-      setError("Gagal membaca tab aktif.")
+    setTabUrl((currentTabUrl) =>
+      currentTabUrl === nextTabUrl ? currentTabUrl : nextTabUrl
+    )
+
+    return tab
+  }
+
+  useEffect(() => {
+    syncActiveTabUrl().catch(() => {
+      setTabUrl("")
     })
   }, [])
+
+  useEffect(() => {
+    setHasAutoReadAttempted(false)
+  }, [tabUrl])
 
   const refreshAuthState = async (options?: { silent?: boolean }) => {
     if (!getConfiguredClaraApiBaseUrl()) {
@@ -2051,8 +2120,8 @@ function ClaraSidePanel() {
       throw new Error("Tab aktif tidak ditemukan.")
     }
 
-    if (!tab.url?.startsWith("https://web.whatsapp.com/")) {
-      throw new Error("Buka WhatsApp Web dulu di tab aktif.")
+    if (!isSupportedLiveSyncTabUrl(tab.url)) {
+      throw new Error(getSupportedLiveSyncTabMessage())
     }
 
     let response: WhatsAppReadResponse | undefined
@@ -2071,14 +2140,18 @@ function ClaraSidePanel() {
         throw messageError
       }
 
-      const [result] = await chrome.scripting.executeScript({
-        func: readWhatsAppFromPage,
-        target: {
-          tabId: tab.id
-        }
-      })
+      if (isWhatsAppTabUrl(tab.url)) {
+        const [result] = await chrome.scripting.executeScript({
+          func: readWhatsAppFromPage,
+          target: {
+            tabId: tab.id
+          }
+        })
 
-      response = result?.result as WhatsAppReadResponse | undefined
+        response = result?.result as WhatsAppReadResponse | undefined
+      } else {
+        throw new Error(getContentScriptUnavailableMessage(tab.url))
+      }
     }
 
     if (!response?.ok || !response.data) {
@@ -2179,15 +2252,11 @@ function ClaraSidePanel() {
   }
 
   useEffect(() => {
-    if (hasAutoReadAttempted || isLoading || !tabUrl) {
+    if (hasAutoReadAttempted || isLoading || !isSupportedLiveSyncTabUrl(tabUrl)) {
       return
     }
 
     setHasAutoReadAttempted(true)
-
-    if (!tabUrl.startsWith("https://web.whatsapp.com/")) {
-      return
-    }
 
     handleReadChat().catch(() => {
       // Error state is already handled inside handleReadChat.
@@ -2195,24 +2264,30 @@ function ClaraSidePanel() {
   }, [hasAutoReadAttempted, isLoading, tabUrl])
 
   useEffect(() => {
-    if (!tabUrl.startsWith("https://web.whatsapp.com/")) {
-      return
-    }
-
     const intervalId = window.setInterval(() => {
       if (isLoading || isSuggesting || isInsertingIndex !== null) {
         return
       }
 
-      refreshChatSilently().catch(() => {
-        // Silent refresh should stay silent.
-      })
+      syncActiveTabUrl()
+        .then((tab) => {
+          if (!isSupportedLiveSyncTabUrl(tab?.url)) {
+            return
+          }
+
+          refreshChatSilently().catch(() => {
+            // Silent refresh should stay silent.
+          })
+        })
+        .catch(() => {
+          // Silent refresh should stay silent.
+        })
     }, AUTO_REFRESH_INTERVAL_MS)
 
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [chatSignature, isInsertingIndex, isLoading, isSuggesting, tabUrl])
+  }, [chatSignature, isInsertingIndex, isLoading, isSuggesting])
 
   const handleSuggestReplies = async () => {
     setIsSuggesting(true)
@@ -2281,8 +2356,8 @@ function ClaraSidePanel() {
         throw new Error("Tab aktif tidak ditemukan.")
       }
 
-      if (!tab.url?.startsWith("https://web.whatsapp.com/")) {
-        throw new Error("Buka WhatsApp Web dulu di tab aktif.")
+      if (!isSupportedLiveSyncTabUrl(tab.url)) {
+        throw new Error(getSupportedLiveSyncTabMessage())
       }
 
       let response: WhatsAppActionResponse | undefined
@@ -2302,15 +2377,19 @@ function ClaraSidePanel() {
           throw messageError
         }
 
-        const [result] = await chrome.scripting.executeScript({
-          args: [suggestion],
-          func: insertReplyIntoPage,
-          target: {
-            tabId: tab.id
-          }
-        })
+        if (isWhatsAppTabUrl(tab.url)) {
+          const [result] = await chrome.scripting.executeScript({
+            args: [suggestion],
+            func: insertReplyIntoPage,
+            target: {
+              tabId: tab.id
+            }
+          })
 
-        response = result?.result as WhatsAppActionResponse | undefined
+          response = result?.result as WhatsAppActionResponse | undefined
+        } else {
+          throw new Error(getContentScriptUnavailableMessage(tab.url))
+        }
       }
 
       if (!response?.ok) {
@@ -2405,8 +2484,8 @@ function ClaraSidePanel() {
         throw new Error("Tab aktif tidak ditemukan.")
       }
 
-      if (!tab.url?.startsWith("https://web.whatsapp.com/")) {
-        throw new Error("Buka WhatsApp Web dulu di tab aktif.")
+      if (!isSupportedLiveSyncTabUrl(tab.url)) {
+        throw new Error(getSupportedLiveSyncTabMessage())
       }
 
       let response: WhatsAppActionResponse | undefined
@@ -2426,15 +2505,19 @@ function ClaraSidePanel() {
           throw messageError
         }
 
-        const [result] = await chrome.scripting.executeScript({
-          args: [suggestion],
-          func: sendReplyFromPanel,
-          target: {
-            tabId: tab.id
-          }
-        })
+        if (isWhatsAppTabUrl(tab.url)) {
+          const [result] = await chrome.scripting.executeScript({
+            args: [suggestion],
+            func: sendReplyFromPanel,
+            target: {
+              tabId: tab.id
+            }
+          })
 
-        response = result?.result as WhatsAppActionResponse | undefined
+          response = result?.result as WhatsAppActionResponse | undefined
+        } else {
+          throw new Error(getContentScriptUnavailableMessage(tab.url))
+        }
       }
 
       if (!response?.ok) {
@@ -2448,7 +2531,10 @@ function ClaraSidePanel() {
         return
       }
 
-      const claraSendUrl = getClaraSendReplyUrl(replySuggestionId)
+      const claraSendUrl = getClaraSendReplyUrl(
+        replySuggestionId,
+        chatData?.channel
+      )
 
       if (!claraSendUrl) {
         setFeedback(
@@ -2539,6 +2625,7 @@ function ClaraSidePanel() {
                 {sessionMeta || LOGIN_MESSAGE}
               </div>
             </div>
+            <div className="clara-build-badge">{EXTENSION_BUILD_LABEL}</div>
           </div>
         </section>
 
@@ -2584,6 +2671,9 @@ function ClaraSidePanel() {
                   <p className="clara-pane__copy">
                     Baca isi chat dari WhatsApp Web untuk dijadikan konteks.
                   </p>
+                  <p className="clara-pane__copy">
+                    Build aktif: <strong>{EXTENSION_BUILD_LABEL}</strong>
+                  </p>
                 </div>
 
                 <div className="clara-chip clara-chip--soft">
@@ -2625,6 +2715,18 @@ function ClaraSidePanel() {
                     {latestMessage ? (
                       <div className="clara-chat-latest">
                         <strong>Pesan terbaru:</strong> {latestMessage.text}
+                      </div>
+                    ) : null}
+
+                    {chatData.debugInfo ? (
+                      <div className="clara-debug-box">
+                        <strong>Debug:</strong>
+                        {"\n"}channel: {chatData.debugInfo.channel || "-"}
+                        {"\n"}composeBox: {chatData.debugInfo.composeBox || "-"}
+                        {"\n"}selectedTextbox: {chatData.debugInfo.selectedTextbox || "-"}
+                        {"\n"}bounds: {chatData.debugInfo.bounds || "-"}
+                        {"\n"}candidateCount: {chatData.debugInfo.candidateCount ?? "-"}
+                        {"\n"}titleCandidateCount: {chatData.debugInfo.titleCandidateCount ?? "-"}
                       </div>
                     ) : null}
 

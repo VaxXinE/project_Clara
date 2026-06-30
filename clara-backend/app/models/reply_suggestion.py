@@ -24,6 +24,8 @@ class ReplySuggestion(Base):
         nullable=False,
         index=True,
     )
+    channel: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    provider: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
 
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)
     schema_version: Mapped[str] = mapped_column(String(50), nullable=False, default="v1")

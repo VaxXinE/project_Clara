@@ -140,7 +140,10 @@ def _find_or_create_conversation(
         organization_id=context.organization.id,
         sales_user_id=context.sales_user.id,
         title=display_name,
+        channel="whatsapp",
+        provider="official_api",
         provider_key="meta",
+        external_thread_id=external_thread_key,
         external_thread_key=external_thread_key,
         source=WHATSAPP_WEBHOOK_SOURCE,
         status="webhook_synced",
@@ -163,7 +166,11 @@ def _apply_message_to_conversation(
         return False
 
     existing_message = db.scalars(
-        select(Message).where(Message.external_message_id == message.id)
+        select(Message).where(
+            Message.provider == "official_api",
+            Message.channel == "whatsapp",
+            Message.external_message_id == message.id,
+        )
     ).first()
     if existing_message is not None:
         return False
@@ -178,6 +185,8 @@ def _apply_message_to_conversation(
             conversation_id=conversation.id,
             sender_name=display_name,
             sender_type="customer",
+            channel="whatsapp",
+            provider="official_api",
             external_message_id=message.id,
             message_text=message.text.body.strip(),
             message_timestamp=message_timestamp,

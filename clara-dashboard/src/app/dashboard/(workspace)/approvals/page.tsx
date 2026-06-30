@@ -6,10 +6,13 @@ import { useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import {
+  formatChannelLabel,
   formatDateTime,
   formatStatusLabel,
+  getChannelBadgeClass,
   getLeadBadgeClass,
   getRiskBadgeClass,
+  isExperimentalChannel,
 } from "@/lib/format";
 import {
   canAccessQueueAndActionCenter,
@@ -435,6 +438,7 @@ export default function ChatReviewCenterPage() {
                       <option value="whatsapp">WhatsApp</option>
                       <option value="telegram">Telegram</option>
                       <option value="instagram">Instagram</option>
+                      <option value="tiktok">TikTok</option>
                       <option value="email">Email</option>
                       <option value="import">Import</option>
                       <option value="unknown">Unknown</option>
@@ -649,6 +653,18 @@ function ReviewCard({
             >
               {formatStatusLabel(item.age_bucket)}
             </span>
+            <span
+              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getChannelBadgeClass(
+                item.source_channel,
+              )}`}
+            >
+              {formatChannelLabel(item.source_channel)}
+            </span>
+            {isExperimentalChannel(item.source_channel) ? (
+              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                Experimental
+              </span>
+            ) : null}
           </div>
 
           <p className="mt-2 text-sm text-[#d6bb84]">

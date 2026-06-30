@@ -44,6 +44,11 @@ class ReplySuggestionError(RuntimeError):
     pass
 
 
+def _build_openai_error_detail(exc: Exception) -> str:
+    detail = str(exc).strip() or exc.__class__.__name__
+    return f"{exc.__class__.__name__}: {detail}"
+
+
 MAX_MESSAGES_FOR_REPLY_CONTEXT = 14
 MAX_MESSAGES_FOR_SINGLE_REPLY_CONTEXT = 8
 MAX_MESSAGES_FOR_ULTRA_FAST_REPLY_CONTEXT = 2
@@ -3525,7 +3530,9 @@ def call_openai_for_reply_suggestion(
             },
         )
         raise ReplySuggestionError(
-            "Failed to call OpenAI. Check OPENAI_API_KEY and OPENAI_MODEL configuration."
+            "Failed to call OpenAI. "
+            "Check OPENAI_API_KEY, OPENAI_MODEL, and outbound network access. "
+            f"Detail: {_build_openai_error_detail(exc)}"
         ) from exc
 
     try:
@@ -4103,6 +4110,8 @@ def create_reply_suggestion(
     suggestion = ReplySuggestion(
         conversation_id=conversation.id,
         ai_extraction_id=extraction.id,
+        channel=conversation.channel,
+        provider=conversation.provider,
         model_name=get_reply_generation_model(
             desired_count=desired_count,
             latency_profile=latency_profile,

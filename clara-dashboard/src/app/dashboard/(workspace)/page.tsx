@@ -17,7 +17,13 @@ import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import {
+  formatChannelLabel,
+  formatDateTime,
+  formatStatusLabel,
+  getChannelBadgeClass,
+  isExperimentalChannel,
+} from "@/lib/format";
 import { canAccessQueueAndActionCenter, isAdminLike } from "@/lib/roles";
 import type {
   CurrentUser,
@@ -417,6 +423,20 @@ export default function DashboardHomePage() {
                 {latestConversation ? (
                   <div className="space-y-4">
                     <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        <span
+                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getChannelBadgeClass(
+                            latestConversation.source_channel,
+                          )}`}
+                        >
+                          {formatChannelLabel(latestConversation.source_channel)}
+                        </span>
+                        {isExperimentalChannel(latestConversation.source_channel) ? (
+                          <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                            Experimental
+                          </span>
+                        ) : null}
+                      </div>
                       <p className="text-base font-semibold text-slate-950">
                         {latestConversation.title}
                       </p>

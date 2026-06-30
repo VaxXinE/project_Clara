@@ -7,10 +7,16 @@ import { useEffect, useMemo, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import {
+  formatChannelLabel,
   formatDateTime,
+  formatProviderLabel,
   formatStatusLabel,
+  getChannelBadgeClass,
   getLeadBadgeClass,
+  getProviderBadgeClass,
   getRiskBadgeClass,
+  inferProviderFromSource,
+  isExperimentalChannel,
 } from "@/lib/format";
 import {
   canAccessQueueAndActionCenter,
@@ -22,6 +28,8 @@ import type { CurrentUser, SalesInboxItem } from "@/types/dashboard";
 const SOURCE_CHANNEL_OPTIONS = [
   { value: "all", label: "Semua Channel" },
   { value: "whatsapp", label: "WhatsApp" },
+  { value: "instagram", label: "Instagram DM" },
+  { value: "tiktok", label: "TikTok DM" },
   { value: "telegram", label: "Telegram" },
 ] as const;
 
@@ -256,7 +264,6 @@ export default function SalesInboxPage() {
     (item) => item.latest_ai_extraction?.risk_level === "high",
   ).length;
   const shouldShowOwnership = isManagerLike(currentUser?.role);
-  const archivedCount = inboxItems.filter((item) => item.is_archived).length;
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
   const filteredInboxItems = useMemo(() => {
@@ -611,7 +618,7 @@ export default function SalesInboxPage() {
                     {inboxItems.length === 0
                       ? archiveScope === "archived"
                         ? "Chat lama yang tidak aktif akan muncul di tab ini setelah melewati batas inactivity yang ditentukan sistem."
-                        : "Workspace ini akan mulai terasa hidup setelah chat WhatsApp pertama di-upload dan diparse menjadi conversation."
+                        : "Workspace ini akan mulai terasa hidup setelah chat pertama dari WhatsApp, Instagram, TikTok, atau upload manual masuk ke conversation."
                       : "Coba longgarkan pencarian atau ganti bucket kerja supaya conversation yang relevan muncul lagi."}
                   </p>
                   {inboxItems.length === 0 && archiveScope !== "archived" && (
@@ -708,6 +715,7 @@ export default function SalesInboxPage() {
                       <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {paginatedItems.map((item) => {
                           const extraction = item.latest_ai_extraction;
+                          const provider = inferProviderFromSource(item.source);
                           const canAnalyze = extraction === null;
                           const canGenerateDraft =
                             extraction !== null &&
@@ -730,6 +738,28 @@ export default function SalesInboxPage() {
                                   </div>
 
                                   <div className="flex flex-wrap gap-2">
+                                    <span
+                                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getChannelBadgeClass(
+                                        item.source_channel,
+                                      )}`}
+                                    >
+                                      {formatChannelLabel(item.source_channel)}
+                                    </span>
+
+                                    <span
+                                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getProviderBadgeClass(
+                                        provider,
+                                      )}`}
+                                    >
+                                      {formatProviderLabel(provider)}
+                                    </span>
+
+                                    {isExperimentalChannel(item.source_channel) ? (
+                                      <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                        Experimental
+                                      </span>
+                                    ) : null}
+
                                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
                                       {section.config.label}
                                     </span>
@@ -785,6 +815,12 @@ export default function SalesInboxPage() {
 
                                   <div className="grid gap-2 text-xs text-slate-500">
                                     <div className="flex flex-wrap gap-x-2 gap-y-1">
+                                      <span>
+                                        Sumber:{" "}
+                                        <span className="font-semibold text-slate-700">
+                                          {item.source_label}
+                                        </span>
+                                      </span>
                                       {shouldShowOwnership ? (
                                         <span>
                                           Owner:{" "}

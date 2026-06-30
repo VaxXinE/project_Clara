@@ -19,6 +19,11 @@ class AIExtractionError(RuntimeError):
     pass
 
 
+def _build_openai_error_detail(exc: Exception) -> str:
+    detail = str(exc).strip() or exc.__class__.__name__
+    return f"{exc.__class__.__name__}: {detail}"
+
+
 MAX_MESSAGES_FOR_ANALYSIS = 80
 MINI_CATEGORY_SIGNAL_PATTERN = re.compile(
     r"\b("
@@ -292,7 +297,9 @@ def call_openai_for_extraction(conversation_text: str) -> AIExtractionCreate:
         )
     except Exception as exc:
         raise AIExtractionError(
-            "Failed to call OpenAI. Check OPENAI_API_KEY and OPENAI_MODEL configuration."
+            "Failed to call OpenAI. "
+            "Check OPENAI_API_KEY, OPENAI_MODEL, and outbound network access. "
+            f"Detail: {_build_openai_error_detail(exc)}"
         ) from exc
 
     raw_output = response.output_text

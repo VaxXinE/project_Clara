@@ -1,86 +1,23 @@
 import type { PlasmoCSConfig } from "plasmo"
 
-import {
-  insertReplyIntoComposeBox,
-  readOpenChat,
-  sendReplyThroughComposeBox
-} from "~/utils/whatsapp-page"
+import type { LegacyRuntimeMessage } from "~/types/channel"
+import { getActiveAdapter } from "~/utils/channel-adapters/adapter-registry"
 
 export const config: PlasmoCSConfig = {
-  matches: ["https://web.whatsapp.com/*"]
+  matches: [
+    "https://web.whatsapp.com/*",
+    "https://www.instagram.com/direct/*",
+    "https://www.tiktok.com/messages*"
+  ]
 }
 
 const MESSAGE_HANDLER_KEY = "__sgExtensionWhatsAppHandler__"
 const MANUAL_SEND_LOCK_KEY = "__sgExtensionManualSendLock__"
 
-const getComposeBox = () => {
-  const selectors = [
-    '[data-testid="conversation-compose-box-input"][contenteditable="true"]',
-    '[contenteditable="true"][data-lexical-editor="true"]',
-    'footer [contenteditable="true"][role="textbox"]'
-  ]
-
-  for (const selector of selectors) {
-    const node = document.querySelector<HTMLElement>(selector)
-
-    if (node) {
-      return node
-    }
-  }
-
-  return null
-}
-
-const getComposeText = () =>
-  getComposeBox()?.innerText.replace(/\s+/g, " ").trim() || ""
-
-const getChatRoot = () => {
-  const selectors = [
-    '#main[data-testid="conversation-panel-wrapper"]',
-    "#main",
-    '[data-testid="conversation-panel-wrapper"]'
-  ]
-
-  for (const selector of selectors) {
-    const node = document.querySelector<HTMLElement>(selector)
-
-    if (node) {
-      return node
-    }
-  }
-
-  return null
-}
-
-const getConversationTitle = () => {
-  const chatRoot = getChatRoot()
-
-  if (!chatRoot) {
-    return ""
-  }
-
-  const titleSelectors = [
-    '[data-testid="conversation-info-header-chat-title"]',
-    "header [title]",
-    'header [dir="auto"]'
-  ]
-
-  for (const selector of titleSelectors) {
-    const node = chatRoot.querySelector<HTMLElement>(selector)
-    const title =
-      node?.getAttribute("title")?.trim() || node?.textContent?.trim()
-
-    if (title) {
-      return title
-    }
-  }
-
-  return ""
-}
-
 const triggerManualSendSync = () => {
-  const composeText = getComposeText()
-  const chatTitle = getConversationTitle()
+  const activeAdapter = getActiveAdapter()
+  const composeText = activeAdapter?.getComposeText?.() || ""
+  const chatTitle = activeAdapter?.getConversationTitle?.() || ""
 
   if (!composeText || !chatTitle) {
     return
@@ -112,22 +49,61 @@ const triggerManualSendSync = () => {
 }
 
 const handleRuntimeMessage = (
-  message: { text?: string; type?: string },
+  message: LegacyRuntimeMessage,
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response?: unknown) => void
 ) => {
+  const activeAdapter = getActiveAdapter()
+
   if (message?.type === "READ_WHATSAPP_CHAT") {
-    sendResponse(readOpenChat())
+    if (!activeAdapter) {
+      sendResponse({
+        error: "Halaman chat aktif belum didukung.",
+        ok: false
+      })
+      return false
+    }
+
+    sendResponse(activeAdapter.readOpenChat())
     return false
   }
 
   if (message?.type === "INSERT_WHATSAPP_REPLY") {
-    sendResponse(insertReplyIntoComposeBox(String(message?.text || "")))
+    if (!activeAdapter) {
+      sendResponse({
+        error: "Halaman chat aktif belum didukung.",
+        ok: false
+      })
+      return false
+    }
+
+    sendResponse(activeAdapter.insertReply(String(message?.text || "")))
+    return false
+  }
+
+  if (message?.type === "FOCUS_CHAT_COMPOSE") {
+    if (!activeAdapter?.focusCompose) {
+      sendResponse({
+        error: "Kolom chat aktif belum bisa difokuskan di halaman ini.",
+        ok: false
+      })
+      return false
+    }
+
+    sendResponse(activeAdapter.focusCompose())
     return false
   }
 
   if (message?.type === "SEND_WHATSAPP_REPLY") {
-    sendReplyThroughComposeBox(String(message?.text || ""))
+    if (!activeAdapter) {
+      sendResponse({
+        error: "Halaman chat aktif belum didukung.",
+        ok: false
+      })
+      return false
+    }
+
+    Promise.resolve(activeAdapter.sendReply(String(message?.text || "")))
       .then((result) => {
         sendResponse(result)
       })
@@ -162,11 +138,12 @@ document.addEventListener(
   "click",
   (event) => {
     const target = event.target as HTMLElement | null
+    const activeAdapter = getActiveAdapter()
     const sendButton = target?.closest(
       '[data-testid="compose-btn-send"], button[aria-label="Send"], button[aria-label="Kirim"]'
     )
 
-    if (sendButton) {
+    if (sendButton && activeAdapter?.channel === "whatsapp") {
       triggerManualSendSync()
     }
   },
@@ -176,13 +153,23 @@ document.addEventListener(
 document.addEventListener(
   "keydown",
   (event) => {
+    const activeAdapter = getActiveAdapter()
+
+    if (activeAdapter?.channel !== "whatsapp") {
+      return
+    }
+
     if (event.key !== "Enter" || event.shiftKey) {
       return
     }
 
-    const composeBox = getComposeBox()
+    const composeBox = document.activeElement as HTMLElement | null
 
     if (!composeBox) {
+      return
+    }
+
+    if (!composeBox.isContentEditable) {
       return
     }
 

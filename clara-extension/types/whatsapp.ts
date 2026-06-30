@@ -13,9 +13,19 @@ export interface WhatsAppMessage {
 
 export interface WhatsAppChatSnapshot {
   capturedAt: string
+  channel?: "whatsapp" | "instagram" | "tiktok"
   chatTitle: string
   chatSubtitle: string
+  debugInfo?: {
+    bounds?: string
+    candidateCount?: number
+    channel?: string
+    composeBox?: string
+    selectedTextbox?: string
+    titleCandidateCount?: number
+  }
   messages: WhatsAppMessage[]
+  provider?: "extension" | "official_api" | "manual"
 }
 
 export interface WhatsAppReadResponse {

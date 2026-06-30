@@ -1,4 +1,5 @@
 import type { ClaraExtensionSessionUser } from "~/types/whatsapp"
+import type { Channel } from "~/types/channel"
 
 const DEFAULT_PROXY_URL = "http://127.0.0.1:9898/reply-suggestions"
 const DEFAULT_CHAT_SNAPSHOT_PROXY_URL = "http://127.0.0.1:9898/chat-snapshots"
@@ -108,7 +109,22 @@ export const getChatSnapshotProxyUrl = (
   }
 }
 
+const normalizeExtensionChannel = (channel?: string | null): Channel => {
+  const normalized = (channel || "").trim().toLowerCase()
+
+  if (
+    normalized === "instagram" ||
+    normalized === "tiktok" ||
+    normalized === "whatsapp"
+  ) {
+    return normalized
+  }
+
+  return "whatsapp"
+}
+
 export const getClaraSnapshotSyncUrl = (
+  channel?: string | null,
   apiBaseUrl = getConfiguredClaraApiBaseUrl()
 ) => {
   if (!apiBaseUrl) {
@@ -116,13 +132,17 @@ export const getClaraSnapshotSyncUrl = (
   }
 
   try {
-    return buildClaraApiUrl(apiBaseUrl, "/extension/whatsapp/snapshots")
+    return buildClaraApiUrl(
+      apiBaseUrl,
+      `/extension/${normalizeExtensionChannel(channel)}/snapshots`
+    )
   } catch (_error) {
     return ""
   }
 }
 
 export const getClaraReplySuggestionsUrl = (
+  channel?: string | null,
   apiBaseUrl = getConfiguredClaraApiBaseUrl()
 ) => {
   if (!apiBaseUrl) {
@@ -130,7 +150,10 @@ export const getClaraReplySuggestionsUrl = (
   }
 
   try {
-    return buildClaraApiUrl(apiBaseUrl, "/extension/whatsapp/reply-suggestions")
+    return buildClaraApiUrl(
+      apiBaseUrl,
+      `/extension/${normalizeExtensionChannel(channel)}/reply-suggestions`
+    )
   } catch (_error) {
     return ""
   }
@@ -138,6 +161,7 @@ export const getClaraReplySuggestionsUrl = (
 
 export const getClaraSendReplyUrl = (
   replySuggestionId: string,
+  channel?: string | null,
   apiBaseUrl = getConfiguredClaraApiBaseUrl()
 ) => {
   if (!apiBaseUrl || !replySuggestionId.trim()) {
@@ -147,7 +171,7 @@ export const getClaraSendReplyUrl = (
   try {
     return buildClaraApiUrl(
       apiBaseUrl,
-      `/extension/whatsapp/reply-suggestions/${replySuggestionId.trim()}/send`
+      `/extension/${normalizeExtensionChannel(channel)}/reply-suggestions/${replySuggestionId.trim()}/send`
     )
   } catch (_error) {
     return ""
@@ -167,8 +191,8 @@ export const getProxyCandidates = (url: string) => {
   return Array.from(new Set(candidates.filter(Boolean)))
 }
 
-export const getSnapshotSyncCandidates = () => {
-  const claraSnapshotUrl = getClaraSnapshotSyncUrl()
+export const getSnapshotSyncCandidates = (channel?: string | null) => {
+  const claraSnapshotUrl = getClaraSnapshotSyncUrl(channel)
 
   if (claraSnapshotUrl) {
     return getProxyCandidates(claraSnapshotUrl)
@@ -181,8 +205,8 @@ export const getSnapshotSyncCandidates = () => {
   return getProxyCandidates(DEFAULT_CHAT_SNAPSHOT_PROXY_URL)
 }
 
-export const getReplySuggestionCandidates = () => {
-  const claraReplySuggestionsUrl = getClaraReplySuggestionsUrl()
+export const getReplySuggestionCandidates = (channel?: string | null) => {
+  const claraReplySuggestionsUrl = getClaraReplySuggestionsUrl(channel)
 
   if (claraReplySuggestionsUrl) {
     return getProxyCandidates(claraReplySuggestionsUrl)

@@ -40,6 +40,9 @@ const getChatRoot = () => {
   return null
 }
 
+export const isWhatsAppSupportedPage = () =>
+  window.location.hostname === "web.whatsapp.com"
+
 const getConversationTitle = (chatRoot: HTMLElement) => {
   const titleSelectors = [
     '[data-testid="conversation-info-header-chat-title"]',
@@ -299,6 +302,26 @@ const getComposeFooter = () => getComposeBox()?.closest("footer") || document
 
 const getComposeText = (composeBox: HTMLElement) =>
   composeBox.innerText.replace(/\s+/g, " ").trim()
+
+export const getWhatsAppComposeText = () => {
+  const composeBox = getComposeBox()
+
+  if (!composeBox) {
+    return ""
+  }
+
+  return getComposeText(composeBox)
+}
+
+export const getWhatsAppConversationTitle = () => {
+  const chatRoot = getChatRoot()
+
+  if (!chatRoot) {
+    return ""
+  }
+
+  return getConversationTitle(chatRoot)
+}
 
 const clickElement = (node: HTMLElement) => {
   node.dispatchEvent(
