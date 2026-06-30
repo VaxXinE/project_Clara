@@ -34,7 +34,7 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.0.58-tiktok-active-pane-guard-1"
+const EXTENSION_BUILD_LABEL = "v0.0.67-instagram-direction-meta-fix-1"
 
 const panelCss = `
   html,
@@ -1765,9 +1765,16 @@ const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
 
       const payload = await response.json()
 
+      const backendErrorMessage =
+        (typeof payload?.error === "string" && payload.error.trim()) ||
+        (typeof payload?.detail === "string" && payload.detail.trim()) ||
+        (typeof payload?.detail?.message === "string" &&
+          payload.detail.message.trim()) ||
+        ""
+
       if (!response.ok) {
         throw new Error(
-          payload?.error ||
+          backendErrorMessage ||
             `API snapshot chat gagal memproses data scraping di ${proxyUrl}.`
         )
       }

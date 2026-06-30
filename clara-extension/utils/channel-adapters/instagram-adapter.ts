@@ -125,14 +125,19 @@ const META_TEXT_PATTERNS = [
   /^(today|yesterday|kemarin)$/i,
   /^\d{1,2}:\d{2}\s*(am|pm)$/i,
   /^\d+\s*(m|h|d|w)$/i,
+  /^\d+\s*(m|h|d|w)\s+ago$/i,
   /^\d+\s+new\s+messages?$/i,
   /^message\.{0,3}$/i,
   /^pesan\.{0,3}$/i,
   /^(seen|sent|delivered|diterima|dilihat)$/i,
+  /^(seen|sent|delivered|diterima|dilihat)\s+\d+\s*(m|h|d|w)\s+ago$/i,
+  /^(seen|sent|delivered|diterima|dilihat)\s+just\s+now$/i,
   /^you sent an attachment\.?$/i
 ]
 
 const COMPOSER_HINT_PATTERNS = [/message/i, /pesan/i]
+const URL_LIKE_PATTERN =
+  /(https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,}(?:\/[^\s]*)?)/i
 
 const isUsefulMessageText = (text: string, chatTitle: string) => {
   const normalized = normalizeText(text)
@@ -459,6 +464,7 @@ const getHeaderTextSet = (root: ParentNode = document) => {
 }
 
 type TextCandidate = {
+  bubbleKey: string
   rect: DOMRect
   text: string
 }
@@ -470,21 +476,313 @@ type TopRightTextCandidate = {
   text: string
 }
 
+type BubbleCandidate = {
+  bubbleKey: string
+  element: HTMLElement
+  rect: DOMRect
+}
+
+const isLikelyLinkPreviewTextNode = (textNode: Node, parent: HTMLElement) => {
+  const text = normalizeText(textNode.textContent || "")
+
+  if (!text || URL_LIKE_PATTERN.test(text) || text.length > 180) {
+    return false
+  }
+
+  let current: HTMLElement | null = parent
+
+  for (let depth = 0; current && depth < 6; depth += 1) {
+    const hasMedia = Boolean(current.querySelector("img, video, canvas, svg"))
+    const anchor =
+      current.matches("a[href], [role='link']") ?
+        current
+      : current.querySelector<HTMLElement>("a[href], [role='link']")
+
+    if (hasMedia && anchor) {
+      const anchorHref = anchor.getAttribute("href") || ""
+      const subtreeText = normalizeText(current.textContent || "")
+      const nodeInsideAnchor =
+        anchor === parent ||
+        anchor.contains(parent) ||
+        parent.closest("a[href], [role='link']") === anchor
+      const subtreeLooksCompact =
+        subtreeText === text ||
+        subtreeText.length <= Math.max(140, text.length + 48)
+      const currentLooksCompact = current.childElementCount <= 6
+
+      if (
+        subtreeLooksCompact &&
+        currentLooksCompact &&
+        (
+          nodeInsideAnchor ||
+          subtreeText.toLowerCase().includes("official website")
+        ) &&
+        (
+          anchorHref ||
+          URL_LIKE_PATTERN.test(subtreeText) ||
+          subtreeText.toLowerCase().includes("official website")
+        )
+      ) {
+        return true
+      }
+    }
+
+    current = current.parentElement
+  }
+
+  return false
+}
+
+const getBubbleContainer = (node: HTMLElement, root: HTMLElement) => {
+  const rootRect = root.getBoundingClientRect()
+  let current: HTMLElement | null = node
+  let bestCandidate: HTMLElement | null = null
+
+  while (current && current !== root) {
+    const rect = current.getBoundingClientRect()
+    const withinRoot =
+      rect.left >= rootRect.left - 24 &&
+      rect.right <= rootRect.right + 24 &&
+      rect.top >= rootRect.top - 24 &&
+      rect.bottom <= rootRect.bottom + 24
+
+    if (
+      withinRoot &&
+      rect.width >= 56 &&
+      rect.height >= 18 &&
+      rect.width <= rootRect.width * 0.98 &&
+      !current.closest("header, nav, aside, footer, form, button")
+    ) {
+      const childTextCount = Array.from(current.childNodes).filter((child) =>
+        Boolean(normalizeText(child.textContent || ""))
+      ).length
+      const hasMedia = Boolean(current.querySelector("img, video, canvas, svg"))
+
+      if (childTextCount >= 1 || hasMedia) {
+        bestCandidate = current
+      }
+    }
+
+    current = current.parentElement
+  }
+
+  return bestCandidate || node
+}
+
+const getBubbleKey = (node: HTMLElement, root: HTMLElement) => {
+  const container = getBubbleContainer(node, root)
+  const rect = container.getBoundingClientRect()
+
+  return [
+    container.tagName.toLowerCase(),
+    Math.round(rect.left),
+    Math.round(rect.top),
+    Math.round(rect.width),
+    Math.round(rect.height)
+  ].join(":")
+}
+
+const getNodeRect = (node: Node) => {
+  const range = document.createRange()
+  range.selectNodeContents(node)
+
+  return range.getBoundingClientRect()
+}
+
+const isBubbleTextNodeVisible = (
+  bubbleRect: DOMRect,
+  textRect: DOMRect,
+  bounds: ReturnType<typeof getConversationBounds>
+) => {
+  if (!textRect.width || !textRect.height) {
+    return false
+  }
+
+  if (
+    textRect.top < bounds.minTop - 8 ||
+    textRect.bottom > bounds.maxBottom + 8 ||
+    textRect.left < bounds.minLeft - 24 ||
+    textRect.right > bounds.maxRight + 24
+  ) {
+    return false
+  }
+
+  return (
+    textRect.left >= bubbleRect.left - 8 &&
+    textRect.right <= bubbleRect.right + 8 &&
+    textRect.top >= bubbleRect.top - 8 &&
+    textRect.bottom <= bubbleRect.bottom + 8
+  )
+}
+
+const collectBubbleText = (
+  bubble: HTMLElement,
+  bounds: ReturnType<typeof getConversationBounds>
+) => {
+  const bubbleRect = bubble.getBoundingClientRect()
+  const parts: string[] = []
+  const rects: DOMRect[] = []
+  const seen = new Set<string>()
+  const walker = document.createTreeWalker(bubble, NodeFilter.SHOW_TEXT)
+
+  while (walker.nextNode()) {
+    const textNode = walker.currentNode
+    const parent = textNode.parentElement
+    const text = normalizeText(textNode.textContent || "")
+
+    if (!parent || !text || !isVisibleElement(parent)) {
+      continue
+    }
+
+    if (isLikelyLinkPreviewTextNode(textNode, parent)) {
+      continue
+    }
+
+    const rect = getNodeRect(textNode)
+
+    if (!isBubbleTextNodeVisible(bubbleRect, rect, bounds)) {
+      continue
+    }
+
+    const key = `${text}-${Math.round(rect.top)}-${Math.round(rect.left)}`
+
+    if (seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    parts.push(text)
+    rects.push(rect)
+  }
+
+  const text = mergeMessageCandidateTexts(parts)
+
+  if (!text || rects.length === 0) {
+    return null
+  }
+
+  const mergedRect = {
+    bottom: Math.max(...rects.map((rect) => rect.bottom)),
+    height: 0,
+    left: Math.min(...rects.map((rect) => rect.left)),
+    right: Math.max(...rects.map((rect) => rect.right)),
+    top: Math.min(...rects.map((rect) => rect.top)),
+    width: 0,
+    x: 0,
+    y: 0,
+    toJSON: () => bubbleRect.toJSON()
+  } as DOMRect
+
+  mergedRect.width = mergedRect.right - mergedRect.left
+  mergedRect.height = mergedRect.bottom - mergedRect.top
+  mergedRect.x = mergedRect.left
+  mergedRect.y = mergedRect.top
+
+  return {
+    rect: mergedRect,
+    text
+  }
+}
+
+const getTextCandidateDirection = (
+  candidate: TextCandidate,
+  centerX: number
+): "incoming" | "outgoing" =>
+  candidate.rect.left + candidate.rect.width / 2 > centerX ? "outgoing" : "incoming"
+
+const shouldDropSubsetCandidate = (
+  current: TextCandidate,
+  other: TextCandidate,
+  centerX: number
+) => {
+  if (current === other) {
+    return false
+  }
+
+  if (getTextCandidateDirection(current, centerX) !== getTextCandidateDirection(other, centerX)) {
+    return false
+  }
+
+  if (current.text.length >= other.text.length) {
+    return false
+  }
+
+  const normalizedCurrent = normalizeText(current.text)
+  const normalizedOther = normalizeText(other.text)
+
+  if (!normalizedCurrent || !normalizedOther.includes(normalizedCurrent)) {
+    return false
+  }
+
+  const horizontallyNear =
+    Math.abs(current.rect.left - other.rect.left) <= 48 ||
+    Math.abs(current.rect.right - other.rect.right) <= 48
+  const verticallyNear =
+    Math.abs(current.rect.top - other.rect.top) <= 160 ||
+    Math.abs(current.rect.bottom - other.rect.bottom) <= 160
+
+  return horizontallyNear && verticallyNear
+}
+
+const mergeMessageCandidateTexts = (texts: string[]) => {
+  const uniqueTexts = Array.from(
+    new Set(texts.map((text) => normalizeText(text)).filter(Boolean))
+  )
+  const trimmedBoundaryMetaTexts = [...uniqueTexts]
+
+  while (
+    trimmedBoundaryMetaTexts.length > 0 &&
+    META_TEXT_PATTERNS.some((pattern) => pattern.test(trimmedBoundaryMetaTexts[0]))
+  ) {
+    trimmedBoundaryMetaTexts.shift()
+  }
+
+  while (
+    trimmedBoundaryMetaTexts.length > 0 &&
+    META_TEXT_PATTERNS.some((pattern) =>
+      pattern.test(trimmedBoundaryMetaTexts[trimmedBoundaryMetaTexts.length - 1])
+    )
+  ) {
+    trimmedBoundaryMetaTexts.pop()
+  }
+
+  const hasRicherText = uniqueTexts.some((text) => /[\p{L}\p{N}]/u.test(text) && text.length > 2)
+
+  const cleanedTexts = trimmedBoundaryMetaTexts
+    .filter((text) => {
+      if (!hasRicherText) {
+        return true
+      }
+
+      return !/^[.]+$/u.test(text)
+    })
+    .map((text, index) => {
+      if (index === 0) {
+        return text
+      }
+
+      return text.replace(/^[.:\-]+\s*/u, "")
+    })
+
+  return normalizeText(cleanedTexts.join(" "))
+}
+
 const readMessageCandidates = (): TextCandidate[] => {
-  const { maxBottom, maxRight, minLeft, root } = getConversationBounds()
+  const bounds = getConversationBounds()
+  const { maxBottom, maxRight, minLeft, root } = bounds
+  const rootElement = root instanceof HTMLElement ? root : getConversationPane()
   const primaryTitleCandidate = getPrimaryTitleCandidate(root)
-  const chatTitle = primaryTitleCandidate?.text || getTitle()
   const effectiveMinLeft = primaryTitleCandidate
     ? Math.max(minLeft, primaryTitleCandidate.rect.left - 36)
     : minLeft
   const headerCandidates = getTopRightTextCandidates(root).filter(
-    (candidate) => candidate.text === chatTitle
+    (candidate) => candidate.text === (primaryTitleCandidate?.text || getTitle())
   )
   const composeBox = findComposeBox(root)
   const composeRect = composeBox?.getBoundingClientRect()
   const minTop = headerCandidates[0]?.rect.bottom ?? window.innerHeight * 0.08
   const effectiveMaxBottom = composeRect?.top ?? maxBottom
-  const candidates: TextCandidate[] = []
+  const bubbleMap = new Map<string, BubbleCandidate>()
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
 
   while (walker.nextNode()) {
@@ -504,6 +802,10 @@ const readMessageCandidates = (): TextCandidate[] => {
       parent.closest("form") ||
       parent.closest("button")
     ) {
+      continue
+    }
+
+    if (isLikelyLinkPreviewTextNode(textNode, parent)) {
       continue
     }
 
@@ -539,26 +841,50 @@ const readMessageCandidates = (): TextCandidate[] => {
       continue
     }
 
-    candidates.push({
-      rect,
-      text
-    })
+    const bubbleElement = getBubbleContainer(parent, rootElement)
+    const bubbleKey = getBubbleKey(parent, rootElement)
+    const bubbleRect = bubbleElement.getBoundingClientRect()
+
+    if (!bubbleMap.has(bubbleKey)) {
+      bubbleMap.set(bubbleKey, {
+        bubbleKey,
+        element: bubbleElement,
+        rect: bubbleRect
+      })
+    }
   }
 
-  const seen = new Set<string>()
+  return Array.from(bubbleMap.values())
+    .map((bubble) => {
+      const bubbleText = collectBubbleText(bubble.element, {
+        centerX: bounds.centerX,
+        maxBottom: effectiveMaxBottom,
+        maxRight,
+        minLeft: effectiveMinLeft,
+        minTop,
+        root
+      })
 
-  return candidates.filter((candidate) => {
-    const key = `${candidate.text}-${Math.round(candidate.rect.top)}-${Math.round(
-      candidate.rect.left
-    )}`
+      return bubbleText ?
+          {
+            bubbleKey: bubble.bubbleKey,
+            rect: bubbleText.rect,
+            text: bubbleText.text
+          }
+        : null
+    })
+    .filter((candidate): candidate is TextCandidate => Boolean(candidate))
+    .sort((a, b) => {
+      if (Math.abs(a.rect.top - b.rect.top) > 6) {
+        return a.rect.top - b.rect.top
+      }
 
-    if (seen.has(key)) {
-      return false
-    }
-
-    seen.add(key)
-    return true
-  })
+      return a.rect.left - b.rect.left
+    })
+    .filter(
+      (candidate, _index, list) =>
+        !list.some((other) => shouldDropSubsetCandidate(candidate, other, bounds.centerX))
+    )
 }
 
 const getComposeText = () => {
@@ -742,9 +1068,9 @@ const buildSnapshot = (): ChannelChatSnapshot => {
   const composeBox = findComposeBox(getRoot())
   const titleCandidates = getTopRightTextCandidates(getRoot())
   const headerTexts = getHeaderTextSet(getConversationPane())
-  const rawCandidates = readMessageCandidates()
+  const mergedCandidates = readMessageCandidates()
 
-  const messages: ChannelMessage[] = rawCandidates
+  const messages: ChannelMessage[] = mergedCandidates
     .map((candidate, index) => {
       const text = candidate.text
 
@@ -778,7 +1104,7 @@ const buildSnapshot = (): ChannelChatSnapshot => {
       bounds: `left>=${Math.round(bounds.minLeft)} right<=${Math.round(
         bounds.maxRight
       )} top>=${Math.round(bounds.minTop)} bottom<=${Math.round(bounds.maxBottom)}`,
-      candidateCount: rawCandidates.length,
+      candidateCount: mergedCandidates.length,
       channel: "instagram",
       composeBox: formatRect(composeBox?.getBoundingClientRect()),
       selectedTextbox: composeBox
