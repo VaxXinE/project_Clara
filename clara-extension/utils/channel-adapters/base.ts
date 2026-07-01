@@ -12,6 +12,6 @@ export interface ChannelAdapter {
   getConversationTitle?(): string
   insertReply(text: string): WhatsAppActionResponse
   isSupportedPage(): boolean
-  readOpenChat(): WhatsAppReadResponse
+  readOpenChat(): Promise<WhatsAppReadResponse> | WhatsAppReadResponse
   sendReply(text: string): Promise<WhatsAppActionResponse> | WhatsAppActionResponse
 }

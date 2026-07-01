@@ -64,8 +64,21 @@ const handleRuntimeMessage = (
       return false
     }
 
-    sendResponse(activeAdapter.readOpenChat())
-    return false
+    Promise.resolve(activeAdapter.readOpenChat())
+      .then((result) => {
+        sendResponse(result)
+      })
+      .catch((error) => {
+        sendResponse({
+          error:
+            error instanceof Error ?
+              error.message
+            : "Terjadi kendala saat membaca chat aktif.",
+          ok: false
+        })
+      })
+
+    return true
   }
 
   if (message?.type === "INSERT_WHATSAPP_REPLY") {
