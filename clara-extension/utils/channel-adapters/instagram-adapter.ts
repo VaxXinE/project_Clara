@@ -8,6 +8,10 @@ import type { WhatsAppReadResponse } from "~/types/whatsapp"
 import type { ChannelAdapter } from "./base"
 
 const MAX_VISIBLE_MESSAGES = 80
+const HISTORY_SWEEP_STEP_RATIO = 0.82
+const HISTORY_SWEEP_SETTLE_MS = 180
+const HISTORY_SWEEP_MAX_STEPS = 24
+const HISTORY_SWEEP_STABLE_LIMIT = 3
 
 const normalizeText = (value: string) =>
   value
@@ -101,6 +105,12 @@ const isVisibleElement = (node: HTMLElement) => {
     rect.bottom >= 0 &&
     rect.top <= window.innerHeight
   )
+}
+
+const hasRenderableBox = (node: HTMLElement) => {
+  const rect = node.getBoundingClientRect()
+
+  return rect.width > 0 && rect.height > 0
 }
 
 const IGNORED_TEXT = new Set([
@@ -270,7 +280,182 @@ const getComposePlaceholderCandidates = (root: ParentNode = document) =>
       return scoreB - scoreA
     })
 
+const getViewportProbeElement = (xRatio: number, yRatio: number) => {
+  const x = Math.min(window.innerWidth - 2, Math.max(2, window.innerWidth * xRatio))
+  const y = Math.min(window.innerHeight - 2, Math.max(2, window.innerHeight * yRatio))
+
+  return document.elementFromPoint(x, y) as HTMLElement | null
+}
+
+const findComposeBoxFromViewportProbe = () => {
+  const probeTargets = [
+    getViewportProbeElement(0.76, 0.93),
+    getViewportProbeElement(0.72, 0.9),
+    getViewportProbeElement(0.68, 0.88)
+  ].filter((node): node is HTMLElement => Boolean(node))
+
+  for (const target of probeTargets) {
+    const resolved = resolveEditableComposeBox(target)
+
+    if (resolved) {
+      return resolved
+    }
+
+    const ancestor = target.closest<HTMLElement>("div, section, form, footer")
+    const nested = ancestor?.querySelector<HTMLElement>(
+      '[contenteditable="true"], textarea, input, div[role="textbox"]'
+    )
+
+    if (nested) {
+      const resolvedNested = resolveEditableComposeBox(nested)
+
+      if (resolvedNested) {
+        return resolvedNested
+      }
+    }
+  }
+
+  return null
+}
+
+const getMessagesListPagelet = () => {
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-pagelet="IGDMessagesList"]')
+  ).filter((node) => isVisibleElement(node))
+
+  candidates.sort((a, b) => {
+    const rectA = a.getBoundingClientRect()
+    const rectB = b.getBoundingClientRect()
+
+    if (Math.abs(rectB.left - rectA.left) > 8) {
+      return rectB.left - rectA.left
+    }
+
+    if (Math.abs(rectB.width - rectA.width) > 8) {
+      return rectB.width - rectA.width
+    }
+
+    return rectA.top - rectB.top
+  })
+
+  return candidates[0] || null
+}
+
+const getComposerPagelet = () => {
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-pagelet="IGDComposerForCannes"]')
+  ).filter((node) => isVisibleElement(node))
+
+  candidates.sort((a, b) => {
+    const rectA = a.getBoundingClientRect()
+    const rectB = b.getBoundingClientRect()
+
+    if (Math.abs(rectB.left - rectA.left) > 8) {
+      return rectB.left - rectA.left
+    }
+
+    if (Math.abs(rectB.width - rectA.width) > 8) {
+      return rectB.width - rectA.width
+    }
+
+    return rectB.top - rectA.top
+  })
+
+  return candidates[0] || null
+}
+
+const getMessageScanRoot = () => getMessagesListPagelet() || getConversationPane()
+
+const isScrollableElement = (node: HTMLElement) => {
+  const style = window.getComputedStyle(node)
+
+  return (
+    (style.overflowY === "auto" || style.overflowY === "scroll") &&
+    node.scrollHeight - node.clientHeight > 40
+  )
+}
+
+const getHistoryScrollContainer = () => {
+  const root = getMessagesListPagelet()
+
+  if (!root) {
+    return null
+  }
+
+  const messageGroup = root.querySelector<HTMLElement>('div[role="group"][tabindex="-1"]')
+
+  if (messageGroup) {
+    for (const ancestor of getAncestorChain(messageGroup.parentElement)) {
+      if (!isScrollableElement(ancestor) || !hasRenderableBox(ancestor)) {
+        continue
+      }
+
+      const rect = ancestor.getBoundingClientRect()
+
+      if (
+        rect.height >= 180 &&
+        rect.width >= 220 &&
+        rect.left >= root.getBoundingClientRect().left - 24
+      ) {
+        return ancestor
+      }
+    }
+  }
+
+  const descendants = [
+    root,
+    ...Array.from(root.querySelectorAll<HTMLElement>("div, section, main"))
+  ]
+
+  const candidates = descendants.filter((node) => {
+    if (!isVisibleElement(node) || !isScrollableElement(node)) {
+      return false
+    }
+
+    const rect = node.getBoundingClientRect()
+
+    return rect.height >= 180 && rect.width >= 220
+  })
+
+  candidates.sort((a, b) => {
+    const rectA = a.getBoundingClientRect()
+    const rectB = b.getBoundingClientRect()
+    const scoreA = a.scrollHeight - a.clientHeight + rectA.height
+    const scoreB = b.scrollHeight - b.clientHeight + rectB.height
+
+    if (Math.abs(scoreB - scoreA) > 12) {
+      return scoreB - scoreA
+    }
+
+    return rectB.height - rectA.height
+  })
+
+  return candidates[0] || root
+}
+
 const findComposeBox = (root: ParentNode = document) => {
+  const composerRoot = root === document ? getComposerPagelet() : null
+
+  if (composerRoot) {
+    const composerCandidates = getVisibleTextboxCandidates(composerRoot)
+    const composerPreferred = composerCandidates.find((node) => {
+      const haystack = `${safeText(node)} ${node.getAttribute("aria-label") || ""} ${
+        node.getAttribute("placeholder") || ""
+      }`.toLowerCase()
+
+      return haystack.includes("message") || haystack.includes("pesan")
+    })
+
+    const resolvedComposerBox =
+      resolveEditableComposeBox(composerPreferred) ||
+      resolveEditableComposeBox(composerCandidates[0] || null) ||
+      resolveEditableComposeBox(getComposePlaceholderCandidates(composerRoot)[0] || null)
+
+    if (resolvedComposerBox) {
+      return resolvedComposerBox
+    }
+  }
+
   const candidates = getVisibleTextboxCandidates(root)
   const preferred = candidates.find((node) => {
     const rect = node.getBoundingClientRect()
@@ -289,6 +474,7 @@ const findComposeBox = (root: ParentNode = document) => {
     resolveEditableComposeBox(preferred) ||
     resolveEditableComposeBox(candidates[0] || null) ||
     resolveEditableComposeBox(getComposePlaceholderCandidates(root)[0] || null) ||
+    findComposeBoxFromViewportProbe() ||
     null
   )
 }
@@ -306,31 +492,34 @@ const getAncestorChain = (node: HTMLElement | null) => {
 }
 
 const getConversationBounds = () => {
-  const root = getConversationPane()
-  const composeBox = findComposeBox(root)
+  const root = getMessageScanRoot()
+  const composeBox = findComposeBox(document)
+  const composerRoot = getComposerPagelet()
+  const rootRect = root.getBoundingClientRect()
+  const composerRect = composerRoot?.getBoundingClientRect()
 
   if (!composeBox) {
-    const fallbackRoot = root.getBoundingClientRect()
-
     return {
-      centerX: fallbackRoot.left + fallbackRoot.width / 2,
-      maxBottom: Math.min(window.innerHeight * 0.92, fallbackRoot.bottom),
-      maxRight: Math.min(window.innerWidth - 16, fallbackRoot.right),
-      minLeft: Math.max(window.innerWidth * 0.45, fallbackRoot.left),
-      minTop: Math.max(0, fallbackRoot.top),
+      centerX: rootRect.left + rootRect.width / 2,
+      maxBottom: Math.min(
+        window.innerHeight * 0.94,
+        composerRect?.top ?? rootRect.bottom
+      ),
+      maxRight: Math.min(window.innerWidth - 16, rootRect.right + 8),
+      minLeft: Math.max(0, rootRect.left),
+      minTop: Math.max(0, rootRect.top),
       root
     }
   }
 
   const composeRect = composeBox.getBoundingClientRect()
-  const paneRect = root.getBoundingClientRect()
 
   return {
     centerX: composeRect.left + composeRect.width / 2,
-    maxBottom: composeRect.top,
-    maxRight: Math.min(window.innerWidth, Math.max(paneRect.right, composeRect.right + 24)),
-    minLeft: Math.max(window.innerWidth * 0.45, Math.min(paneRect.left, composeRect.left - 24)),
-    minTop: Math.max(0, paneRect.top),
+    maxBottom: composerRect?.top ?? composeRect.top,
+    maxRight: Math.min(window.innerWidth, Math.max(rootRect.right + 8, composeRect.right + 24)),
+    minLeft: Math.max(0, Math.min(rootRect.left, composeRect.left - 48)),
+    minTop: Math.max(0, rootRect.top),
     root
   }
 }
@@ -340,6 +529,13 @@ const getTopRightTextCandidates = (
 ): TopRightTextCandidate[] => {
   const candidates: TopRightTextCandidate[] = []
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const rootRect =
+    root instanceof HTMLElement
+      ? root.getBoundingClientRect()
+      : getRoot().getBoundingClientRect()
+  const titleBandBottom = rootRect.top + Math.min(170, rootRect.height * 0.24)
+  const minLeft = rootRect.left + Math.min(28, rootRect.width * 0.08)
+  const maxRight = rootRect.right - 16
 
   while (walker.nextNode()) {
     const textNode = walker.currentNode
@@ -374,8 +570,10 @@ const getTopRightTextCandidates = (
     const centerX = rect.left + rect.width / 2
 
     if (
-      centerX < window.innerWidth * 0.45 ||
-      rect.top > window.innerHeight * 0.22
+      rect.left < minLeft ||
+      rect.right > maxRight ||
+      centerX < rootRect.left + rootRect.width * 0.12 ||
+      rect.top > titleBandBottom
     ) {
       continue
     }
@@ -406,44 +604,302 @@ const getTopRightTextCandidates = (
 const getPrimaryTitleCandidate = (root: ParentNode = document) =>
   getTopRightTextCandidates(root)[0] || null
 
+const getConversationPaneFromViewportProbe = () => {
+  const probeTargets = [
+    getViewportProbeElement(0.75, 0.2),
+    getViewportProbeElement(0.76, 0.45),
+    getViewportProbeElement(0.76, 0.72)
+  ].filter((node): node is HTMLElement => Boolean(node))
+
+  for (const target of probeTargets) {
+    for (const ancestor of getAncestorChain(target)) {
+      const rect = ancestor.getBoundingClientRect()
+
+      if (
+        rect.width >= window.innerWidth * 0.32 &&
+        rect.height >= window.innerHeight * 0.52 &&
+        rect.left >= window.innerWidth * 0.24 &&
+        rect.right >= window.innerWidth * 0.68
+      ) {
+        return ancestor
+      }
+    }
+  }
+
+  return null
+}
+
 const getConversationPane = () => {
   const root = getRoot()
   const composeBox = findComposeBox(root)
   const titleCandidate = getPrimaryTitleCandidate(root)
 
-  if (!composeBox || !titleCandidate?.element) {
-    return root
+  if (composeBox && titleCandidate?.element) {
+    const composeAncestors = new Set(getAncestorChain(composeBox))
+
+    for (const ancestor of getAncestorChain(titleCandidate.element)) {
+      if (!composeAncestors.has(ancestor)) {
+        continue
+      }
+
+      const rect = ancestor.getBoundingClientRect()
+
+      if (
+        rect.width >= window.innerWidth * 0.25 &&
+        rect.height >= window.innerHeight * 0.45 &&
+        rect.left >= window.innerWidth * 0.2
+      ) {
+        return ancestor
+      }
+    }
   }
 
-  const composeAncestors = new Set(getAncestorChain(composeBox))
+  const viewportPane = getConversationPaneFromViewportProbe()
 
-  for (const ancestor of getAncestorChain(titleCandidate.element)) {
-    if (!composeAncestors.has(ancestor)) {
-      continue
-    }
-
-    const rect = ancestor.getBoundingClientRect()
-
-    if (
-      rect.width >= window.innerWidth * 0.25 &&
-      rect.height >= window.innerHeight * 0.45 &&
-      rect.left >= window.innerWidth * 0.2
-    ) {
-      return ancestor
-    }
+  if (viewportPane) {
+    return viewportPane
   }
 
   return root
 }
 
-const getTitle = () => {
-  const directCandidates = getTopRightTextCandidates(getConversationPane())
+const getInboxHeaderPagelet = () => {
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-pagelet="IGDInboxHeaderOffMsys"]')
+  ).filter((node) => isVisibleElement(node))
 
-  return directCandidates[0]?.text || "Instagram DM"
+  candidates.sort((a, b) => {
+    const rectA = a.getBoundingClientRect()
+    const rectB = b.getBoundingClientRect()
+
+    if (Math.abs(rectB.left - rectA.left) > 8) {
+      return rectB.left - rectA.left
+    }
+
+    if (Math.abs(rectA.top - rectB.top) > 8) {
+      return rectA.top - rectB.top
+    }
+
+    return rectB.width - rectA.width
+  })
+
+  return candidates[0] || null
+}
+
+const getDedicatedHeaderTitle = () => {
+  const headerRoot = getInboxHeaderPagelet()
+
+  if (!headerRoot) {
+    return ""
+  }
+
+  const explicitTitle = queryFirst<HTMLElement>(headerRoot, [
+    'h2 span[title]',
+    'a[aria-label^="Open the profile page of"] span[title]',
+    'a[href^="/"] h2 span[title]'
+  ])
+
+  const explicitText =
+    explicitTitle?.getAttribute("title")?.trim() || safeText(explicitTitle)
+
+  if (explicitText) {
+    return explicitText
+  }
+
+  const profileLink = headerRoot.querySelector<HTMLElement>(
+    'a[aria-label^="Open the profile page of"]'
+  )
+  const profileLabel = profileLink?.getAttribute("aria-label") || ""
+  const profileMatch = profileLabel.match(/Open the profile page of\s+(.+)$/i)
+
+  if (profileMatch?.[1]?.trim()) {
+    return profileMatch[1].trim()
+  }
+
+  return ""
+}
+
+const getConversationHeaderContainer = (pane: HTMLElement) => {
+  const dedicatedHeader = getInboxHeaderPagelet()
+
+  if (dedicatedHeader) {
+    return dedicatedHeader
+  }
+
+  const paneRect = pane.getBoundingClientRect()
+  const directCandidates = Array.from(pane.children).filter(
+    (node): node is HTMLElement => node instanceof HTMLElement
+  )
+  const nestedCandidates = directCandidates.flatMap((node) =>
+    Array.from(node.children).filter(
+      (child): child is HTMLElement => child instanceof HTMLElement
+    )
+  )
+  const candidates = [...directCandidates, ...nestedCandidates].filter((node) => {
+    if (!isVisibleElement(node)) {
+      return false
+    }
+
+    const rect = node.getBoundingClientRect()
+
+    if (!rect.width || !rect.height) {
+      return false
+    }
+
+    if (rect.top < paneRect.top - 2) {
+      return false
+    }
+
+    if (rect.top > paneRect.top + Math.min(110, paneRect.height * 0.14)) {
+      return false
+    }
+
+    if (Math.abs(rect.left - paneRect.left) > 20) {
+      return false
+    }
+
+    if (
+      rect.width < paneRect.width * 0.78 ||
+      rect.height < 44 ||
+      rect.height > 120
+    ) {
+      return false
+    }
+
+    if (Math.abs(rect.right - paneRect.right) > 20) {
+      return false
+    }
+
+    if (!safeText(node)) {
+      return false
+    }
+
+    return true
+  })
+
+  candidates.sort((a, b) => {
+    const rectA = a.getBoundingClientRect()
+    const rectB = b.getBoundingClientRect()
+    const scoreA =
+      Math.abs(rectA.top - paneRect.top) * 10 +
+      Math.abs(rectA.left - paneRect.left) * 6 +
+      Math.abs(rectA.right - paneRect.right) * 6 +
+      Math.abs(paneRect.width - rectA.width)
+    const scoreB =
+      Math.abs(rectB.top - paneRect.top) * 10 +
+      Math.abs(rectB.left - paneRect.left) * 6 +
+      Math.abs(rectB.right - paneRect.right) * 6 +
+      Math.abs(paneRect.width - rectB.width)
+
+    if (Math.abs(scoreA - scoreB) > 1) {
+      return scoreA - scoreB
+    }
+
+    return rectB.width - rectA.width
+  })
+
+  return candidates[0] || null
+}
+
+const getConversationHeaderCandidates = (pane: HTMLElement) => {
+  const headerContainer = getConversationHeaderContainer(pane)
+  const searchRoot = headerContainer || pane
+  const searchRect = searchRoot.getBoundingClientRect()
+  const candidates: TopRightTextCandidate[] = []
+  const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_TEXT)
+
+  while (walker.nextNode()) {
+    const textNode = walker.currentNode
+    const parent = textNode.parentElement
+    const text = normalizeText(textNode.textContent || "")
+
+    if (!parent || !text || !isVisibleElement(parent)) {
+      continue
+    }
+
+    if (
+      parent.closest("nav") ||
+      parent.closest("aside") ||
+      parent.closest("footer") ||
+      parent.closest("button")
+    ) {
+      continue
+    }
+
+    if (
+      text.length > 80 ||
+      IGNORED_TEXT.has(text.toLowerCase()) ||
+      META_TEXT_PATTERNS.some((pattern) => pattern.test(text))
+    ) {
+      continue
+    }
+
+    const range = document.createRange()
+    range.selectNodeContents(textNode)
+    const rect = range.getBoundingClientRect()
+
+    if (!rect.width || !rect.height) {
+      continue
+    }
+
+    if (
+      rect.top < searchRect.top - 2 ||
+      rect.bottom > searchRect.bottom + 2 ||
+      rect.left < searchRect.left + 18 ||
+      rect.right > searchRect.right - 72
+    ) {
+      continue
+    }
+
+    const fontSize = Number.parseFloat(window.getComputedStyle(parent).fontSize || "0")
+
+    candidates.push({
+      element: parent,
+      fontSize,
+      rect,
+      text
+    })
+  }
+
+  return candidates.sort((a, b) => {
+    if (Math.abs(b.fontSize - a.fontSize) > 0.5) {
+      return b.fontSize - a.fontSize
+    }
+
+    if (Math.abs(a.rect.top - b.rect.top) > 8) {
+      return a.rect.top - b.rect.top
+    }
+
+    if (Math.abs(a.rect.left - b.rect.left) > 8) {
+      return a.rect.left - b.rect.left
+    }
+
+    return a.text.length - b.text.length
+  })
+}
+
+const getTitle = () => {
+  const dedicatedTitle = getDedicatedHeaderTitle()
+
+  if (dedicatedTitle) {
+    return dedicatedTitle
+  }
+
+  const pane = getConversationPane()
+  const headerCandidates = getConversationHeaderCandidates(pane)
+
+  return (
+    headerCandidates[0]?.text ||
+    getTopRightTextCandidates(pane)[0]?.text ||
+    "Instagram DM"
+  )
 }
 
 const getHeaderTextSet = (root: ParentNode = document) => {
-  const candidates = getTopRightTextCandidates(root)
+  const pane =
+    getInboxHeaderPagelet() ||
+    (root instanceof HTMLElement ? root : getConversationPane())
+  const candidates = getConversationHeaderCandidates(pane)
   const primary = candidates[0]
 
   if (!primary) {
@@ -469,6 +925,11 @@ type TextCandidate = {
   text: string
 }
 
+type BubbleTextPart = {
+  rect: DOMRect
+  text: string
+}
+
 type TopRightTextCandidate = {
   element: HTMLElement
   fontSize: number
@@ -481,6 +942,16 @@ type BubbleCandidate = {
   element: HTMLElement
   rect: DOMRect
 }
+
+type SnapshotMessageDraft = {
+  direction: "incoming" | "outgoing"
+  text: string
+}
+
+const wait = (ms: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
 
 const isLikelyLinkPreviewTextNode = (textNode: Node, parent: HTMLElement) => {
   const text = normalizeText(textNode.textContent || "")
@@ -540,6 +1011,7 @@ const getBubbleContainer = (node: HTMLElement, root: HTMLElement) => {
 
   while (current && current !== root) {
     const rect = current.getBoundingClientRect()
+    const parentRect = current.parentElement?.getBoundingClientRect() || null
     const withinRoot =
       rect.left >= rootRect.left - 24 &&
       rect.right <= rootRect.right + 24 &&
@@ -557,9 +1029,26 @@ const getBubbleContainer = (node: HTMLElement, root: HTMLElement) => {
         Boolean(normalizeText(child.textContent || ""))
       ).length
       const hasMedia = Boolean(current.querySelector("img, video, canvas, svg"))
+      const expansionWidth =
+        parentRect && rect.width > 0 ? parentRect.width / rect.width : 1
+      const expansionHeight =
+        parentRect && rect.height > 0 ? parentRect.height / rect.height : 1
+      const parentExpandsSubstantially =
+        expansionWidth >= 1.28 || expansionHeight >= 1.55
+      const looksTooLargeForSingleBubble =
+        rect.width >= rootRect.width * 0.9 &&
+        rect.height >= Math.max(220, window.innerHeight * 0.22)
 
       if (childTextCount >= 1 || hasMedia) {
+        if (looksTooLargeForSingleBubble && bestCandidate) {
+          return bestCandidate
+        }
+
         bestCandidate = current
+
+        if (parentExpandsSubstantially) {
+          return bestCandidate
+        }
       }
     }
 
@@ -615,12 +1104,58 @@ const isBubbleTextNodeVisible = (
   )
 }
 
+const mergeBubbleTextParts = (parts: BubbleTextPart[]) => {
+  const sortedParts = [...parts].sort((a, b) => {
+    if (Math.abs(a.rect.top - b.rect.top) > 6) {
+      return a.rect.top - b.rect.top
+    }
+
+    return a.rect.left - b.rect.left
+  })
+  const rows: BubbleTextPart[][] = []
+
+  for (const part of sortedParts) {
+    const lastRow = rows[rows.length - 1]
+
+    if (!lastRow) {
+      rows.push([part])
+      continue
+    }
+
+    const rowTop = Math.min(...lastRow.map((item) => item.rect.top))
+    const rowBottom = Math.max(...lastRow.map((item) => item.rect.bottom))
+    const isSameVisualRow =
+      Math.abs(part.rect.top - rowTop) <= 12 ||
+      (part.rect.top <= rowBottom + 6 && part.rect.bottom >= rowTop - 6)
+
+    if (isSameVisualRow) {
+      lastRow.push(part)
+      continue
+    }
+
+    rows.push([part])
+  }
+
+  const lines = rows
+    .map((row) =>
+      row
+        .sort((a, b) => a.rect.left - b.rect.left)
+        .map((part) => part.text)
+        .filter(Boolean)
+        .map((text, index) => (index === 0 ? text : text.replace(/^[.:\-]+\s*/u, "")))
+        .join(" ")
+    )
+    .filter(Boolean)
+
+  return mergeMessageCandidateTexts(lines)
+}
+
 const collectBubbleText = (
   bubble: HTMLElement,
   bounds: ReturnType<typeof getConversationBounds>
 ) => {
   const bubbleRect = bubble.getBoundingClientRect()
-  const parts: string[] = []
+  const parts: BubbleTextPart[] = []
   const rects: DOMRect[] = []
   const seen = new Set<string>()
   const walker = document.createTreeWalker(bubble, NodeFilter.SHOW_TEXT)
@@ -651,11 +1186,14 @@ const collectBubbleText = (
     }
 
     seen.add(key)
-    parts.push(text)
+    parts.push({
+      rect,
+      text
+    })
     rects.push(rect)
   }
 
-  const text = mergeMessageCandidateTexts(parts)
+  const text = mergeBubbleTextParts(parts)
 
   if (!text || rects.length === 0) {
     return null
@@ -764,114 +1302,179 @@ const mergeMessageCandidateTexts = (texts: string[]) => {
       return text.replace(/^[.:\-]+\s*/u, "")
     })
 
-  return normalizeText(cleanedTexts.join(" "))
+  return normalizeText(cleanedTexts.join("\n"))
 }
 
-const readMessageCandidates = (): TextCandidate[] => {
-  const bounds = getConversationBounds()
-  const { maxBottom, maxRight, minLeft, root } = bounds
-  const rootElement = root instanceof HTMLElement ? root : getConversationPane()
-  const primaryTitleCandidate = getPrimaryTitleCandidate(root)
-  const effectiveMinLeft = primaryTitleCandidate
-    ? Math.max(minLeft, primaryTitleCandidate.rect.left - 36)
-    : minLeft
-  const headerCandidates = getTopRightTextCandidates(root).filter(
-    (candidate) => candidate.text === (primaryTitleCandidate?.text || getTitle())
+const collectGroupTextParts = (
+  group: HTMLElement,
+  bounds: ReturnType<typeof getConversationBounds>,
+  includeOffscreen: boolean
+) => {
+  const groupRect = group.getBoundingClientRect()
+  const textNodes = Array.from(
+    group.querySelectorAll<HTMLElement>("div[dir='auto'], span[dir='auto']")
   )
-  const composeBox = findComposeBox(root)
-  const composeRect = composeBox?.getBoundingClientRect()
-  const minTop = headerCandidates[0]?.rect.bottom ?? window.innerHeight * 0.08
-  const effectiveMaxBottom = composeRect?.top ?? maxBottom
-  const bubbleMap = new Map<string, BubbleCandidate>()
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const parts: BubbleTextPart[] = []
+  const seen = new Set<string>()
 
-  while (walker.nextNode()) {
-    const textNode = walker.currentNode
-    const text = normalizeText(textNode.textContent || "")
-    const parent = textNode.parentElement
+  for (const node of textNodes) {
+    const text = normalizeText(node.textContent || "")
+    const rect = node.getBoundingClientRect()
 
-    if (!text || !parent || !isVisibleElement(parent)) {
+    if (!text || !rect.width || !rect.height || !hasRenderableBox(node)) {
       continue
     }
 
     if (
-      parent.closest("header") ||
-      parent.closest("nav") ||
-      parent.closest("aside") ||
-      parent.closest("footer") ||
-      parent.closest("form") ||
-      parent.closest("button")
+      !includeOffscreen &&
+      !isBubbleTextNodeVisible(groupRect, rect, bounds)
     ) {
       continue
     }
-
-    if (isLikelyLinkPreviewTextNode(textNode, parent)) {
-      continue
-    }
-
-    const mediaAncestor = parent.closest<HTMLElement>("article, section, div, li")
-    const mediaRect = mediaAncestor?.getBoundingClientRect()
 
     if (
-      mediaAncestor &&
-      mediaRect &&
-      mediaRect.width >= 180 &&
-      mediaRect.height >= 180 &&
-      mediaAncestor.querySelector("img, video, canvas, svg")
+      rect.left < groupRect.left - 12 ||
+      rect.right > groupRect.right + 12 ||
+      rect.top < groupRect.top - 12 ||
+      rect.bottom > groupRect.bottom + 12
     ) {
       continue
     }
-
-    const range = document.createRange()
-    range.selectNodeContents(textNode)
-    const rect = range.getBoundingClientRect()
-
-    if (!rect.width || !rect.height) {
-      continue
-    }
-
-    const centerX = rect.left + rect.width / 2
 
     if (
-      rect.top < minTop - 8 ||
-      rect.bottom > effectiveMaxBottom + 8 ||
-      centerX < effectiveMinLeft - 16 ||
-      centerX > maxRight + 16
+      rect.left < bounds.minLeft - 24 ||
+      rect.right > bounds.maxRight + 24
     ) {
       continue
     }
 
-    const bubbleElement = getBubbleContainer(parent, rootElement)
-    const bubbleKey = getBubbleKey(parent, rootElement)
-    const bubbleRect = bubbleElement.getBoundingClientRect()
+    const key = `${text}-${Math.round(rect.top)}-${Math.round(rect.left)}`
 
-    if (!bubbleMap.has(bubbleKey)) {
-      bubbleMap.set(bubbleKey, {
-        bubbleKey,
-        element: bubbleElement,
-        rect: bubbleRect
-      })
+    if (seen.has(key)) {
+      continue
     }
+
+    seen.add(key)
+    parts.push({
+      rect,
+      text
+    })
   }
 
-  return Array.from(bubbleMap.values())
-    .map((bubble) => {
-      const bubbleText = collectBubbleText(bubble.element, {
-        centerX: bounds.centerX,
-        maxBottom: effectiveMaxBottom,
-        maxRight,
-        minLeft: effectiveMinLeft,
-        minTop,
-        root
-      })
+  return parts
+}
 
-      return bubbleText ?
-          {
-            bubbleKey: bubble.bubbleKey,
-            rect: bubbleText.rect,
-            text: bubbleText.text
-          }
-        : null
+const getMergedPartsRect = (parts: BubbleTextPart[]) => {
+  const rects = parts.map((part) => part.rect)
+  const firstRect = rects[0]
+
+  if (!firstRect) {
+    return null
+  }
+
+  const mergedRect = {
+    bottom: Math.max(...rects.map((rect) => rect.bottom)),
+    height: 0,
+    left: Math.min(...rects.map((rect) => rect.left)),
+    right: Math.max(...rects.map((rect) => rect.right)),
+    top: Math.min(...rects.map((rect) => rect.top)),
+    width: 0,
+    x: 0,
+    y: 0,
+    toJSON: () => firstRect.toJSON()
+  } as DOMRect
+
+  mergedRect.width = mergedRect.right - mergedRect.left
+  mergedRect.height = mergedRect.bottom - mergedRect.top
+  mergedRect.x = mergedRect.left
+  mergedRect.y = mergedRect.top
+
+  return mergedRect
+}
+
+const getGroupCandidateDirection = (
+  group: HTMLElement,
+  textRect: DOMRect,
+  centerX: number
+): "incoming" | "outgoing" => {
+  const hasIncomingProfileLink = Boolean(
+    group.querySelector('a[aria-label^="Open the profile page of "]')
+  )
+
+  if (hasIncomingProfileLink) {
+    return "incoming"
+  }
+
+  return textRect.left + textRect.width / 2 > centerX ? "outgoing" : "incoming"
+}
+
+const readMessageCandidates = ({
+  includeOffscreen = false
+}: {
+  includeOffscreen?: boolean
+} = {}): TextCandidate[] => {
+  const bounds = getConversationBounds()
+  const { maxBottom, maxRight, minLeft, root } = bounds
+  const rootElement = root instanceof HTMLElement ? root : getMessageScanRoot()
+  const dedicatedHeader = getInboxHeaderPagelet()
+  const dedicatedHeaderRect = dedicatedHeader?.getBoundingClientRect()
+  const composeBox = findComposeBox(document)
+  const composeRect = composeBox?.getBoundingClientRect()
+  const minTop =
+    dedicatedHeaderRect?.bottom ??
+    Math.max(rootElement.getBoundingClientRect().top, window.innerHeight * 0.08)
+  const effectiveMaxBottom = composeRect?.top ?? maxBottom
+  const groups = Array.from(
+    rootElement.querySelectorAll<HTMLElement>('div[role="group"][tabindex="-1"]')
+  )
+
+  return groups
+    .map((group, index) => {
+      if (!(includeOffscreen ? hasRenderableBox(group) : isVisibleElement(group))) {
+        return null
+      }
+
+      const rect = group.getBoundingClientRect()
+      const centerX = rect.left + rect.width / 2
+      const isClippedByViewport =
+        rect.top <= minTop + 6 || rect.bottom >= effectiveMaxBottom - 6
+
+      if (
+        (!includeOffscreen && rect.top < minTop - 8) ||
+        (!includeOffscreen && rect.bottom > effectiveMaxBottom + 8) ||
+        (!includeOffscreen && isClippedByViewport) ||
+        centerX < minLeft - 16 ||
+        centerX > maxRight + 16
+      ) {
+        return null
+      }
+
+      const parts = collectGroupTextParts(
+        group,
+        {
+          centerX: bounds.centerX,
+          maxBottom: effectiveMaxBottom,
+          maxRight,
+          minLeft,
+          minTop,
+          root
+        },
+        includeOffscreen
+      )
+      const text = mergeBubbleTextParts(parts)
+      const textRect = getMergedPartsRect(parts)
+
+      if (!text || !textRect) {
+        return null
+      }
+
+      const direction = getGroupCandidateDirection(group, textRect, bounds.centerX)
+
+      return {
+        bubbleKey: `${direction}:${Math.round(textRect.top)}:${Math.round(textRect.left)}:${index}`,
+        rect: textRect,
+        text
+      } satisfies TextCandidate
     })
     .filter((candidate): candidate is TextCandidate => Boolean(candidate))
     .sort((a, b) => {
@@ -1061,17 +1664,14 @@ const clickSendButton = (): ChannelActionResponse => {
   }
 }
 
-const buildSnapshot = (): ChannelChatSnapshot => {
-  const chatTitle = getTitle()
-  const bounds = getConversationBounds()
-  const paneCenterX = bounds.centerX
-  const composeBox = findComposeBox(getRoot())
-  const titleCandidates = getTopRightTextCandidates(getRoot())
-  const headerTexts = getHeaderTextSet(getConversationPane())
-  const mergedCandidates = readMessageCandidates()
-
-  const messages: ChannelMessage[] = mergedCandidates
-    .map((candidate, index) => {
+const toSnapshotMessageDrafts = (
+  mergedCandidates: TextCandidate[],
+  chatTitle: string,
+  paneCenterX: number,
+  headerTexts: Set<string>
+) =>
+  mergedCandidates
+    .map((candidate) => {
       const text = candidate.text
 
       if (!isUsefulMessageText(text, chatTitle) || headerTexts.has(text)) {
@@ -1084,14 +1684,111 @@ const buildSnapshot = (): ChannelChatSnapshot => {
           : "incoming"
 
       return {
-        id: `instagram-${index}-${text.slice(0, 24)}`,
-        author: direction === "outgoing" ? "Anda" : chatTitle,
         direction,
-        text,
+        text
+      } satisfies SnapshotMessageDraft
+    })
+    .filter((message): message is SnapshotMessageDraft => Boolean(message))
+
+const areDraftMessagesEqual = (
+  left: SnapshotMessageDraft,
+  right: SnapshotMessageDraft
+) => left.direction === right.direction && left.text === right.text
+
+const prependChunkWithOverlap = (
+  existing: SnapshotMessageDraft[],
+  incoming: SnapshotMessageDraft[]
+) => {
+  if (!incoming.length) {
+    return existing
+  }
+
+  if (!existing.length) {
+    return incoming
+  }
+
+  const maxOverlap = Math.min(existing.length, incoming.length)
+
+  for (let overlap = maxOverlap; overlap >= 1; overlap -= 1) {
+    let matches = true
+
+    for (let index = 0; index < overlap; index += 1) {
+      if (!areDraftMessagesEqual(incoming[incoming.length - overlap + index]!, existing[index]!)) {
+        matches = false
+        break
+      }
+    }
+
+    if (matches) {
+      return [...incoming.slice(0, incoming.length - overlap), ...existing]
+    }
+  }
+
+  if (incoming.some((message) => existing.some((current) => areDraftMessagesEqual(message, current)))) {
+    const existingSet = new Set(existing.map((message) => `${message.direction}:${message.text}`))
+
+    return [
+      ...incoming.filter((message) => !existingSet.has(`${message.direction}:${message.text}`)),
+      ...existing
+    ]
+  }
+
+  return [...incoming, ...existing]
+}
+
+const collectVisibleSnapshotDrafts = (chatTitle: string) => {
+  const bounds = getConversationBounds()
+  const headerTexts = getHeaderTextSet(getConversationPane())
+  const mergedCandidates = readMessageCandidates()
+
+  return {
+    bounds,
+    headerTexts,
+    mergedCandidates,
+    messages: toSnapshotMessageDrafts(mergedCandidates, chatTitle, bounds.centerX, headerTexts)
+  }
+}
+
+const collectDomWideSnapshotDrafts = (chatTitle: string) => {
+  const bounds = getConversationBounds()
+  const headerTexts = getHeaderTextSet(getConversationPane())
+  const mergedCandidates = readMessageCandidates({ includeOffscreen: true })
+
+  return {
+    bounds,
+    headerTexts,
+    mergedCandidates,
+    messages: toSnapshotMessageDrafts(mergedCandidates, chatTitle, bounds.centerX, headerTexts)
+  }
+}
+
+const collectConversationHistoryDrafts = async (chatTitle: string) => {
+  const domWideDrafts = collectDomWideSnapshotDrafts(chatTitle)
+
+  if (domWideDrafts.messages.length > 0) {
+    return domWideDrafts
+  }
+
+  return collectVisibleSnapshotDrafts(chatTitle)
+}
+
+const buildSnapshot = async (): Promise<ChannelChatSnapshot> => {
+  const chatTitle = getTitle()
+  const { bounds, mergedCandidates, messages: collectedMessages } =
+    await collectConversationHistoryDrafts(chatTitle)
+  const composeBox = findComposeBox(getRoot())
+  const titleCandidates = getTopRightTextCandidates(getRoot())
+
+  const messages: ChannelMessage[] = collectedMessages
+    .map((candidate, index) => {
+      return {
+        id: `instagram-${index}-${candidate.text.slice(0, 24)}`,
+        author: candidate.direction === "outgoing" ? "Anda" : chatTitle,
+        direction: candidate.direction,
+        text: candidate.text,
         timestampLabel: ""
       } satisfies ChannelMessage
     })
-    .filter((message): message is ChannelMessage => Boolean(message))
     .slice(-MAX_VISIBLE_MESSAGES)
 
   return {
@@ -1135,9 +1832,9 @@ export const instagramAdapter: ChannelAdapter = {
     return isInstagramDmPage()
   },
 
-  readOpenChat(): WhatsAppReadResponse {
+  async readOpenChat(): Promise<WhatsAppReadResponse> {
     try {
-      const snapshot = buildSnapshot()
+      const snapshot = await buildSnapshot()
 
       if (!snapshot.messages.length) {
         return {

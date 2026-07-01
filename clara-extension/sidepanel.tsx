@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 
 import type {
   ClaraExtensionSessionUser,
@@ -9,6 +9,7 @@ import type {
   WhatsAppReadResponse,
   WhatsAppSuggestionResult
 } from "~/types/whatsapp"
+import { readWhatsAppFromPage } from "~/utils/whatsapp-page"
 import {
   getChatSnapshotProxyUrl,
   getClaraAuthHeaders,
@@ -34,7 +35,9 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.0.67-instagram-direction-meta-fix-1"
+const EXTENSION_BUILD_LABEL = "v0.0.84-instagram-no-autoscroll-direction-fix-1"
+const CHATGPT_EMBED_URL =
+  "https://chatgpt.com/g/g-69cde65d2fa081919907393fcd892e6e-solid-prime-sales"
 
 const panelCss = `
   html,
@@ -72,6 +75,11 @@ const panelCss = `
     width: 100%;
   }
 
+  .clara-panel--chatgpt {
+    height: 100vh;
+    overflow: hidden;
+  }
+
   .clara-panel *,
   .clara-panel *::before,
   .clara-panel *::after {
@@ -82,6 +90,11 @@ const panelCss = `
     display: grid;
     gap: 12px;
     min-width: 0;
+  }
+
+  .clara-stage--chatgpt {
+    grid-template-rows: auto minmax(0, 1fr);
+    height: calc(100vh - 24px);
   }
 
   .clara-stage > * {
@@ -152,17 +165,57 @@ const panelCss = `
     text-transform: uppercase;
   }
 
-  .clara-debug-box {
-    background: rgba(12, 9, 6, 0.54);
-    border: 1px dashed rgba(240, 203, 115, 0.24);
-    border-radius: 14px;
-    color: rgba(247, 231, 183, 0.84);
-    font-size: 11px;
-    line-height: 1.45;
+  .clara-workspace-switcher {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .clara-workspace-cta {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-top: 10px;
-    padding: 10px 12px;
-    white-space: pre-wrap;
-    word-break: break-word;
+    position: relative;
+    z-index: 1;
+  }
+
+  .clara-workspace-tab {
+    appearance: none;
+    background: rgba(12, 9, 6, 0.56);
+    border: 1px solid rgba(240, 203, 115, 0.14);
+    border-radius: 999px;
+    color: rgba(247, 231, 183, 0.82);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 9px 12px;
+    text-transform: uppercase;
+    transition:
+      border-color 0.16s ease,
+      background 0.16s ease,
+      color 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .clara-workspace-tab:hover {
+    border-color: rgba(240, 203, 115, 0.32);
+    color: #fff0c9;
+    transform: translateY(-1px);
+  }
+
+  .clara-workspace-tab--active {
+    background: linear-gradient(135deg, rgba(240, 203, 115, 0.22), rgba(194, 144, 50, 0.18));
+    border-color: rgba(240, 203, 115, 0.42);
+    color: #fff0c9;
+  }
+
+  .clara-workspace-cta .clara-button {
+    min-height: 44px;
   }
 
   .clara-hero__eyebrow {
@@ -234,6 +287,35 @@ const panelCss = `
     gap: 12px;
     min-width: 0;
     padding: 14px;
+  }
+
+  .clara-pane--chatgpt {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .clara-pane--chatgpt .clara-pane__header {
+    gap: 8px;
+  }
+
+  .clara-pane--chatgpt .clara-pane__eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+  }
+
+  .clara-pane--chatgpt .clara-pane__title {
+    font-size: 15px;
+    margin-top: 2px;
+  }
+
+  .clara-pane--chatgpt .clara-pane__copy {
+    font-size: 11px;
+    line-height: 1.35;
+    margin-top: 2px;
   }
 
   .clara-pane--reply {
@@ -406,6 +488,12 @@ const panelCss = `
     background: rgba(55, 38, 18, 0.96);
     border: 1px solid rgba(240, 203, 115, 0.22);
     color: #f3d694;
+  }
+
+  .clara-pane--chatgpt .clara-note--warn {
+    font-size: 10px;
+    line-height: 1.35;
+    padding: 9px 10px;
   }
 
   .clara-note--success {
@@ -650,6 +738,57 @@ const panelCss = `
     line-height: 1.6;
   }
 
+  .clara-embed-shell {
+    background: rgba(7, 5, 3, 0.56);
+    border: 1px solid rgba(240, 203, 115, 0.12);
+    border-radius: 18px;
+    min-height: 86vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .clara-embed-shell--chatgpt {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    border: none;
+    border-radius: inherit;
+  }
+
+  .clara-embed-toolbar {
+    align-items: center;
+    background: rgba(13, 10, 7, 0.92);
+    border-bottom: 1px solid rgba(240, 203, 115, 0.12);
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    padding: 8px 10px;
+  }
+
+  .clara-embed-url {
+    color: rgba(247, 231, 183, 0.72);
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .clara-embed-frame {
+    background: #0b0805;
+    border: 0;
+    display: block;
+    height: 86vh;
+    min-height: 820px;
+    width: 100%;
+  }
+
+  .clara-embed-frame--chatgpt {
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+  }
+
   .clara-brief {
     background:
       linear-gradient(180deg, rgba(34,24,16,0.96), rgba(19,13,10,0.96));
@@ -808,7 +947,8 @@ const panelCss = `
     }
 
     .clara-overview__grid,
-    .clara-draft__actions {
+    .clara-draft__actions,
+    .clara-workspace-cta {
       grid-template-columns: 1fr;
     }
 
@@ -1385,361 +1525,6 @@ const getContentScriptUnavailableMessage = (url: string | undefined) =>
       ? "Content script Clara belum aktif di halaman TikTok Messages ini. Refresh halaman lalu coba lagi."
     : "Content script Clara belum aktif di halaman ini. Refresh tab lalu coba lagi."
 
-const readWhatsAppFromPage = (): WhatsAppReadResponse => {
-  const SELF_AUTHOR_PATTERN = /^(you|anda|me|saya)$/i
-
-  const parsePrePlainText = (value: string) => {
-    const trimmedValue = value.trim()
-    const match = trimmedValue.match(
-      /^\[(?<timestamp>[^\]]+)\]\s?(?<author>.*?)(?::)?$/
-    )
-
-    return {
-      author: match?.groups?.author?.trim() || "",
-      timestampLabel: match?.groups?.timestamp?.trim() || ""
-    }
-  }
-
-  const getChatRoot = () => {
-    const selectors = [
-      '#main[data-testid="conversation-panel-wrapper"]',
-      "#main",
-      '[data-testid="conversation-panel-wrapper"]'
-    ]
-
-    for (const selector of selectors) {
-      const node = document.querySelector<HTMLElement>(selector)
-
-      if (node) {
-        return node
-      }
-    }
-
-    return null
-  }
-
-  const getConversationTitle = (chatRoot: HTMLElement) => {
-    const titleSelectors = [
-      '[data-testid="conversation-info-header-chat-title"]',
-      "header [title]",
-      'header [dir="auto"]'
-    ]
-
-    for (const selector of titleSelectors) {
-      const node = chatRoot.querySelector<HTMLElement>(selector)
-      const title =
-        node?.getAttribute("title")?.trim() || node?.textContent?.trim()
-
-      if (title) {
-        return title
-      }
-    }
-
-    return ""
-  }
-
-  const getConversationSubtitle = (chatRoot: HTMLElement) => {
-    const subtitleSelectors = [
-      '[data-testid="chat-subtitle"]',
-      "header span[title]"
-    ]
-
-    for (const selector of subtitleSelectors) {
-      const node = chatRoot.querySelector<HTMLElement>(selector)
-      const subtitle =
-        node?.getAttribute("title")?.trim() || node?.textContent?.trim()
-
-      if (subtitle) {
-        return subtitle
-      }
-    }
-
-    return ""
-  }
-
-  const getMessageDirection = (
-    container: HTMLElement
-  ): WhatsAppMessageDirection => {
-    const metaSource =
-      container
-        .querySelector<HTMLElement>("[data-pre-plain-text]")
-        ?.getAttribute("data-pre-plain-text") || ""
-    const parsedMeta = parsePrePlainText(metaSource)
-    const directionNode =
-      container.matches(".message-out, .message-in")
-        ? container
-        : container.querySelector<HTMLElement>(".message-out, .message-in") ||
-          container.closest<HTMLElement>(".message-out, .message-in") ||
-          container.parentElement?.closest<HTMLElement>(
-            ".message-out, .message-in"
-          ) ||
-          null
-
-    if (directionNode?.classList.contains("message-out")) {
-      return "outgoing"
-    }
-
-    if (directionNode?.classList.contains("message-in")) {
-      return "incoming"
-    }
-
-    if (
-      container.querySelector(
-        '[data-icon="msg-check"], [data-icon="msg-dblcheck"], [data-icon="status-dblcheck"], [data-icon="msg-time"]'
-      ) &&
-      SELF_AUTHOR_PATTERN.test(parsedMeta.author)
-    ) {
-      return "outgoing"
-    }
-
-    if (SELF_AUTHOR_PATTERN.test(parsedMeta.author)) {
-      return "outgoing"
-    }
-
-    const alignmentNodes = [
-      container,
-      container.parentElement,
-      container.parentElement?.parentElement
-    ].filter((node): node is HTMLElement => Boolean(node))
-
-    for (const node of alignmentNodes) {
-      const computedStyle = window.getComputedStyle(node)
-
-      if (computedStyle.justifyContent === "flex-end") {
-        return "outgoing"
-      }
-
-      if (computedStyle.justifyContent === "flex-start") {
-        return "incoming"
-      }
-
-      if (node.classList.contains("xuk3077")) {
-        return "outgoing"
-      }
-
-      if (node.classList.contains("x1cy8zhl")) {
-        return "incoming"
-      }
-    }
-
-    const rect = container.getBoundingClientRect()
-    const leftSpace = rect.left
-    const rightSpace = window.innerWidth - rect.right
-
-    if (rightSpace < leftSpace) {
-      return "outgoing"
-    }
-
-    return "incoming"
-  }
-
-  const normalizeMessageBlockText = (value: string) =>
-    value
-      .split(/\r?\n/)
-      .map((line) => line.replace(/\s+/g, " ").trim())
-      .filter(Boolean)
-      .join("\n")
-      .trim()
-
-  const getPreferredMessageTexts = (nodes: HTMLElement[]) => {
-    const uniqueTexts = Array.from(
-      new Set(
-        nodes
-          .map((node) => normalizeMessageBlockText(node.innerText || ""))
-          .filter(Boolean)
-      )
-    )
-
-    return uniqueTexts.filter(
-      (text) =>
-        !uniqueTexts.some(
-          (otherText) =>
-            otherText !== text &&
-            otherText.length > text.length &&
-            otherText.includes(text)
-        )
-    )
-  }
-
-  type ParsedReplyAwareMessage = {
-    replyContextSenderName?: string
-    replyContextSenderType?: "incoming" | "outgoing" | "unknown"
-    replyContextText?: string
-    text: string
-  }
-
-  const splitReplyAwareMessageText = (candidates: string[]) => {
-    if (candidates.length === 0) {
-      return {
-        text: ""
-      } satisfies ParsedReplyAwareMessage
-    }
-
-    if (candidates.length > 1) {
-      return {
-        replyContextText: candidates.slice(0, -1).join("\n"),
-        text: candidates[candidates.length - 1]
-      } satisfies ParsedReplyAwareMessage
-    }
-
-    const singleCandidate = candidates[0]
-    const lines = singleCandidate
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-
-    if (lines.length >= 2) {
-      const replyContext = lines.slice(0, -1).join(" ").trim()
-      const bodyText = lines[lines.length - 1]?.trim() || ""
-
-      if (replyContext.length >= 18 && bodyText) {
-        return {
-          replyContextText: replyContext,
-          text: bodyText
-        } satisfies ParsedReplyAwareMessage
-      }
-    }
-
-    return {
-      text: singleCandidate
-    } satisfies ParsedReplyAwareMessage
-  }
-
-  const getMessageText = (container: HTMLElement) => {
-    const primaryCandidates = getPreferredMessageTexts(
-      Array.from(
-        container.querySelectorAll<HTMLElement>('[data-testid="msg-text"]')
-      )
-    )
-    const fallbackCandidates = getPreferredMessageTexts(
-      Array.from(
-        container.querySelectorAll<HTMLElement>(
-          '[data-testid="selectable-text"], .copyable-text'
-        )
-      )
-    )
-    const candidates =
-      primaryCandidates.length > 0 ? primaryCandidates : fallbackCandidates
-
-    if (candidates.length > 0) {
-      const parsed = splitReplyAwareMessageText(candidates)
-      if (parsed.replyContextText) {
-        const direction = getMessageDirection(container)
-        const replyContextSenderType = direction === "outgoing" ? "incoming" : "outgoing"
-        return {
-          replyContextSenderName: undefined,
-          replyContextSenderType,
-          replyContextText: parsed.replyContextText,
-          text: parsed.text
-        } satisfies ParsedReplyAwareMessage
-      }
-      return parsed
-    }
-
-    const mediaLabel = container
-      .querySelector<HTMLElement>('[data-testid="media-caption"], [aria-label]')
-      ?.innerText
-
-    const normalizedMediaLabel = mediaLabel
-      ? normalizeMessageBlockText(mediaLabel)
-      : ""
-
-    return {
-      text: normalizedMediaLabel || ""
-    } satisfies ParsedReplyAwareMessage
-  }
-
-  const chatRoot = getChatRoot()
-  if (!chatRoot) {
-    return {
-      error: "Panel chat WhatsApp Web belum ditemukan.",
-      ok: false
-    }
-  }
-
-  const chatTitle = getConversationTitle(chatRoot)
-
-  if (!chatTitle) {
-    return {
-      error: "Belum ada percakapan yang sedang dibuka.",
-      ok: false
-    }
-  }
-
-  const messageContainers = Array.from(
-    new Set(
-      Array.from(
-        (
-          chatRoot.querySelector<HTMLElement>(
-            '[data-testid="conversation-panel-messages"]'
-          ) || chatRoot
-        ).querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
-      )
-    )
-  )
-
-  const messages: WhatsAppMessage[] = messageContainers
-    .map((container, index) => {
-      const metaSource =
-        container
-          .querySelector<HTMLElement>("[data-pre-plain-text]")
-          ?.getAttribute("data-pre-plain-text") || ""
-      const parsedMeta = parsePrePlainText(metaSource)
-      const parsedMessage = getMessageText(container)
-      const text = parsedMessage.text
-
-      if (!text) {
-        return null
-      }
-
-      return {
-        authorName:
-          parsedMeta.author ||
-          (getMessageDirection(container) === "outgoing" ? "Anda" : chatTitle),
-        direction: getMessageDirection(container),
-        parsedMessage,
-        parsedMeta,
-        text
-      }
-    })
-    .map((entry, index) => {
-      if (!entry) {
-        return null
-      }
-
-      const { authorName, direction, parsedMessage, parsedMeta, text } = entry
-      const replyContextSenderName = parsedMessage.replyContextText
-        ? direction === "outgoing"
-          ? chatTitle
-          : "Anda"
-        : undefined
-
-      return {
-        author:
-          authorName,
-        direction,
-        id: `${parsedMeta.timestampLabel}-${index}`,
-        replyContextSenderName:
-          parsedMessage.replyContextSenderName || replyContextSenderName,
-        replyContextSenderType: parsedMessage.replyContextSenderType,
-        replyContextText: parsedMessage.replyContextText,
-        text,
-        timestampLabel: parsedMeta.timestampLabel
-      }
-    })
-    .filter((message): message is WhatsAppMessage => Boolean(message))
-
-  return {
-    data: {
-      capturedAt: new Date().toISOString(),
-      chatSubtitle: getConversationSubtitle(chatRoot),
-      chatTitle,
-      messages
-    },
-    ok: true
-  }
-}
-
 const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
   let lastFetchError = ""
   const snapshotCandidates = getSnapshotSyncCandidates(chatData.channel)
@@ -1907,7 +1692,110 @@ const shouldClearSnapshotForError = (message: string) =>
     "Judul percakapan TikTok DM aktif belum berhasil dikenali."
   ].some((pattern) => message.includes(pattern))
 
+const normalizeMessageFingerprintText = (value: string) =>
+  value.replace(/\s+/g, " ").trim()
+
+const getMessageFingerprint = (message: WhatsAppMessage) =>
+  `${message.direction}::${normalizeMessageFingerprintText(message.text)}`
+
+const findBestMessageOverlap = (
+  existing: WhatsAppMessage[],
+  incoming: WhatsAppMessage[]
+) => {
+  const existingKeys = existing.map(getMessageFingerprint)
+  const incomingKeys = incoming.map(getMessageFingerprint)
+  let best:
+    | {
+        existingStart: number
+        incomingStart: number
+        length: number
+      }
+    | null = null
+
+  for (let existingStart = 0; existingStart < existingKeys.length; existingStart += 1) {
+    for (let incomingStart = 0; incomingStart < incomingKeys.length; incomingStart += 1) {
+      let length = 0
+
+      while (
+        existingStart + length < existingKeys.length &&
+        incomingStart + length < incomingKeys.length &&
+        existingKeys[existingStart + length] === incomingKeys[incomingStart + length]
+      ) {
+        length += 1
+      }
+
+      if (!length) {
+        continue
+      }
+
+      if (!best || length > best.length) {
+        best = {
+          existingStart,
+          incomingStart,
+          length
+        }
+      }
+    }
+  }
+
+  return best
+}
+
+const dedupeMessagesByFingerprint = (messages: WhatsAppMessage[]) => {
+  const seen = new Set<string>()
+
+  return messages.filter((message) => {
+    const fingerprint = getMessageFingerprint(message)
+
+    if (seen.has(fingerprint)) {
+      return false
+    }
+
+    seen.add(fingerprint)
+    return true
+  })
+}
+
+const mergeChatSnapshots = (
+  current: WhatsAppChatSnapshot | null,
+  incoming: WhatsAppChatSnapshot
+) => {
+  if (!current) {
+    return incoming
+  }
+
+  if (
+    current.channel !== incoming.channel ||
+    current.provider !== incoming.provider ||
+    current.chatTitle !== incoming.chatTitle
+  ) {
+    return incoming
+  }
+
+  if (incoming.channel === "whatsapp") {
+    return incoming
+  }
+
+  const overlap = findBestMessageOverlap(current.messages, incoming.messages)
+
+  if (!overlap) {
+    return incoming
+  }
+
+  return {
+    ...incoming,
+    messages: dedupeMessagesByFingerprint([
+      ...incoming.messages.slice(0, overlap.incomingStart),
+      ...current.messages,
+      ...incoming.messages.slice(overlap.incomingStart + overlap.length)
+    ]).slice(-80)
+  }
+}
+
 function ClaraSidePanel() {
+  const [activeWorkspace, setActiveWorkspace] = useState<"clara" | "chatgpt">(
+    "clara"
+  )
   const [chatData, setChatData] = useState<WhatsAppChatSnapshot | null>(null)
   const [authStatus, setAuthStatus] = useState<
     "checking" | "authenticated" | "unauthenticated" | "misconfigured"
@@ -1929,6 +1817,7 @@ function ClaraSidePanel() {
   const [replySuggestionId, setReplySuggestionId] = useState("")
   const [tabUrl, setTabUrl] = useState("")
 
+  const isClaraWorkspace = activeWorkspace === "clara"
   const isAuthenticated = authStatus === "authenticated"
 
   const latestMessage = useMemo(
@@ -2095,6 +1984,12 @@ function ClaraSidePanel() {
     })
   }
 
+  const openChatGptInNewTab = async () => {
+    await chrome.tabs.create({
+      url: CHATGPT_EMBED_URL
+    })
+  }
+
   const ensureAuthenticated = async () => {
     if (isAuthenticated) {
       return true
@@ -2174,10 +2069,11 @@ function ClaraSidePanel() {
 
     try {
       const data = await readChatFromActiveTab()
-      setChatData(data)
+      const mergedData = mergeChatSnapshots(chatData, data)
+      setChatData(mergedData)
 
       try {
-        const syncResult = await syncChatSnapshotToProxy(data)
+        const syncResult = await syncChatSnapshotToProxy(mergedData)
         setFeedback(
           syncResult.duplicate
             ? "Chat aktif berhasil dibaca. Snapshot yang sama sudah ada di API."
@@ -2213,18 +2109,19 @@ function ClaraSidePanel() {
   const refreshChatSilently = async () => {
     try {
       const data = await readChatFromActiveTab()
+      const mergedData = mergeChatSnapshots(chatData, data)
 
       const nextSignature = JSON.stringify({
-        chatTitle: data.chatTitle,
-        lastMessageId: data.messages[data.messages.length - 1]?.id || "",
-        lastMessageText: data.messages[data.messages.length - 1]?.text || "",
-        messageCount: data.messages.length
+        chatTitle: mergedData.chatTitle,
+        lastMessageId: mergedData.messages[mergedData.messages.length - 1]?.id || "",
+        lastMessageText: mergedData.messages[mergedData.messages.length - 1]?.text || "",
+        messageCount: mergedData.messages.length
       })
 
       if (nextSignature !== chatSignature) {
-        setChatData(data)
+        setChatData(mergedData)
 
-        syncChatSnapshotToProxy(data).catch(() => {
+        syncChatSnapshotToProxy(mergedData).catch(() => {
           // Silent refresh should not interrupt the current side panel experience.
         })
       }
@@ -2252,7 +2149,12 @@ function ClaraSidePanel() {
   }
 
   useEffect(() => {
-    if (hasAutoReadAttempted || isLoading || !isSupportedLiveSyncTabUrl(tabUrl)) {
+    if (
+      !isClaraWorkspace ||
+      hasAutoReadAttempted ||
+      isLoading ||
+      !isSupportedLiveSyncTabUrl(tabUrl)
+    ) {
       return
     }
 
@@ -2261,10 +2163,14 @@ function ClaraSidePanel() {
     handleReadChat().catch(() => {
       // Error state is already handled inside handleReadChat.
     })
-  }, [hasAutoReadAttempted, isLoading, tabUrl])
+  }, [hasAutoReadAttempted, isClaraWorkspace, isLoading, tabUrl])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
+      if (!isClaraWorkspace) {
+        return
+      }
+
       if (isLoading || isSuggesting || isInsertingIndex !== null) {
         return
       }
@@ -2287,7 +2193,7 @@ function ClaraSidePanel() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [chatSignature, isInsertingIndex, isLoading, isSuggesting])
+  }, [chatSignature, isClaraWorkspace, isInsertingIndex, isLoading, isSuggesting])
 
   const handleSuggestReplies = async () => {
     setIsSuggesting(true)
@@ -2299,16 +2205,17 @@ function ClaraSidePanel() {
         chatData && chatData.messages.length > 0
           ? chatData
           : await readChatFromActiveTab()
+      const mergedChatData = mergeChatSnapshots(chatData, currentChatData)
 
-      if (currentChatData.messages.length === 0) {
+      if (mergedChatData.messages.length === 0) {
         throw new Error(
           "Chat aktif belum punya pesan teks yang bisa dipakai untuk generate jawaban."
         )
       }
 
-      setChatData(currentChatData)
+      setChatData(mergedChatData)
       const suggestionResult =
-        await fetchSuggestionsFromClaraBackendOnly(currentChatData)
+        await fetchSuggestionsFromClaraBackendOnly(mergedChatData)
       const bestSuggestion = suggestionResult?.suggestions[0]?.trim()
 
       if (!bestSuggestion) {
@@ -2609,27 +2516,78 @@ function ClaraSidePanel() {
       ? "Sedang menyusun jawaban"
       : "Belum ada jawaban"
 
+  useLayoutEffect(() => {
+    if (activeWorkspace !== "chatgpt") {
+      return
+    }
+
+    window.scrollTo(0, 0)
+
+    const scrollingElement = document.scrollingElement
+
+    if (scrollingElement) {
+      scrollingElement.scrollTop = 0
+    }
+  }, [activeWorkspace])
+
   return (
-    <div className="clara-panel">
+    <div
+      className={`clara-panel ${
+        activeWorkspace === "chatgpt" ? "clara-panel--chatgpt" : ""
+      }`}>
       <style>{panelCss}</style>
 
-      <div className="clara-stage">
+      <div
+        className={`clara-stage ${
+          activeWorkspace === "chatgpt" ? "clara-stage--chatgpt" : ""
+        }`}>
         <section className="clara-hero">
           <div className="clara-hero__top">
             <div className="clara-identity">
               <div className="clara-identity__label">Workspace</div>
               <div className="clara-identity__name">
-                {authUser?.name || "Clara"}
+                {activeWorkspace === "clara"
+                  ? authUser?.name || "Clara"
+                  : "ChatGPT Embed"}
               </div>
               <div className="clara-identity__meta">
-                {sessionMeta || LOGIN_MESSAGE}
+                {activeWorkspace === "clara"
+                  ? sessionMeta || LOGIN_MESSAGE
+                  : "Mode side panel untuk buka ChatGPT langsung di dalam extension."}
               </div>
             </div>
             <div className="clara-build-badge">{EXTENSION_BUILD_LABEL}</div>
           </div>
+          <div className="clara-workspace-switcher">
+            <button
+              className={`clara-workspace-tab ${isClaraWorkspace ? "clara-workspace-tab--active" : ""}`}
+              onClick={() => setActiveWorkspace("clara")}
+              type="button">
+              Clara Ops
+            </button>
+            <button
+              className={`clara-workspace-tab ${!isClaraWorkspace ? "clara-workspace-tab--active" : ""}`}
+              onClick={() => setActiveWorkspace("chatgpt")}
+              type="button">
+              ChatGPT
+            </button>
+          </div>
         </section>
 
-        {!isAuthenticated && (
+        {!isClaraWorkspace ? (
+          <section className="clara-pane clara-pane--chatgpt">
+            <div className="clara-embed-shell clara-embed-shell--chatgpt">
+              <iframe
+                allow="clipboard-read; clipboard-write"
+                className="clara-embed-frame clara-embed-frame--chatgpt"
+                referrerPolicy="strict-origin-when-cross-origin"
+                sandbox="allow-downloads allow-forms allow-popups allow-same-origin allow-scripts"
+                src={CHATGPT_EMBED_URL}
+                title="ChatGPT Embed"
+              />
+            </div>
+          </section>
+        ) : !isAuthenticated && (
           <section className="clara-pane">
             <div className="clara-pane__header">
               <div>
@@ -2659,7 +2617,7 @@ function ClaraSidePanel() {
           </section>
         )}
 
-        {!isAuthenticated ? null : (
+        {!isClaraWorkspace || !isAuthenticated ? null : (
           <>
             <section className="clara-pane">
               <div className="clara-pane__header">
@@ -2715,18 +2673,6 @@ function ClaraSidePanel() {
                     {latestMessage ? (
                       <div className="clara-chat-latest">
                         <strong>Pesan terbaru:</strong> {latestMessage.text}
-                      </div>
-                    ) : null}
-
-                    {chatData.debugInfo ? (
-                      <div className="clara-debug-box">
-                        <strong>Debug:</strong>
-                        {"\n"}channel: {chatData.debugInfo.channel || "-"}
-                        {"\n"}composeBox: {chatData.debugInfo.composeBox || "-"}
-                        {"\n"}selectedTextbox: {chatData.debugInfo.selectedTextbox || "-"}
-                        {"\n"}bounds: {chatData.debugInfo.bounds || "-"}
-                        {"\n"}candidateCount: {chatData.debugInfo.candidateCount ?? "-"}
-                        {"\n"}titleCandidateCount: {chatData.debugInfo.titleCandidateCount ?? "-"}
                       </div>
                     ) : null}
 

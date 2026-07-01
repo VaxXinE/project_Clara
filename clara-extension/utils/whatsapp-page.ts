@@ -43,6 +43,347 @@ const getChatRoot = () => {
 export const isWhatsAppSupportedPage = () =>
   window.location.hostname === "web.whatsapp.com"
 
+export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
+  const SELF_AUTHOR_PATTERN = /^(you|anda|me|saya)$/i
+
+  const parsePrePlainText = (value: string) => {
+    const trimmedValue = value.trim()
+    const match = trimmedValue.match(
+      /^\[(?<timestamp>[^\]]+)\]\s?(?<author>.*?)(?::)?$/
+    )
+
+    return {
+      author: match?.groups?.author?.trim() || "",
+      timestampLabel: match?.groups?.timestamp?.trim() || ""
+    }
+  }
+
+  const getChatRoot = () => {
+    const selectors = [
+      '#main[data-testid="conversation-panel-wrapper"]',
+      "#main",
+      '[data-testid="conversation-panel-wrapper"]'
+    ]
+
+    for (const selector of selectors) {
+      const node = document.querySelector<HTMLElement>(selector)
+
+      if (node) {
+        return node
+      }
+    }
+
+    return null
+  }
+
+  const getConversationTitle = (chatRoot: HTMLElement) => {
+    const titleSelectors = [
+      '[data-testid="conversation-info-header-chat-title"]',
+      'header [title]',
+      'header [dir="auto"]'
+    ]
+
+    for (const selector of titleSelectors) {
+      const node = chatRoot.querySelector<HTMLElement>(selector)
+      const title =
+        node?.getAttribute("title")?.trim() || node?.textContent?.trim()
+
+      if (title) {
+        return title
+      }
+    }
+
+    return ""
+  }
+
+  const getConversationSubtitle = (chatRoot: HTMLElement) => {
+    const subtitleSelectors = [
+      '[data-testid="chat-subtitle"]',
+      "header span[title]"
+    ]
+
+    for (const selector of subtitleSelectors) {
+      const node = chatRoot.querySelector<HTMLElement>(selector)
+      const subtitle =
+        node?.getAttribute("title")?.trim() || node?.textContent?.trim()
+
+      if (subtitle) {
+        return subtitle
+      }
+    }
+
+    return ""
+  }
+
+  const getMessageDirection = (
+    container: HTMLElement
+  ): WhatsAppMessageDirection => {
+    const metaSource =
+      container
+        .querySelector<HTMLElement>("[data-pre-plain-text]")
+        ?.getAttribute("data-pre-plain-text") || ""
+    const parsedMeta = parsePrePlainText(metaSource)
+    const directionNode =
+      container.matches(".message-out, .message-in")
+        ? container
+        : container.querySelector<HTMLElement>(".message-out, .message-in") ||
+          container.closest<HTMLElement>(".message-out, .message-in") ||
+          container.parentElement?.closest<HTMLElement>(
+            ".message-out, .message-in"
+          ) ||
+          null
+
+    if (directionNode?.classList.contains("message-out")) {
+      return "outgoing"
+    }
+
+    if (directionNode?.classList.contains("message-in")) {
+      return "incoming"
+    }
+
+    if (
+      container.querySelector(
+        '[data-icon="msg-check"], [data-icon="msg-dblcheck"], [data-icon="status-dblcheck"], [data-icon="msg-time"]'
+      ) &&
+      SELF_AUTHOR_PATTERN.test(parsedMeta.author)
+    ) {
+      return "outgoing"
+    }
+
+    if (SELF_AUTHOR_PATTERN.test(parsedMeta.author)) {
+      return "outgoing"
+    }
+
+    const alignmentNodes = [
+      container,
+      container.parentElement,
+      container.parentElement?.parentElement
+    ].filter((node): node is HTMLElement => Boolean(node))
+
+    for (const node of alignmentNodes) {
+      const computedStyle = window.getComputedStyle(node)
+
+      if (computedStyle.justifyContent === "flex-end") {
+        return "outgoing"
+      }
+
+      if (computedStyle.justifyContent === "flex-start") {
+        return "incoming"
+      }
+
+      if (node.classList.contains("xuk3077")) {
+        return "outgoing"
+      }
+
+      if (node.classList.contains("x1cy8zhl")) {
+        return "incoming"
+      }
+    }
+
+    const rect = container.getBoundingClientRect()
+    const leftSpace = rect.left
+    const rightSpace = window.innerWidth - rect.right
+
+    if (rightSpace < leftSpace) {
+      return "outgoing"
+    }
+
+    return "incoming"
+  }
+
+  const normalizeMessageBlockText = (value: string) =>
+    value
+      .split(/\r?\n/)
+      .map((line) => line.replace(/\s+/g, " ").trim())
+      .filter(Boolean)
+      .join("\n")
+      .trim()
+
+  const getPreferredMessageTexts = (nodes: HTMLElement[]) => {
+    const uniqueTexts = Array.from(
+      new Set(
+        nodes
+          .map((node) => normalizeMessageBlockText(node.innerText || ""))
+          .filter(Boolean)
+      )
+    )
+
+    return uniqueTexts.filter(
+      (text) =>
+        !uniqueTexts.some(
+          (otherText) =>
+            otherText !== text &&
+            otherText.length > text.length &&
+            otherText.includes(text)
+        )
+    )
+  }
+
+  type ParsedReplyAwareMessage = {
+    replyContextSenderName?: string
+    replyContextSenderType?: "incoming" | "outgoing" | "unknown"
+    replyContextText?: string
+    text: string
+  }
+
+  const splitReplyAwareMessageText = (candidates: string[]) => {
+    if (candidates.length === 0) {
+      return {
+        text: ""
+      } satisfies ParsedReplyAwareMessage
+    }
+
+    if (candidates.length > 1) {
+      return {
+        replyContextText: candidates.slice(0, -1).join("\n"),
+        text: candidates[candidates.length - 1]
+      } satisfies ParsedReplyAwareMessage
+    }
+
+    return {
+      text: candidates[0]
+    } satisfies ParsedReplyAwareMessage
+  }
+
+  const getMessageText = (container: HTMLElement) => {
+    const primaryCandidates = getPreferredMessageTexts(
+      Array.from(
+        container.querySelectorAll<HTMLElement>('[data-testid="msg-text"]')
+      )
+    )
+    const fallbackCandidates = getPreferredMessageTexts(
+      Array.from(
+        container.querySelectorAll<HTMLElement>(
+          '[data-testid="selectable-text"], .copyable-text'
+        )
+      )
+    )
+    const candidates =
+      primaryCandidates.length > 0 ? primaryCandidates : fallbackCandidates
+
+    if (candidates.length > 0) {
+      const parsed = splitReplyAwareMessageText(candidates)
+
+      if (parsed.replyContextText) {
+        const direction = getMessageDirection(container)
+        const replyContextSenderType =
+          direction === "outgoing" ? "incoming" : "outgoing"
+
+        return {
+          replyContextSenderName: undefined,
+          replyContextSenderType,
+          replyContextText: parsed.replyContextText,
+          text: parsed.text
+        } satisfies ParsedReplyAwareMessage
+      }
+
+      return parsed
+    }
+
+    const mediaLabel = container
+      .querySelector<HTMLElement>('[data-testid="media-caption"], [aria-label]')
+      ?.innerText
+
+    const normalizedMediaLabel = mediaLabel
+      ? normalizeMessageBlockText(mediaLabel)
+      : ""
+
+    return {
+      text: normalizedMediaLabel || ""
+    } satisfies ParsedReplyAwareMessage
+  }
+
+  const chatRoot = getChatRoot()
+
+  if (!chatRoot) {
+    return {
+      error: "Panel chat WhatsApp Web belum ditemukan.",
+      ok: false
+    }
+  }
+
+  const chatTitle = getConversationTitle(chatRoot)
+
+  if (!chatTitle) {
+    return {
+      error: "Belum ada percakapan yang sedang dibuka.",
+      ok: false
+    }
+  }
+
+  const messageContainers = Array.from(
+    new Set(
+      Array.from(
+        (
+          chatRoot.querySelector<HTMLElement>(
+            '[data-testid="conversation-panel-messages"]'
+          ) || chatRoot
+        ).querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
+      )
+    )
+  )
+
+  const messages: WhatsAppMessage[] = messageContainers
+    .map((container) => {
+      const metaSource =
+        container
+          .querySelector<HTMLElement>("[data-pre-plain-text]")
+          ?.getAttribute("data-pre-plain-text") || ""
+      const parsedMeta = parsePrePlainText(metaSource)
+      const parsedMessage = getMessageText(container)
+      const text = parsedMessage.text
+
+      if (!text) {
+        return null
+      }
+
+      return {
+        authorName:
+          parsedMeta.author ||
+          (getMessageDirection(container) === "outgoing" ? "Anda" : chatTitle),
+        direction: getMessageDirection(container),
+        parsedMessage,
+        parsedMeta,
+        text
+      }
+    })
+    .map((entry, index) => {
+      if (!entry) {
+        return null
+      }
+
+      const { authorName, direction, parsedMessage, parsedMeta, text } = entry
+      const replyContextSenderName = parsedMessage.replyContextText
+        ? direction === "outgoing"
+          ? chatTitle
+          : "Anda"
+        : undefined
+
+      return {
+        author: authorName,
+        direction,
+        id: `${parsedMeta.timestampLabel}-${index}`,
+        replyContextSenderName:
+          parsedMessage.replyContextSenderName || replyContextSenderName,
+        replyContextSenderType: parsedMessage.replyContextSenderType,
+        replyContextText: parsedMessage.replyContextText,
+        text,
+        timestampLabel: parsedMeta.timestampLabel
+      }
+    })
+    .filter((message): message is WhatsAppMessage => Boolean(message))
+
+  return {
+    data: {
+      capturedAt: new Date().toISOString(),
+      chatSubtitle: getConversationSubtitle(chatRoot),
+      chatTitle,
+      messages
+    },
+    ok: true
+  }
+}
+
 const getConversationTitle = (chatRoot: HTMLElement) => {
   const titleSelectors = [
     '[data-testid="conversation-info-header-chat-title"]',
@@ -215,26 +556,8 @@ const splitReplyAwareMessageText = (candidates: string[]) => {
     } satisfies ParsedReplyAwareMessage
   }
 
-  const singleCandidate = candidates[0]
-  const lines = singleCandidate
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  if (lines.length >= 2) {
-    const replyContext = lines.slice(0, -1).join(" ").trim()
-    const bodyText = lines[lines.length - 1]?.trim() || ""
-
-    if (replyContext.length >= 18 && bodyText) {
-      return {
-        replyContextText: replyContext,
-        text: bodyText
-      } satisfies ParsedReplyAwareMessage
-    }
-  }
-
   return {
-    text: singleCandidate
+    text: candidates[0]
   } satisfies ParsedReplyAwareMessage
 }
 
@@ -380,88 +703,7 @@ const getSendButtonTarget = (): HTMLElement | null => {
 }
 
 export const readOpenChat = (): WhatsAppReadResponse => {
-  const chatRoot = getChatRoot()
-
-  if (!chatRoot) {
-    return {
-      error: "Panel chat WhatsApp Web belum ditemukan.",
-      ok: false
-    }
-  }
-
-  const chatTitle = getConversationTitle(chatRoot)
-
-  if (!chatTitle) {
-    return {
-      error: "Belum ada percakapan yang sedang dibuka.",
-      ok: false
-    }
-  }
-
-  const messageContainers = queryUniqueMessageContainers(chatRoot)
-
-  const messages: WhatsAppMessage[] = messageContainers
-    .map((container, index) => {
-      const metaSource =
-        container
-          .querySelector<HTMLElement>("[data-pre-plain-text]")
-          ?.getAttribute("data-pre-plain-text") || ""
-      const parsedMeta = parsePrePlainText(metaSource)
-      const parsedMessage = getMessageText(container)
-      const text = parsedMessage.text
-
-      if (!text) {
-        return null
-      }
-
-      return {
-        authorName:
-          parsedMeta.author ||
-          (getMessageDirection(container) === "outgoing" ? "Anda" : chatTitle),
-        direction: getMessageDirection(container),
-        parsedMessage,
-        parsedMeta,
-        text
-      }
-    })
-    .map((entry, index) => {
-      if (!entry) {
-        return null
-      }
-
-      const { authorName, direction, parsedMessage, parsedMeta, text } = entry
-      const replyContextSenderName = parsedMessage.replyContextText
-        ? direction === "outgoing"
-          ? chatTitle
-          : "Anda"
-        : undefined
-
-      return {
-        author:
-          authorName,
-        direction,
-        id: `${parsedMeta.timestampLabel}-${index}`,
-        replyContextSenderName:
-          parsedMessage.replyContextSenderName || replyContextSenderName,
-        replyContextSenderType: parsedMessage.replyContextSenderType,
-        replyContextText: parsedMessage.replyContextText,
-        text,
-        timestampLabel: parsedMeta.timestampLabel
-      }
-    })
-    .filter((message): message is WhatsAppMessage => Boolean(message))
-
-  const snapshot: WhatsAppChatSnapshot = {
-    capturedAt: new Date().toISOString(),
-    chatSubtitle: getConversationSubtitle(chatRoot),
-    chatTitle,
-    messages
-  }
-
-  return {
-    data: snapshot,
-    ok: true
-  }
+  return readWhatsAppFromPage()
 }
 
 export const insertReplyIntoComposeBox = (

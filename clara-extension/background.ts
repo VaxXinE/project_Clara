@@ -12,6 +12,32 @@ import {
 
 const OPENAI_PROXY_URL = getConfiguredProxyUrl()
 const PENDING_REPLIES_STORAGE_KEY = "clara.pendingReplies"
+const CHATGPT_FRAME_EMBED_RULE_ID = 1001
+const CHATGPT_EMBED_RULE: chrome.declarativeNetRequest.Rule = {
+  action: {
+    responseHeaders: [
+      {
+        header: "content-security-policy",
+        operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE
+      },
+      {
+        header: "x-frame-options",
+        operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE
+      },
+      {
+        header: "frame-ancestors",
+        operation: chrome.declarativeNetRequest.HeaderOperation.REMOVE
+      }
+    ],
+    type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS
+  },
+  condition: {
+    requestDomains: ["chatgpt.com", "chat.openai.com"],
+    resourceTypes: [chrome.declarativeNetRequest.ResourceType.SUB_FRAME]
+  },
+  id: CHATGPT_FRAME_EMBED_RULE_ID,
+  priority: 1
+}
 
 type PendingReplyRecord = {
   chatTitle: string
@@ -37,14 +63,32 @@ const initializeSidePanelBehavior = () => {
     })
 }
 
+const ensureChatGptEmbedRules = () => {
+  if (!chrome.declarativeNetRequest?.updateDynamicRules) {
+    return
+  }
+
+  chrome.declarativeNetRequest
+    .updateDynamicRules({
+      addRules: [CHATGPT_EMBED_RULE],
+      removeRuleIds: [CHATGPT_FRAME_EMBED_RULE_ID]
+    })
+    .catch(() => {
+      // Ignore runtime issues on browsers without declarativeNetRequest support.
+    })
+}
+
 initializeSidePanelBehavior()
+ensureChatGptEmbedRules()
 
 chrome.runtime.onInstalled.addListener(() => {
   initializeSidePanelBehavior()
+  ensureChatGptEmbedRules()
 })
 
 chrome.runtime.onStartup.addListener(() => {
   initializeSidePanelBehavior()
+  ensureChatGptEmbedRules()
 })
 
 const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
