@@ -319,18 +319,7 @@ def _reply_excerpt_matches_previous_message(
     if normalized_excerpt in normalized_previous:
         return True
 
-    excerpt_tokens = [
-        token for token in normalized_excerpt.split() if len(token) >= 4
-    ]
-    previous_tokens = {
-        token for token in normalized_previous.split() if len(token) >= 4
-    }
-
-    if not excerpt_tokens or not previous_tokens:
-        return False
-
-    overlap = sum(1 for token in excerpt_tokens if token in previous_tokens)
-    return overlap >= max(3, len(excerpt_tokens) // 2)
+    return normalized_previous in normalized_excerpt
 
 
 def split_reply_context_from_snapshot_text(
