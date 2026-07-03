@@ -19,6 +19,13 @@ PLAYBOOK_FILES = (
     "KB_ADDON_BULLETPROOF_SOLID_REGULAR.md",
     "SALES_KNOWLEDGE_BRIDGE_MINI.md",
     "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
+    "01_solid_prime_chatbox_system_prompt.md",
+    "02_solid_prime_faq_answer_library.md",
+    "03_solid_prime_compliance_guardrail_escalation.md",
+    "04_solid_prime_product_contract_reference_kb.md",
+    "05_solid_prime_website_official_source_kb.md",
+    "06_solid_prime_lead_qualification_handoff_kb.md",
+    "07_solid_prime_conversation_examples_training_dataset_kb.md",
 )
 
 SYSTEM_PLAYBOOK_FILES = (
@@ -42,36 +49,50 @@ INTENT_PLAYBOOK_FILES: dict[str, tuple[str, ...]] = {
         "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
         "KB_ADDON_BULLETPROOF_SOLID_PRIME.md",
         "KB_ADDON_BULLETPROOF_SOLID_REGULAR.md",
+        "02_solid_prime_faq_answer_library.md",
+        "04_solid_prime_product_contract_reference_kb.md",
     ),
     "legality": (
         "OBJECTION.md",
         "OBJECTION_EXTREME.md",
         "KB_ADDON_BULLETPROOF_SOLID_PRIME.md",
         "KB_ADDON_BULLETPROOF_SOLID_REGULAR.md",
+        "03_solid_prime_compliance_guardrail_escalation.md",
+        "05_solid_prime_website_official_source_kb.md",
     ),
     "safety": (
         "OBJECTION.md",
         "OBJECTION_EXTREME.md",
         "CONVERSION_BEHAVIOR_ENGINE.md",
+        "03_solid_prime_compliance_guardrail_escalation.md",
     ),
     "minimum_capital": (
         "POSITIONING.md",
         "SALES_KNOWLEDGE_BRIDGE_MINI.md",
         "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
+        "02_solid_prime_faq_answer_library.md",
+        "04_solid_prime_product_contract_reference_kb.md",
+        "05_solid_prime_website_official_source_kb.md",
     ),
     "next_step": (
         "CONVERSION_LAYER.md",
         "CLOSING_ENGINE.md",
+        "06_solid_prime_lead_qualification_handoff_kb.md",
     ),
     "setup_scalping": (
         "OBJECTION.md",
+        "03_solid_prime_compliance_guardrail_escalation.md",
     ),
     "mechanism": (
         "POSITIONING.md",
+        "02_solid_prime_faq_answer_library.md",
+        "04_solid_prime_product_contract_reference_kb.md",
     ),
     "beginner": (
         "POSITIONING.md",
         "SALES_KNOWLEDGE_BRIDGE_MINI.md",
+        "02_solid_prime_faq_answer_library.md",
+        "06_solid_prime_lead_qualification_handoff_kb.md",
     ),
 }
 
@@ -131,12 +152,28 @@ def get_selected_supporting_playbook_filenames(
                 "POSITIONING.md",
                 "SALES_KNOWLEDGE_BRIDGE_MINI.md",
                 "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
+                "04_solid_prime_product_contract_reference_kb.md",
             ),
-            "legality": ("OBJECTION.md",),
-            "safety": ("OBJECTION.md",),
-            "minimum_capital": ("POSITIONING.md",),
-            "beginner": ("POSITIONING.md",),
-            "mechanism": ("POSITIONING.md",),
+            "legality": (
+                "OBJECTION.md",
+                "05_solid_prime_website_official_source_kb.md",
+            ),
+            "safety": (
+                "OBJECTION.md",
+                "03_solid_prime_compliance_guardrail_escalation.md",
+            ),
+            "minimum_capital": (
+                "POSITIONING.md",
+                "05_solid_prime_website_official_source_kb.md",
+            ),
+            "beginner": (
+                "POSITIONING.md",
+                "06_solid_prime_lead_qualification_handoff_kb.md",
+            ),
+            "mechanism": (
+                "POSITIONING.md",
+                "04_solid_prime_product_contract_reference_kb.md",
+            ),
         }
         return ultra_fast_map.get(
             latest_customer_intent or "",

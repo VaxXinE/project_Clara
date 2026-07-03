@@ -17,6 +17,7 @@ from app.schemas.ai_extraction_schema import (
 )
 from app.services.clara_playbook_service import (
     get_selected_playbook_filenames,
+    load_clara_response_playbook,
     load_clara_system_instruction_playbook,
 )
 from app.services.reply_suggestion_service import (
@@ -24,6 +25,7 @@ from app.services.reply_suggestion_service import (
     _normalize_reply_payload,
     _normalize_reply_tone_value,
     build_grounded_knowledge_context,
+    build_product_option_summary,
     build_prioritized_knowledge_brief,
     build_reply_system_prompt,
     format_conversation_for_reply,
@@ -33,11 +35,15 @@ from app.services.reply_suggestion_service import (
     infer_customer_variant_focus,
     infer_latency_profile,
     infer_latest_customer_intent,
+    resolve_latest_customer_intent,
     infer_product_variant_response_mode,
     get_known_customer_identity_fields,
+    response_breaks_subject_focus,
     response_defers_answer_with_question,
+    response_fails_product_option_requirement,
     response_misses_latest_customer_intent,
     response_is_vague_after_identity_submission,
+    response_states_fixed_sensitive_number,
     response_stays_stuck_in_onboarding_after_milestone,
     response_opens_with_source_dump,
     response_starts_too_generic,
@@ -325,6 +331,64 @@ def test_response_starts_too_generic_accepts_direct_opening() -> None:
     )
 
 
+def test_infer_latest_customer_intent_detects_glossary_and_mechanism_questions() -> None:
+    assert infer_latest_customer_intent("Margin itu maksudnya apa?") == "mechanism"
+    assert infer_latest_customer_intent("Brent oil itu tradingnya gimana?") == "mechanism"
+
+
+def test_resolve_latest_customer_intent_preserves_previous_mechanism_for_short_follow_up() -> None:
+    assert (
+        resolve_latest_customer_intent(
+            "Tolong jelasin kak",
+            "1 lot itu satuan transaksi ya kak, jadi itu ukuran besar posisi yang dibuka di market.",
+            "Okee, nah sekarang 1 lot itu maksudnya apa?",
+        )
+        == "mechanism"
+    )
+
+
+def test_infer_latest_customer_intent_detects_product_option_comparison_questions() -> None:
+    assert (
+        infer_latest_customer_intent("Bedanya multilateral sama bilateral apa?")
+        == "product_options"
+    )
+
+
+def test_response_misses_latest_customer_intent_flags_beginner_answer_that_jumps_to_source() -> None:
+    assert response_misses_latest_customer_intent(
+        "Untuk info resmi, kakak bisa cek dulu halaman BAPPEBTI dan website resminya ya.",
+        "beginner",
+    )
+
+
+def test_response_states_fixed_sensitive_number_allows_official_mini_initial_capital() -> None:
+    assert not response_states_fixed_sensitive_number(
+        "Untuk Mini, modal awalnya mulai dari Rp5.000.000 kak.",
+        "minimum_capital",
+    )
+
+
+def test_response_states_fixed_sensitive_number_flags_unapproved_fixed_nominal() -> None:
+    assert response_states_fixed_sensitive_number(
+        "Untuk akun mikro, minimal deposit awalnya mulai dari Rp5.000.000 ya kak.",
+        "minimum_capital",
+    )
+
+
+def test_response_misses_latest_customer_intent_accepts_official_mini_initial_capital_answer() -> None:
+    assert not response_misses_latest_customer_intent(
+        "Untuk akun Mini, modal awal resminya mulai dari Rp5.000.000 kak.",
+        "minimum_capital",
+    )
+
+
+def test_response_misses_latest_customer_intent_flags_fixed_nominal_for_other_account() -> None:
+    assert response_misses_latest_customer_intent(
+        "Untuk akun Mikro, minimal deposit awalnya mulai dari Rp5.000.000 ya kak.",
+        "minimum_capital",
+    )
+
+
 def test_infer_answer_commitment_level_prefers_direct_answer_for_follow_up() -> None:
     assert (
         infer_answer_commitment_level(
@@ -347,6 +411,42 @@ def test_response_defers_answer_with_question_accepts_answer_then_single_questio
     assert not response_defers_answer_with_question(
         "Sistemnya dijelaskan dulu alurnya, lalu akun disesuaikan dengan tujuan dan batas risiko. Kalau mau, saya lanjut jelaskan step awalnya ya?",
         "direct_answer_first",
+    )
+
+
+def test_response_breaks_subject_focus_flags_margin_answer_for_gold_question() -> None:
+    assert response_breaks_subject_focus(
+        "Margin itu dana jaminan yang dipakai untuk membuka posisi transaksi ya kak.",
+        "Gold buat pemula cocok ga?",
+    )
+
+
+def test_response_breaks_subject_focus_flags_margin_answer_for_lot_follow_up() -> None:
+    assert response_breaks_subject_focus(
+        "Margin itu sederhananya dana jaminan untuk buka posisi.",
+        "Tolong jelasin kak",
+        "1 lot itu maksudnya apa?",
+    )
+
+
+def test_response_breaks_subject_focus_accepts_brent_mechanism_answer() -> None:
+    assert not response_breaks_subject_focus(
+        "Brent oil itu diperdagangkan dari pergerakan harga minyak dunia, jadi fokusnya ke naik-turun harga dan risikonya.",
+        "Brent oil itu tradingnya gimana?",
+    )
+
+
+def test_response_breaks_subject_focus_flags_lot_contamination_inside_brent_answer() -> None:
+    assert response_breaks_subject_focus(
+        "Brent oil itu trading berjangka, tapi 1 lot itu ukuran transaksi yang dipakai di sistem.",
+        "Brent oil itu tradingnya gimana?",
+    )
+
+
+def test_response_breaks_subject_focus_flags_variant_contamination_inside_multilateral_answer() -> None:
+    assert response_breaks_subject_focus(
+        "Bilateral itu langsung antar pihak, sedangkan multilateral lewat bursa. Untuk pemula biasanya Mini lebih ringan.",
+        "Bedanya multilateral dan bilateral apa?",
     )
 
 
@@ -695,6 +795,24 @@ def test_format_conversation_for_reply_fast_profile_uses_tighter_window() -> Non
     assert "..." in fast
 
 
+def test_build_product_option_summary_includes_account_and_instrument_options() -> None:
+    grounded_knowledge = "\n".join(
+        [
+            "- [faq] Mini | 02 Solid Prime FAQ Answer Library: Akun Mini adalah jenis akun dengan kebutuhan modal lebih ringan dibanding akun reguler.",
+            "- [product_reference] Mini | 04 Solid Prime Product Contract Reference KB: Gold biasanya lebih mudah dipahami pemula karena familiar dan sering dibahas di berita.",
+            "- [product_reference] Mini | 04 Solid Prime Product Contract Reference KB: Brent Oil menarik karena mudah dikaitkan dengan berita global, tapi pergerakannya bisa tajam.",
+            "- [product_reference] Mini | 04 Solid Prime Product Contract Reference KB: Forex bergerak berdasarkan perubahan nilai antar mata uang dan bisa cepat saat rilis data ekonomi.",
+        ]
+    )
+
+    summary = build_product_option_summary(grounded_knowledge)
+
+    assert "- Mini:" in summary
+    assert "- Gold:" in summary
+    assert "- Brent Oil:" in summary
+    assert "- Forex:" in summary
+
+
 def test_get_selected_playbook_filenames_uses_compact_subset_for_single_reply() -> None:
     filenames = get_selected_playbook_filenames(
         latest_customer_intent="product_options",
@@ -729,8 +847,21 @@ def test_get_selected_playbook_filenames_uses_ultra_fast_subset() -> None:
     )
 
     assert "OBJECTION.md" in filenames
+    assert "05_solid_prime_website_official_source_kb.md" in filenames
     assert "FLOW.md" not in filenames
     assert "INSTRUCTION.md" not in filenames
+
+
+def test_get_selected_playbook_filenames_includes_new_mini_knowledge_for_fast_single_reply() -> None:
+    filenames = get_selected_playbook_filenames(
+        latest_customer_intent="minimum_capital",
+        desired_count=1,
+        latency_profile="fast",
+    )
+
+    assert "04_solid_prime_product_contract_reference_kb.md" in filenames
+    assert "05_solid_prime_website_official_source_kb.md" in filenames
+    assert "07_solid_prime_conversation_examples_training_dataset_kb.md" not in filenames
 
 
 def test_load_clara_system_instruction_playbook_contains_core_instruction_files() -> None:
@@ -740,6 +871,18 @@ def test_load_clara_system_instruction_playbook_contains_core_instruction_files(
     assert "clara_knowledge_mini/GUARDRAIL.md" in playbook
     assert "clara_knowledge_mini/FLOW.md" in playbook
     assert "clara_knowledge_mini/POSITIONING.md" not in playbook
+
+
+def test_load_clara_response_playbook_includes_new_mini_knowledge_for_single_reply() -> None:
+    playbook = load_clara_response_playbook(
+        "mini",
+        latest_customer_intent="legality",
+        desired_count=1,
+        latency_profile="ultra_fast",
+    )
+
+    assert "clara_knowledge_mini/05_solid_prime_website_official_source_kb.md" in playbook
+    assert "clara_knowledge_mini/03_solid_prime_compliance_guardrail_escalation.md" not in playbook
 
 
 def test_infer_latency_profile_prefers_fast_for_simple_single_reply() -> None:
@@ -802,6 +945,45 @@ def test_response_uses_vague_legality_deflection_flags_non_answer() -> None:
     assert response_uses_vague_legality_deflection(
         "Kalau yang dimaksud legal dan aman, kami perlu cek status resmi sesuai produk atau akun yang dipilih dulu ya kak.",
         "legality",
+    )
+
+
+def test_response_fails_product_option_requirement_accepts_instrument_answer_when_summary_contains_instruments() -> None:
+    summary = "\n".join(
+        [
+            "- Gold: Gold biasanya lebih mudah dipahami pemula karena familiar dan sering dibahas di berita.",
+            "- Brent Oil: Brent Oil menarik karena terkait berita global dan volatil.",
+            "- Forex: Forex bergerak berdasarkan perubahan nilai antar mata uang.",
+        ]
+    )
+
+    assert not response_fails_product_option_requirement(
+        "Secara umum yang sering dikenalkan antara lain Gold, Brent Oil, dan Forex. Gold biasanya lebih familiar buat pemula, sementara Oil dan Forex cenderung lebih cepat pergerakannya.",
+        True,
+        summary,
+    )
+
+
+def test_response_fails_product_option_requirement_flags_answer_that_ignores_instrument_options() -> None:
+    summary = "\n".join(
+        [
+            "- Gold: Gold biasanya lebih mudah dipahami pemula karena familiar dan sering dibahas di berita.",
+            "- Brent Oil: Brent Oil menarik karena terkait berita global dan volatil.",
+            "- Forex: Forex bergerak berdasarkan perubahan nilai antar mata uang.",
+        ]
+    )
+
+    assert response_fails_product_option_requirement(
+        "Mini biasanya lebih cocok untuk pemula yang mau mulai pelan-pelan.",
+        True,
+        summary,
+    )
+
+
+def test_response_opens_with_source_dump_flags_mechanism_answer_that_opens_with_url() -> None:
+    assert response_opens_with_source_dump(
+        "Untuk acuan resmi bisa lihat dulu sg-berjangka.com. Margin itu dana jaminan untuk membuka posisi.",
+        "mechanism",
     )
 
 
