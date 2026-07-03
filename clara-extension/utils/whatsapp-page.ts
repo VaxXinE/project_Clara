@@ -40,6 +40,76 @@ const getChatRoot = () => {
   return null
 }
 
+const isLikelyMessageContainer = (node: HTMLElement) =>
+  Boolean(
+    node.querySelector("[data-pre-plain-text]") ||
+      node.querySelector('[data-testid="msg-text"]') ||
+      node.querySelector('[data-testid="selectable-text"]') ||
+      node.matches("[data-testid='msg-container']")
+  )
+
+const compareMessageContainerOrder = (
+  left: HTMLElement,
+  right: HTMLElement
+) => {
+  if (left === right) {
+    return 0
+  }
+
+  const leftRect = left.getBoundingClientRect()
+  const rightRect = right.getBoundingClientRect()
+  const topDelta = leftRect.top - rightRect.top
+
+  if (Math.abs(topDelta) > 6) {
+    return topDelta
+  }
+
+  const leftDelta = leftRect.left - rightRect.left
+
+  if (Math.abs(leftDelta) > 6) {
+    return leftDelta
+  }
+
+  const documentPosition = left.compareDocumentPosition(right)
+
+  if (documentPosition & Node.DOCUMENT_POSITION_FOLLOWING) {
+    return -1
+  }
+
+  if (documentPosition & Node.DOCUMENT_POSITION_PRECEDING) {
+    return 1
+  }
+
+  return 0
+}
+
+const queryUniqueMessageContainers = (root: ParentNode) => {
+  const panelRoot =
+    root.querySelector<HTMLElement>('[data-testid="conversation-panel-messages"]') ||
+    root
+
+  const directContainers = Array.from(
+    panelRoot.querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
+  )
+  const fallbackContainers = Array.from(
+    panelRoot.querySelectorAll<HTMLElement>(
+      '[data-pre-plain-text], [data-testid="msg-text"], [data-testid="selectable-text"]'
+    )
+  )
+    .map(
+      (node) =>
+        node.closest<HTMLElement>('[data-testid="msg-container"]') ||
+        node.closest<HTMLElement>('div[role="row"]') ||
+        node.parentElement
+    )
+    .filter((node): node is HTMLElement => Boolean(node))
+    .filter(isLikelyMessageContainer)
+
+  return Array.from(new Set([...directContainers, ...fallbackContainers])).sort(
+    compareMessageContainerOrder
+  )
+}
+
 export const isWhatsAppSupportedPage = () =>
   window.location.hostname === "web.whatsapp.com"
 
@@ -311,17 +381,7 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     }
   }
 
-  const messageContainers = Array.from(
-    new Set(
-      Array.from(
-        (
-          chatRoot.querySelector<HTMLElement>(
-            '[data-testid="conversation-panel-messages"]'
-          ) || chatRoot
-        ).querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
-      )
-    )
-  )
+  const messageContainers = queryUniqueMessageContainers(chatRoot)
 
   const messages: WhatsAppMessage[] = messageContainers
     .map((container) => {
@@ -378,6 +438,12 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
       capturedAt: new Date().toISOString(),
       chatSubtitle: getConversationSubtitle(chatRoot),
       chatTitle,
+      debugInfo: {
+        candidateCount: messageContainers.length,
+        channel: "whatsapp",
+        firstMessageText: messages[0]?.text || "",
+        lastMessageText: messages[messages.length - 1]?.text || ""
+      },
       messages
     },
     ok: true
@@ -419,20 +485,6 @@ const getConversationSubtitle = (chatRoot: HTMLElement) => {
   }
 
   return ""
-}
-
-const queryUniqueMessageContainers = (root: ParentNode) => {
-  const panelRoot =
-    root.querySelector<HTMLElement>('[data-testid="conversation-panel-messages"]') ||
-    root
-
-  return Array.from(
-    new Set(
-      Array.from(
-        panelRoot.querySelectorAll<HTMLElement>('[data-testid="msg-container"]')
-      )
-    )
-  )
 }
 
 const getMessageDirection = (container: HTMLElement): WhatsAppMessageDirection => {
@@ -702,10 +754,6 @@ const getSendButtonTarget = (): HTMLElement | null => {
   return null
 }
 
-export const readOpenChat = (): WhatsAppReadResponse => {
-  return readWhatsAppFromPage()
-}
-
 export const insertReplyIntoComposeBox = (
   text: string
 ): WhatsAppActionResponse => {
@@ -822,6 +870,84 @@ const wait = (ms: number) =>
   new Promise((resolve) => {
     window.setTimeout(resolve, ms)
   })
+
+const getSnapshotLastMessage = (snapshot: WhatsAppReadResponse | undefined) => {
+  const messages = snapshot?.data?.messages || []
+  return messages[messages.length - 1]
+}
+
+const snapshotSignature = (snapshot: WhatsAppReadResponse | undefined) => {
+  const lastMessage = getSnapshotLastMessage(snapshot)
+
+  return JSON.stringify({
+    chatTitle: snapshot?.data?.chatTitle || "",
+    candidateCount: snapshot?.data?.debugInfo?.candidateCount || 0,
+    lastMessageId: lastMessage?.id || "",
+    lastMessageText: lastMessage?.text || "",
+    messageCount: snapshot?.data?.messages.length || 0
+  })
+}
+
+const pickBetterSnapshot = (
+  current: WhatsAppReadResponse,
+  candidate: WhatsAppReadResponse
+) => {
+  if (!current.ok || !current.data) {
+    return candidate
+  }
+
+  if (!candidate.ok || !candidate.data) {
+    return current
+  }
+
+  if (candidate.data.messages.length !== current.data.messages.length) {
+    return candidate.data.messages.length > current.data.messages.length
+      ? candidate
+      : current
+  }
+
+  if (
+    (candidate.data.debugInfo?.candidateCount || 0) !==
+    (current.data.debugInfo?.candidateCount || 0)
+  ) {
+    return (candidate.data.debugInfo?.candidateCount || 0) >
+      (current.data.debugInfo?.candidateCount || 0)
+      ? candidate
+      : current
+  }
+
+  const currentLastMessage = getSnapshotLastMessage(current)?.text.trim() || ""
+  const candidateLastMessage = getSnapshotLastMessage(candidate)?.text.trim() || ""
+
+  if (candidateLastMessage.length !== currentLastMessage.length) {
+    return candidateLastMessage.length > currentLastMessage.length
+      ? candidate
+      : current
+  }
+
+  return candidate
+}
+
+export const readOpenChat = async (): Promise<WhatsAppReadResponse> => {
+  let bestSnapshot = readWhatsAppFromPage()
+  let previousSignature = snapshotSignature(bestSnapshot)
+
+  for (const delayMs of [180, 260]) {
+    await wait(delayMs)
+
+    const nextSnapshot = readWhatsAppFromPage()
+    const nextSignature = snapshotSignature(nextSnapshot)
+    bestSnapshot = pickBetterSnapshot(bestSnapshot, nextSnapshot)
+
+    if (nextSignature === previousSignature) {
+      break
+    }
+
+    previousSignature = nextSignature
+  }
+
+  return bestSnapshot
+}
 
 const normalizeMessageText = (value: string) =>
   value.replace(/\s+/g, " ").trim().toLowerCase()

@@ -1,8 +1,8 @@
 {
   "name": "clara-extension",
   "displayName": "Clara Extension",
-  "version": "0.0.84",
-  "description": "Browser extension untuk WhatsApp Web yang terintegrasi dengan Clara.",
+  "version": "0.0.87",
+  "description": "Browser extension Clara untuk membaca chat aktif WhatsApp Web dengan sinkronisasi snapshot yang lebih stabil.",
   "author": "newsmaker.id",
   "scripts": {
     "dev": "concurrently \"node scripts/plasmo-cli.mjs dev\" \"node server/openai-proxy.mjs\"",

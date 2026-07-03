@@ -21,6 +21,8 @@ export interface WhatsAppChatSnapshot {
     candidateCount?: number
     channel?: string
     composeBox?: string
+    firstMessageText?: string
+    lastMessageText?: string
     selectedTextbox?: string
     titleCandidateCount?: number
   }

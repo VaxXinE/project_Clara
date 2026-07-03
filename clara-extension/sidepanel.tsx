@@ -35,7 +35,7 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.0.84-instagram-no-autoscroll-direction-fix-1"
+const EXTENSION_BUILD_LABEL = "v0.0.87-whatsapp-visual-order-fix-1"
 const CHATGPT_EMBED_URL =
   "https://chatgpt.com/g/g-69cde65d2fa081919907393fcd892e6e-solid-prime-sales"
 
@@ -1698,6 +1698,48 @@ const normalizeMessageFingerprintText = (value: string) =>
 const getMessageFingerprint = (message: WhatsAppMessage) =>
   `${message.direction}::${normalizeMessageFingerprintText(message.text)}`
 
+const getSnapshotLastFingerprint = (snapshot: WhatsAppChatSnapshot | null) => {
+  const lastMessage = snapshot?.messages[snapshot.messages.length - 1]
+  return lastMessage ? getMessageFingerprint(lastMessage) : ""
+}
+
+const isIncomingSnapshotLikelyStale = (
+  current: WhatsAppChatSnapshot,
+  incoming: WhatsAppChatSnapshot
+) => {
+  if (incoming.messages.length >= current.messages.length) {
+    return false
+  }
+
+  const incomingFingerprints = new Set(incoming.messages.map(getMessageFingerprint))
+  const currentLastFingerprint = getSnapshotLastFingerprint(current)
+
+  if (currentLastFingerprint && !incomingFingerprints.has(currentLastFingerprint)) {
+    return true
+  }
+
+  const incomingFirstFingerprint = incoming.messages[0]
+    ? getMessageFingerprint(incoming.messages[0])
+    : ""
+
+  const currentFirstFingerprint = current.messages[0]
+    ? getMessageFingerprint(current.messages[0])
+    : ""
+
+  if (incomingFirstFingerprint && currentFirstFingerprint) {
+    const startsLaterThanCurrent =
+      current.messages.findIndex(
+        (message) => getMessageFingerprint(message) === incomingFirstFingerprint
+      ) > 0
+
+    if (startsLaterThanCurrent) {
+      return true
+    }
+  }
+
+  return false
+}
+
 const findBestMessageOverlap = (
   existing: WhatsAppMessage[],
   incoming: WhatsAppMessage[]
@@ -1756,6 +1798,46 @@ const dedupeMessagesByFingerprint = (messages: WhatsAppMessage[]) => {
   })
 }
 
+const buildSnapshotSignature = (snapshot: WhatsAppChatSnapshot | null) =>
+  JSON.stringify({
+    channel: snapshot?.channel || "",
+    provider: snapshot?.provider || "",
+    chatTitle: snapshot?.chatTitle || "",
+    chatSubtitle: snapshot?.chatSubtitle || "",
+    lastMessageId: snapshot?.messages[snapshot.messages.length - 1]?.id || "",
+    lastMessageText:
+      snapshot?.messages[snapshot.messages.length - 1]?.text || "",
+    messageCount: snapshot?.messages.length || 0
+  })
+
+const chooseMoreCompleteSnapshot = (
+  current: WhatsAppChatSnapshot,
+  incoming: WhatsAppChatSnapshot
+) => {
+  if (incoming.messages.length > current.messages.length) {
+    return incoming
+  }
+
+  if (incoming.messages.length < current.messages.length) {
+    return current
+  }
+
+  const currentLastText =
+    current.messages[current.messages.length - 1]?.text.trim() || ""
+  const incomingLastText =
+    incoming.messages[incoming.messages.length - 1]?.text.trim() || ""
+
+  if (incomingLastText.length > currentLastText.length) {
+    return incoming
+  }
+
+  if (incomingLastText.length < currentLastText.length) {
+    return current
+  }
+
+  return incoming
+}
+
 const mergeChatSnapshots = (
   current: WhatsAppChatSnapshot | null,
   incoming: WhatsAppChatSnapshot
@@ -1772,17 +1854,17 @@ const mergeChatSnapshots = (
     return incoming
   }
 
-  if (incoming.channel === "whatsapp") {
-    return incoming
+  if (isIncomingSnapshotLikelyStale(current, incoming)) {
+    return current
   }
 
   const overlap = findBestMessageOverlap(current.messages, incoming.messages)
 
   if (!overlap) {
-    return incoming
+    return chooseMoreCompleteSnapshot(current, incoming)
   }
 
-  return {
+  const mergedSnapshot = {
     ...incoming,
     messages: dedupeMessagesByFingerprint([
       ...incoming.messages.slice(0, overlap.incomingStart),
@@ -1790,6 +1872,21 @@ const mergeChatSnapshots = (
       ...incoming.messages.slice(overlap.incomingStart + overlap.length)
     ]).slice(-80)
   }
+
+  const currentLastFingerprint = getSnapshotLastFingerprint(current)
+  const mergedFingerprints = new Set(
+    mergedSnapshot.messages.map(getMessageFingerprint)
+  )
+
+  if (
+    currentLastFingerprint &&
+    current.messages.length > mergedSnapshot.messages.length &&
+    !mergedFingerprints.has(currentLastFingerprint)
+  ) {
+    return current
+  }
+
+  return mergedSnapshot
 }
 
 function ClaraSidePanel() {
@@ -1816,6 +1913,8 @@ function ClaraSidePanel() {
   >(null)
   const [replySuggestionId, setReplySuggestionId] = useState("")
   const [tabUrl, setTabUrl] = useState("")
+  const chatDataRef = useRef<WhatsAppChatSnapshot | null>(null)
+  const chatSignatureRef = useRef("")
 
   const isClaraWorkspace = activeWorkspace === "clara"
   const isAuthenticated = authStatus === "authenticated"
@@ -1831,17 +1930,14 @@ function ClaraSidePanel() {
   const primaryDraftSuggestion = draftSuggestions[0] || primarySuggestion
 
   const chatSignature = useMemo(
-    () =>
-      JSON.stringify({
-        chatTitle: chatData?.chatTitle || "",
-        lastMessageId:
-          chatData?.messages[chatData.messages.length - 1]?.id || "",
-        lastMessageText:
-          chatData?.messages[chatData.messages.length - 1]?.text || "",
-        messageCount: chatData?.messages.length || 0
-      }),
+    () => buildSnapshotSignature(chatData),
     [chatData]
   )
+
+  useEffect(() => {
+    chatDataRef.current = chatData
+    chatSignatureRef.current = chatSignature
+  }, [chatData, chatSignature])
 
   const syncActiveTabUrl = async () => {
     const tab = await getActiveTab()
@@ -2069,7 +2165,7 @@ function ClaraSidePanel() {
 
     try {
       const data = await readChatFromActiveTab()
-      const mergedData = mergeChatSnapshots(chatData, data)
+      const mergedData = mergeChatSnapshots(chatDataRef.current, data)
       setChatData(mergedData)
 
       try {
@@ -2109,16 +2205,11 @@ function ClaraSidePanel() {
   const refreshChatSilently = async () => {
     try {
       const data = await readChatFromActiveTab()
-      const mergedData = mergeChatSnapshots(chatData, data)
+      const mergedData = mergeChatSnapshots(chatDataRef.current, data)
 
-      const nextSignature = JSON.stringify({
-        chatTitle: mergedData.chatTitle,
-        lastMessageId: mergedData.messages[mergedData.messages.length - 1]?.id || "",
-        lastMessageText: mergedData.messages[mergedData.messages.length - 1]?.text || "",
-        messageCount: mergedData.messages.length
-      })
+      const nextSignature = buildSnapshotSignature(mergedData)
 
-      if (nextSignature !== chatSignature) {
+      if (nextSignature !== chatSignatureRef.current) {
         setChatData(mergedData)
 
         syncChatSnapshotToProxy(mergedData).catch(() => {
@@ -2205,7 +2296,10 @@ function ClaraSidePanel() {
         chatData && chatData.messages.length > 0
           ? chatData
           : await readChatFromActiveTab()
-      const mergedChatData = mergeChatSnapshots(chatData, currentChatData)
+      const mergedChatData = mergeChatSnapshots(
+        chatDataRef.current,
+        currentChatData
+      )
 
       if (mergedChatData.messages.length === 0) {
         throw new Error(
