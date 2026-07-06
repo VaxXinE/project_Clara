@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import type {
   ClaraExtensionSessionUser,
@@ -35,7 +35,7 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.0.87-whatsapp-visual-order-fix-1"
+const EXTENSION_BUILD_LABEL = "v0.0.95-chatgpt-fixed-workspace-1"
 const CHATGPT_EMBED_URL =
   "https://chatgpt.com/g/g-69cde65d2fa081919907393fcd892e6e-solid-prime-sales"
 
@@ -293,6 +293,7 @@ const panelCss = `
     display: flex;
     flex-direction: column;
     gap: 0;
+    height: 100%;
     min-height: 0;
     overflow: hidden;
     padding: 0;
@@ -749,11 +750,13 @@ const panelCss = `
 
   .clara-embed-shell--chatgpt {
     display: flex;
-    flex: 1;
+    flex: 1 1 auto;
     flex-direction: column;
+    height: 100%;
     min-height: 0;
     border: none;
     border-radius: inherit;
+    overflow: hidden;
   }
 
   .clara-embed-toolbar {
@@ -2610,31 +2613,13 @@ function ClaraSidePanel() {
       ? "Sedang menyusun jawaban"
       : "Belum ada jawaban"
 
-  useLayoutEffect(() => {
-    if (activeWorkspace !== "chatgpt") {
-      return
-    }
-
-    window.scrollTo(0, 0)
-
-    const scrollingElement = document.scrollingElement
-
-    if (scrollingElement) {
-      scrollingElement.scrollTop = 0
-    }
-  }, [activeWorkspace])
-
   return (
     <div
-      className={`clara-panel ${
-        activeWorkspace === "chatgpt" ? "clara-panel--chatgpt" : ""
-      }`}>
+      className={`clara-panel ${!isClaraWorkspace ? "clara-panel--chatgpt" : ""}`}>
       <style>{panelCss}</style>
 
       <div
-        className={`clara-stage ${
-          activeWorkspace === "chatgpt" ? "clara-stage--chatgpt" : ""
-        }`}>
+        className={`clara-stage ${!isClaraWorkspace ? "clara-stage--chatgpt" : ""}`}>
         <section className="clara-hero">
           <div className="clara-hero__top">
             <div className="clara-identity">

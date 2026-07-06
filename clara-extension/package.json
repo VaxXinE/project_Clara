@@ -1,7 +1,7 @@
 {
   "name": "clara-extension",
   "displayName": "Clara Extension",
-  "version": "0.0.87",
+  "version": "0.0.95",
   "description": "Browser extension Clara untuk membaca chat aktif WhatsApp Web dengan sinkronisasi snapshot yang lebih stabil.",
   "author": "newsmaker.id",
   "scripts": {
