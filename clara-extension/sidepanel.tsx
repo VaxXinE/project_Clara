@@ -35,9 +35,11 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.0.95-chatgpt-fixed-workspace-1"
+const EXTENSION_BUILD_LABEL = "v0.0.99-chatgpt-context-autodetect-1"
 const CHATGPT_EMBED_URL =
   "https://chatgpt.com/g/g-69cde65d2fa081919907393fcd892e6e-solid-prime-sales"
+const CHATGPT_CONTEXT_MESSAGE_LIMIT = 12
+const CHATGPT_CONTEXT_TEXT_LIMIT = 280
 
 const panelCss = `
   html,
@@ -297,6 +299,108 @@ const panelCss = `
     min-height: 0;
     overflow: hidden;
     padding: 0;
+  }
+
+  .clara-chatgpt-context {
+    background:
+      linear-gradient(180deg, rgba(28, 20, 13, 0.98), rgba(18, 13, 10, 0.98));
+    border-bottom: 1px solid rgba(240, 203, 115, 0.12);
+    display: grid;
+    gap: 10px;
+    max-height: min(42vh, 360px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 14px;
+    scrollbar-gutter: stable;
+  }
+
+  .clara-chatgpt-context--collapsed {
+    gap: 8px;
+    max-height: none;
+    overflow: hidden;
+  }
+
+  .clara-chatgpt-context::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .clara-chatgpt-context::-webkit-scrollbar-thumb {
+    background: rgba(240, 203, 115, 0.24);
+    border-radius: 999px;
+  }
+
+  .clara-chatgpt-context__top {
+    align-items: flex-start;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+  }
+
+  .clara-chatgpt-context__summary {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .clara-chatgpt-context__actions {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .clara-chatgpt-context__toggle {
+    align-items: center;
+    appearance: none;
+    background: rgba(255, 240, 201, 0.04);
+    border: 1px solid rgba(240, 203, 115, 0.14);
+    border-radius: 14px;
+    color: #f0cb73;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 11px;
+    font-weight: 800;
+    gap: 8px;
+    justify-content: center;
+    min-height: 38px;
+    padding: 8px 12px;
+    width: 100%;
+  }
+
+  .clara-chatgpt-context__toggle:hover {
+    border-color: rgba(240, 203, 115, 0.28);
+  }
+
+  .clara-chatgpt-context__toggle-icon {
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .clara-chatgpt-context__meta {
+    background: rgba(255, 240, 201, 0.06);
+    border: 1px solid rgba(240, 203, 115, 0.12);
+    border-radius: 16px;
+    color: #e5c98b;
+    display: grid;
+    gap: 6px;
+    font-size: 11px;
+    line-height: 1.45;
+    padding: 11px 12px;
+  }
+
+  .clara-chatgpt-context__meta strong {
+    color: #fff0c9;
+  }
+
+  .clara-chatgpt-context__prompt {
+    font-size: 11px;
+    line-height: 1.55;
+    min-height: 104px;
+    max-height: 148px;
+    resize: none;
+  }
+
+  .clara-chatgpt-context__prompt[readonly] {
+    cursor: text;
   }
 
   .clara-pane--chatgpt .clara-pane__header {
@@ -753,7 +857,7 @@ const panelCss = `
     flex: 1 1 auto;
     flex-direction: column;
     height: 100%;
-    min-height: 0;
+    min-height: 420px;
     border: none;
     border-radius: inherit;
     overflow: hidden;
@@ -1528,6 +1632,67 @@ const getContentScriptUnavailableMessage = (url: string | undefined) =>
       ? "Content script Clara belum aktif di halaman TikTok Messages ini. Refresh halaman lalu coba lagi."
     : "Content script Clara belum aktif di halaman ini. Refresh tab lalu coba lagi."
 
+const getChannelLabel = (channel?: string | null) =>
+  channel === "instagram"
+    ? "Instagram DM"
+    : channel === "tiktok"
+      ? "TikTok DM"
+      : "WhatsApp Web"
+
+const getPromptSafeText = (value: string, maxLength = CHATGPT_CONTEXT_TEXT_LIMIT) => {
+  const normalized = value.replace(/\s+/g, " ").trim()
+
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`
+}
+
+const getContextSpeakerLabel = (direction: WhatsAppMessageDirection) =>
+  direction === "outgoing" ? "Sales" : "Customer"
+
+const buildChatGptContextPrompt = (chatData: WhatsAppChatSnapshot | null) => {
+  if (!chatData?.messages.length) {
+    return ""
+  }
+
+  const lastIncomingMessage = [...chatData.messages]
+    .reverse()
+    .find((message) => message.direction === "incoming")
+
+  const transcriptLines = chatData.messages
+    .slice(-CHATGPT_CONTEXT_MESSAGE_LIMIT)
+    .map((message) => {
+      const replyContext = message.replyContextText
+        ? ` | reply-context: ${getPromptSafeText(message.replyContextText, 120)}`
+        : ""
+
+      return `- ${getContextSpeakerLabel(message.direction)}${
+        message.timestampLabel ? ` [${message.timestampLabel}]` : ""
+      }: ${getPromptSafeText(message.text)}${replyContext}`
+    })
+
+  return [
+    "Kamu adalah sales assistant yang membantu membalas chat customer berdasarkan konteks tab aktif.",
+    "Gunakan konteks di bawah ini sebagai sumber utama jawaban.",
+    "",
+    `Channel: ${getChannelLabel(chatData.channel)}`,
+    `Nama percakapan: ${chatData.chatTitle || "-"}`,
+    `Subtitle: ${chatData.chatSubtitle || "-"}`,
+    `Pesan customer terbaru: ${lastIncomingMessage ? getPromptSafeText(lastIncomingMessage.text) : "-"}`,
+    "",
+    "Transkrip terbaru:",
+    ...transcriptLines,
+    "",
+    "Tugas:",
+    "1. Pahami intent customer dari percakapan terbaru.",
+    "2. Tulis jawaban singkat, natural, sopan, dan siap kirim dalam Bahasa Indonesia.",
+    "3. Jangan mengarang fakta di luar konteks chat. Kalau data kurang, minta klarifikasi singkat.",
+    "4. Fokus pada membantu sales menjawab chat customer, bukan menjelaskan proses internal."
+  ].join("\n")
+}
+
 const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
   let lastFetchError = ""
   const snapshotCandidates = getSnapshotSyncCandidates(chatData.channel)
@@ -1916,8 +2081,17 @@ function ClaraSidePanel() {
   >(null)
   const [replySuggestionId, setReplySuggestionId] = useState("")
   const [tabUrl, setTabUrl] = useState("")
+  const [chatGptContextData, setChatGptContextData] =
+    useState<WhatsAppChatSnapshot | null>(null)
+  const [chatGptContextError, setChatGptContextError] = useState("")
+  const [chatGptContextFeedback, setChatGptContextFeedback] = useState("")
+  const [isRefreshingChatGptContext, setIsRefreshingChatGptContext] =
+    useState(false)
+  const [isChatGptContextExpanded, setIsChatGptContextExpanded] =
+    useState(false)
   const chatDataRef = useRef<WhatsAppChatSnapshot | null>(null)
   const chatSignatureRef = useRef("")
+  const chatGptAutoContextKeyRef = useRef("")
 
   const isClaraWorkspace = activeWorkspace === "clara"
   const isAuthenticated = authStatus === "authenticated"
@@ -1931,6 +2105,17 @@ function ClaraSidePanel() {
   )
   const primarySuggestion = suggestions[0] || ""
   const primaryDraftSuggestion = draftSuggestions[0] || primarySuggestion
+  const latestChatGptContextMessage = useMemo(
+    () =>
+      chatGptContextData?.messages.length
+        ? chatGptContextData.messages[chatGptContextData.messages.length - 1]
+        : null,
+    [chatGptContextData]
+  )
+  const chatGptContextPrompt = useMemo(
+    () => buildChatGptContextPrompt(chatGptContextData),
+    [chatGptContextData]
+  )
 
   const chatSignature = useMemo(
     () => buildSnapshotSignature(chatData),
@@ -1962,6 +2147,43 @@ function ClaraSidePanel() {
   useEffect(() => {
     setHasAutoReadAttempted(false)
   }, [tabUrl])
+
+  useEffect(() => {
+    if (isClaraWorkspace) {
+      return
+    }
+
+    if (isRefreshingChatGptContext) {
+      return
+    }
+
+    syncActiveTabUrl()
+      .then((tab) => {
+        const activeTabUrl = tab?.url || ""
+
+        if (!isSupportedLiveSyncTabUrl(activeTabUrl)) {
+          setChatGptContextData(null)
+          setChatGptContextFeedback("")
+          setChatGptContextError(getSupportedLiveSyncTabMessage())
+          chatGptAutoContextKeyRef.current = ""
+          return
+        }
+
+        const nextAutoContextKey = `${activeTabUrl}::${chatDataRef.current?.chatTitle || ""}`
+
+        if (chatGptAutoContextKeyRef.current === nextAutoContextKey) {
+          return
+        }
+
+        chatGptAutoContextKeyRef.current = nextAutoContextKey
+        handleRefreshChatGptContext().catch(() => {
+          // Error state already handled inside the refresh handler.
+        })
+      })
+      .catch(() => {
+        setChatGptContextError("Tab aktif belum berhasil dibaca.")
+      })
+  }, [isClaraWorkspace, isRefreshingChatGptContext, tabUrl])
 
   const refreshAuthState = async (options?: { silent?: boolean }) => {
     if (!getConfiguredClaraApiBaseUrl()) {
@@ -2103,8 +2325,10 @@ function ClaraSidePanel() {
     return ok
   }
 
-  const readChatFromActiveTab = async () => {
-    if (!(await ensureAuthenticated())) {
+  const readActiveChatFromActiveTab = async (options?: {
+    requireAuthentication?: boolean
+  }) => {
+    if (options?.requireAuthentication && !(await ensureAuthenticated())) {
       throw new Error(LOGIN_MESSAGE)
     }
 
@@ -2122,7 +2346,7 @@ function ClaraSidePanel() {
 
     try {
       response = (await chrome.tabs.sendMessage(tab.id, {
-        type: "READ_WHATSAPP_CHAT"
+        type: "READ_ACTIVE_CHANNEL_CHAT"
       })) as WhatsAppReadResponse
     } catch (messageError) {
       const message =
@@ -2156,6 +2380,11 @@ function ClaraSidePanel() {
 
     return response.data
   }
+
+  const readChatFromActiveTab = async () =>
+    readActiveChatFromActiveTab({
+      requireAuthentication: true
+    })
 
   const handleReadChat = async () => {
     setIsLoading(true)
@@ -2341,6 +2570,52 @@ function ClaraSidePanel() {
       setError(message)
     } finally {
       setIsSuggesting(false)
+    }
+  }
+
+  const handleRefreshChatGptContext = async () => {
+    setIsRefreshingChatGptContext(true)
+    setChatGptContextError("")
+    setChatGptContextFeedback("")
+
+    try {
+      const data = await readActiveChatFromActiveTab()
+      setChatGptContextData((current) => mergeChatSnapshots(current, data))
+      setIsChatGptContextExpanded(true)
+      setChatGptContextFeedback(
+        `Context ${getChannelLabel(data.channel)} berhasil dibaca dari tab aktif.`
+      )
+    } catch (contextError) {
+      setChatGptContextData(null)
+      setChatGptContextError(
+        contextError instanceof Error
+          ? contextError.message
+          : "Gagal membaca context tab aktif."
+      )
+    } finally {
+      setIsRefreshingChatGptContext(false)
+    }
+  }
+
+  const handleCopyChatGptContextPrompt = async () => {
+    if (!chatGptContextPrompt.trim()) {
+      setChatGptContextError(
+        "Context prompt belum tersedia. Klik Refresh Context dulu."
+      )
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(chatGptContextPrompt)
+      setChatGptContextError("")
+      setChatGptContextFeedback(
+        "Context prompt sudah disalin. Tinggal paste ke input ChatGPT."
+      )
+    } catch (_error) {
+      setChatGptContextFeedback("")
+      setChatGptContextError(
+        "Gagal menyalin context prompt ke clipboard browser."
+      )
     }
   }
 
@@ -2655,6 +2930,107 @@ function ClaraSidePanel() {
 
         {!isClaraWorkspace ? (
           <section className="clara-pane clara-pane--chatgpt">
+            <div
+              className={`clara-chatgpt-context ${
+                isChatGptContextExpanded ? "" : "clara-chatgpt-context--collapsed"
+              }`}>
+              <div className="clara-chatgpt-context__top">
+                <div className="clara-chatgpt-context__summary">
+                  <div>
+                    <div className="clara-pane__eyebrow">Active Context</div>
+                    <div className="clara-pane__title">
+                      Bawa konteks tab aktif ke ChatGPT
+                    </div>
+                    <p className="clara-pane__copy">
+                      Clara baca chat aktif dari WhatsApp, Instagram DM, atau
+                      TikTok DM lalu menyiapkan prompt yang siap dipaste ke
+                      ChatGPT.
+                    </p>
+                  </div>
+                </div>
+                <div className="clara-chip clara-chip--soft">
+                  {chatGptContextData
+                    ? `${chatGptContextData.messages.length} pesan`
+                    : "Belum ada context"}
+                </div>
+              </div>
+
+              <button
+                className="clara-chatgpt-context__toggle"
+                onClick={() =>
+                  setIsChatGptContextExpanded((current) => !current)
+                }
+                type="button">
+                <span className="clara-chatgpt-context__toggle-icon">
+                  {isChatGptContextExpanded ? "▴" : "▾"}
+                </span>
+                {isChatGptContextExpanded
+                  ? "Sembunyikan detail context"
+                  : "Tampilkan detail context"}
+              </button>
+
+              {chatGptContextError ? (
+                <div className="clara-note clara-note--error">
+                  {chatGptContextError}
+                </div>
+              ) : null}
+
+              {chatGptContextFeedback ? (
+                <div className="clara-note clara-note--success">
+                  {chatGptContextFeedback}
+                </div>
+              ) : null}
+
+              <div className="clara-chatgpt-context__actions">
+                <button
+                  className="clara-button clara-button--ghost clara-button--block"
+                  disabled={isRefreshingChatGptContext}
+                  onClick={handleRefreshChatGptContext}
+                  type="button">
+                  {isRefreshingChatGptContext
+                    ? "Membaca context..."
+                    : "Refresh Context"}
+                </button>
+                <button
+                  className="clara-button clara-button--primary clara-button--block"
+                  disabled={!chatGptContextPrompt.trim()}
+                  onClick={handleCopyChatGptContextPrompt}
+                  type="button">
+                  Copy Context Prompt
+                </button>
+              </div>
+
+              {isChatGptContextExpanded && chatGptContextData ? (
+                <>
+                  <div className="clara-chatgpt-context__meta">
+                    <div>
+                      <strong>Channel:</strong>{" "}
+                      {getChannelLabel(chatGptContextData.channel)}
+                    </div>
+                    <div>
+                      <strong>Percakapan:</strong>{" "}
+                      {chatGptContextData.chatTitle || "-"}
+                    </div>
+                    <div>
+                      <strong>Pesan terbaru:</strong>{" "}
+                      {latestChatGptContextMessage?.text || "-"}
+                    </div>
+                  </div>
+
+                  <textarea
+                    className="clara-input clara-input--textarea clara-chatgpt-context__prompt"
+                    readOnly
+                    value={chatGptContextPrompt}
+                  />
+                </>
+              ) : isChatGptContextExpanded ? (
+                <div className="clara-note clara-note--warn">
+                  Buka chat aktif di WhatsApp Web, Instagram DM, atau TikTok
+                  Messages, lalu klik <strong>Refresh Context</strong>. Clara
+                  hanya membaca percakapan aktif, bukan seluruh inbox.
+                </div>
+              ) : null}
+            </div>
             <div className="clara-embed-shell clara-embed-shell--chatgpt">
               <iframe
                 allow="clipboard-read; clipboard-write"
