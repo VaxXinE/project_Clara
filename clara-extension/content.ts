@@ -81,7 +81,36 @@ const handleRuntimeMessage = (
     return true
   }
 
-  if (message?.type === "INSERT_WHATSAPP_REPLY") {
+  if (message?.type === "READ_ACTIVE_CHANNEL_CHAT") {
+    if (!activeAdapter) {
+      sendResponse({
+        error: "Halaman chat aktif belum didukung.",
+        ok: false
+      })
+      return false
+    }
+
+    Promise.resolve(activeAdapter.readOpenChat())
+      .then((result) => {
+        sendResponse(result)
+      })
+      .catch((error) => {
+        sendResponse({
+          error:
+            error instanceof Error ?
+              error.message
+            : "Terjadi kendala saat membaca chat aktif.",
+          ok: false
+        })
+      })
+
+    return true
+  }
+
+  if (
+    message?.type === "INSERT_WHATSAPP_REPLY" ||
+    message?.type === "INSERT_ACTIVE_CHANNEL_REPLY"
+  ) {
     if (!activeAdapter) {
       sendResponse({
         error: "Halaman chat aktif belum didukung.",
@@ -107,7 +136,10 @@ const handleRuntimeMessage = (
     return false
   }
 
-  if (message?.type === "SEND_WHATSAPP_REPLY") {
+  if (
+    message?.type === "SEND_WHATSAPP_REPLY" ||
+    message?.type === "SEND_ACTIVE_CHANNEL_REPLY"
+  ) {
     if (!activeAdapter) {
       sendResponse({
         error: "Halaman chat aktif belum didukung.",

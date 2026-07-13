@@ -156,11 +156,15 @@ def load_file_content(file_path: Path) -> str:
 
 def derive_category(filename: str) -> str:
     stem = filename.removesuffix(".md").upper()
+    if "FAQ" in stem:
+        return "faq"
     if "OBJECTION" in stem:
         return "objection_handling"
     if "POSITIONING" in stem:
         return "positioning"
     if "GUARDRAIL" in stem:
+        return "guardrail"
+    if "COMPLIANCE" in stem or "ESCALATION" in stem:
         return "guardrail"
     if "FLOW" in stem:
         return "workflow"
@@ -168,8 +172,18 @@ def derive_category(filename: str) -> str:
         return "personality_mode"
     if "CLOSING" in stem:
         return "closing_engine"
+    if "HANDOFF" in stem or "QUALIFICATION" in stem:
+        return "handoff"
     if "CONVERSION" in stem:
         return "conversion_engine"
+    if "OFFICIAL_SOURCE" in stem or "WEBSITE" in stem:
+        return "official_source"
+    if "PRODUCT_CONTRACT_REFERENCE" in stem:
+        return "product_reference"
+    if "CHATBOX_SYSTEM_PROMPT" in stem:
+        return "instruction"
+    if "TRAINING_DATASET" in stem or "EXAMPLES" in stem:
+        return "training_examples"
     if "KB_ADDON" in stem or "SALES_KNOWLEDGE_BRIDGE" in stem:
         return "product_facts"
     if "AUTO_ADAPT" in stem:
@@ -181,7 +195,17 @@ def derive_category(filename: str) -> str:
 
 def humanize_filename(filename: str) -> str:
     stem = filename.removesuffix(".md").replace("_", " ").strip().title()
-    return stem.replace("Kb ", "KB ").replace("Ai ", "AI ")
+    return (
+        stem.replace("Kb ", "KB ", 1)
+        .replace(" Kb ", " KB ")
+        .replace(" Kb", " KB")
+        .replace("Faq", "FAQ")
+        .replace("Ai ", "AI ")
+    )
+
+
+def normalize_knowledge_title(title: str) -> str:
+    return " ".join(title.strip().lower().split())
 
 
 def build_import_items(knowledge_root: Path) -> list[tuple[KnowledgeImportItem, Path]]:
@@ -217,6 +241,42 @@ def deactivate_legacy_imports(db: Session) -> int:
         .values(is_active=False)
     )
     return int(result.rowcount or 0)
+
+
+def deactivate_conflicting_import_titles(
+    db: Session,
+    items: list[tuple[KnowledgeImportItem, Path]],
+) -> int:
+    if not items:
+        return 0
+
+    source_types = sorted({item.source_type for item, _ in items})
+    canonical_title_by_key = {
+        (normalize_knowledge_title(item.title), item.source_type): item.title
+        for item, _ in items
+    }
+    rows = db.scalars(
+        select(ProductKnowledge).where(
+            ProductKnowledge.organization_id.is_(None),
+            ProductKnowledge.source_type.in_(source_types),
+            ProductKnowledge.is_active.is_(True),
+        )
+    ).all()
+
+    deactivated_count = 0
+    for row in rows:
+        normalized_key = (normalize_knowledge_title(row.title), row.source_type)
+        canonical_title = canonical_title_by_key.get(normalized_key)
+        if canonical_title is None:
+            continue
+        if row.title == canonical_title:
+            continue
+
+        row.is_active = False
+        db.add(row)
+        deactivated_count += 1
+
+    return deactivated_count
 
 
 def get_existing_entries(
@@ -311,6 +371,10 @@ def run_import(
 
         imported_items = build_import_items(knowledge_root)
         legacy_deactivated_count = deactivate_legacy_imports(session)
+        conflicting_title_deactivated_count = deactivate_conflicting_import_titles(
+            session,
+            imported_items,
+        )
         results = upsert_knowledge_entries(
             session,
             items=imported_items,
@@ -323,10 +387,19 @@ def run_import(
             message_lines.append(
                 f"- legacy markdown_import dinonaktifkan: {legacy_deactivated_count}"
             )
+        if conflicting_title_deactivated_count:
+            message_lines.append(
+                "- knowledge duplikat title konflik dinonaktifkan: "
+                f"{conflicting_title_deactivated_count}"
+            )
         message_lines.extend(f"- {result}" for result in results)
 
         return KnowledgeImportResult(
-            changed=bool(legacy_deactivated_count or results),
+            changed=bool(
+                legacy_deactivated_count
+                or conflicting_title_deactivated_count
+                or results
+            ),
             message_lines=message_lines,
         )
     except KnowledgeImportError:
