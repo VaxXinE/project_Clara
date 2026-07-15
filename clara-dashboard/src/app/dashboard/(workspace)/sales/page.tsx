@@ -478,7 +478,10 @@ export default function SalesInboxPage() {
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="clara-card rounded-[30px] p-6">
+            <section
+              data-onboarding-id="sales-inbox-hero"
+              className="clara-card rounded-[30px] p-6"
+            >
               <p className="clara-kicker text-xs">Ringkasan cepat</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
@@ -511,7 +514,10 @@ export default function SalesInboxPage() {
               </div>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-3">
+            <section
+              data-onboarding-id="sales-inbox-metrics"
+              className="grid gap-4 md:grid-cols-3"
+            >
               <OverviewTile
                 label="Perlu Analisis"
                 value={String(inboxItems.length - analyzedCount)}
@@ -529,7 +535,10 @@ export default function SalesInboxPage() {
               />
             </section>
 
-            <section className="clara-card rounded-[30px] p-6">
+            <section
+              data-onboarding-id="sales-inbox-filters"
+              className="clara-card rounded-[30px] p-6"
+            >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-2xl">
                   <p className="clara-kicker text-xs">Filter kerja</p>
@@ -604,7 +613,10 @@ export default function SalesInboxPage() {
               </div>
             </section>
 
-            <section className="grid gap-4">
+            <section
+              data-onboarding-id="sales-inbox-queue"
+              className="grid gap-4"
+            >
               {filteredInboxItems.length === 0 ? (
                 <div className="clara-empty-state">
                   <h2 className="text-xl font-semibold text-slate-900">
@@ -712,7 +724,10 @@ export default function SalesInboxPage() {
                         </div>
                       ) : null}
 
-                      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <div
+                        data-onboarding-id="sales-inbox-upcoming-actions"
+                        className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+                      >
                         {paginatedItems.map((item) => {
                           const extraction = item.latest_ai_extraction;
                           const provider = inferProviderFromSource(item.source);

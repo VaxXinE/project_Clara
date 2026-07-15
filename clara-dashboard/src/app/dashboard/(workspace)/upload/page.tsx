@@ -59,7 +59,10 @@ export default function UploadWhatsAppPage() {
       }
     >
       <div className="mx-auto space-y-6">
-        <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <section
+          data-onboarding-id="sales-upload-steps"
+          className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
+        >
           <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
               Alur paling cepat
@@ -86,7 +89,10 @@ export default function UploadWhatsAppPage() {
             </div>
           </article>
 
-          <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
+          <article
+            data-onboarding-id="sales-upload-safety"
+            className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
+          >
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
               Supaya aman dibaca Clara
             </p>
@@ -101,7 +107,10 @@ export default function UploadWhatsAppPage() {
 
         <WhatsAppUploadForm />
 
-        <section className="clara-card rounded-[28px] p-5 sm:p-6">
+        <section
+          data-onboarding-id="sales-upload-example"
+          className="clara-card rounded-[28px] p-5 sm:p-6"
+        >
           <p className="clara-kicker">Contoh format</p>
           <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
             Format chat yang bisa dibaca Clara

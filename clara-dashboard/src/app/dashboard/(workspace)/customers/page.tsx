@@ -106,7 +106,10 @@ export default function CustomerListPage() {
       description={pageDescription}
     >
       <div className="space-y-6">
-        <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <section
+          data-onboarding-id="sales-customers-hero"
+          className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
+        >
           <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
               {isLeadershipWorkspace
@@ -142,7 +145,10 @@ export default function CustomerListPage() {
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
+        <section
+          data-onboarding-id="sales-customers-filters"
+          className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.2)]"
+        >
           <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr_auto]">
             <label className="space-y-2 text-sm text-[#d8b977]">
               <span className="font-semibold text-[#fff0c9]">
@@ -211,7 +217,10 @@ export default function CustomerListPage() {
         ) : null}
 
         {!isLoading && !errorMessage ? (
-          <section className="space-y-4">
+          <section
+            data-onboarding-id="sales-customers-list"
+            className="space-y-4"
+          >
             {customers.length === 0 ? (
               <div className="rounded-[28px] border border-dashed border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-8 text-center text-sm leading-7 text-[#d7bb7e]">
                 Belum ada customer yang cocok dengan filter ini.

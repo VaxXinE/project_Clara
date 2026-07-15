@@ -328,7 +328,10 @@ export default function DashboardHomePage() {
 
         {isSalesWorkspace ? (
           <>
-            <section className="clara-card rounded-[32px] p-6">
+            <section
+              data-onboarding-id="sales-home-summary"
+              className="clara-card rounded-[32px] p-6"
+            >
               <p className="clara-kicker text-xs">Ringkasan hari ini</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
@@ -357,7 +360,10 @@ export default function DashboardHomePage() {
               </div>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2">
+            <section
+              data-onboarding-id="sales-home-metrics"
+              className="grid gap-4 md:grid-cols-2"
+            >
               <MetricCard
                 label="Chat Perlu Dibalas"
                 value={isLoading ? "..." : String(pendingAiCount)}
@@ -375,7 +381,8 @@ export default function DashboardHomePage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
-              <PanelFrame
+              <div data-onboarding-id="sales-home-next-action">
+                <PanelFrame
                 eyebrow={salesNextAction.eyebrow}
                 title={salesNextAction.title}
                 actionLabel={salesNextAction.label}
@@ -417,9 +424,11 @@ export default function DashboardHomePage() {
                     icon={faTriangleExclamation}
                   />
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Aktivitas terakhir" title="Percakapan terbaru">
+              <div data-onboarding-id="sales-home-latest-conversation">
+                <PanelFrame eyebrow="Aktivitas terakhir" title="Percakapan terbaru">
                 {latestConversation ? (
                   <div className="space-y-4">
                     <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
@@ -468,11 +477,13 @@ export default function DashboardHomePage() {
                     Input Chat untuk mengisi pipeline kerja Sales.
                   </div>
                 )}
-              </PanelFrame>
+                </PanelFrame>
+              </div>
             </section>
 
             <section className="grid gap-6 xl:grid-cols-3">
-              <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
+              <div data-onboarding-id="sales-home-quick-nav">
+                <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
                 <div className="grid gap-3">
                   <Link
                     href="/dashboard/sales"
@@ -499,9 +510,11 @@ export default function DashboardHomePage() {
                     Input Chat
                   </Link>
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Mulai kerja" title="Fokus kerja Sales hari ini">
+              <div data-onboarding-id="sales-home-focus">
+                <PanelFrame eyebrow="Mulai kerja" title="Fokus kerja Sales hari ini">
                 <div className="grid gap-4 md:grid-cols-2">
                   <MiniInsightCard
                     label="Prioritas utama"
@@ -544,15 +557,18 @@ export default function DashboardHomePage() {
                     Buka Leads
                   </Link>
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Kondisi kerja" title="Angka penting hari ini">
+              <div data-onboarding-id="sales-home-health">
+                <PanelFrame eyebrow="Kondisi kerja" title="Angka penting hari ini">
                 <div className="space-y-3">
                   <PulseRow label="Sudah dibaca AI" value={String(metrics.analyzedCount)} />
                   <PulseRow label="Risiko tinggi" value={String(metrics.highRiskCount)} />
                   <PulseRow label="Coverage AI" value={aiCoverage} />
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
             </section>
           </>
         ) : isManagerWorkspace ? (

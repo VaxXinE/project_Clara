@@ -692,7 +692,10 @@ export default function CrmPage() {
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="clara-card rounded-[30px] p-6">
+            <section
+              data-onboarding-id="sales-crm-hero"
+              className="clara-card rounded-[30px] p-6"
+            >
               <p className="clara-kicker text-xs">Ringkasan leads</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
@@ -762,7 +765,10 @@ export default function CrmPage() {
               </div>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section
+              data-onboarding-id="sales-crm-metrics"
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+            >
               <BoardMetric
                 label={isLeadershipWorkspace ? "Butuh perhatian" : "Perlu tindakan"}
                 value={String(summary.needsAction)}
@@ -804,7 +810,10 @@ export default function CrmPage() {
               )}
             </section>
 
-            <section className="clara-card rounded-[30px] p-6">
+            <section
+              data-onboarding-id="sales-crm-filters"
+              className="clara-card rounded-[30px] p-6"
+            >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-2xl">
                   <p className="clara-kicker text-xs">Filter lead</p>
@@ -1101,7 +1110,10 @@ export default function CrmPage() {
               </div>
             ) : null}
 
-            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-4 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+            <section
+              data-onboarding-id="sales-crm-list"
+              className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-4 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
+            >
               <div className="flex items-center justify-between gap-3 border-b border-[#f0cb73]/12 px-2 pb-4">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
@@ -1177,7 +1189,7 @@ export default function CrmPage() {
                       ) : null}
                     </div>
 
-                    <div>
+                    <div data-onboarding-id="sales-crm-preview">
                       {selectedLead ? (
                         <>
                           <div className="border-b border-[#f0cb73]/12 pb-4">
