@@ -35,7 +35,7 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.0.99-chatgpt-context-autodetect-1"
+const EXTENSION_BUILD_LABEL = "v0.1.0-chatgpt-context-autodetect-2"
 const CHATGPT_EMBED_URL =
   "https://chatgpt.com/g/g-69cde65d2fa081919907393fcd892e6e-solid-prime-sales"
 const CHATGPT_CONTEXT_MESSAGE_LIMIT = 12
@@ -78,8 +78,10 @@ const panelCss = `
   }
 
   .clara-panel--chatgpt {
-    height: 100vh;
-    overflow: hidden;
+    max-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .clara-panel *,
@@ -96,7 +98,7 @@ const panelCss = `
 
   .clara-stage--chatgpt {
     grid-template-rows: auto minmax(0, 1fr);
-    height: calc(100vh - 24px);
+    min-height: calc(100vh - 24px);
   }
 
   .clara-stage > * {
@@ -168,10 +170,9 @@ const panelCss = `
   }
 
   .clara-workspace-switcher {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     gap: 8px;
-    margin-top: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     position: relative;
     z-index: 1;
   }
@@ -194,8 +195,11 @@ const panelCss = `
     cursor: pointer;
     font-size: 11px;
     font-weight: 800;
+    justify-content: center;
     letter-spacing: 0.08em;
+    min-height: 42px;
     padding: 9px 12px;
+    text-align: center;
     text-transform: uppercase;
     transition:
       border-color 0.16s ease,
@@ -208,6 +212,14 @@ const panelCss = `
     border-color: rgba(240, 203, 115, 0.32);
     color: #fff0c9;
     transform: translateY(-1px);
+  }
+
+  .clara-hero__footer {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 12px;
+    position: relative;
+    z-index: 1;
   }
 
   .clara-workspace-tab--active {
@@ -295,8 +307,7 @@ const panelCss = `
     display: flex;
     flex-direction: column;
     gap: 0;
-    height: 100%;
-    min-height: 0;
+    min-height: 72vh;
     overflow: hidden;
     padding: 0;
   }
@@ -304,7 +315,7 @@ const panelCss = `
   .clara-chatgpt-context {
     background:
       linear-gradient(180deg, rgba(28, 20, 13, 0.98), rgba(18, 13, 10, 0.98));
-    border-bottom: 1px solid rgba(240, 203, 115, 0.12);
+    border-top: 1px solid rgba(240, 203, 115, 0.12);
     display: grid;
     gap: 10px;
     max-height: min(42vh, 360px);
@@ -854,10 +865,9 @@ const panelCss = `
 
   .clara-embed-shell--chatgpt {
     display: flex;
-    flex: 1 1 auto;
+    flex: 1 0 auto;
     flex-direction: column;
-    height: 100%;
-    min-height: 420px;
+    min-height: 72vh;
     border: none;
     border-radius: inherit;
     overflow: hidden;
@@ -2092,6 +2102,10 @@ function ClaraSidePanel() {
   const chatDataRef = useRef<WhatsAppChatSnapshot | null>(null)
   const chatSignatureRef = useRef("")
   const chatGptAutoContextKeyRef = useRef("")
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const panelScrollTopRef = useRef(0)
+  const authStatusRef = useRef(authStatus)
+  const authUserRef = useRef<ClaraExtensionSessionUser | null>(authUser)
 
   const isClaraWorkspace = activeWorkspace === "clara"
   const isAuthenticated = authStatus === "authenticated"
@@ -2126,6 +2140,29 @@ function ClaraSidePanel() {
     chatDataRef.current = chatData
     chatSignatureRef.current = chatSignature
   }, [chatData, chatSignature])
+
+  useEffect(() => {
+    authStatusRef.current = authStatus
+    authUserRef.current = authUser
+  }, [authStatus, authUser])
+
+  useEffect(() => {
+    if (isClaraWorkspace) {
+      return
+    }
+
+    const panel = panelRef.current
+
+    if (!panel) {
+      return
+    }
+
+    if (Math.abs(panel.scrollTop - panelScrollTopRef.current) <= 1) {
+      return
+    }
+
+    panel.scrollTop = panelScrollTopRef.current
+  })
 
   const syncActiveTabUrl = async () => {
     const tab = await getActiveTab()
@@ -2187,12 +2224,16 @@ function ClaraSidePanel() {
 
   const refreshAuthState = async (options?: { silent?: boolean }) => {
     if (!getConfiguredClaraApiBaseUrl()) {
-      setAuthUser(null)
-      setAuthStatus("misconfigured")
+      if (authUserRef.current !== null) {
+        setAuthUser(null)
+      }
+      if (authStatusRef.current !== "misconfigured") {
+        setAuthStatus("misconfigured")
+      }
       return false
     }
 
-    if (!options?.silent) {
+    if (!options?.silent && authStatusRef.current !== "checking") {
       setAuthStatus("checking")
     }
 
@@ -2200,17 +2241,35 @@ function ClaraSidePanel() {
       const user = await getCurrentClaraSessionUser()
 
       if (!user) {
-        setAuthUser(null)
-        setAuthStatus("unauthenticated")
+        if (authUserRef.current !== null) {
+          setAuthUser(null)
+        }
+        if (authStatusRef.current !== "unauthenticated") {
+          setAuthStatus("unauthenticated")
+        }
         return false
       }
 
-      setAuthUser(user)
-      setAuthStatus("authenticated")
+      if (
+        !authUserRef.current ||
+        authUserRef.current.id !== user.id ||
+        authUserRef.current.email !== user.email ||
+        authUserRef.current.role !== user.role ||
+        authUserRef.current.organizationName !== user.organizationName
+      ) {
+        setAuthUser(user)
+      }
+      if (authStatusRef.current !== "authenticated") {
+        setAuthStatus("authenticated")
+      }
       return true
     } catch (sessionError) {
-      setAuthUser(null)
-      setAuthStatus("unauthenticated")
+      if (authUserRef.current !== null) {
+        setAuthUser(null)
+      }
+      if (authStatusRef.current !== "unauthenticated") {
+        setAuthStatus("unauthenticated")
+      }
       setError(
         sessionError instanceof Error
           ? sessionError.message
@@ -2227,7 +2286,7 @@ function ClaraSidePanel() {
   }, [])
 
   useEffect(() => {
-    if (isAuthenticated || authStatus === "misconfigured") {
+    if (!isClaraWorkspace || isAuthenticated || authStatus === "misconfigured") {
       return
     }
 
@@ -2240,9 +2299,13 @@ function ClaraSidePanel() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [authStatus, isAuthenticated])
+  }, [authStatus, isAuthenticated, isClaraWorkspace])
 
   useEffect(() => {
+    if (!isClaraWorkspace) {
+      return
+    }
+
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") {
         return
@@ -2266,10 +2329,10 @@ function ClaraSidePanel() {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       window.removeEventListener("focus", handleFocus)
     }
-  }, [])
+  }, [isClaraWorkspace])
 
   useEffect(() => {
-    if (!chrome.cookies?.onChanged) {
+    if (!isClaraWorkspace || !chrome.cookies?.onChanged) {
       return
     }
 
@@ -2297,7 +2360,7 @@ function ClaraSidePanel() {
     return () => {
       chrome.cookies.onChanged.removeListener(listener)
     }
-  }, [])
+  }, [isClaraWorkspace])
 
   const openDashboardLogin = async () => {
     await chrome.tabs.create({
@@ -2875,13 +2938,6 @@ function ClaraSidePanel() {
         : authStatus === "misconfigured"
           ? "Setup needed"
           : "Login needed"
-  const sessionMeta = [
-    authUser?.email,
-    authUser?.organizationName,
-    authUser?.role ? `role ${authUser.role}` : ""
-  ]
-    .filter(Boolean)
-    .join(" | ")
   const draftStatusLabel = suggestions.length
     ? "Jawaban terbaik siap"
     : isSuggesting
@@ -2890,28 +2946,20 @@ function ClaraSidePanel() {
 
   return (
     <div
+      onScroll={(event) => {
+        if (isClaraWorkspace) {
+          return
+        }
+
+        panelScrollTopRef.current = event.currentTarget.scrollTop
+      }}
+      ref={panelRef}
       className={`clara-panel ${!isClaraWorkspace ? "clara-panel--chatgpt" : ""}`}>
       <style>{panelCss}</style>
 
       <div
         className={`clara-stage ${!isClaraWorkspace ? "clara-stage--chatgpt" : ""}`}>
         <section className="clara-hero">
-          <div className="clara-hero__top">
-            <div className="clara-identity">
-              <div className="clara-identity__label">Workspace</div>
-              <div className="clara-identity__name">
-                {activeWorkspace === "clara"
-                  ? authUser?.name || "Clara"
-                  : "ChatGPT Embed"}
-              </div>
-              <div className="clara-identity__meta">
-                {activeWorkspace === "clara"
-                  ? sessionMeta || LOGIN_MESSAGE
-                  : "Mode side panel untuk buka ChatGPT langsung di dalam extension."}
-              </div>
-            </div>
-            <div className="clara-build-badge">{EXTENSION_BUILD_LABEL}</div>
-          </div>
           <div className="clara-workspace-switcher">
             <button
               className={`clara-workspace-tab ${isClaraWorkspace ? "clara-workspace-tab--active" : ""}`}
@@ -2926,10 +2974,23 @@ function ClaraSidePanel() {
               ChatGPT
             </button>
           </div>
+          <div className="clara-hero__footer">
+            <div className="clara-build-badge">{EXTENSION_BUILD_LABEL}</div>
+          </div>
         </section>
 
         {!isClaraWorkspace ? (
           <section className="clara-pane clara-pane--chatgpt">
+            <div className="clara-embed-shell clara-embed-shell--chatgpt">
+              <iframe
+                allow="clipboard-read; clipboard-write"
+                className="clara-embed-frame clara-embed-frame--chatgpt"
+                referrerPolicy="strict-origin-when-cross-origin"
+                sandbox="allow-downloads allow-forms allow-popups allow-same-origin allow-scripts"
+                src={CHATGPT_EMBED_URL}
+                title="ChatGPT Embed"
+              />
+            </div>
             <div
               className={`clara-chatgpt-context ${
                 isChatGptContextExpanded ? "" : "clara-chatgpt-context--collapsed"
@@ -3030,16 +3091,6 @@ function ClaraSidePanel() {
                   hanya membaca percakapan aktif, bukan seluruh inbox.
                 </div>
               ) : null}
-            </div>
-            <div className="clara-embed-shell clara-embed-shell--chatgpt">
-              <iframe
-                allow="clipboard-read; clipboard-write"
-                className="clara-embed-frame clara-embed-frame--chatgpt"
-                referrerPolicy="strict-origin-when-cross-origin"
-                sandbox="allow-downloads allow-forms allow-popups allow-same-origin allow-scripts"
-                src={CHATGPT_EMBED_URL}
-                title="ChatGPT Embed"
-              />
             </div>
           </section>
         ) : !isAuthenticated && (
