@@ -1032,7 +1032,10 @@ function ConversationDetailContent({
     ? detail.messages
     : detail.messages.slice(Math.max(detail.messages.length - 12, 0));
   const chatTimeline = (
-    <div className="clara-card rounded-[30px] p-5 sm:p-6">
+    <div
+      data-onboarding-id="sales-conversation-timeline"
+      className="clara-card rounded-[30px] p-5 sm:p-6"
+    >
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="clara-kicker">Chat Timeline</p>
@@ -1158,7 +1161,10 @@ function ConversationDetailContent({
           <>
             <div>{chatTimeline}</div>
 
-            <section className="clara-card rounded-[30px] p-5 xl:sticky xl:top-28">
+            <section
+              data-onboarding-id="sales-conversation-workspace"
+              className="clara-card rounded-[30px] p-5 xl:sticky xl:top-28"
+            >
               <div>
                 <p className="clara-kicker">Area kerja sales</p>
                 <h3 className="mt-2 text-lg font-semibold text-slate-950">
@@ -1194,7 +1200,10 @@ function ConversationDetailContent({
                       onUpdated={onUpdated}
                     />
 
-                    <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+                    <div
+                      data-onboarding-id="sales-conversation-ai-summary"
+                      className="rounded-[26px] border border-slate-200 bg-white p-5"
+                    >
                       <p className="clara-kicker">Ringkasan Clara</p>
                       <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
                         Hasil baca percakapan
@@ -1264,28 +1273,30 @@ function ConversationDetailContent({
                       )}
                     </div>
 
-                    {suggestion ? (
-                      <ReplySuggestionActions
-                        replySuggestionId={suggestion.id}
-                        suggestedReplies={suggestion.suggested_replies}
-                        approvalStatus={suggestion.approval_status}
-                        hasBeenSent={detail.sent_messages.some(
-                          (sentMessage) =>
-                            sentMessage.reply_suggestion_id === suggestion.id,
-                        )}
-                        isStale={suggestionStale}
-                        onUpdated={onUpdated}
-                      />
-                    ) : (
-                      <div className="clara-card-outline rounded-[30px] p-5">
-                        <h2 className="text-lg font-semibold text-slate-950">
-                          Belum ada jawaban terbaik
-                        </h2>
-                        <p className="mt-2 text-sm text-slate-600">
-                          Setelah chat dibaca AI, lanjut buat jawaban terbaik supaya kamu tinggal review dan pakai.
-                        </p>
-                      </div>
-                    )}
+                    <div data-onboarding-id="sales-conversation-reply-actions">
+                      {suggestion ? (
+                        <ReplySuggestionActions
+                          replySuggestionId={suggestion.id}
+                          suggestedReplies={suggestion.suggested_replies}
+                          approvalStatus={suggestion.approval_status}
+                          hasBeenSent={detail.sent_messages.some(
+                            (sentMessage) =>
+                              sentMessage.reply_suggestion_id === suggestion.id,
+                          )}
+                          isStale={suggestionStale}
+                          onUpdated={onUpdated}
+                        />
+                      ) : (
+                        <div className="clara-card-outline rounded-[30px] p-5">
+                          <h2 className="text-lg font-semibold text-slate-950">
+                            Belum ada jawaban terbaik
+                          </h2>
+                          <p className="mt-2 text-sm text-slate-600">
+                            Setelah chat dibaca AI, lanjut buat jawaban terbaik supaya kamu tinggal review dan pakai.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : null}
 

@@ -24,7 +24,7 @@ type TourState = {
   stepIndex: number;
 };
 
-const STORAGE_VERSION = 2;
+const STORAGE_VERSION = 3;
 const VIEWPORT_GAP = 16;
 const POPUP_WIDTH = 320;
 
@@ -251,7 +251,120 @@ const TOUR_ROUTES: TourRoute[] = [
       },
     ],
   },
+  {
+    path: "/customers/[customerId]",
+    title: "Detail Customer",
+    steps: [
+      {
+        id: "sales-customer-detail-focus",
+        title: "Fokus customer ini",
+        description:
+          "Bagian atas ini merangkum customer yang sedang dibuka: seberapa aktif lead-nya, channel utamanya, dan kenapa customer ini layak dicek sekarang.",
+      },
+      {
+        id: "sales-customer-detail-summary",
+        title: "Ringkasan customer",
+        description:
+          "Panel ini membantu kamu baca customer sebagai satu entitas, meskipun dia muncul di beberapa lead atau channel.",
+      },
+      {
+        id: "sales-customer-detail-panels",
+        title: "Pilihan panel kerja",
+        description:
+          "Tombol ini dipakai untuk ganti fokus antara ringkasan customer, lead terkait, dan merge candidate tanpa pindah halaman.",
+      },
+      {
+        id: "sales-customer-detail-profile",
+        title: "Data customer inti",
+        description:
+          "Di sini kamu cek identitas customer, status, channel, dan data yang perlu dirapikan sebelum turun ke lead terkait.",
+      },
+    ],
+  },
+  {
+    path: "/sales/conversations/[conversationId]",
+    title: "Detail Percakapan",
+    steps: [
+      {
+        id: "sales-conversation-timeline",
+        title: "Timeline percakapan",
+        description:
+          "Mulai dari sini untuk baca chat terbaru lebih dulu. Fokus utamanya pahami konteks customer sebelum menjalankan AI atau memilih balasan.",
+      },
+      {
+        id: "sales-conversation-workspace",
+        title: "Area kerja sales",
+        description:
+          "Panel kanan ini adalah workspace utama saat mengerjakan satu conversation: pindah antara AI dan riwayat kirim tanpa kehilangan konteks chat.",
+      },
+      {
+        id: "sales-conversation-ai-summary",
+        title: "Ringkasan hasil baca Clara",
+        description:
+          "Bagian ini merangkum pembacaan AI terhadap chat: stage, sentimen, objection, dan next best action.",
+      },
+      {
+        id: "sales-conversation-reply-actions",
+        title: "Aksi jawaban",
+        description:
+          "Di sini kamu lanjut generate, review, lalu pilih jawaban terbaik. Tujuannya bukan langsung kirim, tapi memastikan balasan yang dipakai benar konteksnya.",
+      },
+    ],
+  },
+  {
+    path: "/crm/[leadId]",
+    title: "Detail Lead",
+    steps: [
+      {
+        id: "sales-lead-detail-focus",
+        title: "Fokus kerja lead ini",
+        description:
+          "Bagian atas ini memberi tahu tekanan utama lead saat ini: follow-up berikutnya, task terbuka, dan arah kerja yang paling dekat ke aksi.",
+      },
+      {
+        id: "sales-lead-detail-snapshot",
+        title: "Snapshot lead",
+        description:
+          "Kartu ini dipakai untuk baca kondisi inti lead secara cepat: kategori akun, kontak terakhir, owner, status deal, dan jumlah percakapan.",
+      },
+      {
+        id: "sales-lead-detail-context",
+        title: "Update konteks lead",
+        description:
+          "Form ini dipakai untuk merapikan stage, suhu lead, ringkasan, catatan internal, dan jadwal follow-up dari satu tempat.",
+      },
+      {
+        id: "sales-lead-detail-discipline",
+        title: "Catatan follow-up harian",
+        description:
+          "Bagian ini menyimpan jejak follow-up yang benar-benar terjadi supaya lead tidak cuma punya status, tapi juga ritme kerja yang kebaca jelas.",
+      },
+      {
+        id: "sales-lead-detail-timeline",
+        title: "Riwayat perubahan lead",
+        description:
+          "Timeline ini adalah audit trail cepat untuk melihat perubahan stage, follow-up, task, dan aktivitas penting lain di lead ini.",
+      },
+    ],
+  },
 ];
+
+function isDynamicRoutePath(path: string) {
+  return path.includes("[");
+}
+
+function matchesRoutePath(routePath: string, pathname: string) {
+  if (routePath === pathname) {
+    return true;
+  }
+
+  if (!isDynamicRoutePath(routePath)) {
+    return false;
+  }
+
+  const routePattern = routePath.replace(/\[[^\]]+\]/g, "[^/]+");
+  return new RegExp(`^${routePattern}$`).test(pathname);
+}
 
 function buildStorageKey(userId: string) {
   return `clara.sales-onboarding.v${STORAGE_VERSION}.${userId}`;
@@ -333,7 +446,9 @@ export function SalesOnboardingTour() {
 
   const isSalesUser = currentUser?.role === "sales";
   const userId = currentUser?.id ?? "";
-  const routeIndexFromPath = TOUR_ROUTES.findIndex((route) => route.path === pathname);
+  const routeIndexFromPath = TOUR_ROUTES.findIndex((route) =>
+    matchesRoutePath(route.path, pathname),
+  );
 
   useEffect(() => {
     if (!isSalesUser || !userId) {
@@ -483,6 +598,10 @@ export function SalesOnboardingTour() {
     tourState.stepIndex >= activeRoute.steps.length - 1;
   const isLastRoute = tourState.routeIndex >= TOUR_ROUTES.length - 1;
   const activeRouteIndex = tourState.routeIndex;
+  const nextRoute = isLastRoute ? null : TOUR_ROUTES[activeRouteIndex + 1] ?? null;
+  const nextRouteRequiresManualOpen = nextRoute
+    ? isDynamicRoutePath(nextRoute.path)
+    : false;
   const viewportHeight =
     typeof window === "undefined" ? 800 : window.innerHeight;
   const viewportWidth =
@@ -543,13 +662,14 @@ export function SalesOnboardingTour() {
     }
 
     if (!isLastRoute) {
-      const nextRoute = TOUR_ROUTES[activeRouteIndex + 1];
       updateTourState((current) => ({
         ...current,
         routeIndex: current.routeIndex + 1,
         stepIndex: 0,
       }));
-      router.push(nextRoute.path);
+      if (nextRoute && !isDynamicRoutePath(nextRoute.path)) {
+        router.push(nextRoute.path);
+      }
       return;
     }
 
@@ -642,7 +762,9 @@ export function SalesOnboardingTour() {
             {isLastStepOnRoute
               ? isLastRoute
                 ? "Ini langkah terakhir onboarding."
-                : "Setelah ini Clara akan pindah ke halaman berikutnya."
+                : nextRouteRequiresManualOpen
+                  ? "Setelah ini buka halaman detail berikutnya untuk lanjut onboarding."
+                  : "Setelah ini Clara akan pindah ke halaman berikutnya."
               : "Lanjutkan untuk melihat komponen berikutnya di halaman ini."}
           </p>
 
@@ -654,7 +776,9 @@ export function SalesOnboardingTour() {
             {isLastStepOnRoute
               ? isLastRoute
                 ? "Selesai"
-                : "Lanjut halaman"
+                : nextRouteRequiresManualOpen
+                  ? "Lanjut nanti"
+                  : "Lanjut halaman"
               : "Lanjut"}
           </button>
         </div>

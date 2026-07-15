@@ -723,7 +723,10 @@ export default function LeadDetailPage() {
         {lead && !isLoading && !errorMessage && (
           <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
             <section className="space-y-6">
-              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+              <section
+                data-onboarding-id="sales-lead-detail-focus"
+                className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
+              >
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                   {isHeadWorkspace
                     ? "Prioritas head"
@@ -760,7 +763,10 @@ export default function LeadDetailPage() {
                 </div>
               </section>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <div
+                data-onboarding-id="sales-lead-detail-snapshot"
+                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -818,6 +824,7 @@ export default function LeadDetailPage() {
               </div>
 
               <form
+                data-onboarding-id="sales-lead-detail-context"
                 onSubmit={(event) => void handleSaveLead(event)}
                 className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
               >
@@ -942,7 +949,10 @@ export default function LeadDetailPage() {
                 </div>
               </form>
 
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <section
+                data-onboarding-id="sales-lead-detail-discipline"
+                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-semibold text-slate-950">
@@ -1181,7 +1191,10 @@ export default function LeadDetailPage() {
             </section>
 
             <aside className="space-y-6">
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <section
+                data-onboarding-id="sales-lead-detail-timeline"
+                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+              >
                   <div>
                     <h2 className="text-xl font-semibold text-slate-950">
                       {isSalesWorkspace

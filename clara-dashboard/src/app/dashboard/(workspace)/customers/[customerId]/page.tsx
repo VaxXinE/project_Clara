@@ -231,7 +231,10 @@ export default function CustomerProfilePage() {
 
         {profile && !isLoading && !errorMessage ? (
           <>
-            <section className="rounded-[34px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+            <section
+              data-onboarding-id="sales-customer-detail-focus"
+              className="rounded-[34px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
+            >
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
                 {isLeadershipWorkspace
                   ? "Fokus manager pada customer ini"
@@ -256,7 +259,10 @@ export default function CustomerProfilePage() {
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-[34px] border border-slate-200 bg-white p-7 shadow-[0_18px_40px_rgba(15,23,42,0.08)]">
+            <section
+              data-onboarding-id="sales-customer-detail-summary"
+              className="overflow-hidden rounded-[34px] border border-slate-200 bg-white p-7 shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+            >
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_380px] xl:items-start">
                 <div className="max-w-4xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">
@@ -323,7 +329,10 @@ export default function CustomerProfilePage() {
               </div>
             </section>
 
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
+            <section
+              data-onboarding-id="sales-customer-detail-panels"
+              className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]"
+            >
               <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                 <div className="max-w-3xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
@@ -379,7 +388,10 @@ export default function CustomerProfilePage() {
             </section>
 
             <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-              <article className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <article
+                data-onboarding-id="sales-customer-detail-profile"
+                className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+              >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <h2 className="text-xl font-semibold text-slate-950">
