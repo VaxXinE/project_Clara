@@ -613,10 +613,7 @@ export default function SalesInboxPage() {
               </div>
             </section>
 
-            <section
-              data-onboarding-id="sales-inbox-queue"
-              className="grid gap-4"
-            >
+            <section className="grid gap-4">
               {filteredInboxItems.length === 0 ? (
                 <div className="clara-empty-state">
                   <h2 className="text-xl font-semibold text-slate-900">
@@ -643,7 +640,7 @@ export default function SalesInboxPage() {
                   )}
                 </div>
               ) : (
-                queueSections.map((section) => {
+                queueSections.map((section, sectionIndex) => {
                   const requestedPage = queueSectionPages[section.bucket] ?? 1;
                   const totalPages = Math.max(
                     1,
@@ -661,6 +658,9 @@ export default function SalesInboxPage() {
                   return (
                     <section
                       key={section.bucket}
+                      data-onboarding-id={
+                        sectionIndex === 0 ? "sales-inbox-queue" : undefined
+                      }
                       className="clara-card rounded-[28px] p-5"
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -724,11 +724,8 @@ export default function SalesInboxPage() {
                         </div>
                       ) : null}
 
-                      <div
-                        data-onboarding-id="sales-inbox-upcoming-actions"
-                        className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-                      >
-                        {paginatedItems.map((item) => {
+                      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {paginatedItems.map((item, itemIndex) => {
                           const extraction = item.latest_ai_extraction;
                           const provider = inferProviderFromSource(item.source);
                           const canAnalyze = extraction === null;
@@ -742,6 +739,11 @@ export default function SalesInboxPage() {
                           return (
                             <article
                               key={item.conversation_id}
+                              data-onboarding-id={
+                                sectionIndex === 0 && itemIndex === 0
+                                  ? "sales-inbox-upcoming-actions"
+                                  : undefined
+                              }
                               className="clara-card rounded-[30px] p-5"
                             >
                               <div className="flex h-full flex-col gap-4">

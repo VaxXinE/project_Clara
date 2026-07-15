@@ -472,10 +472,7 @@ export default function FollowUpPage() {
               </div>
             </section>
 
-            <section
-              data-onboarding-id="sales-followup-list"
-              className="clara-card rounded-[28px] p-5"
-            >
+            <section className="clara-card rounded-[28px] p-5">
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -496,7 +493,7 @@ export default function FollowUpPage() {
                     Belum ada task prioritas. Inbox Anda sedang relatif aman.
                   </div>
                 ) : (
-                  todaySections.map((section) => (
+                  todaySections.map((section, sectionIndex) => (
                     <div key={section.bucket} className="space-y-4">
                       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                         <div>
@@ -518,6 +515,11 @@ export default function FollowUpPage() {
                           item={item}
                           index={index}
                           bucket={section.bucket}
+                          onboardingTargetId={
+                            sectionIndex === 0 && index === 0
+                              ? "sales-followup-list"
+                              : undefined
+                          }
                           isUpdating={
                             updatingTaskId === (item.task_id ?? item.lead_id)
                           }
@@ -591,12 +593,14 @@ function WorklistRow({
   item,
   index,
   bucket,
+  onboardingTargetId,
   isUpdating,
   onTaskAction,
 }: {
   item: SalesWorklistItem;
   index: number;
   bucket: ActionBucketKey;
+  onboardingTargetId?: string;
   isUpdating: boolean;
   onTaskAction: (
     item: SalesWorklistItem,
@@ -623,7 +627,10 @@ function WorklistRow({
   const isItemOverdue = isOverdue(item);
 
   return (
-    <article className="clara-card rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5">
+    <article
+      data-onboarding-id={onboardingTargetId}
+      className="clara-card rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">

@@ -383,7 +383,10 @@ export default function NotificationsPage() {
         {notifications && !isLoading && !errorMessage && (
           <>
             {isHeadMonitorView ? (
-              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+              <section
+                data-onboarding-id="head-alerts-summary"
+                className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
+              >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="max-w-3xl">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
@@ -433,7 +436,10 @@ export default function NotificationsPage() {
               <>
                 {!showActiveEmptyState ? (
                   <>
-                    <section className="grid gap-4 md:grid-cols-3">
+                    <section
+                      data-onboarding-id="head-alerts-metrics"
+                      className="grid gap-4 md:grid-cols-3"
+                    >
                       <MetricCard
                         label={
                           isHeadMonitorView
@@ -585,7 +591,10 @@ export default function NotificationsPage() {
                   </section>
                 )}
 
-                <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+                <section
+                  data-onboarding-id="head-alerts-filters"
+                  className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
+                >
                   <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
@@ -652,9 +661,12 @@ export default function NotificationsPage() {
                       Tidak ada alert yang cocok dengan filter saat ini. Coba ubah status atau severity untuk melihat histori alert lain.
                     </div>
                   ) : isOversightAlertView ? (
-                    groupedNotifications.map((group) => (
+                    groupedNotifications.map((group, index) => (
                       <section
                         key={group.ownerName}
+                        data-onboarding-id={
+                          index === 0 ? "head-alerts-list" : undefined
+                        }
                         className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(27,20,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0cb73]/12 pb-4">

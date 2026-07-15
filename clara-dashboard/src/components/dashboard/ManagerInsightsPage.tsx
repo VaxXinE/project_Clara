@@ -238,7 +238,10 @@ export function ManagerInsightsPage() {
         {insights && !isLoading && !errorMessage ? (
           <>
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_320px]">
-              <section className="clara-card rounded-[32px] p-6">
+              <section
+                data-onboarding-id="manager-insights-hero"
+                className="clara-card rounded-[32px] p-6"
+              >
                 <div className="max-w-4xl">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                     {isHeadView ? "Head insight" : "Prioritas monitor"}
@@ -309,7 +312,10 @@ export function ManagerInsightsPage() {
                 </div>
               </section>
 
-              <section className="clara-card rounded-[32px] p-6">
+              <section
+                data-onboarding-id="manager-insights-steps"
+                className="clara-card rounded-[32px] p-6"
+              >
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
                   Urutan baca cepat
                 </p>
@@ -345,7 +351,10 @@ export function ManagerInsightsPage() {
               </section>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section
+              data-onboarding-id="manager-insights-metrics"
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+            >
               <MetricCard
                 label={isHeadView ? "Perlu Keputusan" : "Item Mendesak"}
                 value={String(monitorUrgencyCount)}
@@ -385,7 +394,8 @@ export function ManagerInsightsPage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-              <Panel
+              <div>
+                <Panel
                 title={isHeadView ? "Area Risiko yang Perlu Dibaca Dulu" : "Alert yang Perlu Dicek Dulu"}
                 description={
                   isHeadView
@@ -400,6 +410,9 @@ export function ManagerInsightsPage() {
                     boundaryAlerts.slice(0, 4).map((alert, index) => (
                       <article
                         key={`${alert.team_name}-${index}`}
+                        data-onboarding-id={
+                          index === 0 ? "manager-insights-alerts" : undefined
+                        }
                         className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
                       >
                         <div className="flex flex-wrap items-center gap-2">
@@ -439,9 +452,11 @@ export function ManagerInsightsPage() {
                     ))
                   )}
                 </div>
-              </Panel>
+                </Panel>
+              </div>
 
-              <Panel
+              <div>
+                <Panel
                 title={isHeadView ? "Case yang Butuh Keputusan Head" : "Case Review yang Harus Dibaca"}
                 description={
                   isHeadView
@@ -453,20 +468,25 @@ export function ManagerInsightsPage() {
                   {reviewCases.length === 0 ? (
                     <EmptyText text="Belum ada coaching case aktif di scope ini." />
                   ) : (
-                    reviewCases.slice(0, 3).map((item) => (
+                    reviewCases.slice(0, 3).map((item, index) => (
                       <CoachingPriorityCard
                         key={item.review_case_id}
                         item={item}
                         isHeadView={isHeadView}
+                        onboardingTargetId={
+                          index === 0 ? "manager-insights-cases" : undefined
+                        }
                       />
                     ))
                   )}
                 </div>
-              </Panel>
+                </Panel>
+              </div>
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-              <Panel
+              <div>
+                <Panel
                 title={isHeadView ? "Tim yang Perlu Dipantau" : "Ringkasan Kondisi Tiap Tim"}
                 description={
                   isHeadView
@@ -478,7 +498,7 @@ export function ManagerInsightsPage() {
                   {topTeamRows.length === 0 ? (
                     <EmptyText text="Belum ada data team yang bisa diringkas." />
                   ) : (
-                    topTeamRows.map((row) => {
+                    topTeamRows.map((row, index) => {
                       const teamKey = row.team_id ?? row.team_name;
                       const isExpanded =
                         row.team_id !== null && expandedTeamIds.includes(row.team_id);
@@ -488,6 +508,9 @@ export function ManagerInsightsPage() {
                           <TeamHealthCard
                             row={row}
                             isExpanded={isExpanded}
+                            onboardingTargetId={
+                              index === 0 ? "manager-insights-teams" : undefined
+                            }
                             onToggle={toggleTeamMembers}
                           />
 
@@ -535,9 +558,11 @@ export function ManagerInsightsPage() {
                     })
                   )}
                 </div>
-              </Panel>
+                </Panel>
+              </div>
 
-              <Panel
+              <div data-onboarding-id="manager-insights-objections">
+                <Panel
                 title={isHeadView ? "Pola Hambatan Tim" : "Objection yang Paling Sering Muncul"}
                 description={
                   isHeadView
@@ -566,7 +591,8 @@ export function ManagerInsightsPage() {
                     ))
                   )}
                 </div>
-              </Panel>
+                </Panel>
+              </div>
             </section>
           </>
         ) : null}
@@ -578,14 +604,19 @@ export function ManagerInsightsPage() {
 function CoachingPriorityCard({
   item,
   isHeadView,
+  onboardingTargetId,
 }: {
   item: ManagerInsightsResponse["coaching_priority"][number];
   isHeadView: boolean;
+  onboardingTargetId?: string;
 }) {
   const action = getCoachingPriorityAction(item, isHeadView);
 
   return (
-    <article className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+    <article
+      data-onboarding-id={onboardingTargetId}
+      className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-semibold text-[#fff0c9]">{item.lead_name}</p>
         <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
@@ -715,14 +746,19 @@ function ManagerStepItem({
 function TeamHealthCard({
   row,
   isExpanded,
+  onboardingTargetId,
   onToggle,
 }: {
   row: ManagerInsightsResponse["team_discipline"][number];
   isExpanded: boolean;
+  onboardingTargetId?: string;
   onToggle: (teamId: string | null) => void;
 }) {
   return (
-    <article className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5">
+    <article
+      data-onboarding-id={onboardingTargetId}
+      className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">

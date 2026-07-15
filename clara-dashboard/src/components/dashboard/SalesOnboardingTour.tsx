@@ -24,6 +24,8 @@ type TourState = {
   stepIndex: number;
 };
 
+type TourRole = "sales" | "manager" | "head";
+
 const STORAGE_VERSION = 3;
 const VIEWPORT_GAP = 16;
 const POPUP_WIDTH = 320;
@@ -349,6 +351,534 @@ const TOUR_ROUTES: TourRoute[] = [
   },
 ];
 
+const MANAGER_TOUR_ROUTES: TourRoute[] = [
+  {
+    path: "/workspace",
+    title: "Beranda Manager",
+    steps: [
+      {
+        id: "manager-shell-sidebar",
+        title: "Menu kerja manager",
+        description:
+          "Sidebar ini adalah jalur kerja manager. Fokus utamanya pindah cepat antara Beranda, Lead Tim, Review Sales, dan Monitor Tim.",
+      },
+      {
+        id: "manager-home-summary",
+        title: "Ringkasan bottleneck hari ini",
+        description:
+          "Bagian atas ini dipakai untuk tahu tekanan utama tim hari ini sebelum Anda turun ke case atau lead tertentu.",
+      },
+      {
+        id: "manager-home-next-action",
+        title: "Aksi manager berikutnya",
+        description:
+          "Panel ini menunjukkan pekerjaan paling bernilai untuk dibuka lebih dulu, jadi Anda tidak perlu membaca semua data tim sekaligus.",
+      },
+      {
+        id: "manager-home-health",
+        title: "Kondisi tim singkat",
+        description:
+          "Blok ini merangkum kesehatan ritme tim: kepatuhan follow-up, lead yang mulai macet, dan jumlah catatan yang belum rapi.",
+      },
+      {
+        id: "manager-home-quick-nav",
+        title: "Navigasi cepat manager",
+        description:
+          "Shortcut ini dipakai untuk lompat ke area kerja paling sering setelah membaca beranda.",
+      },
+      {
+        id: "manager-home-priority",
+        title: "Urutan kerja manager",
+        description:
+          "Bagian ini menjelaskan urutan kerja yang paling aman: review sales dulu, cek monitor tim, lalu turun ke lead spesifik kalau perlu.",
+      },
+      {
+        id: "manager-home-metrics",
+        title: "Angka penting manager",
+        description:
+          "Kartu angka ini dipakai untuk pembacaan cepat kondisi tim tanpa perlu buka laporan monitor penuh.",
+      },
+    ],
+  },
+  {
+    path: "/crm",
+    title: "Lead Tim",
+    steps: [
+      {
+        id: "sales-crm-hero",
+        title: "Ringkasan lead tim",
+        description:
+          "Bagian atas ini membantu manager tahu lead tim mana yang paling dekat ke risiko, overdue, atau butuh arahan cepat.",
+      },
+      {
+        id: "sales-crm-metrics",
+        title: "Angka tekanan lead tim",
+        description:
+          "Kartu ini memberi pembacaan cepat kondisi lead tim: perlu tindakan, overdue, hot, dan sinkronisasi yang tertinggal.",
+      },
+      {
+        id: "sales-crm-filters",
+        title: "Filter lead tim",
+        description:
+          "Gunakan filter ini untuk menyaring lead yang benar-benar layak dibaca manager lebih dulu.",
+      },
+      {
+        id: "sales-crm-list",
+        title: "Daftar lead prioritas",
+        description:
+          "Bagian kiri ini adalah daftar lead yang perlu dipilih dulu sebelum manager turun ke preview atau detail penuh.",
+      },
+      {
+        id: "sales-crm-preview",
+        title: "Preview keputusan cepat",
+        description:
+          "Panel kanan membantu manager cek owner, stage, sync health, dan next action tanpa harus selalu masuk ke detail lead.",
+      },
+    ],
+  },
+  {
+    path: "/approvals",
+    title: "Review Sales",
+    steps: [
+      {
+        id: "manager-approvals-summary",
+        title: "Ringkasan review sales",
+        description:
+          "Bagian atas ini dipakai untuk membaca antrean review hari ini dan menentukan kasus mana yang perlu keputusan lebih dulu.",
+      },
+      {
+        id: "manager-approvals-metrics",
+        title: "Kartu tekanan review",
+        description:
+          "Angka ini menunjukkan beban keputusan, persiapan, eskalasi, dan item stale yang perlu dijaga manager.",
+      },
+      {
+        id: "manager-approvals-filters",
+        title: "Filter antrean review",
+        description:
+          "Filter ini membantu manager memotong antrean berdasarkan bucket, risk, age, dan channel agar fokusnya tidak melebar.",
+      },
+      {
+        id: "manager-approvals-guide",
+        title: "Urutan kerja review",
+        description:
+          "Bagian ini memberi panduan ringkas cara membaca antrean review dengan urutan yang aman dan cepat.",
+      },
+      {
+        id: "manager-approvals-queue",
+        title: "Daftar case review",
+        description:
+          "Di sinilah manager membaca case satu per satu, melihat konteks singkat, lalu memutuskan jalur berikutnya.",
+      },
+    ],
+  },
+  {
+    path: "/manager-insights",
+    title: "Monitor Tim",
+    steps: [
+      {
+        id: "manager-insights-hero",
+        title: "Ringkasan monitor tim",
+        description:
+          "Bagian atas ini menjelaskan area tim yang mulai melambat dan apa yang paling layak dipantau manager sekarang.",
+      },
+      {
+        id: "manager-insights-steps",
+        title: "Urutan baca monitor",
+        description:
+          "Panduan ini membantu manager membaca halaman monitor dengan urutan yang benar: tim bermasalah dulu, lalu case coaching, lalu pola hambatan.",
+      },
+      {
+        id: "manager-insights-metrics",
+        title: "Angka utama monitor",
+        description:
+          "Kartu angka ini dipakai untuk membaca urgensi tim tanpa perlu membuka semua panel detail.",
+      },
+      {
+        id: "manager-insights-alerts",
+        title: "Alert tim yang perlu dicek",
+        description:
+          "Bagian ini berisi area risiko yang paling menonjol, supaya manager bisa mulai dari tim yang paling butuh dorongan.",
+      },
+      {
+        id: "manager-insights-cases",
+        title: "Case review prioritas",
+        description:
+          "Panel ini mengelompokkan case coaching yang paling cepat memberi dampak kalau manager ambil keputusan sekarang.",
+      },
+      {
+        id: "manager-insights-teams",
+        title: "Ringkasan kondisi tiap tim",
+        description:
+          "Di sini manager bisa membandingkan kondisi tim secara cepat, lalu membuka anggota tim saat butuh konteks lebih dalam.",
+      },
+      {
+        id: "manager-insights-objections",
+        title: "Pola hambatan tim",
+        description:
+          "Bagian ini membantu manager melihat objection yang berulang, supaya arahan tim bisa lebih sistematis dan tidak hanya case-by-case.",
+      },
+    ],
+  },
+  {
+    path: "/crm/[leadId]",
+    title: "Detail Lead",
+    steps: [
+      {
+        id: "sales-lead-detail-focus",
+        title: "Fokus lead untuk manager",
+        description:
+          "Bagian atas ini memberi pembacaan cepat tekanan utama lead sebelum manager turun ke form atau timeline detail.",
+      },
+      {
+        id: "sales-lead-detail-snapshot",
+        title: "Snapshot lead tim",
+        description:
+          "Kartu ini membantu manager mengecek kondisi inti lead: owner, kontak terakhir, follow-up, deal status, dan jumlah percakapan.",
+      },
+      {
+        id: "sales-lead-detail-context",
+        title: "Kontrol konteks lead",
+        description:
+          "Form ini adalah tempat manager memvalidasi stage, suhu lead, summary, owner, dan jadwal follow-up.",
+      },
+      {
+        id: "sales-lead-detail-discipline",
+        title: "Jejak follow-up sales",
+        description:
+          "Bagian ini membantu manager melihat apakah follow-up benar-benar berjalan atau hanya terlihat rapi di status.",
+      },
+      {
+        id: "sales-lead-detail-timeline",
+        title: "Audit trail lead",
+        description:
+          "Timeline ini dipakai manager untuk melihat perubahan penting di lead tanpa harus menebak histori kerjanya.",
+      },
+    ],
+  },
+  {
+    path: "/sales/conversations/[conversationId]",
+    title: "Detail Percakapan",
+    steps: [
+      {
+        id: "sales-conversation-timeline",
+        title: "Timeline conversation",
+        description:
+          "Manager tetap mulai dari chat terbaru supaya keputusan review tidak lepas dari konteks customer yang sebenarnya.",
+      },
+      {
+        id: "sales-conversation-workspace",
+        title: "Workspace review manager",
+        description:
+          "Panel kanan ini adalah area kerja manager untuk berpindah antara AI, coaching, knowledge, dan sent logs.",
+      },
+      {
+        id: "sales-conversation-ai-summary",
+        title: "Ringkasan AI conversation",
+        description:
+          "Bagian ini merangkum hasil baca Clara yang paling relevan untuk manager saat menilai kualitas arah balasan.",
+      },
+      {
+        id: "sales-conversation-reply-actions",
+        title: "Aksi jawaban dan review",
+        description:
+          "Di sinilah manager melihat draft, approval, dan langkah tindak lanjut sebelum memutuskan arahan ke sales.",
+      },
+    ],
+  },
+  {
+    path: "/customers/[customerId]",
+    title: "Detail Customer",
+    steps: [
+      {
+        id: "sales-customer-detail-focus",
+        title: "Fokus customer untuk manager",
+        description:
+          "Bagian atas ini membantu manager tahu customer mana yang perlu dicek dan kenapa customer ini penting buat tim sekarang.",
+      },
+      {
+        id: "sales-customer-detail-summary",
+        title: "Ringkasan customer lintas lead",
+        description:
+          "Panel ini menunjukkan customer sebagai satu entitas lintas lead dan channel, bukan sekadar satu conversation.",
+      },
+      {
+        id: "sales-customer-detail-panels",
+        title: "Pilihan panel customer",
+        description:
+          "Tombol ini membantu manager berpindah fokus antara ringkasan, lead terkait, dan merge candidate.",
+      },
+      {
+        id: "sales-customer-detail-profile",
+        title: "Data customer inti",
+        description:
+          "Di sini manager memvalidasi identitas customer dan memastikan data yang dipakai tim tidak pecah atau salah baca.",
+      },
+    ],
+  },
+];
+
+const HEAD_TOUR_ROUTES: TourRoute[] = [
+  {
+    path: "/workspace",
+    title: "Beranda Head",
+    steps: [
+      {
+        id: "head-shell-sidebar",
+        title: "Menu kerja head",
+        description:
+          "Sidebar ini adalah jalur kerja head untuk berpindah antara Beranda, Alert Tim, Monitor Tim, Arahan Tim, dan Lead Tim.",
+      },
+      {
+        id: "head-home-next-action",
+        title: "Aksi head berikutnya",
+        description:
+          "Panel utama ini menunjukkan area lintas tim yang paling layak dibaca dulu sebelum head turun ke detail yang lebih spesifik.",
+      },
+      {
+        id: "head-home-health",
+        title: "Ringkasan lintas tim",
+        description:
+          "Bagian ini dipakai untuk melihat kesehatan follow-up lintas tim secara cepat tanpa membuka halaman monitor penuh.",
+      },
+      {
+        id: "head-home-quick-nav",
+        title: "Navigasi cepat head",
+        description:
+          "Shortcut ini membantu head langsung masuk ke area kerja strategis yang paling sering dipakai.",
+      },
+      {
+        id: "head-home-priority",
+        title: "Cara baca beranda head",
+        description:
+          "Blok ini menjelaskan urutan kerja yang aman untuk head: alert besar dulu, pola monitor tim, lalu turunkan arahan.",
+      },
+      {
+        id: "head-home-metrics",
+        title: "Angka penting head",
+        description:
+          "Kartu angka ini dipakai untuk membaca tekanan lintas tim dengan cepat tanpa tenggelam di semua detail.",
+      },
+    ],
+  },
+  {
+    path: "/notifications",
+    title: "Alert Tim",
+    steps: [
+      {
+        id: "head-alerts-summary",
+        title: "Ringkasan alert tim",
+        description:
+          "Bagian atas ini membantu head memahami tingkat urgensi alert lintas tim dan area mana yang perlu dibaca dulu.",
+      },
+      {
+        id: "head-alerts-metrics",
+        title: "Kartu tekanan alert",
+        description:
+          "Kartu angka ini dipakai untuk membaca jumlah alert aktif, acknowledged, resolved, dan escalation dengan cepat.",
+      },
+      {
+        id: "head-alerts-filters",
+        title: "Filter alert tim",
+        description:
+          "Filter ini membantu head memotong daftar alert berdasarkan status dan severity agar fokusnya tetap tajam.",
+      },
+      {
+        id: "head-alerts-list",
+        title: "Daftar alert per owner",
+        description:
+          "Di sini alert dikelompokkan supaya head bisa langsung melihat owner atau area tim mana yang paling banyak butuh perhatian.",
+      },
+    ],
+  },
+  {
+    path: "/manager-insights",
+    title: "Head Insight",
+    steps: [
+      {
+        id: "manager-insights-hero",
+        title: "Ringkasan head insight",
+        description:
+          "Bagian atas ini membantu head membaca area risiko tim dan memutuskan intervensi lintas tim yang paling penting.",
+      },
+      {
+        id: "manager-insights-steps",
+        title: "Urutan baca head insight",
+        description:
+          "Blok ini menjelaskan cara membaca insight untuk head: area risiko, case keputusan, lalu pola hambatan tim.",
+      },
+      {
+        id: "manager-insights-metrics",
+        title: "Angka utama head insight",
+        description:
+          "Kartu angka ini memberi pembacaan cepat kondisi lintas tim tanpa perlu membuka semua panel detail.",
+      },
+      {
+        id: "manager-insights-alerts",
+        title: "Area risiko tim",
+        description:
+          "Panel ini berisi boundary alert atau area tim yang cukup besar untuk masuk radar keputusan head.",
+      },
+      {
+        id: "manager-insights-cases",
+        title: "Case yang butuh keputusan head",
+        description:
+          "Di sinilah head melihat case coaching yang memang butuh arahan atau validasi level lebih tinggi.",
+      },
+      {
+        id: "manager-insights-teams",
+        title: "Tim yang perlu dipantau",
+        description:
+          "Bagian ini membantu head membandingkan kondisi tiap tim tanpa harus membaca semua lead satu per satu.",
+      },
+      {
+        id: "manager-insights-objections",
+        title: "Pola hambatan lintas tim",
+        description:
+          "Panel ini membantu head melihat objection berulang yang layak dijadikan arahan umum untuk banyak tim sekaligus.",
+      },
+    ],
+  },
+  {
+    path: "/approvals",
+    title: "Arahan Tim",
+    steps: [
+      {
+        id: "manager-approvals-summary",
+        title: "Ringkasan arahan tim",
+        description:
+          "Bagian atas ini dipakai head untuk melihat antrean keputusan yang benar-benar perlu intervensi level lebih tinggi.",
+      },
+      {
+        id: "manager-approvals-metrics",
+        title: "Kartu tekanan arahan",
+        description:
+          "Angka ini memberi pembacaan cepat jumlah item yang perlu diputuskan, disiapkan, atau sudah naik eskalasi.",
+      },
+      {
+        id: "manager-approvals-filters",
+        title: "Filter arahan tim",
+        description:
+          "Gunakan filter ini untuk menyaring kasus berdasarkan bucket, risk, age, dan channel supaya keputusan head tetap fokus.",
+      },
+      {
+        id: "manager-approvals-guide",
+        title: "Urutan kerja arahan",
+        description:
+          "Bagian ini merangkum urutan kerja yang paling aman saat membaca antrean arahan tim.",
+      },
+      {
+        id: "manager-approvals-queue",
+        title: "Daftar kasus arahan",
+        description:
+          "Di sinilah head membaca case, melihat konteks singkat, lalu memutuskan jalur keputusan berikutnya.",
+      },
+    ],
+  },
+  {
+    path: "/crm",
+    title: "Lead Tim",
+    steps: [
+      {
+        id: "sales-crm-hero",
+        title: "Ringkasan lead lintas tim",
+        description:
+          "Bagian atas ini membantu head melihat lead tim mana yang paling dekat ke risiko atau butuh keputusan lintas tim.",
+      },
+      {
+        id: "sales-crm-metrics",
+        title: "Angka tekanan lead lintas tim",
+        description:
+          "Kartu angka ini memberi pembacaan cepat kondisi lead lintas tim: overdue, hot, dan sinkronisasi yang tertinggal.",
+      },
+      {
+        id: "sales-crm-filters",
+        title: "Filter lead lintas tim",
+        description:
+          "Filter ini dipakai head untuk menyaring lead yang memang layak dibaca sebelum turun ke detail.",
+      },
+      {
+        id: "sales-crm-list",
+        title: "Daftar lead tim",
+        description:
+          "Panel kiri ini adalah daftar lead prioritas yang perlu dipilih dulu sebelum membaca preview atau detail penuh.",
+      },
+      {
+        id: "sales-crm-preview",
+        title: "Preview keputusan head",
+        description:
+          "Panel kanan membantu head membaca owner, stage, sync health, dan next action tanpa harus selalu turun ke detail lead.",
+      },
+    ],
+  },
+  {
+    path: "/crm/[leadId]",
+    title: "Detail Lead",
+    steps: [
+      {
+        id: "sales-lead-detail-focus",
+        title: "Fokus lead untuk head",
+        description:
+          "Bagian atas ini membantu head melihat tekanan utama lead sebelum memberikan arahan atau intervensi.",
+      },
+      {
+        id: "sales-lead-detail-snapshot",
+        title: "Snapshot lead lintas keputusan",
+        description:
+          "Kartu ini dipakai untuk membaca kondisi inti lead secara cepat: owner, follow-up, status deal, dan jumlah percakapan.",
+      },
+      {
+        id: "sales-lead-detail-context",
+        title: "Validasi konteks lead",
+        description:
+          "Form ini adalah tempat head memvalidasi stage, owner, suhu lead, dan konteks yang memengaruhi keputusan.",
+      },
+      {
+        id: "sales-lead-detail-discipline",
+        title: "Jejak eksekusi tim",
+        description:
+          "Bagian ini membantu head melihat apakah follow-up tim benar-benar jalan atau hanya tampak rapi di status.",
+      },
+      {
+        id: "sales-lead-detail-timeline",
+        title: "Audit trail lead",
+        description:
+          "Timeline ini dipakai head untuk membaca histori perubahan lead sebelum memutuskan eskalasi atau arahan tambahan.",
+      },
+    ],
+  },
+  {
+    path: "/sales/conversations/[conversationId]",
+    title: "Detail Percakapan",
+    steps: [
+      {
+        id: "sales-conversation-timeline",
+        title: "Timeline percakapan untuk head",
+        description:
+          "Head tetap mulai dari konteks chat terbaru supaya keputusan yang diambil tidak lepas dari situasi customer sebenarnya.",
+      },
+      {
+        id: "sales-conversation-workspace",
+        title: "Workspace arahan",
+        description:
+          "Panel kanan ini adalah area kerja head untuk melihat AI, coaching, knowledge, dan sent logs tanpa kehilangan konteks utama.",
+      },
+      {
+        id: "sales-conversation-ai-summary",
+        title: "Ringkasan AI percakapan",
+        description:
+          "Bagian ini merangkum hasil baca Clara yang paling relevan untuk keputusan atau validasi arah balasan.",
+      },
+      {
+        id: "sales-conversation-reply-actions",
+        title: "Aksi keputusan percakapan",
+        description:
+          "Di sinilah head melihat draft, approval, dan jalur tindak lanjut sebelum memberi arahan ke manager atau sales.",
+      },
+    ],
+  },
+];
+
 function isDynamicRoutePath(path: string) {
   return path.includes("[");
 }
@@ -366,19 +896,33 @@ function matchesRoutePath(routePath: string, pathname: string) {
   return new RegExp(`^${routePattern}$`).test(pathname);
 }
 
-function buildStorageKey(userId: string) {
-  return `clara.sales-onboarding.v${STORAGE_VERSION}.${userId}`;
+function getTourRoutes(role: TourRole) {
+  if (role === "manager") {
+    return MANAGER_TOUR_ROUTES;
+  }
+  if (role === "head") {
+    return HEAD_TOUR_ROUTES;
+  }
+  return TOUR_ROUTES;
 }
 
-export function resetSalesOnboardingState(userId: string) {
+function buildStorageKey(userId: string, role: TourRole) {
+  return `clara.${role}-onboarding.v${STORAGE_VERSION}.${userId}`;
+}
+
+export function resetDashboardOnboardingState(userId: string, role: TourRole) {
   if (typeof window === "undefined" || !userId) {
     return;
   }
 
-  window.localStorage.removeItem(buildStorageKey(userId));
+  window.localStorage.removeItem(buildStorageKey(userId, role));
 }
 
-function readState(userId: string): TourState {
+export function resetSalesOnboardingState(userId: string) {
+  resetDashboardOnboardingState(userId, "sales");
+}
+
+function readState(userId: string, role: TourRole): TourState {
   if (typeof window === "undefined") {
     return {
       completed: false,
@@ -389,7 +933,7 @@ function readState(userId: string): TourState {
   }
 
   try {
-    const raw = window.localStorage.getItem(buildStorageKey(userId));
+    const raw = window.localStorage.getItem(buildStorageKey(userId, role));
     if (!raw) {
       return {
         completed: false,
@@ -422,12 +966,15 @@ function readState(userId: string): TourState {
   }
 }
 
-function writeState(userId: string, state: TourState) {
+function writeState(userId: string, role: TourRole, state: TourState) {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(buildStorageKey(userId), JSON.stringify(state));
+  window.localStorage.setItem(
+    buildStorageKey(userId, role),
+    JSON.stringify(state),
+  );
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -444,28 +991,39 @@ export function SalesOnboardingTour() {
   const popupRef = useRef<HTMLDivElement | null>(null);
   const [popupHeight, setPopupHeight] = useState(260);
 
-  const isSalesUser = currentUser?.role === "sales";
+  const currentTourRole: TourRole | null =
+    currentUser?.role === "sales"
+      ? "sales"
+      : currentUser?.role === "manager"
+        ? "manager"
+        : currentUser?.role === "head"
+          ? "head"
+        : null;
   const userId = currentUser?.id ?? "";
-  const routeIndexFromPath = TOUR_ROUTES.findIndex((route) =>
+  const activeTourRoutes = useMemo(
+    () => (currentTourRole ? getTourRoutes(currentTourRole) : []),
+    [currentTourRole],
+  );
+  const routeIndexFromPath = activeTourRoutes.findIndex((route) =>
     matchesRoutePath(route.path, pathname),
   );
 
   useEffect(() => {
-    if (!isSalesUser || !userId) {
+    if (!currentTourRole || !userId) {
       setTourState(null);
       return;
     }
 
-    setTourState(readState(userId));
-  }, [isSalesUser, userId]);
+    setTourState(readState(userId, currentTourRole));
+  }, [currentTourRole, userId]);
 
   useEffect(() => {
-    if (!tourState || !userId) {
+    if (!tourState || !userId || !currentTourRole) {
       return;
     }
 
-    writeState(userId, tourState);
-  }, [tourState, userId]);
+    writeState(userId, currentTourRole, tourState);
+  }, [currentTourRole, tourState, userId]);
 
   useEffect(() => {
     if (!tourState || routeIndexFromPath < 0 || tourState.completed || tourState.dismissed) {
@@ -502,8 +1060,8 @@ export function SalesOnboardingTour() {
       return null;
     }
 
-    return TOUR_ROUTES[tourState.routeIndex] ?? null;
-  }, [routeIndexFromPath, tourState]);
+    return activeTourRoutes[tourState.routeIndex] ?? null;
+  }, [activeTourRoutes, routeIndexFromPath, tourState]);
 
   const activeStep = useMemo(() => {
     if (!activeRoute || !tourState) {
@@ -588,17 +1146,19 @@ export function SalesOnboardingTour() {
     tourState?.stepIndex,
   ]);
 
-  if (!isSalesUser || !tourState || !activeRoute || !activeStep) {
+  if (!currentTourRole || !tourState || !activeRoute || !activeStep) {
     return null;
   }
 
-  const routeLabel = `${tourState.routeIndex + 1}/${TOUR_ROUTES.length}`;
+  const routeLabel = `${tourState.routeIndex + 1}/${activeTourRoutes.length}`;
   const stepLabel = `${tourState.stepIndex + 1}/${activeRoute.steps.length}`;
   const isLastStepOnRoute =
     tourState.stepIndex >= activeRoute.steps.length - 1;
-  const isLastRoute = tourState.routeIndex >= TOUR_ROUTES.length - 1;
+  const isLastRoute = tourState.routeIndex >= activeTourRoutes.length - 1;
   const activeRouteIndex = tourState.routeIndex;
-  const nextRoute = isLastRoute ? null : TOUR_ROUTES[activeRouteIndex + 1] ?? null;
+  const nextRoute = isLastRoute
+    ? null
+    : activeTourRoutes[activeRouteIndex + 1] ?? null;
   const nextRouteRequiresManualOpen = nextRoute
     ? isDynamicRoutePath(nextRoute.path)
     : false;
@@ -734,7 +1294,11 @@ export function SalesOnboardingTour() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#f6d98c]">
-              Onboarding Sales
+              {currentTourRole === "manager"
+                ? "Onboarding Manager"
+                : currentTourRole === "head"
+                  ? "Onboarding Head"
+                  : "Onboarding Sales"}
             </p>
             <h2 className="mt-2 text-xl font-bold leading-7 text-[#fff6de]">
               {activeStep.title}

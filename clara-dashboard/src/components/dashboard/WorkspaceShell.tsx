@@ -25,7 +25,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
-import { resetSalesOnboardingState } from "@/components/dashboard/SalesOnboardingTour";
+import { resetDashboardOnboardingState } from "@/components/dashboard/SalesOnboardingTour";
 import { apiFetch } from "@/lib/api";
 import {
   canAccessQueueAndActionCenter,
@@ -406,7 +406,13 @@ export function WorkspaceShell({
       return;
     }
 
-    resetSalesOnboardingState(resolvedCurrentUser.id);
+    if (
+      normalizedRole === "sales" ||
+      normalizedRole === "manager" ||
+      normalizedRole === "head"
+    ) {
+      resetDashboardOnboardingState(resolvedCurrentUser.id, normalizedRole);
+    }
     setAccountMenuOpen(false);
     window.location.href = "/workspace";
   }
@@ -427,7 +433,13 @@ export function WorkspaceShell({
         <aside
           id="clara-mobile-sidebar"
           data-onboarding-id={
-            normalizedRole === "sales" ? "sales-shell-sidebar" : undefined
+            normalizedRole === "sales"
+              ? "sales-shell-sidebar"
+              : normalizedRole === "manager"
+                ? "manager-shell-sidebar"
+                : normalizedRole === "head"
+                  ? "head-shell-sidebar"
+                : undefined
           }
           className={`fixed inset-y-0 left-0 z-50 flex w-[292px] max-w-[86vw] flex-col overflow-hidden border-r border-[#f0cb73]/14 bg-[linear-gradient(180deg,#15100a_0%,#0f0b07_48%,#090705_100%)] text-white shadow-[0_24px_48px_rgba(0,0,0,0.4)] transition-transform duration-300 xl:sticky xl:top-0 xl:z-auto xl:h-screen xl:w-auto xl:max-w-none xl:translate-x-0 xl:shadow-none ${
             mobileNavOpen ? "translate-x-0" : "-translate-x-full"
@@ -585,7 +597,9 @@ export function WorkspaceShell({
                         >
                           Profile
                         </Link>
-                        {normalizedRole === "sales" ? (
+                        {normalizedRole === "sales" ||
+                        normalizedRole === "manager" ||
+                        normalizedRole === "head" ? (
                           <button
                             type="button"
                             onClick={handleRestartOnboarding}
