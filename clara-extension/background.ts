@@ -300,6 +300,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         let lastFetchError = ""
         const replyCandidates = getReplySuggestionCandidates()
+        const authHeaders = await getClaraAuthHeaders()
+
+        if (!("Authorization" in authHeaders)) {
+          sendResponse({
+            error:
+              "Login dulu di dashboard Clara supaya seluruh fitur extension bisa dipakai.",
+            ok: false
+          })
+          return
+        }
 
         if (replyCandidates.length === 0) {
           sendResponse({
@@ -318,7 +328,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               }),
               headers: {
                 "Content-Type": "application/json",
-                ...(await getClaraAuthHeaders())
+                ...authHeaders
               },
               method: "POST"
             })

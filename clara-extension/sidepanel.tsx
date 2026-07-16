@@ -2109,6 +2109,7 @@ function ClaraSidePanel() {
 
   const isClaraWorkspace = activeWorkspace === "clara"
   const isAuthenticated = authStatus === "authenticated"
+  const shouldShowLoginGate = !isAuthenticated
 
   const latestMessage = useMemo(
     () =>
@@ -2147,7 +2148,7 @@ function ClaraSidePanel() {
   }, [authStatus, authUser])
 
   useEffect(() => {
-    if (isClaraWorkspace) {
+    if (isClaraWorkspace || !isAuthenticated) {
       return
     }
 
@@ -2186,7 +2187,7 @@ function ClaraSidePanel() {
   }, [tabUrl])
 
   useEffect(() => {
-    if (isClaraWorkspace) {
+    if (isClaraWorkspace || !isAuthenticated) {
       return
     }
 
@@ -2220,7 +2221,7 @@ function ClaraSidePanel() {
       .catch(() => {
         setChatGptContextError("Tab aktif belum berhasil dibaca.")
       })
-  }, [isClaraWorkspace, isRefreshingChatGptContext, tabUrl])
+  }, [isAuthenticated, isClaraWorkspace, isRefreshingChatGptContext, tabUrl])
 
   const refreshAuthState = async (options?: { silent?: boolean }) => {
     if (!getConfiguredClaraApiBaseUrl()) {
@@ -2637,6 +2638,10 @@ function ClaraSidePanel() {
   }
 
   const handleRefreshChatGptContext = async () => {
+    if (!(await ensureAuthenticated())) {
+      return
+    }
+
     setIsRefreshingChatGptContext(true)
     setChatGptContextError("")
     setChatGptContextFeedback("")
@@ -2979,7 +2984,38 @@ function ClaraSidePanel() {
           </div>
         </section>
 
-        {!isClaraWorkspace ? (
+        {shouldShowLoginGate ? (
+          <section className="clara-pane">
+            <div className="clara-pane__header">
+              <div>
+                <div className="clara-pane__eyebrow">Login Clara</div>
+                <div className="clara-pane__title">
+                  Login dashboard Clara dulu
+                </div>
+                <p className="clara-pane__copy">
+                  {authStatus === "misconfigured"
+                    ? "PLASMO_PUBLIC_CLARA_API_BASE_URL belum diisi. Extension butuh koneksi ke backend Clara."
+                    : authStatus === "checking"
+                      ? "Sedang memeriksa session login Clara."
+                      : "Seluruh fitur extension dikunci sampai kamu login di web Clara dengan akun yang benar."}
+                </p>
+                <p className="clara-pane__copy">
+                  Setelah login berhasil, Clara Ops dan workspace ChatGPT baru bisa dipakai.
+                </p>
+              </div>
+
+              <div className="clara-chip clara-chip--warn">
+                {authStatusLabel}
+              </div>
+            </div>
+
+            <button
+              className="clara-button clara-button--primary clara-button--block"
+              onClick={openDashboardLogin}>
+              Buka Dashboard Login
+            </button>
+          </section>
+        ) : !isClaraWorkspace ? (
           <section className="clara-pane clara-pane--chatgpt">
             <div className="clara-embed-shell clara-embed-shell--chatgpt">
               <iframe
@@ -3093,37 +3129,9 @@ function ClaraSidePanel() {
               ) : null}
             </div>
           </section>
-        ) : !isAuthenticated && (
-          <section className="clara-pane">
-            <div className="clara-pane__header">
-              <div>
-                <div className="clara-pane__eyebrow">Login Clara</div>
-                <div className="clara-pane__title">
-                  Hubungkan extension ke dashboard dulu
-                </div>
-                <p className="clara-pane__copy">
-                  {authStatus === "misconfigured"
-                    ? "PLASMO_PUBLIC_CLARA_API_BASE_URL belum diisi. Extension butuh koneksi ke backend Clara."
-                    : authStatus === "checking"
-                      ? "Sedang memeriksa session login Clara."
-                      : "Begitu login berhasil, panel ini akan otomatis lanjut ke mode kerja tanpa perlu refresh manual."}
-                </p>
-              </div>
+        ) : null}
 
-              <div className="clara-chip clara-chip--warn">
-                {authStatusLabel}
-              </div>
-            </div>
-
-            <button
-              className="clara-button clara-button--primary clara-button--block"
-              onClick={openDashboardLogin}>
-              Buka Dashboard Login
-            </button>
-          </section>
-        )}
-
-        {!isClaraWorkspace || !isAuthenticated ? null : (
+        {!isClaraWorkspace || shouldShowLoginGate ? null : (
           <>
             <section className="clara-pane">
               <div className="clara-pane__header">
