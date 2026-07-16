@@ -11,3 +11,7 @@ TEST_CONVERSATIONS_CLARA.md
 MANUAL_TEST_CASES_CLARA.md
 sales-command-center
 clara-extensioncy
+infra/.env
+infra/.env.prod
+scripts/deploy-prod.sh
+scripts/docker-up.sh
