@@ -1,0 +1,22 @@
+{
+  "global": {
+    "content_type": "application/zip",
+    "file_name": "chrome-mv3-prod.zip",
+    "role": "all",
+    "size_bytes": 448070,
+    "stored_file_name": "clara-extension-0.1.0.zip",
+    "uploaded_at": "2026-07-16T03:22:55.890774+00:00",
+    "uploaded_by_email": "23superadmin@gmail.com",
+    "version": "0.1.0"
+  },
+  "sales": {
+    "content_type": "application/zip",
+    "file_name": "chrome-mv3-prod.zip",
+    "role": "sales",
+    "size_bytes": 448070,
+    "stored_file_name": "sales-v0.1.0.zip",
+    "uploaded_at": "2026-07-16T03:14:08.060647+00:00",
+    "uploaded_by_email": "23superadmin@gmail.com",
+    "version": "v0.1.0"
+  }
+}

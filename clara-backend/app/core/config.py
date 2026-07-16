@@ -88,6 +88,7 @@ class Settings(BaseSettings):
     extension_whatsapp_enabled: bool = True
     extension_instagram_enabled: bool = False
     extension_tiktok_enabled: bool = False
+    extension_distribution_dir: str = "./storage/extension-builds"
 
     model_config = SettingsConfigDict(
         env_file=".env",
