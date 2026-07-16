@@ -725,16 +725,16 @@ function ConversationFreshnessBanner({
       ) : null}
 
       {(freshCustomerReply || analysisStale || suggestionStale) ? (
-        <div className="rounded-[28px] border border-amber-200 bg-[linear-gradient(180deg,#fff8eb_0%,#fff2d8_100%)] p-5">
+        <div className="rounded-[28px] border border-[#f0cb73]/20 bg-[linear-gradient(135deg,rgba(43,31,20,0.96)_0%,rgba(24,18,12,0.98)_100%)] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.22)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="clara-kicker text-[#9a5a08]">
+              <p className="clara-kicker text-[#f0cb73]">
                 Chat terus berkembang
               </p>
-              <h2 className="mt-2 text-lg font-bold text-slate-950">
+              <h2 className="mt-2 text-lg font-bold text-[#fff0c9]">
                 Ada konteks baru setelah tindakan terakhir
               </h2>
-              <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+              <div className="mt-3 space-y-2 text-sm leading-6 text-[#d6bb82]">
                 {freshCustomerReply ? (
                   <p>
                     Customer sudah membalas lagi setelah pesan terakhir yang
@@ -760,14 +760,14 @@ function ConversationFreshnessBanner({
             <div className="flex flex-wrap gap-3">
               <Link
                 href={continuationHref}
-                className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                className="inline-flex rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
               >
                 Upload Chat Lanjutan
               </Link>
               <button
                 type="button"
                 onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                className="inline-flex rounded-full border border-[#f0cb73]/24 bg-[#f0cb73]/10 px-4 py-2.5 text-sm font-semibold text-[#f3d694] hover:bg-[#f0cb73]/14"
               >
                 Baca dari atas lagi
               </button>

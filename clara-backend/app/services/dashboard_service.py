@@ -1,10 +1,13 @@
+import json
 from collections import Counter
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.audit_log import AuditLog
 from app.models.chat_review_case import ChatReviewCase
@@ -106,6 +109,29 @@ from app.services.source_intelligence_service import (
     normalize_source_key,
 )
 from app.services.role_service import is_head_like, is_sales_like, is_superadmin_like
+
+
+GLOBAL_EXTENSION_BUILD_KEY = "global"
+
+
+def _read_extension_distribution_manifest() -> dict[str, dict[str, object]]:
+    manifest_path = Path(settings.extension_distribution_dir).resolve() / "manifest.json"
+    if not manifest_path.exists():
+        return {}
+
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+    if not isinstance(payload, dict):
+        return {}
+
+    return {
+        str(key): value
+        for key, value in payload.items()
+        if isinstance(key, str) and isinstance(value, dict)
+    }
 
 
 def dedupe_timeline_messages(messages: list[Message]) -> list[Message]:
@@ -2046,6 +2072,37 @@ def sync_ops_notifications(
 
     desired_notifications: list[dict[str, str | None]] = []
 
+    extension_manifest = _read_extension_distribution_manifest()
+    extension_build = extension_manifest.get(GLOBAL_EXTENSION_BUILD_KEY)
+    if (
+        extension_build
+        and current_user.organization_id is not None
+        and not is_superadmin_like(current_user.role)
+    ):
+        extension_version = str(extension_build.get("version") or "").strip()
+        uploaded_at = str(extension_build.get("uploaded_at") or "").strip()
+        uploaded_by_email = str(extension_build.get("uploaded_by_email") or "").strip()
+        version_label = extension_version or "terbaru"
+        uploader_label = uploaded_by_email or "superadmin"
+
+        desired_notifications.append(
+            {
+                "source_type": "extension_build_update",
+                "source_key": f"extension-build:{version_label}:{uploaded_at or 'unknown'}",
+                "workflow_scope": "ops_oversight",
+                "owner_role": "superadmin",
+                "target_role": "all",
+                "severity": "high",
+                "title": f"Extension Clara {version_label} tersedia",
+                "body": (
+                    "Superadmin baru upload versi extension terbaru. "
+                    f"Download dari halaman profile kalau perlu update browser kerja. "
+                    f"Uploader: {uploader_label}."
+                ),
+                "target_href": "/dashboard/profile",
+            }
+        )
+
     if worklist is not None:
         for item in worklist.items[:20]:
             if item.task_type not in {
@@ -2170,7 +2227,15 @@ def sync_ops_notifications(
         OpsNotification.organization_id == current_user.organization_id
     )
     if not is_head_like(current_user.role):
-        statement = statement.where(OpsNotification.user_id == current_user.id)
+        statement = statement.where(
+            or_(
+                OpsNotification.user_id == current_user.id,
+                (
+                    (OpsNotification.source_type == "extension_build_update")
+                    & OpsNotification.user_id.is_(None)
+                ),
+            )
+        )
 
     existing_notifications = list(db.scalars(statement).all())
     existing_by_key = {
@@ -2195,12 +2260,28 @@ def sync_ops_notifications(
         if notification is None:
             notification = OpsNotification(
                 organization_id=current_user.organization_id,
-                user_id=None if is_head_like(current_user.role) else current_user.id,
+                user_id=(
+                    None
+                    if (
+                        is_head_like(current_user.role)
+                        or str(item["source_type"]) == "extension_build_update"
+                    )
+                    else current_user.id
+                ),
                 source_type=str(item["source_type"]),
                 source_key=str(item["source_key"]),
-                workflow_scope=_resolve_notification_workflow_scope(str(item["source_type"])),
-                owner_role=_resolve_notification_owner_role(str(item["source_type"])),
-                target_role=_resolve_notification_target_role(str(item["source_type"])),
+                workflow_scope=str(
+                    item.get("workflow_scope")
+                    or _resolve_notification_workflow_scope(str(item["source_type"]))
+                ),
+                owner_role=str(
+                    item.get("owner_role")
+                    or _resolve_notification_owner_role(str(item["source_type"]))
+                ),
+                target_role=str(
+                    item.get("target_role")
+                    or _resolve_notification_target_role(str(item["source_type"]))
+                ),
                 severity=str(item["severity"]),
                 title=str(item["title"]),
                 body=str(item["body"]),
@@ -2212,14 +2293,17 @@ def sync_ops_notifications(
                 escalation_level="none",
             )
         else:
-            notification.workflow_scope = _resolve_notification_workflow_scope(
-                str(item["source_type"])
+            notification.workflow_scope = str(
+                item.get("workflow_scope")
+                or _resolve_notification_workflow_scope(str(item["source_type"]))
             )
-            notification.owner_role = _resolve_notification_owner_role(
-                str(item["source_type"])
+            notification.owner_role = str(
+                item.get("owner_role")
+                or _resolve_notification_owner_role(str(item["source_type"]))
             )
-            notification.target_role = _resolve_notification_target_role(
-                str(item["source_type"])
+            notification.target_role = str(
+                item.get("target_role")
+                or _resolve_notification_target_role(str(item["source_type"]))
             )
             notification.severity = str(item["severity"])
             notification.title = str(item["title"])
@@ -2227,7 +2311,10 @@ def sync_ops_notifications(
             notification.target_href = (
                 str(item["target_href"]) if item["target_href"] else None
             )
-            if notification.status == "resolved":
+            if (
+                notification.status == "resolved"
+                and notification.source_type != "extension_build_update"
+            ):
                 notification.status = "active"
                 notification.resolved_at = None
                 notification.resolution_note = None
@@ -2258,7 +2345,13 @@ def sync_ops_notifications(
     )
     if not is_head_like(current_user.role):
         refreshed_statement = refreshed_statement.where(
-            OpsNotification.user_id == current_user.id
+            or_(
+                OpsNotification.user_id == current_user.id,
+                (
+                    (OpsNotification.source_type == "extension_build_update")
+                    & OpsNotification.user_id.is_(None)
+                ),
+            )
         )
 
     return list(db.scalars(refreshed_statement).all())

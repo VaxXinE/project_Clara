@@ -281,7 +281,9 @@ function getGlobalAlertNotifications(
   const activeItems = notifications.filter(
     (item) =>
       item.status === "active" &&
-      (!normalizedRole || item.target_role === normalizedRole),
+      (!normalizedRole ||
+        item.target_role === normalizedRole ||
+        item.target_role === "all"),
   );
   const prioritizedItems = activeItems.sort((left, right) => {
     const leftIsDealSync = left.source_type === "deal_metrics_sync" ? 1 : 0;
@@ -324,6 +326,9 @@ export function WorkspaceShell({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountMenuPathname, setAccountMenuPathname] = useState(pathname);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [resolvingNotificationId, setResolvingNotificationId] = useState<
+    string | null
+  >(null);
   const [globalNotifications, setGlobalNotifications] = useState<
     OpsNotificationItem[]
   >([]);
@@ -415,6 +420,24 @@ export function WorkspaceShell({
     }
     setAccountMenuOpen(false);
     window.location.href = "/workspace";
+  }
+
+  async function handleResolveGlobalNotification(notificationId: string) {
+    setResolvingNotificationId(notificationId);
+
+    try {
+      await apiFetch(`/dashboard/notifications/${notificationId}/resolve`, {
+        method: "PATCH",
+        body: { resolution_note: "Ditutup dari ringkasan global." },
+      });
+      setGlobalNotifications((current) =>
+        current.filter((item) => item.id !== notificationId),
+      );
+    } catch {
+      // Keep the card visible if resolve fails.
+    } finally {
+      setResolvingNotificationId(null);
+    }
   }
 
   return (
@@ -711,6 +734,18 @@ export function WorkspaceShell({
                         >
                           Buka notification center
                         </Link>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleResolveGlobalNotification(notification.id)
+                          }
+                          disabled={resolvingNotificationId === notification.id}
+                          className="inline-flex items-center rounded-full border border-[#f0cb73]/18 bg-transparent px-4 py-2.5 text-sm font-semibold text-[#c9b17a] hover:border-[#f0cb73]/30 hover:text-[#f3d694] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {resolvingNotificationId === notification.id
+                            ? "Menutup..."
+                            : "Tutup"}
+                        </button>
                       </div>
                     </div>
                   </div>

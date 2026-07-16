@@ -162,17 +162,24 @@ def test_extension_config_reports_channel_flags(
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["channels"]["whatsapp"]["enabled"] is True
-    assert payload["channels"]["instagram"]["enabled"] is False
-    assert payload["channels"]["tiktok"]["enabled"] is False
+    assert (
+        payload["channels"]["instagram"]["enabled"]
+        is settings.extension_instagram_enabled
+    )
+    assert (
+        payload["channels"]["tiktok"]["enabled"] is settings.extension_tiktok_enabled
+    )
     assert payload["channels"]["whatsapp"]["provider"] == "extension"
 
 
 def test_generic_extension_snapshot_endpoint_rejects_disabled_instagram_channel(
     client: TestClient,
     seeded_data: dict[str, object],
+    monkeypatch,
 ) -> None:
     marketing_a = seeded_data["marketing_a"]
     login(client, email=marketing_a.email, password="MarketingPass123!")
+    monkeypatch.setattr(settings, "extension_instagram_enabled", False)
 
     response = client.post(
         "/extension/instagram/snapshots",
@@ -344,6 +351,84 @@ def test_extension_snapshot_sync_updates_messages_when_chat_grows(
         ).all()
     )
     assert len(messages) == 3
+
+
+def test_extension_snapshot_sync_auto_creates_ai_extraction(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+
+    monkeypatch.setattr(
+        "app.services.ai_extraction_service.call_openai_for_extraction",
+        lambda _conversation_text: AIExtractionCreate(
+            lead_temperature="warm",
+            pipeline_stage="qualification",
+            buying_intent="medium",
+            sentiment="neutral",
+            risk_level="low",
+            main_objections=["belum ada"],
+            budget_signal={
+                "detected": False,
+                "amount_text": None,
+                "notes": "Belum ada budget spesifik.",
+            },
+            recommended_reply_strategy={
+                "tone": "friendly",
+                "key_points": ["jawab pertanyaan inti"],
+                "avoid_topics": ["klaim berlebihan"],
+            },
+            customer_summary="Customer baru membuka percakapan awal.",
+            next_best_action="Lanjutkan kebutuhan utama customer.",
+            content_insight="Percakapan awal masih ringan.",
+            internal_notes="Auto analysis dari snapshot extension.",
+            confidence_score=0.9,
+        ),
+    )
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    response = client.post(
+        "/extension/whatsapp/snapshots",
+        json={
+            "chatData": {
+                "capturedAt": "2026-05-12T09:00:00.000Z",
+                "chatTitle": "Auto Analysis Customer",
+                "chatSubtitle": "online",
+                "messages": [
+                    {
+                        "id": "09.00-0",
+                        "author": "Customer",
+                        "direction": "incoming",
+                        "text": "Halo kak, saya mau tanya dulu.",
+                        "timestampLabel": "09.00",
+                    },
+                    {
+                        "id": "09.01-1",
+                        "author": "Arya",
+                        "direction": "outgoing",
+                        "text": "Siap kak, saya bantu ya.",
+                        "timestampLabel": "09.01",
+                    },
+                ],
+            }
+        },
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 201, response.text
+
+    db = db_session_factory()
+    conversation_id = UUID(response.json()["conversation_id"])
+    extractions = list(
+        db.scalars(
+            select(AIExtraction).where(AIExtraction.conversation_id == conversation_id)
+        ).all()
+    )
+    assert len(extractions) == 1
+    assert extractions[0].pipeline_stage == "qualification"
 
 
 def test_split_reply_context_from_snapshot_text_keeps_only_new_customer_body() -> None:
