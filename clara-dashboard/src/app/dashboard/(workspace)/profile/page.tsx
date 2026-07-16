@@ -373,7 +373,10 @@ export default function ProfilePage() {
                   </div>
                 ) : null}
 
-                <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5">
+                <article
+                  data-onboarding-id="profile-extension-download"
+                  className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d6737]">
@@ -421,7 +424,11 @@ export default function ProfilePage() {
               </Panel>
 
               {canManageExtensionBuilds ? (
-                <Panel title="Upload Extension Package" eyebrow="Admin Only">
+                <Panel
+                  title="Upload Extension Package"
+                  eyebrow="Admin Only"
+                  onboardingId="profile-extension-upload"
+                >
                   <form onSubmit={handleUploadExtensionBuild} className="space-y-4">
                     <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.92)_0%,rgba(18,13,10,0.92)_100%)] p-4 text-sm leading-6 text-[#d6bb84]">
                       Superadmin upload sekali untuk semua user. File lama langsung tergantikan dan semua role akan download package yang sama.
@@ -468,14 +475,16 @@ export default function ProfilePage() {
 function Panel({
   eyebrow,
   title,
+  onboardingId,
   children,
 }: {
   eyebrow: string;
   title: string;
+  onboardingId?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="clara-card rounded-[30px] p-6">
+    <section data-onboarding-id={onboardingId} className="clara-card rounded-[30px] p-6">
       <p className="clara-kicker text-xs">{eyebrow}</p>
       <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
         {title}

@@ -26,7 +26,7 @@ type TourState = {
 
 type TourRole = "sales" | "manager" | "head";
 
-const STORAGE_VERSION = 3;
+const STORAGE_VERSION = 4;
 const VIEWPORT_GAP = 16;
 const POPUP_WIDTH = 320;
 
@@ -349,6 +349,18 @@ const TOUR_ROUTES: TourRoute[] = [
       },
     ],
   },
+  {
+    path: "/profile",
+    title: "Profile",
+    steps: [
+      {
+        id: "profile-extension-download",
+        title: "Download Clara Extension",
+        description:
+          "Ambil extension Clara dari kartu ini. Semua role memakai file extension yang sama, jadi cukup download dari sini lalu pasang ke browser kerja kamu.",
+      },
+    ],
+  },
 ];
 
 const MANAGER_TOUR_ROUTES: TourRoute[] = [
@@ -616,6 +628,18 @@ const MANAGER_TOUR_ROUTES: TourRoute[] = [
       },
     ],
   },
+  {
+    path: "/profile",
+    title: "Profile",
+    steps: [
+      {
+        id: "profile-extension-download",
+        title: "Download Clara Extension",
+        description:
+          "Kalau perlu pasang ulang atau bantu tim instal extension, ambil file extension global dari kartu ini. Manager memakai package yang sama dengan role lain.",
+      },
+    ],
+  },
 ];
 
 const HEAD_TOUR_ROUTES: TourRoute[] = [
@@ -874,6 +898,18 @@ const HEAD_TOUR_ROUTES: TourRoute[] = [
         title: "Aksi keputusan percakapan",
         description:
           "Di sinilah head melihat draft, approval, dan jalur tindak lanjut sebelum memberi arahan ke manager atau sales.",
+      },
+    ],
+  },
+  {
+    path: "/profile",
+    title: "Profile",
+    steps: [
+      {
+        id: "profile-extension-download",
+        title: "Download Clara Extension",
+        description:
+          "Halaman profile sekarang juga jadi titik distribusi extension. Head bisa arahkan user untuk ambil file extension global langsung dari kartu ini.",
       },
     ],
   },
