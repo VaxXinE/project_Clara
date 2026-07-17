@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
 from app.models.user import User
-from app.schemas.auth_schema import CreateUserRequest, UpdateUserRequest
+from app.schemas.auth_schema import CreateUserRequest, LoginOptionItem, UpdateUserRequest
 from app.models.organization import Organization
 from app.models.sales_team import SalesTeam
 from app.services.role_service import normalize_role
@@ -23,6 +23,12 @@ class AuthError(RuntimeError):
 
 
 ALLOWED_ROLES = {"superadmin", "head", "manager", "sales"}
+LOGIN_ROLE_ORDER = {
+    "superadmin": 0,
+    "head": 1,
+    "manager": 2,
+    "sales": 3,
+}
 
 
 def hash_password(password: str) -> str:
@@ -167,6 +173,36 @@ def list_users(db: Session) -> list[User]:
             )
             .order_by(User.created_at.desc())
         ).all()
+    )
+
+
+def list_login_options(db: Session) -> list[LoginOptionItem]:
+    users = list(
+        db.scalars(
+            select(User)
+            .where(User.is_active.is_(True))
+            .order_by(User.role.asc(), User.name.asc(), User.email.asc())
+        ).all()
+    )
+
+    options = [
+        LoginOptionItem(
+            role=normalize_role(user.role),
+            name=user.name,
+            email=user.email,
+        )
+        for user in users
+        if normalize_role(user.role) in ALLOWED_ROLES
+        and normalize_role(user.role) != "superadmin"
+    ]
+
+    return sorted(
+        options,
+        key=lambda item: (
+            LOGIN_ROLE_ORDER.get(item.role, 999),
+            item.name.lower(),
+            item.email.lower(),
+        ),
     )
 
 

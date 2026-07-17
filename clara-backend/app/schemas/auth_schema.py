@@ -9,6 +9,16 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=8, max_length=255)
 
 
+class LoginOptionItem(BaseModel):
+    role: str
+    name: str
+    email: str
+
+
+class LoginOptionsResponse(BaseModel):
+    items: list[LoginOptionItem]
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
