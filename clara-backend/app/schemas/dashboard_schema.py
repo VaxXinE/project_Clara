@@ -314,6 +314,169 @@ class ManagerBoundaryAlertItem(BaseModel):
     target_href: str | None
 
 
+class ManagerSalesPerformanceSummary(BaseModel):
+    sales_count: int
+    total_active_leads: int
+    total_needs_reply: int
+    total_overdue_follow_up: int
+    range_label: str = "7d"
+    previous_range_label: str = "prev_7d"
+    delta_total_needs_reply: int = 0
+    delta_total_overdue_follow_up: int = 0
+
+
+class SalesPerformanceTrend(BaseModel):
+    range_label: str
+    previous_range_label: str
+    delta_active_leads: int
+    delta_needs_reply: int
+    delta_overdue_follow_up: int
+    delta_hot_leads: int
+    delta_analyzed_conversations: int
+    delta_won_deals: int
+    momentum_label: str
+
+
+class SalesCoachingSignal(BaseModel):
+    priority_score: int
+    priority_label: str
+    primary_reason: str
+    recommended_action: str
+    focus_area: str
+
+
+class TopCoachingTargetItem(BaseModel):
+    sales_user_id: UUID
+    sales_name: str
+    priority_label: str
+    primary_reason: str
+    recommended_action: str
+
+
+class TeamTopContributorItem(BaseModel):
+    sales_user_id: UUID
+    sales_name: str
+    priority_label: str
+    primary_reason: str
+
+
+class TeamPerformanceSummary(BaseModel):
+    team_count: int
+    range_label: str
+    previous_range_label: str
+    total_overdue_follow_up: int
+    total_needs_reply: int
+
+
+class TeamPerformanceItem(BaseModel):
+    team_id: UUID | None
+    team_name: str
+    unit_id: UUID | None
+    unit_name: str | None
+    manager_user_name: str | None
+    member_count: int
+    active_leads_count: int
+    needs_reply_count: int
+    overdue_follow_up_count: int
+    hot_leads_count: int
+    analyzed_conversations_count: int
+    needs_analysis_count: int
+    won_deals_count: int
+    latest_activity_at: datetime | None
+    avg_response_sla_status: str
+    crm_discipline_status: str
+    trend: SalesPerformanceTrend
+    coaching_signal: SalesCoachingSignal
+    top_sales_contributors: list[TeamTopContributorItem]
+
+
+class ManagerSalesPerformanceItem(BaseModel):
+    sales_user_id: UUID
+    sales_name: str
+    role: str
+    active_leads_count: int
+    needs_reply_count: int
+    overdue_follow_up_count: int
+    hot_leads_count: int
+    analyzed_conversations_count: int
+    needs_analysis_count: int
+    won_deals_count: int
+    lost_deals_count: int
+    open_deals_count: int
+    latest_activity_at: datetime | None
+    avg_response_sla_status: str
+    crm_discipline_status: str
+    trend: SalesPerformanceTrend
+    coaching_signal: SalesCoachingSignal
+
+
+class SalesPerformanceDetailUser(BaseModel):
+    id: UUID
+    name: str
+    role: str
+    team_name: str | None
+    unit_name: str | None
+    is_active: bool
+
+
+class SalesPerformanceDetailSummary(BaseModel):
+    range_label: str
+    previous_range_label: str
+    active_leads_count: int
+    needs_reply_count: int
+    overdue_follow_up_count: int
+    hot_leads_count: int
+    analyzed_conversations_count: int
+    needs_analysis_count: int
+    won_deals_count: int
+    lost_deals_count: int
+    open_deals_count: int
+    latest_activity_at: datetime | None
+    avg_response_sla_status: str
+    crm_discipline_status: str
+    trend: SalesPerformanceTrend
+    coaching_signal: SalesCoachingSignal
+
+
+class SalesPerformanceLeadItem(BaseModel):
+    lead_id: UUID
+    lead_name: str
+    current_stage: str
+    lead_temperature: str
+    next_follow_up_at: datetime | None
+    last_contact_at: datetime | None
+    discipline_status: str
+    target_href: str
+
+
+class SalesPerformanceConversationItem(BaseModel):
+    conversation_id: UUID
+    conversation_title: str
+    ui_status: str
+    source_channel: str
+    risk_level: str | None
+    last_message_at: datetime | None
+    target_href: str
+
+
+class SalesPerformanceFollowUpItem(BaseModel):
+    lead_id: UUID
+    lead_name: str
+    task_type: str
+    due_at: datetime | None
+    priority_label: str
+    target_href: str
+
+
+class SalesPerformanceDetailResponse(BaseModel):
+    generated_at: datetime
+    sales_user: SalesPerformanceDetailUser
+    summary: SalesPerformanceDetailSummary
+    lead_items: list[SalesPerformanceLeadItem]
+    conversation_items: list[SalesPerformanceConversationItem]
+    follow_up_items: list[SalesPerformanceFollowUpItem]
+
+
 class ManagerInsightsResponse(BaseModel):
     generated_at: datetime
     scope_label: str
@@ -330,6 +493,11 @@ class ManagerInsightsResponse(BaseModel):
     coaching_priority: list[ManagerCoachingPriorityItem]
     objection_trends: list[ManagerObjectionTrendItem]
     boundary_alerts: list[ManagerBoundaryAlertItem]
+    sales_performance_summary: ManagerSalesPerformanceSummary
+    sales_performance: list[ManagerSalesPerformanceItem]
+    top_coaching_targets: list[TopCoachingTargetItem]
+    team_performance_summary: TeamPerformanceSummary
+    team_performance: list[TeamPerformanceItem]
 
 
 class ChatReviewCaseUpsertRequest(BaseModel):

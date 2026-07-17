@@ -559,6 +559,169 @@ export type ManagerBoundaryAlertItem = {
   target_href: string | null;
 };
 
+export type ManagerSalesPerformanceSummary = {
+  sales_count: number;
+  total_active_leads: number;
+  total_needs_reply: number;
+  total_overdue_follow_up: number;
+  range_label: string;
+  previous_range_label: string;
+  delta_total_needs_reply: number;
+  delta_total_overdue_follow_up: number;
+};
+
+export type SalesPerformanceTrend = {
+  range_label: string;
+  previous_range_label: string;
+  delta_active_leads: number;
+  delta_needs_reply: number;
+  delta_overdue_follow_up: number;
+  delta_hot_leads: number;
+  delta_analyzed_conversations: number;
+  delta_won_deals: number;
+  momentum_label: string;
+};
+
+export type SalesCoachingSignal = {
+  priority_score: number;
+  priority_label: string;
+  primary_reason: string;
+  recommended_action: string;
+  focus_area: string;
+};
+
+export type TopCoachingTargetItem = {
+  sales_user_id: string;
+  sales_name: string;
+  priority_label: string;
+  primary_reason: string;
+  recommended_action: string;
+};
+
+export type TeamTopContributorItem = {
+  sales_user_id: string;
+  sales_name: string;
+  priority_label: string;
+  primary_reason: string;
+};
+
+export type TeamPerformanceSummary = {
+  team_count: number;
+  range_label: string;
+  previous_range_label: string;
+  total_overdue_follow_up: number;
+  total_needs_reply: number;
+};
+
+export type TeamPerformanceItem = {
+  team_id: string | null;
+  team_name: string;
+  unit_id: string | null;
+  unit_name: string | null;
+  manager_user_name: string | null;
+  member_count: number;
+  active_leads_count: number;
+  needs_reply_count: number;
+  overdue_follow_up_count: number;
+  hot_leads_count: number;
+  analyzed_conversations_count: number;
+  needs_analysis_count: number;
+  won_deals_count: number;
+  latest_activity_at: string | null;
+  avg_response_sla_status: string;
+  crm_discipline_status: string;
+  trend: SalesPerformanceTrend;
+  coaching_signal: SalesCoachingSignal;
+  top_sales_contributors: TeamTopContributorItem[];
+};
+
+export type ManagerSalesPerformanceItem = {
+  sales_user_id: string;
+  sales_name: string;
+  role: string;
+  active_leads_count: number;
+  needs_reply_count: number;
+  overdue_follow_up_count: number;
+  hot_leads_count: number;
+  analyzed_conversations_count: number;
+  needs_analysis_count: number;
+  won_deals_count: number;
+  lost_deals_count: number;
+  open_deals_count: number;
+  latest_activity_at: string | null;
+  avg_response_sla_status: string;
+  crm_discipline_status: string;
+  trend: SalesPerformanceTrend;
+  coaching_signal: SalesCoachingSignal;
+};
+
+export type SalesPerformanceDetailUser = {
+  id: string;
+  name: string;
+  role: string;
+  team_name: string | null;
+  unit_name: string | null;
+  is_active: boolean;
+};
+
+export type SalesPerformanceDetailSummary = {
+  range_label: string;
+  previous_range_label: string;
+  active_leads_count: number;
+  needs_reply_count: number;
+  overdue_follow_up_count: number;
+  hot_leads_count: number;
+  analyzed_conversations_count: number;
+  needs_analysis_count: number;
+  won_deals_count: number;
+  lost_deals_count: number;
+  open_deals_count: number;
+  latest_activity_at: string | null;
+  avg_response_sla_status: string;
+  crm_discipline_status: string;
+  trend: SalesPerformanceTrend;
+  coaching_signal: SalesCoachingSignal;
+};
+
+export type SalesPerformanceLeadItem = {
+  lead_id: string;
+  lead_name: string;
+  current_stage: string;
+  lead_temperature: string;
+  next_follow_up_at: string | null;
+  last_contact_at: string | null;
+  discipline_status: string;
+  target_href: string;
+};
+
+export type SalesPerformanceConversationItem = {
+  conversation_id: string;
+  conversation_title: string;
+  ui_status: string;
+  source_channel: string;
+  risk_level: string | null;
+  last_message_at: string | null;
+  target_href: string;
+};
+
+export type SalesPerformanceFollowUpItem = {
+  lead_id: string;
+  lead_name: string;
+  task_type: string;
+  due_at: string | null;
+  priority_label: string;
+  target_href: string;
+};
+
+export type SalesPerformanceDetailResponse = {
+  generated_at: string;
+  sales_user: SalesPerformanceDetailUser;
+  summary: SalesPerformanceDetailSummary;
+  lead_items: SalesPerformanceLeadItem[];
+  conversation_items: SalesPerformanceConversationItem[];
+  follow_up_items: SalesPerformanceFollowUpItem[];
+};
+
 export type ManagerInsightsResponse = {
   generated_at: string;
   scope_label: string;
@@ -575,6 +738,11 @@ export type ManagerInsightsResponse = {
   coaching_priority: ManagerCoachingPriorityItem[];
   objection_trends: ManagerObjectionTrendItem[];
   boundary_alerts: ManagerBoundaryAlertItem[];
+  sales_performance_summary: ManagerSalesPerformanceSummary;
+  sales_performance: ManagerSalesPerformanceItem[];
+  top_coaching_targets: TopCoachingTargetItem[];
+  team_performance_summary: TeamPerformanceSummary;
+  team_performance: TeamPerformanceItem[];
 };
 
 export type SalesApprovalQueueItem = {

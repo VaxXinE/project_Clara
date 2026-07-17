@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -11,6 +11,7 @@ import { canAccessManagerInsights, isHeadRole } from "@/lib/roles";
 import type {
   CurrentUser,
   ManagerInsightsResponse,
+  SalesPerformanceDetailResponse,
 } from "@/types/dashboard";
 
 function formatPercent(value: number): string {
@@ -102,6 +103,14 @@ export function ManagerInsightsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [expandedTeamIds, setExpandedTeamIds] = useState<string[]>([]);
+  const [performanceRange, setPerformanceRange] = useState("7d");
+  const [salesSlaFilter, setSalesSlaFilter] = useState("all");
+  const [salesDisciplineFilter, setSalesDisciplineFilter] = useState("all");
+  const [salesSortBy, setSalesSortBy] = useState("overdue");
+  const [selectedSalesUserId, setSelectedSalesUserId] = useState<string | null>(null);
+  const [salesDetail, setSalesDetail] = useState<SalesPerformanceDetailResponse | null>(null);
+  const [salesDetailLoadingId, setSalesDetailLoadingId] = useState<string | null>(null);
+  const [salesDetailError, setSalesDetailError] = useState("");
   const isHeadView = isHeadRole(currentUser?.role);
   const teamRows = insights?.team_discipline ?? [];
   const reviewCases = insights?.coaching_priority ?? [];
@@ -146,6 +155,59 @@ export function ManagerInsightsPage() {
       : isHeadView
         ? "Belum ada alert besar. Pakai halaman ini untuk membaca pola hambatan antar tim dan mendeteksi area yang mulai longgar sebelum membesar."
         : "Belum ada alert besar. Pakai halaman ini untuk cek tim dengan overdue tertinggi dan menjaga ritme follow-up tetap rapi.";
+  const filteredSalesPerformance = useMemo(() => {
+    const items = insights?.sales_performance ?? [];
+    const nextItems = items.filter((item) => {
+      if (salesSlaFilter !== "all" && item.avg_response_sla_status !== salesSlaFilter) {
+        return false;
+      }
+      if (
+        salesDisciplineFilter !== "all"
+        && item.crm_discipline_status !== salesDisciplineFilter
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    return [...nextItems].sort((left, right) => {
+      if (salesSortBy === "priority") {
+        return right.coaching_signal.priority_score - left.coaching_signal.priority_score;
+      }
+      if (salesSortBy === "hot") {
+        return right.hot_leads_count - left.hot_leads_count;
+      }
+      if (salesSortBy === "latest_activity") {
+        return (right.latest_activity_at ?? "").localeCompare(left.latest_activity_at ?? "");
+      }
+      if (salesSortBy === "needs_reply") {
+        return right.needs_reply_count - left.needs_reply_count;
+      }
+      return right.overdue_follow_up_count - left.overdue_follow_up_count;
+    });
+  }, [insights?.sales_performance, salesDisciplineFilter, salesSlaFilter, salesSortBy]);
+
+  async function fetchSalesDetail(salesUserId: string, rangeLabel: string) {
+    setSelectedSalesUserId(salesUserId);
+    setSalesDetail(null);
+    setSalesDetailError("");
+    setSalesDetailLoadingId(salesUserId);
+
+    try {
+      const response = await apiFetch<SalesPerformanceDetailResponse>(
+        `/dashboard/manager-insights/sales/${salesUserId}?range=${rangeLabel}`,
+      );
+      setSalesDetail(response);
+    } catch (error) {
+      setSalesDetailError(
+        error instanceof Error
+          ? error.message
+          : "Gagal memuat detail performa sales.",
+      );
+    } finally {
+      setSalesDetailLoadingId(null);
+    }
+  }
 
   useEffect(() => {
     async function loadPage() {
@@ -159,9 +221,13 @@ export function ManagerInsightsPage() {
         }
 
         const response = await apiFetch<ManagerInsightsResponse>(
-          "/dashboard/manager-insights",
+          `/dashboard/manager-insights?range=${performanceRange}`,
         );
         setInsights(response);
+
+        if (selectedSalesUserId) {
+          await fetchSalesDetail(selectedSalesUserId, performanceRange);
+        }
       } catch (error) {
         setErrorMessage(
           error instanceof Error
@@ -174,7 +240,7 @@ export function ManagerInsightsPage() {
     }
 
     void loadPage();
-  }, [router]);
+  }, [performanceRange, router]);
 
   function toggleTeamMembers(teamId: string | null) {
     if (!teamId) {
@@ -186,6 +252,21 @@ export function ManagerInsightsPage() {
         ? current.filter((id) => id !== teamId)
         : [...current, teamId],
     );
+  }
+
+  async function handleOpenSalesDetail(salesUserId: string) {
+    if (
+      selectedSalesUserId === salesUserId
+      && salesDetail
+      && salesDetail.sales_user.id === salesUserId
+    ) {
+      setSelectedSalesUserId(null);
+      setSalesDetail(null);
+      setSalesDetailError("");
+      setSalesDetailLoadingId(null);
+      return;
+    }
+    await fetchSalesDetail(salesUserId, performanceRange);
   }
 
   return (
@@ -484,7 +565,284 @@ export function ManagerInsightsPage() {
               </div>
             </section>
 
+            <section data-onboarding-id="manager-insights-team-performance">
+              <Panel
+                title={isHeadView ? "Perbandingan Performa Tim" : "Perbandingan Tim"}
+                description={
+                  isHeadView
+                    ? "Ringkasan ini membantu Head membandingkan ritme antar tim tanpa harus turun dulu ke level sales individu."
+                    : "Lihat team mana yang backlog-nya paling berat, mana yang stabil, dan siapa sales yang paling mewakili kondisi team itu."
+                }
+              >
+                <div className="mb-4 grid gap-3 md:grid-cols-4">
+                  <MetricCard
+                    label="Jumlah Tim"
+                    value={String(insights.team_performance_summary.team_count)}
+                    hint="Total tim yang masuk scope pantau."
+                  />
+                  <MetricCard
+                    label="Perlu Balas"
+                    value={String(insights.team_performance_summary.total_needs_reply)}
+                    hint="Akumulasi backlog balasan di seluruh tim."
+                  />
+                  <MetricCard
+                    label="Overdue"
+                    value={String(insights.team_performance_summary.total_overdue_follow_up)}
+                    hint="Akumulasi follow-up yang sudah lewat jadwal."
+                  />
+                  <MetricCard
+                    label="Periode"
+                    value={insights.team_performance_summary.range_label}
+                    hint={`Dibanding ${insights.team_performance_summary.previous_range_label}.`}
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  {insights.team_performance.length === 0 ? (
+                    <EmptyText text="Belum ada data perbandingan tim di scope ini." />
+                  ) : (
+                    insights.team_performance.map((item) => (
+                      <TeamPerformanceCard key={item.team_id ?? item.team_name} item={item} />
+                    ))
+                  )}
+                </div>
+              </Panel>
+            </section>
+
             <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+              <div data-onboarding-id="manager-insights-sales-performance">
+                <Panel
+                title={isHeadView ? "Performa Sales Individu" : "Performa Tiap Sales"}
+                description={
+                  isHeadView
+                    ? "Gunakan ini untuk melihat sales mana yang ritmenya paling rapi, siapa yang mulai overload, dan siapa yang perlu perhatian lebih cepat."
+                    : "Bagian ini membantu manager melihat kondisi tiap sales tanpa harus buka lead satu per satu."
+                }
+              >
+                <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                  <div className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-sm text-[#d6bb84]">
+                    Periode aktif: <span className="font-semibold text-[#fff0c9]">{insights.sales_performance_summary.range_label}</span>
+                    {" "}dibanding{" "}
+                    <span className="font-semibold text-[#fff0c9]">
+                      {insights.sales_performance_summary.previous_range_label}
+                    </span>
+                    . Delta backlog: {formatDelta(insights.sales_performance_summary.delta_total_needs_reply)} perlu balas • {formatDelta(insights.sales_performance_summary.delta_total_overdue_follow_up)} overdue.
+                  </div>
+                  <select
+                    value={performanceRange}
+                    onChange={(event) => setPerformanceRange(event.target.value)}
+                    className="clara-input"
+                  >
+                    <option value="7d">7 hari</option>
+                    <option value="14d">14 hari</option>
+                    <option value="30d">30 hari</option>
+                  </select>
+                </div>
+
+                <div className="mb-4 rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                    Prioritas intervensi hari ini
+                  </p>
+                  <div className="mt-4 grid gap-3 md:grid-cols-3">
+                    {insights.top_coaching_targets.length === 0 ? (
+                      <EmptyText text="Belum ada sales yang butuh intervensi khusus." />
+                    ) : (
+                      insights.top_coaching_targets.map((item) => (
+                        <button
+                          key={item.sales_user_id}
+                          type="button"
+                          onClick={() => void handleOpenSalesDetail(item.sales_user_id)}
+                          className="rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-left hover:border-[#f0cb73]/28"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-[#fff0c9]">{item.sales_name}</p>
+                            <span className={getCoachingPriorityClass(item.priority_label)}>
+                              {formatStatusLabel(item.priority_label)}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm text-[#d6bb84]">{item.primary_reason}</p>
+                          <p className="mt-2 text-xs text-[#b89a62]">{item.recommended_action}</p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-4">
+                  <MetricCard
+                    label="Jumlah Sales"
+                    value={String(insights.sales_performance_summary.sales_count)}
+                    hint="Jumlah sales aktif yang masuk scope pantau."
+                  />
+                  <MetricCard
+                    label="Lead Aktif"
+                    value={String(insights.sales_performance_summary.total_active_leads)}
+                    hint="Lead yang masih berjalan dan belum closed."
+                  />
+                  <MetricCard
+                    label="Perlu Balas"
+                    value={String(insights.sales_performance_summary.total_needs_reply)}
+                    hint="Conversation yang paling butuh tindakan balas."
+                  />
+                  <MetricCard
+                    label="Follow-up Overdue"
+                    value={String(insights.sales_performance_summary.total_overdue_follow_up)}
+                    hint="Lead yang ritme follow-up-nya sudah melewati jalur aman."
+                  />
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <select
+                    value={salesSlaFilter}
+                    onChange={(event) => setSalesSlaFilter(event.target.value)}
+                    className="clara-input"
+                  >
+                    <option value="all">Semua SLA</option>
+                    <option value="healthy">SLA sehat</option>
+                    <option value="warning">SLA warning</option>
+                    <option value="critical">SLA critical</option>
+                  </select>
+                  <select
+                    value={salesDisciplineFilter}
+                    onChange={(event) => setSalesDisciplineFilter(event.target.value)}
+                    className="clara-input"
+                  >
+                    <option value="all">Semua disiplin CRM</option>
+                    <option value="disciplined">CRM rapi</option>
+                    <option value="needs_attention">Perlu perhatian</option>
+                  </select>
+                  <select
+                    value={salesSortBy}
+                    onChange={(event) => setSalesSortBy(event.target.value)}
+                    className="clara-input"
+                  >
+                    <option value="priority">Urutkan prioritas</option>
+                    <option value="overdue">Urutkan overdue</option>
+                    <option value="needs_reply">Urutkan perlu balas</option>
+                    <option value="hot">Urutkan hot lead</option>
+                    <option value="latest_activity">Urutkan aktivitas terbaru</option>
+                  </select>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {filteredSalesPerformance.length === 0 ? (
+                    <EmptyText text="Belum ada data performa sales yang cocok dengan filter ini." />
+                  ) : (
+                    filteredSalesPerformance.map((item) => (
+                      <div key={item.sales_user_id} className="space-y-3">
+                        <article className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="text-base font-semibold text-[#fff0c9]">
+                                {item.sales_name}
+                              </p>
+                              <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[#b89a62]">
+                                {formatStatusLabel(item.role)}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <span className={getCoachingPriorityClass(item.coaching_signal.priority_label)}>
+                                {formatStatusLabel(item.coaching_signal.priority_label)}
+                              </span>
+                              <span className={getMomentumClass(item.trend.momentum_label)}>
+                                {formatStatusLabel(item.trend.momentum_label)}
+                              </span>
+                              <span className={getSalesPerformanceToneClass(item.avg_response_sla_status)}>
+                                SLA {formatStatusLabel(item.avg_response_sla_status)}
+                              </span>
+                              <span className={getSalesPerformanceDisciplineClass(item.crm_discipline_status)}>
+                                CRM {formatStatusLabel(item.crm_discipline_status)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+                            <MiniStat label="Lead aktif" value={String(item.active_leads_count)} />
+                            <MiniStat label="Perlu balas" value={String(item.needs_reply_count)} />
+                            <MiniStat label="Overdue" value={String(item.overdue_follow_up_count)} />
+                            <MiniStat label="Hot lead" value={String(item.hot_leads_count)} />
+                            <MiniStat
+                              label="Analyzed"
+                              value={`${item.analyzed_conversations_count}/${item.analyzed_conversations_count + item.needs_analysis_count}`}
+                            />
+                            <MiniStat label="Butuh analysis" value={String(item.needs_analysis_count)} />
+                            <MiniStat
+                              label="Won/Lost/Open"
+                              value={`${item.won_deals_count}/${item.lost_deals_count}/${item.open_deals_count}`}
+                            />
+                            <MiniStat
+                              label="Aktivitas terbaru"
+                              value={item.latest_activity_at ? formatDateTime(item.latest_activity_at) : "-"}
+                            />
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#d6bb84]">
+                            <TrendDeltaChip label="Lead" value={item.trend.delta_active_leads} />
+                            <TrendDeltaChip label="Reply" value={item.trend.delta_needs_reply} inverse />
+                            <TrendDeltaChip label="Overdue" value={item.trend.delta_overdue_follow_up} inverse />
+                            <TrendDeltaChip label="Hot" value={item.trend.delta_hot_leads} />
+                            <TrendDeltaChip label="Analyzed" value={item.trend.delta_analyzed_conversations} />
+                            <TrendDeltaChip label="Won" value={item.trend.delta_won_deals} />
+                          </div>
+
+                          <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={getFocusAreaClass(item.coaching_signal.focus_area)}>
+                                Fokus {formatStatusLabel(item.coaching_signal.focus_area)}
+                              </span>
+                              <span className="text-xs text-[#b89a62]">
+                                Score {item.coaching_signal.priority_score}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-sm font-semibold text-[#fff0c9]">
+                              {item.coaching_signal.primary_reason}
+                            </p>
+                            <p className="mt-2 text-sm text-[#d6bb84]">
+                              {item.coaching_signal.recommended_action}
+                            </p>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => void handleOpenSalesDetail(item.sales_user_id)}
+                              className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
+                            >
+                              {selectedSalesUserId === item.sales_user_id
+                                ? salesDetailLoadingId === item.sales_user_id
+                                  ? "Memuat detail..."
+                                  : "Tutup detail"
+                                : "Buka detail sales"}
+                            </button>
+                          </div>
+                        </article>
+
+                        {selectedSalesUserId === item.sales_user_id ? (
+                          <>
+                            {salesDetailLoadingId === item.sales_user_id ? (
+                              <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[#1b140e] p-5 text-sm text-[#d6bb84]">
+                                Clara sedang memuat detail operasional sales ini...
+                              </div>
+                            ) : null}
+
+                            {!salesDetailLoadingId && salesDetailError ? (
+                              <div className="clara-alert clara-alert-danger">{salesDetailError}</div>
+                            ) : null}
+
+                            {!salesDetailLoadingId
+                            && salesDetail
+                            && salesDetail.sales_user.id === selectedSalesUserId ? (
+                              <SalesPerformanceDetailPanel detail={salesDetail} />
+                            ) : null}
+                          </>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </div>
+                </Panel>
+              </div>
+
               <div>
                 <Panel
                 title={isHeadView ? "Tim yang Perlu Dipantau" : "Ringkasan Kondisi Tiap Tim"}
@@ -827,4 +1185,426 @@ function TeamMiniMetric({
       <p className="mt-1 text-xs text-[#d6bb84]">{hint}</p>
     </div>
   );
+}
+
+function TeamPerformanceCard({
+  item,
+}: {
+  item: ManagerInsightsResponse["team_performance"][number];
+}) {
+  return (
+    <article className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-lg font-semibold text-[#fff0c9]">{item.team_name}</p>
+            <span className={getCoachingPriorityClass(item.coaching_signal.priority_label)}>
+              {formatStatusLabel(item.coaching_signal.priority_label)}
+            </span>
+            <span className={getMomentumClass(item.trend.momentum_label)}>
+              {formatStatusLabel(item.trend.momentum_label)}
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-[#b89a62]">
+            {item.unit_name ?? "Tanpa unit"} • Manager: {item.manager_user_name ?? "-"} • {item.member_count} sales
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className={getSalesPerformanceToneClass(item.avg_response_sla_status)}>
+            SLA {formatStatusLabel(item.avg_response_sla_status)}
+          </span>
+          <span className={getSalesPerformanceDisciplineClass(item.crm_discipline_status)}>
+            CRM {formatStatusLabel(item.crm_discipline_status)}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+        <MiniStat label="Lead aktif" value={String(item.active_leads_count)} />
+        <MiniStat label="Perlu balas" value={String(item.needs_reply_count)} />
+        <MiniStat label="Overdue" value={String(item.overdue_follow_up_count)} />
+        <MiniStat label="Hot lead" value={String(item.hot_leads_count)} />
+        <MiniStat
+          label="Analyzed"
+          value={`${item.analyzed_conversations_count}/${item.analyzed_conversations_count + item.needs_analysis_count}`}
+        />
+        <MiniStat label="Butuh analysis" value={String(item.needs_analysis_count)} />
+        <MiniStat label="Won deals" value={String(item.won_deals_count)} />
+        <MiniStat
+          label="Aktivitas terbaru"
+          value={item.latest_activity_at ? formatDateTime(item.latest_activity_at) : "-"}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#d6bb84]">
+        <TrendDeltaChip label="Lead" value={item.trend.delta_active_leads} />
+        <TrendDeltaChip label="Reply" value={item.trend.delta_needs_reply} inverse />
+        <TrendDeltaChip label="Overdue" value={item.trend.delta_overdue_follow_up} inverse />
+        <TrendDeltaChip label="Hot" value={item.trend.delta_hot_leads} />
+        <TrendDeltaChip label="Analyzed" value={item.trend.delta_analyzed_conversations} />
+        <TrendDeltaChip label="Won" value={item.trend.delta_won_deals} />
+      </div>
+
+      <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={getFocusAreaClass(item.coaching_signal.focus_area)}>
+            Fokus {formatStatusLabel(item.coaching_signal.focus_area)}
+          </span>
+          <span className="text-xs text-[#b89a62]">
+            Score {item.coaching_signal.priority_score}
+          </span>
+        </div>
+        <p className="mt-2 text-sm font-semibold text-[#fff0c9]">
+          {item.coaching_signal.primary_reason}
+        </p>
+        <p className="mt-2 text-sm text-[#d6bb84]">
+          {item.coaching_signal.recommended_action}
+        </p>
+      </div>
+
+      <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+          Top contributor team
+        </p>
+        {item.top_sales_contributors.length === 0 ? (
+          <p className="mt-3 text-sm text-[#d6bb84]">
+            Belum ada sales yang bisa dirangkum untuk team ini.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {item.top_sales_contributors.map((contributor) => (
+              <div
+                key={contributor.sales_user_id}
+                className="rounded-[16px] border border-[#f0cb73]/12 bg-[#17110b] p-3"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-[#fff0c9]">
+                    {contributor.sales_name}
+                  </p>
+                  <span className={getCoachingPriorityClass(contributor.priority_label)}>
+                    {formatStatusLabel(contributor.priority_label)}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-[#d6bb84]">
+                  {contributor.primary_reason}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[18px] border border-[#f0cb73]/12 bg-[#1b140e] p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
+    </div>
+  );
+}
+
+function SalesPerformanceDetailPanel({
+  detail,
+}: {
+  detail: SalesPerformanceDetailResponse;
+}) {
+  const summary = detail.summary;
+  const teamLabel = [detail.sales_user.team_name, detail.sales_user.unit_name]
+    .filter(Boolean)
+    .join(" • ");
+
+  return (
+    <section className="rounded-[24px] border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(28,20,14,0.98)_0%,rgba(15,11,8,0.98)_100%)] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+            Drill-down performa sales
+          </p>
+          <h3 className="mt-3 text-2xl font-semibold text-[#fff0c9]">
+            {detail.sales_user.name}
+          </h3>
+          <p className="mt-2 text-sm text-[#d6bb84]">
+            {formatStatusLabel(detail.sales_user.role)}
+            {teamLabel ? ` • ${teamLabel}` : ""}
+            {` • ${detail.sales_user.is_active ? "Active" : "Inactive"}`}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className={getSalesPerformanceToneClass(summary.avg_response_sla_status)}>
+            SLA {formatStatusLabel(summary.avg_response_sla_status)}
+          </span>
+          <span className={getSalesPerformanceDisciplineClass(summary.crm_discipline_status)}>
+            CRM {formatStatusLabel(summary.crm_discipline_status)}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <MiniStat label="Lead aktif" value={String(summary.active_leads_count)} />
+        <MiniStat label="Perlu balas" value={String(summary.needs_reply_count)} />
+        <MiniStat label="Overdue" value={String(summary.overdue_follow_up_count)} />
+        <MiniStat label="Hot lead" value={String(summary.hot_leads_count)} />
+        <MiniStat
+          label="Analyzed"
+          value={`${summary.analyzed_conversations_count}/${summary.analyzed_conversations_count + summary.needs_analysis_count}`}
+        />
+        <MiniStat label="Butuh analysis" value={String(summary.needs_analysis_count)} />
+        <MiniStat
+          label="Won/Lost/Open"
+          value={`${summary.won_deals_count}/${summary.lost_deals_count}/${summary.open_deals_count}`}
+        />
+        <MiniStat
+          label="Aktivitas terbaru"
+          value={summary.latest_activity_at ? formatDateTime(summary.latest_activity_at) : "-"}
+        />
+      </div>
+
+      <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-sm text-[#d6bb84]">
+        Periode aktif: <span className="font-semibold text-[#fff0c9]">{summary.range_label}</span>
+        {" "}dibanding{" "}
+        <span className="font-semibold text-[#fff0c9]">{summary.previous_range_label}</span>.
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className={getMomentumClass(summary.trend.momentum_label)}>
+            {formatStatusLabel(summary.trend.momentum_label)}
+          </span>
+          <TrendDeltaChip label="Lead" value={summary.trend.delta_active_leads} />
+          <TrendDeltaChip label="Reply" value={summary.trend.delta_needs_reply} inverse />
+          <TrendDeltaChip label="Overdue" value={summary.trend.delta_overdue_follow_up} inverse />
+          <TrendDeltaChip label="Hot" value={summary.trend.delta_hot_leads} />
+          <TrendDeltaChip label="Analyzed" value={summary.trend.delta_analyzed_conversations} />
+          <TrendDeltaChip label="Won" value={summary.trend.delta_won_deals} />
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={getCoachingPriorityClass(summary.coaching_signal.priority_label)}>
+            {formatStatusLabel(summary.coaching_signal.priority_label)}
+          </span>
+          <span className={getFocusAreaClass(summary.coaching_signal.focus_area)}>
+            Fokus {formatStatusLabel(summary.coaching_signal.focus_area)}
+          </span>
+          <span className="text-xs text-[#b89a62]">
+            Score {summary.coaching_signal.priority_score}
+          </span>
+        </div>
+        <p className="mt-3 text-sm font-semibold text-[#fff0c9]">
+          Arahan intervensi
+        </p>
+        <p className="mt-2 text-sm text-[#d6bb84]">
+          {summary.coaching_signal.primary_reason}
+        </p>
+        <p className="mt-2 text-sm text-[#d6bb84]">
+          {summary.coaching_signal.recommended_action}
+        </p>
+      </div>
+
+      <div className="mt-6 grid gap-4 xl:grid-cols-3">
+        <DetailListPanel
+          title="Lead Milik Sales"
+          emptyText="Belum ada lead milik sales ini."
+          items={detail.lead_items.map((item) => (
+            <Link
+              key={item.lead_id}
+              href={item.target_href}
+              className="block rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 hover:border-[#f0cb73]/28"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-[#fff0c9]">{item.lead_name}</p>
+                <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                  {formatStatusLabel(item.current_stage)}
+                </span>
+                <span className={getSalesPerformanceDisciplineClass(item.discipline_status)}>
+                  {formatStatusLabel(item.discipline_status)}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-[#d6bb84]">
+                Temp: {formatStatusLabel(item.lead_temperature)} • Last contact: {item.last_contact_at ? formatDateTime(item.last_contact_at) : "-"}
+              </p>
+              <p className="mt-1 text-sm text-[#d6bb84]">
+                Next follow-up: {item.next_follow_up_at ? formatDateTime(item.next_follow_up_at) : "-"}
+              </p>
+            </Link>
+          ))}
+        />
+
+        <DetailListPanel
+          title="Conversation Perlu Perhatian"
+          emptyText="Belum ada conversation yang perlu perhatian khusus."
+          items={detail.conversation_items.map((item) => (
+            <Link
+              key={item.conversation_id}
+              href={item.target_href}
+              className="block rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 hover:border-[#f0cb73]/28"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-[#fff0c9]">{item.conversation_title}</p>
+                <span className={getConversationStatusClass(item.ui_status)}>
+                  {formatStatusLabel(item.ui_status)}
+                </span>
+                {item.risk_level ? (
+                  <span className={getSalesPerformanceToneClass(item.risk_level === "high" ? "critical" : "warning")}>
+                    Risk {formatStatusLabel(item.risk_level)}
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-2 text-sm text-[#d6bb84]">
+                Channel: {formatStatusLabel(item.source_channel)} • Last message: {item.last_message_at ? formatDateTime(item.last_message_at) : "-"}
+              </p>
+            </Link>
+          ))}
+        />
+
+        <DetailListPanel
+          title="Follow-up Overdue"
+          emptyText="Belum ada follow-up overdue untuk sales ini."
+          items={detail.follow_up_items.map((item) => (
+            <Link
+              key={item.lead_id}
+              href={item.target_href}
+              className="block rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 hover:border-[#f0cb73]/28"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-[#fff0c9]">{item.lead_name}</p>
+                <span className={getFollowUpPriorityClass(item.priority_label)}>
+                  {formatStatusLabel(item.priority_label)}
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-[#d6bb84]">
+                Task: {formatStatusLabel(item.task_type)} • Due: {item.due_at ? formatDateTime(item.due_at) : "-"}
+              </p>
+            </Link>
+          ))}
+        />
+      </div>
+    </section>
+  );
+}
+
+function DetailListPanel({
+  title,
+  emptyText,
+  items,
+}: {
+  title: string;
+  emptyText: string;
+  items: React.ReactNode[];
+}) {
+  return (
+    <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+      <p className="text-sm font-semibold text-[#fff0c9]">{title}</p>
+      <div className="mt-4 space-y-3">
+        {items.length === 0 ? <EmptyText text={emptyText} /> : items}
+      </div>
+    </section>
+  );
+}
+
+function TrendDeltaChip({
+  label,
+  value,
+  inverse = false,
+}: {
+  label: string;
+  value: number;
+  inverse?: boolean;
+}) {
+  const isPositiveGood = inverse ? value < 0 : value > 0;
+  const isNegativeBad = inverse ? value > 0 : value < 0;
+
+  return (
+    <span
+      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+        isPositiveGood
+          ? "border-[#f0cb73]/18 bg-[#f0cb73]/10 text-[#f0cb73]"
+          : isNegativeBad
+            ? "border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
+            : "border-[#3c2c16] bg-[#22190f] text-[#c8ad75]"
+      }`}
+    >
+      {label} {formatDelta(value)}
+    </span>
+  );
+}
+
+function getSalesPerformanceToneClass(status: string) {
+  if (status === "critical") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  if (status === "warning") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  return "rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+}
+
+function getSalesPerformanceDisciplineClass(status: string) {
+  if (status === "needs_attention") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  return "rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+}
+
+function getConversationStatusClass(status: string) {
+  if (status === "needs_escalation" || status === "needs_approval") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  if (status === "needs_analysis" || status === "needs_reply_suggestion") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  return "rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+}
+
+function getFollowUpPriorityClass(priorityLabel: string) {
+  if (priorityLabel === "tinggi") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  if (priorityLabel === "sedang") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  return "rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+}
+
+function getMomentumClass(momentumLabel: string) {
+  if (momentumLabel === "declining") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  if (momentumLabel === "improving") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  return "rounded-full border border-[#3c2c16] bg-[#22190f] px-2.5 py-1 text-xs font-semibold text-[#c8ad75]";
+}
+
+function getCoachingPriorityClass(priorityLabel: string) {
+  if (priorityLabel === "urgent") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  if (priorityLabel === "high") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  if (priorityLabel === "normal") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  return "rounded-full border border-[#3c2c16] bg-[#22190f] px-2.5 py-1 text-xs font-semibold text-[#c8ad75]";
+}
+
+function getFocusAreaClass(focusArea: string) {
+  return "rounded-full border border-[#f0cb73]/18 bg-[#1f160d] px-2.5 py-1 text-xs font-semibold text-[#d6bb84]";
+}
+
+function formatDelta(value: number) {
+  if (value > 0) {
+    return `+${value}`;
+  }
+  return String(value);
 }
