@@ -10,12 +10,65 @@ import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import { canAccessManagerInsights, isHeadRole } from "@/lib/roles";
 import type {
   CurrentUser,
+  HistoricalPerformanceSummary,
   ManagerInsightsResponse,
+  PerformanceActionCreateRequest,
+  PerformanceActionItem,
+  PerformanceActionListResponse,
+  PerformanceActionUpdateRequest,
   SalesPerformanceDetailResponse,
+  WeeklyReviewAlertItem,
+  WeeklyReviewEntityItem,
+  WeeklyPerformanceSnapshotItem,
 } from "@/types/dashboard";
 
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(0)}%`;
+}
+
+function formatWeekLabel(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+  }).format(date);
+}
+
+type ActionDraft = {
+  contextKey: string;
+  sourceType: string;
+  sourceReferenceId: string | null;
+  teamId: string | null;
+  salesUserId: string | null;
+  actionType: string;
+  title: string;
+  description: string;
+  assignedToUserId: string;
+  priorityLabel: string;
+  dueAt: string;
+};
+
+function resolveDefaultActionType(focusArea: string): string {
+  if (focusArea === "reply_backlog") {
+    return "reply_backlog_review";
+  }
+  if (focusArea === "follow_up") {
+    return "follow_up_recovery";
+  }
+  if (focusArea === "discipline") {
+    return "crm_cleanup";
+  }
+  return "coaching";
+}
+
+function resolveActionPriority(priorityLabel: string): string {
+  if (priorityLabel === "stable") {
+    return "low";
+  }
+  return priorityLabel;
 }
 
 function getCoachingPriorityAction(item: {
@@ -111,7 +164,13 @@ export function ManagerInsightsPage() {
   const [salesDetail, setSalesDetail] = useState<SalesPerformanceDetailResponse | null>(null);
   const [salesDetailLoadingId, setSalesDetailLoadingId] = useState<string | null>(null);
   const [salesDetailError, setSalesDetailError] = useState("");
+  const [actionList, setActionList] = useState<PerformanceActionListResponse | null>(null);
+  const [actionListError, setActionListError] = useState("");
+  const [actionDraft, setActionDraft] = useState<ActionDraft | null>(null);
+  const [actionSubmitKey, setActionSubmitKey] = useState<string | null>(null);
+  const [actionStatusLoadingId, setActionStatusLoadingId] = useState<string | null>(null);
   const isHeadView = isHeadRole(currentUser?.role);
+  const weeklyReview = insights?.weekly_review ?? null;
   const teamRows = insights?.team_discipline ?? [];
   const reviewCases = insights?.coaching_priority ?? [];
   const boundaryAlerts = insights?.boundary_alerts ?? [];
@@ -186,6 +245,30 @@ export function ManagerInsightsPage() {
       return right.overdue_follow_up_count - left.overdue_follow_up_count;
     });
   }, [insights?.sales_performance, salesDisciplineFilter, salesSlaFilter, salesSortBy]);
+  const openActionItems = useMemo(
+    () =>
+      (actionList?.items ?? []).filter(
+        (item) => item.status === "open" || item.status === "in_progress",
+      ),
+    [actionList?.items],
+  );
+  const actionAssigneeOptions = insights?.sales_performance ?? [];
+
+  async function loadPerformanceActions() {
+    try {
+      const response = await apiFetch<PerformanceActionListResponse>(
+        "/dashboard/performance-actions",
+      );
+      setActionList(response);
+      setActionListError("");
+    } catch (error) {
+      setActionListError(
+        error instanceof Error
+          ? error.message
+          : "Gagal memuat action operasional.",
+      );
+    }
+  }
 
   async function fetchSalesDetail(salesUserId: string, rangeLabel: string) {
     setSelectedSalesUserId(salesUserId);
@@ -224,6 +307,7 @@ export function ManagerInsightsPage() {
           `/dashboard/manager-insights?range=${performanceRange}`,
         );
         setInsights(response);
+        await loadPerformanceActions();
 
         if (selectedSalesUserId) {
           await fetchSalesDetail(selectedSalesUserId, performanceRange);
@@ -269,6 +353,136 @@ export function ManagerInsightsPage() {
     await fetchSalesDetail(salesUserId, performanceRange);
   }
 
+  function handleWeeklyReviewEntityOpen(item: WeeklyReviewEntityItem) {
+    if (item.scope_type === "sales" && item.sales_user_id) {
+      void handleOpenSalesDetail(item.sales_user_id);
+      return;
+    }
+    router.push(item.target_href ?? "/dashboard/manager-insights");
+  }
+
+  function handleWeeklyReviewTeamAction(item: WeeklyReviewEntityItem) {
+    const matchedTeam = insights?.team_performance.find(
+      (team) => team.team_id === item.team_id,
+    );
+    if (matchedTeam) {
+      openTeamActionDraft(matchedTeam);
+      return;
+    }
+    router.push("/dashboard/notifications");
+  }
+
+  function openSalesActionDraft(item: ManagerInsightsResponse["sales_performance"][number]) {
+    setActionDraft({
+      contextKey: `sales:${item.sales_user_id}`,
+      sourceType: "sales_performance",
+      sourceReferenceId: item.sales_user_id,
+      teamId: null,
+      salesUserId: item.sales_user_id,
+      actionType: resolveDefaultActionType(item.coaching_signal.focus_area),
+      title: `Tindak lanjuti ${item.sales_name}`,
+      description: item.coaching_signal.recommended_action,
+      assignedToUserId: item.sales_user_id,
+      priorityLabel: resolveActionPriority(item.coaching_signal.priority_label),
+      dueAt: "",
+    });
+  }
+
+  function openTeamActionDraft(item: ManagerInsightsResponse["team_performance"][number]) {
+    const defaultAssigneeId =
+      item.top_sales_contributors[0]?.sales_user_id ?? actionAssigneeOptions[0]?.sales_user_id ?? "";
+
+    setActionDraft({
+      contextKey: `team:${item.team_id ?? item.team_name}`,
+      sourceType: "team_performance",
+      sourceReferenceId: item.team_id,
+      teamId: item.team_id,
+      salesUserId: defaultAssigneeId || null,
+      actionType: resolveDefaultActionType(item.coaching_signal.focus_area),
+      title: `Intervensi ${item.team_name}`,
+      description: item.coaching_signal.recommended_action,
+      assignedToUserId: defaultAssigneeId,
+      priorityLabel: resolveActionPriority(item.coaching_signal.priority_label),
+      dueAt: "",
+    });
+  }
+
+  async function handleSubmitActionDraft(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!actionDraft) {
+      return;
+    }
+
+    setActionSubmitKey(actionDraft.contextKey);
+    setErrorMessage("");
+
+    try {
+      const payload: PerformanceActionCreateRequest = {
+        assigned_to_user_id: actionDraft.assignedToUserId,
+        team_id: actionDraft.teamId,
+        sales_user_id: actionDraft.salesUserId,
+        source_type: actionDraft.sourceType,
+        source_reference_id: actionDraft.sourceReferenceId,
+        title: actionDraft.title,
+        description: actionDraft.description,
+        action_type: actionDraft.actionType,
+        priority_label: actionDraft.priorityLabel,
+        due_at: actionDraft.dueAt ? new Date(actionDraft.dueAt).toISOString() : null,
+      };
+      await apiFetch<PerformanceActionItem>("/dashboard/performance-actions", {
+        method: "POST",
+        body: payload,
+      });
+      setActionDraft(null);
+      await loadPerformanceActions();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Gagal membuat action operasional.",
+      );
+    } finally {
+      setActionSubmitKey(null);
+    }
+  }
+
+  async function handleActionStatusUpdate(
+    actionId: string,
+    nextStatus: "in_progress" | "done" | "skipped",
+  ) {
+    setActionStatusLoadingId(actionId);
+    setActionListError("");
+
+    try {
+      let resolutionNote: string | null = null;
+      if (nextStatus === "skipped" && typeof window !== "undefined") {
+        resolutionNote = window.prompt("Alasan lewati action ini:", "")?.trim() ?? "";
+        if (!resolutionNote) {
+          setActionStatusLoadingId(null);
+          return;
+        }
+      }
+
+      const payload: PerformanceActionUpdateRequest = {
+        status: nextStatus,
+        resolution_note: resolutionNote,
+      };
+      await apiFetch<PerformanceActionItem>(`/dashboard/performance-actions/${actionId}`, {
+        method: "PATCH",
+        body: payload,
+      });
+      await loadPerformanceActions();
+    } catch (error) {
+      setActionListError(
+        error instanceof Error
+          ? error.message
+          : "Gagal mengubah status action.",
+      );
+    } finally {
+      setActionStatusLoadingId(null);
+    }
+  }
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
@@ -293,6 +507,13 @@ export function ManagerInsightsPage() {
             className="clara-button clara-button-primary"
           >
             {isHeadView ? "Buka Alert Tim" : "Buka Review Sales"}
+          </Link>
+          <Link
+            href="/api/dashboard/manager-insights/weekly-review?format=csv"
+            className="clara-button clara-button-ghost"
+            target="_blank"
+          >
+            Export Weekly CSV
           </Link>
           {isHeadView ? (
             <Link
@@ -565,6 +786,264 @@ export function ManagerInsightsPage() {
               </div>
             </section>
 
+            <section>
+              <Panel
+                title={isHeadView ? "Action Operasional Terbuka" : "Action Tim yang Sedang Jalan"}
+                description={
+                  isHeadView
+                    ? "Head cukup cek action yang masih terbuka untuk melihat apakah arahan yang sudah dibuat benar-benar bergerak."
+                    : "Bagian ini menjaga insight tidak berhenti di layar. Lihat action yang masih open, sedang dikerjakan, atau perlu ditutup."
+                }
+              >
+                <div className="grid gap-3 md:grid-cols-4">
+                  <MetricCard
+                    label="Open"
+                    value={String(actionList?.open_count ?? 0)}
+                    hint="Action yang belum mulai dikerjakan."
+                  />
+                  <MetricCard
+                    label="In Progress"
+                    value={String(actionList?.in_progress_count ?? 0)}
+                    hint="Action yang sedang dijalankan tim."
+                  />
+                  <MetricCard
+                    label="Done"
+                    value={String(actionList?.done_count ?? 0)}
+                    hint="Action yang sudah ditutup selesai."
+                  />
+                  <MetricCard
+                    label="Skipped"
+                    value={String(actionList?.skipped_count ?? 0)}
+                    hint="Action yang ditutup tanpa dikerjakan."
+                  />
+                </div>
+
+                {actionListError ? (
+                  <div className="mt-4 clara-alert clara-alert-danger">{actionListError}</div>
+                ) : null}
+
+                <div className="mt-4 space-y-3">
+                  {openActionItems.length === 0 ? (
+                    <EmptyText text="Belum ada action terbuka. Buat action langsung dari kartu sales atau team di bawah." />
+                  ) : (
+                    openActionItems.slice(0, 8).map((item) => (
+                      <article
+                        key={item.id}
+                        className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-[#fff0c9]">{item.title}</p>
+                              <span className={getCoachingPriorityClass(item.priority_label)}>
+                                {formatStatusLabel(item.priority_label)}
+                              </span>
+                              <span className={getSalesPerformanceDisciplineClass(item.status)}>
+                                {formatStatusLabel(item.status)}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-sm text-[#d6bb84]">{item.description}</p>
+                            <p className="mt-2 text-xs text-[#b89a62]">
+                              Assignee: {item.assigned_to_user_name ?? "-"} • Source: {formatStatusLabel(item.source_type)} • Due: {formatDateTime(item.due_at)}
+                            </p>
+                            <p className="mt-1 text-xs text-[#b89a62]">
+                              Creator: {item.created_by_user_name ?? "-"} • Target: {item.sales_name ?? item.team_name ?? "-"}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {item.status === "open" ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleActionStatusUpdate(item.id, "in_progress")}
+                                className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                              >
+                                {actionStatusLoadingId === item.id ? "Memproses..." : "Mulai"}
+                              </button>
+                            ) : null}
+                            {item.status !== "done" ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleActionStatusUpdate(item.id, "done")}
+                                className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3 py-2 text-xs font-semibold text-[#140f08] hover:brightness-105"
+                              >
+                                {actionStatusLoadingId === item.id ? "Memproses..." : "Selesai"}
+                              </button>
+                            ) : null}
+                            {item.status !== "done" && item.status !== "skipped" ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleActionStatusUpdate(item.id, "skipped")}
+                                className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                              >
+                                {actionStatusLoadingId === item.id ? "Memproses..." : "Lewati"}
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </Panel>
+            </section>
+
+            {insights.historical_summary ? (
+              <section>
+                <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                    Ringkasan historis mingguan
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className={getMomentumClass(insights.historical_summary.trend_label)}>
+                      {formatStatusLabel(insights.historical_summary.trend_label)}
+                    </span>
+                    <TrendDeltaChip
+                      label="Backlog"
+                      value={insights.historical_summary.delta_total_needs_reply}
+                      inverse
+                    />
+                    <TrendDeltaChip
+                      label="Overdue"
+                      value={insights.historical_summary.delta_total_overdue_follow_up}
+                      inverse
+                    />
+                  </div>
+                  <p className="mt-3 text-sm text-[#d6bb84]">
+                    Dibanding snapshot minggu sebelumnya
+                    {insights.historical_summary.latest_snapshot_date
+                      ? ` (${formatWeekLabel(insights.historical_summary.latest_snapshot_date)})`
+                      : ""}
+                    . Kalau backlog dan overdue turun, berarti ritme tim mulai membaik.
+                  </p>
+                </div>
+              </section>
+            ) : null}
+
+            {weeklyReview ? (
+              <section>
+                <Panel
+                  title={isHeadView ? "Weekly Review Head" : "Weekly Review Manager"}
+                  description={
+                    isHeadView
+                      ? "Ringkas dulu siapa yang naik, siapa yang turun, tim mana yang perlu disentuh, action apa yang masih terbuka, dan alert kritikal apa yang belum selesai."
+                      : "Pakai blok ini untuk review mingguan cepat tanpa bongkar semua kartu performa satu per satu."
+                  }
+                >
+                  <div className="mb-4 rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-sm text-[#d6bb84]">
+                    Periode review:{" "}
+                    <span className="font-semibold text-[#fff0c9]">
+                      {formatWeekLabel(weeklyReview.review_start)} - {formatWeekLabel(weeklyReview.review_end)}
+                    </span>
+                    {" "}• Scope:{" "}
+                    <span className="font-semibold text-[#fff0c9]">{weeklyReview.scope_label}</span>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard
+                      label="Tim Sehat"
+                      value={String(weeklyReview.healthy_team_count)}
+                      hint="Jumlah tim yang ritmenya masih relatif aman minggu ini."
+                    />
+                    <MetricCard
+                      label="Perlu Perhatian"
+                      value={String(weeklyReview.teams_needing_attention_count)}
+                      hint="Tim yang backlog, overdue, atau disiplin CRM-nya mulai bocor."
+                    />
+                    <MetricCard
+                      label="Action Terbuka"
+                      value={String(weeklyReview.unresolved_action_count)}
+                      hint="Action open dan in progress yang belum selesai."
+                    />
+                    <MetricCard
+                      label="Critical Alert"
+                      value={String(weeklyReview.critical_alert_open_count)}
+                      hint="Alert kritikal yang masih aktif atau baru di-acknowledge."
+                    />
+                  </div>
+
+                  <div className="mt-5 grid gap-6 xl:grid-cols-3">
+                    <WeeklyReviewEntitySection
+                      title="Top Improvers"
+                      description="Naik paling jelas dibanding snapshot minggu sebelumnya."
+                      items={weeklyReview.top_improvers}
+                      emptyText="Belum ada improver yang cukup menonjol minggu ini."
+                      actionLabel="Buka detail"
+                      onAction={handleWeeklyReviewEntityOpen}
+                    />
+                    <WeeklyReviewEntitySection
+                      title="Biggest Risks"
+                      description="Yang paling terasa melambat atau mulai bocor."
+                      items={weeklyReview.biggest_risks}
+                      emptyText="Belum ada risiko besar yang menonjol minggu ini."
+                      actionLabel="Buka detail"
+                      onAction={handleWeeklyReviewEntityOpen}
+                    />
+                    <WeeklyReviewEntitySection
+                      title="Teams Needing Intervention"
+                      description="Tim yang paling layak disentuh dulu minggu ini."
+                      items={weeklyReview.teams_needing_intervention}
+                      emptyText="Belum ada tim yang butuh intervensi tambahan."
+                      actionLabel="Buat action"
+                      onAction={handleWeeklyReviewTeamAction}
+                    />
+                  </div>
+
+                  <div className="mt-5 grid gap-6 xl:grid-cols-2">
+                    <section id="open-actions" className="space-y-3">
+                      <h3 className="text-base font-semibold text-[#fff0c9]">Unresolved Actions</h3>
+                      <p className="text-sm text-[#d6bb84]">
+                        Action terbuka yang masih harus ditutup supaya review mingguan tidak berhenti di insight.
+                      </p>
+                      {weeklyReview.unresolved_actions.length === 0 ? (
+                        <EmptyText text="Belum ada unresolved action di scope review ini." />
+                      ) : (
+                        weeklyReview.unresolved_actions.map((item) => (
+                          <article
+                            key={item.id}
+                            className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-[#fff0c9]">{item.title}</p>
+                              <span className={getCoachingPriorityClass(item.priority_label)}>
+                                {formatStatusLabel(item.priority_label)}
+                              </span>
+                              <span className={getSalesPerformanceDisciplineClass(item.status)}>
+                                {formatStatusLabel(item.status)}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-sm text-[#d6bb84]">{item.description}</p>
+                            <p className="mt-2 text-xs text-[#b89a62]">
+                              Target: {item.sales_name ?? item.team_name ?? "-"} • Due: {formatDateTime(item.due_at)}
+                            </p>
+                          </article>
+                        ))
+                      )}
+                    </section>
+
+                    <section className="space-y-3">
+                      <h3 className="text-base font-semibold text-[#fff0c9]">Critical Alerts Open</h3>
+                      <p className="text-sm text-[#d6bb84]">
+                        Alert kritikal yang belum selesai dan perlu dibaca sebelum review minggu ini ditutup.
+                      </p>
+                      {weeklyReview.critical_alerts_open.length === 0 ? (
+                        <EmptyText text="Belum ada alert kritikal yang masih terbuka." />
+                      ) : (
+                        weeklyReview.critical_alerts_open.map((item) => (
+                          <WeeklyReviewAlertCard key={item.notification_id} item={item} />
+                        ))
+                      )}
+                      <Link
+                        href="/dashboard/notifications"
+                        className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                      >
+                        Buka Notification Center
+                      </Link>
+                    </section>
+                  </div>
+                </Panel>
+              </section>
+            ) : null}
+
             <section data-onboarding-id="manager-insights-team-performance">
               <Panel
                 title={isHeadView ? "Perbandingan Performa Tim" : "Perbandingan Tim"}
@@ -602,7 +1081,22 @@ export function ManagerInsightsPage() {
                     <EmptyText text="Belum ada data perbandingan tim di scope ini." />
                   ) : (
                     insights.team_performance.map((item) => (
-                      <TeamPerformanceCard key={item.team_id ?? item.team_name} item={item} />
+                      <div key={item.team_id ?? item.team_name} className="space-y-3">
+                        <TeamPerformanceCard
+                          item={item}
+                          onCreateAction={() => openTeamActionDraft(item)}
+                        />
+                        {actionDraft?.contextKey === `team:${item.team_id ?? item.team_name}` ? (
+                          <ActionDraftPanel
+                            draft={actionDraft}
+                            salesOptions={actionAssigneeOptions}
+                            isSubmitting={actionSubmitKey === actionDraft.contextKey}
+                            onCancel={() => setActionDraft(null)}
+                            onChange={setActionDraft}
+                            onSubmit={handleSubmitActionDraft}
+                          />
+                        ) : null}
+                      </div>
                     ))
                   )}
                 </div>
@@ -777,6 +1271,16 @@ export function ManagerInsightsPage() {
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#d6bb84]">
+                            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                              Score {item.scorecard.overall_score}
+                            </span>
+                            <span className={getScoreLabelClass(item.scorecard.score_label)}>
+                              {formatStatusLabel(item.scorecard.score_label)}
+                            </span>
+                            <span className={getMomentumClass(item.scorecard.score_trend_label)}>
+                              {formatStatusLabel(item.scorecard.score_trend_label)}
+                            </span>
+                            <TrendDeltaChip label="Score" value={item.scorecard.score_delta_vs_previous} />
                             <TrendDeltaChip label="Lead" value={item.trend.delta_active_leads} />
                             <TrendDeltaChip label="Reply" value={item.trend.delta_needs_reply} inverse />
                             <TrendDeltaChip label="Overdue" value={item.trend.delta_overdue_follow_up} inverse />
@@ -784,6 +1288,12 @@ export function ManagerInsightsPage() {
                             <TrendDeltaChip label="Analyzed" value={item.trend.delta_analyzed_conversations} />
                             <TrendDeltaChip label="Won" value={item.trend.delta_won_deals} />
                           </div>
+
+                          <HistoricalSummaryPanel
+                            className="mt-4"
+                            summary={item.history_summary}
+                            weeklyHistory={item.weekly_history}
+                          />
 
                           <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
                             <div className="flex flex-wrap items-center gap-2">
@@ -814,8 +1324,26 @@ export function ManagerInsightsPage() {
                                   : "Tutup detail"
                                 : "Buka detail sales"}
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => openSalesActionDraft(item)}
+                              className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                            >
+                              Buat action
+                            </button>
                           </div>
                         </article>
+
+                        {actionDraft?.contextKey === `sales:${item.sales_user_id}` ? (
+                          <ActionDraftPanel
+                            draft={actionDraft}
+                            salesOptions={actionAssigneeOptions}
+                            isSubmitting={actionSubmitKey === actionDraft.contextKey}
+                            onCancel={() => setActionDraft(null)}
+                            onChange={setActionDraft}
+                            onSubmit={handleSubmitActionDraft}
+                          />
+                        ) : null}
 
                         {selectedSalesUserId === item.sales_user_id ? (
                           <>
@@ -1031,6 +1559,109 @@ function CoachingPriorityCard({
   );
 }
 
+function WeeklyReviewEntitySection({
+  title,
+  description,
+  items,
+  emptyText,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  items: WeeklyReviewEntityItem[];
+  emptyText: string;
+  actionLabel: string;
+  onAction: (item: WeeklyReviewEntityItem) => void;
+}) {
+  return (
+    <section className="space-y-3">
+      <div>
+        <h3 className="text-base font-semibold text-[#fff0c9]">{title}</h3>
+        <p className="mt-1 text-sm text-[#d6bb84]">{description}</p>
+      </div>
+      {items.length === 0 ? (
+        <EmptyText text={emptyText} />
+      ) : (
+        items.map((item) => (
+          <article
+            key={`${title}-${item.scope_type}-${item.sales_user_id ?? item.team_id ?? item.label}`}
+            className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-[#fff0c9]">{item.label}</p>
+              <span className={getScoreLabelClass(item.score_label)}>
+                {formatStatusLabel(item.score_label)}
+              </span>
+              <span className={getMomentumClass(item.trend_label)}>
+                {formatStatusLabel(item.trend_label)}
+              </span>
+              <TrendDeltaChip label="Score" value={item.score_delta} />
+            </div>
+            <p className="mt-2 text-sm text-[#d6bb84]">{item.summary}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#d6bb84]">
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 font-semibold text-[#f0cb73]">
+                Score {item.score}
+              </span>
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#22190f] px-2.5 py-1 font-semibold text-[#e1c27c]">
+                Backlog {item.backlog_count}
+              </span>
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#22190f] px-2.5 py-1 font-semibold text-[#e1c27c]">
+                Overdue {item.overdue_count}
+              </span>
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#22190f] px-2.5 py-1 font-semibold text-[#e1c27c]">
+                Action {item.action_open_count}
+              </span>
+              <span className="rounded-full border border-[#f0cb73]/18 bg-[#22190f] px-2.5 py-1 font-semibold text-[#e1c27c]">
+                Alert {item.critical_alert_count}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onAction(item)}
+              className="mt-4 inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+            >
+              {actionLabel}
+            </button>
+          </article>
+        ))
+      )}
+    </section>
+  );
+}
+
+function WeeklyReviewAlertCard({
+  item,
+}: {
+  item: WeeklyReviewAlertItem;
+}) {
+  return (
+    <article className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm font-semibold text-[#fff0c9]">{item.title}</p>
+        <span className={getCoachingPriorityClass(item.severity)}>
+          {formatStatusLabel(item.severity)}
+        </span>
+        <span className={getSalesPerformanceDisciplineClass(item.status)}>
+          {formatStatusLabel(item.status)}
+        </span>
+      </div>
+      <p className="mt-2 text-sm text-[#d6bb84]">{item.description}</p>
+      <p className="mt-2 text-xs text-[#b89a62]">
+        {item.team_name ?? item.sales_name ?? "Tanpa target spesifik"} • Trigger: {formatDateTime(item.triggered_at)}
+      </p>
+      {item.target_href ? (
+        <Link
+          href={item.target_href}
+          className="mt-4 inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+        >
+          Buka area terkait
+        </Link>
+      ) : null}
+    </article>
+  );
+}
+
 function MetricCard({
   label,
   value,
@@ -1187,10 +1818,115 @@ function TeamMiniMetric({
   );
 }
 
+function HistoricalSummaryPanel({
+  summary,
+  weeklyHistory,
+  className = "",
+}: {
+  summary: HistoricalPerformanceSummary | null;
+  weeklyHistory: WeeklyPerformanceSnapshotItem[];
+  className?: string;
+}) {
+  if (!summary && weeklyHistory.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className={`rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 ${className}`.trim()}>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+          4 minggu terakhir
+        </p>
+        {summary ? (
+          <>
+            <span className={getMomentumClass(summary.trend_label)}>
+              {formatStatusLabel(summary.trend_label)}
+            </span>
+            <TrendDeltaChip label="Reply" value={summary.delta_needs_reply} inverse />
+            <TrendDeltaChip label="Overdue" value={summary.delta_overdue_follow_up} inverse />
+            <TrendDeltaChip label="Won" value={summary.delta_won_deals} />
+          </>
+        ) : null}
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-4">
+        {weeklyHistory.length === 0 ? (
+          <p className="text-sm text-[#d6bb84]">Snapshot mingguan belum tersedia.</p>
+        ) : (
+          weeklyHistory.map((item) => (
+            <div
+              key={`${item.snapshot_granularity}-${item.snapshot_date}`}
+              className="rounded-[16px] border border-[#f0cb73]/12 bg-[#17110b] p-3"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+                {formatWeekLabel(item.snapshot_date)}
+              </p>
+              <div className="mt-2 space-y-1 text-sm text-[#d6bb84]">
+                <p>Reply {item.needs_reply_count}</p>
+                <p>Overdue {item.overdue_follow_up_count}</p>
+                <p>Won {item.won_deals_count}</p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScorecardPanel({
+  scorecard,
+  className = "",
+}: {
+  scorecard: ManagerInsightsResponse["sales_performance"][number]["scorecard"];
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 ${className}`.trim()}>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+          Scorecard operasional
+        </p>
+        <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+          Score {scorecard.overall_score}
+        </span>
+        <span className={getScoreLabelClass(scorecard.score_label)}>
+          {formatStatusLabel(scorecard.score_label)}
+        </span>
+        <span className={getMomentumClass(scorecard.score_trend_label)}>
+          {formatStatusLabel(scorecard.score_trend_label)}
+        </span>
+        <TrendDeltaChip label="Score" value={scorecard.score_delta_vs_previous} />
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <MiniStat label="Response" value={String(scorecard.response_discipline_score)} />
+        <MiniStat label="Follow-up" value={String(scorecard.follow_up_discipline_score)} />
+        <MiniStat label="Hot lead" value={String(scorecard.hot_lead_handling_score)} />
+        <MiniStat label="Pipeline" value={String(scorecard.pipeline_movement_score)} />
+        <MiniStat label="CRM hygiene" value={String(scorecard.crm_hygiene_score)} />
+      </div>
+
+      <div className="mt-4 rounded-[16px] border border-[#f0cb73]/12 bg-[#17110b] p-4">
+        <p className="text-sm font-semibold text-[#fff0c9]">{scorecard.primary_reason}</p>
+        {scorecard.secondary_reason ? (
+          <p className="mt-2 text-sm text-[#d6bb84]">{scorecard.secondary_reason}</p>
+        ) : null}
+        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+          Rekomendasi
+        </p>
+        <p className="mt-1 text-sm text-[#d6bb84]">{scorecard.recommended_action}</p>
+      </div>
+    </div>
+  );
+}
+
 function TeamPerformanceCard({
   item,
+  onCreateAction,
 }: {
   item: ManagerInsightsResponse["team_performance"][number];
+  onCreateAction: () => void;
 }) {
   return (
     <article className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5">
@@ -1237,6 +1973,16 @@ function TeamPerformanceCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs text-[#d6bb84]">
+        <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+          Score {item.scorecard.overall_score}
+        </span>
+        <span className={getScoreLabelClass(item.scorecard.score_label)}>
+          {formatStatusLabel(item.scorecard.score_label)}
+        </span>
+        <span className={getMomentumClass(item.scorecard.score_trend_label)}>
+          {formatStatusLabel(item.scorecard.score_trend_label)}
+        </span>
+        <TrendDeltaChip label="Score" value={item.scorecard.score_delta_vs_previous} />
         <TrendDeltaChip label="Lead" value={item.trend.delta_active_leads} />
         <TrendDeltaChip label="Reply" value={item.trend.delta_needs_reply} inverse />
         <TrendDeltaChip label="Overdue" value={item.trend.delta_overdue_follow_up} inverse />
@@ -1244,6 +1990,12 @@ function TeamPerformanceCard({
         <TrendDeltaChip label="Analyzed" value={item.trend.delta_analyzed_conversations} />
         <TrendDeltaChip label="Won" value={item.trend.delta_won_deals} />
       </div>
+
+      <HistoricalSummaryPanel
+        className="mt-4"
+        summary={item.history_summary}
+        weeklyHistory={item.weekly_history}
+      />
 
       <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -1293,7 +2045,130 @@ function TeamPerformanceCard({
           </div>
         )}
       </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onCreateAction}
+          className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+        >
+          Buat action tim
+        </button>
+      </div>
     </article>
+  );
+}
+
+function ActionDraftPanel({
+  draft,
+  salesOptions,
+  isSubmitting,
+  onCancel,
+  onChange,
+  onSubmit,
+}: {
+  draft: ActionDraft;
+  salesOptions: ManagerInsightsResponse["sales_performance"];
+  isSubmitting: boolean;
+  onCancel: () => void;
+  onChange: (draft: ActionDraft) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => Promise<void>;
+}) {
+  return (
+    <form
+      onSubmit={(event) => void onSubmit(event)}
+      className="rounded-[22px] border border-[#f0cb73]/16 bg-[#1b140e] p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-[#fff0c9]">Buat action operasional</p>
+          <p className="mt-1 text-xs text-[#b89a62]">
+            Simpan tindakan langsung dari insight ini tanpa pindah halaman.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-1.5 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+        >
+          Tutup
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <select
+          value={draft.actionType}
+          onChange={(event) => onChange({ ...draft, actionType: event.target.value })}
+          className="clara-input"
+        >
+          <option value="coaching">Coaching</option>
+          <option value="follow_up_recovery">Follow-up recovery</option>
+          <option value="reply_backlog_review">Reply backlog review</option>
+          <option value="crm_cleanup">CRM cleanup</option>
+          <option value="weekly_review">Weekly review</option>
+        </select>
+        <select
+          value={draft.priorityLabel}
+          onChange={(event) => onChange({ ...draft, priorityLabel: event.target.value })}
+          className="clara-input"
+        >
+          <option value="urgent">Urgent</option>
+          <option value="high">High</option>
+          <option value="normal">Normal</option>
+          <option value="low">Low</option>
+        </select>
+        <select
+          value={draft.assignedToUserId}
+          onChange={(event) =>
+            onChange({
+              ...draft,
+              assignedToUserId: event.target.value,
+              salesUserId: draft.salesUserId ? event.target.value : draft.salesUserId,
+            })
+          }
+          className="clara-input"
+        >
+          <option value="">Pilih assignee</option>
+          {salesOptions.map((item) => (
+            <option key={item.sales_user_id} value={item.sales_user_id}>
+              {item.sales_name}
+            </option>
+          ))}
+        </select>
+        <input
+          type="datetime-local"
+          value={draft.dueAt}
+          onChange={(event) => onChange({ ...draft, dueAt: event.target.value })}
+          className="clara-input"
+        />
+      </div>
+
+      <div className="mt-3 space-y-3">
+        <input
+          type="text"
+          value={draft.title}
+          onChange={(event) => onChange({ ...draft, title: event.target.value })}
+          className="clara-input"
+          placeholder="Judul action"
+        />
+        <textarea
+          value={draft.description}
+          onChange={(event) => onChange({ ...draft, description: event.target.value })}
+          className="clara-input min-h-[110px]"
+          placeholder="Apa yang perlu dilakukan?"
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={isSubmitting || !draft.assignedToUserId}
+          className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSubmitting ? "Menyimpan..." : "Simpan action"}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -1386,6 +2261,14 @@ function SalesPerformanceDetailPanel({
           <TrendDeltaChip label="Won" value={summary.trend.delta_won_deals} />
         </div>
       </div>
+
+      <HistoricalSummaryPanel
+        className="mt-4"
+        summary={summary.history_summary}
+        weeklyHistory={summary.weekly_history}
+      />
+
+      <ScorecardPanel className="mt-4" scorecard={summary.scorecard} />
 
       <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -1580,6 +2463,19 @@ function getMomentumClass(momentumLabel: string) {
     return "rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
   }
   if (momentumLabel === "improving") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  return "rounded-full border border-[#3c2c16] bg-[#22190f] px-2.5 py-1 text-xs font-semibold text-[#c8ad75]";
+}
+
+function getScoreLabelClass(scoreLabel: string) {
+  if (scoreLabel === "critical") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  if (scoreLabel === "needs_attention") {
+    return "rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
+  }
+  if (scoreLabel === "excellent") {
     return "rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]";
   }
   return "rounded-full border border-[#3c2c16] bg-[#22190f] px-2.5 py-1 text-xs font-semibold text-[#c8ad75]";

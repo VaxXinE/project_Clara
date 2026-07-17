@@ -56,11 +56,14 @@ from app.models.marketing_execution_item import MarketingExecutionItem
 from app.models.message import Message
 from app.models.organization import Organization
 from app.models.ops_notification import OpsNotification
+from app.models.performance_action import PerformanceAction
 from app.models.product_knowledge import ProductKnowledge
 from app.models.reply_suggestion import ReplySuggestion
+from app.models.sales_performance_snapshot import SalesPerformanceSnapshot
 from app.models.sales_team import SalesTeam
 from app.models.sales_unit import SalesUnit
 from app.models.sent_message import SentMessage
+from app.models.team_performance_snapshot import TeamPerformanceSnapshot
 from app.models.user import User
 from app.services.auth_service import hash_password
 
@@ -102,6 +105,9 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             LeadDeal.__table__,
             MarketingExecutionItem.__table__,
             OpsNotification.__table__,
+            PerformanceAction.__table__,
+            SalesPerformanceSnapshot.__table__,
+            TeamPerformanceSnapshot.__table__,
             Conversation.__table__,
             Message.__table__,
             AIExtraction.__table__,
@@ -158,6 +164,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             LeadDeal.__table__,
             MarketingExecutionItem.__table__,
             OpsNotification.__table__,
+            TeamPerformanceSnapshot.__table__,
+            SalesPerformanceSnapshot.__table__,
             Lead.__table__,
             CustomerProfile.__table__,
             KpiAlertRecord.__table__,

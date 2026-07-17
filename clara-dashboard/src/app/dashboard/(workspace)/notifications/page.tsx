@@ -20,6 +20,9 @@ type NotificationGroup = {
 };
 
 function getSeverityClass(severity: string) {
+  if (severity === "critical") {
+    return "border border-[#f0cb73]/18 bg-[#6a2417] text-[#fff0c9]";
+  }
   if (severity === "high") {
     return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
   }
@@ -92,6 +95,7 @@ export default function NotificationsPage() {
         active_count: nextItems.filter((item) => item.status === "active").length,
         acknowledged_count: nextItems.filter((item) => item.status === "acknowledged").length,
         resolved_count: nextItems.filter((item) => item.status === "resolved").length,
+        ignored_count: nextItems.filter((item) => item.status === "ignored").length,
         escalated_count: nextItems.filter((item) => item.escalation_level !== "none").length,
         items: nextItems,
       };
@@ -195,6 +199,28 @@ export default function NotificationsPage() {
     }
   }
 
+  async function handleIgnore(item: OpsNotificationItem) {
+    setUpdatingId(item.id);
+    setErrorMessage("");
+    try {
+      const payload: OpsNotificationResolveRequest = {
+        resolution_note: resolutionNote.trim() || null,
+      };
+      await apiFetch(`/dashboard/notifications/${item.id}/ignore`, {
+        method: "PATCH",
+        body: payload,
+      });
+      setResolutionNote("");
+      await loadNotifications();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Gagal ignore notification."
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   async function handleReopen(item: OpsNotificationItem) {
     setUpdatingId(item.id);
     setErrorMessage("");
@@ -242,10 +268,10 @@ export default function NotificationsPage() {
     const items = notifications?.items ?? [];
 
     if (!isOversightAlertView) {
-      return items;
+      return items.filter((item) => !item.alert_type);
     }
 
-    return items.filter((item) => item.workflow_scope === "head_follow_up");
+    return items.filter((item) => Boolean(item.alert_type));
   }, [isOversightAlertView, notifications?.items]);
 
   const filteredNotifications = useMemo(() => {
@@ -278,7 +304,10 @@ export default function NotificationsPage() {
     const groups = new Map<string, OpsNotificationItem[]>();
 
     for (const item of paginatedNotifications) {
-      const ownerName = item.sales_owner_name?.trim() || "Belum ada owner";
+      const ownerName =
+        item.sales_owner_name?.trim() ||
+        item.team_name?.trim() ||
+        "Belum ada owner";
       const existing = groups.get(ownerName);
       if (existing) {
         existing.push(item);
@@ -299,6 +328,7 @@ export default function NotificationsPage() {
       acknowledged: roleScopedNotifications.filter((item) => item.status === "acknowledged")
         .length,
       resolved: roleScopedNotifications.filter((item) => item.status === "resolved").length,
+      ignored: roleScopedNotifications.filter((item) => item.status === "ignored").length,
       escalated: roleScopedNotifications.filter((item) => item.escalation_level !== "none")
         .length,
     }),
@@ -623,6 +653,7 @@ export default function NotificationsPage() {
                         <option value="active">Active</option>
                         <option value="acknowledged">Acknowledged</option>
                         <option value="resolved">Resolved</option>
+                        <option value="ignored">Ignored</option>
                       </select>
                     </label>
 
@@ -637,6 +668,7 @@ export default function NotificationsPage() {
                         className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none"
                       >
                         <option value="all">Semua severity</option>
+                        <option value="critical">Critical</option>
                         <option value="high">High</option>
                         <option value="medium">Medium</option>
                         <option value="low">Low</option>
@@ -679,7 +711,7 @@ export default function NotificationsPage() {
                             </h2>
                           </div>
                           <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-                            {group.items.length} follow-up
+                            {group.items.length} alert
                           </span>
                         </div>
 
@@ -762,19 +794,41 @@ export default function NotificationsPage() {
                                       >
                                         {isHeadMonitorView ? "Tandai selesai" : "Tandai Selesai"}
                                       </button>
+                                      <button
+                                        type="button"
+                                        disabled={updatingId === item.id}
+                                        onClick={() => {
+                                          void handleIgnore(item);
+                                        }}
+                                        className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#1d150d] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                      >
+                                        Abaikan
+                                      </button>
                                     </>
                                   ) : null}
-                                  {item.status === "resolved" ? (
-                                    <button
-                                      type="button"
-                                      disabled={updatingId === item.id}
-                                      onClick={() => {
-                                        void handleReopen(item);
-                                      }}
-                                      className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
-                                    >
-                                      Reopen
-                                    </button>
+                                  {item.status === "acknowledged" ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        disabled={updatingId === item.id}
+                                        onClick={() => {
+                                          void handleResolve(item);
+                                        }}
+                                        className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-70"
+                                      >
+                                        Tandai Selesai
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={updatingId === item.id}
+                                        onClick={() => {
+                                          void handleIgnore(item);
+                                        }}
+                                        className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#1d150d] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                      >
+                                        Abaikan
+                                      </button>
+                                    </>
                                   ) : null}
                                 </div>
                               </div>

@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -12,6 +13,7 @@ from app.models.ai_extraction import AIExtraction
 from app.models.lead_discipline_log import LeadDisciplineLog
 from app.models.lead_task import LeadTask
 from app.models.message import Message
+from app.models.performance_action import PerformanceAction
 from app.models.sales_team import SalesTeam
 from app.models.sales_unit import SalesUnit
 
@@ -465,3 +467,104 @@ def test_sales_cannot_open_sales_performance_detail(
 
     response = client.get(f"/dashboard/manager-insights/sales/{marketing_b.id}")
     assert response.status_code == 403, response.text
+
+
+def test_manager_weekly_review_includes_actions_and_critical_alerts(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    prepare_manager_scope_data(
+        db_session_factory=db_session_factory,
+        seeded_data=seeded_data,
+    )
+    manager_b = seeded_data["manager_b"]
+    marketing_b = seeded_data["marketing_b"]
+    owned_conversation = seeded_data["owned_conversation"]
+
+    login(client, email=manager_b.email, password="ManagerPass123!")
+    create_review_case_and_proposal(
+        client,
+        conversation_id=str(owned_conversation.id),
+    )
+
+    db = db_session_factory()
+    team = db.scalars(
+        select(SalesTeam).where(SalesTeam.manager_user_id == manager_b.id)
+    ).first()
+    assert team is not None
+    db.add(
+        PerformanceAction(
+            organization_id=manager_b.organization_id,
+            created_by_user_id=manager_b.id,
+            assigned_to_user_id=marketing_b.id,
+            team_id=team.id,
+            sales_user_id=marketing_b.id,
+            source_type="sales_performance",
+            source_reference_id=marketing_b.id,
+            title="Weekly backlog recovery",
+            description="Manager harus menutup backlog reply minggu ini.",
+            action_type="weekly_review",
+            status="open",
+            priority_label="high",
+            created_at=datetime.now(timezone.utc) - timedelta(days=4),
+            updated_at=datetime.now(timezone.utc) - timedelta(days=4),
+        )
+    )
+    db.commit()
+    db.close()
+
+    response = client.get("/dashboard/manager-insights/weekly-review")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["scope_label"] == "Scoped team or unit manager view"
+    assert payload["unresolved_action_count"] >= 1
+    assert payload["critical_alert_open_count"] >= 1
+    assert len(payload["top_improvers"]) >= 1
+    assert len(payload["biggest_risks"]) >= 1
+    assert len(payload["teams_needing_intervention"]) >= 1
+    assert any(item["scope_type"] == "sales" for item in payload["top_improvers"])
+    assert any(item["title"] == "Weekly backlog recovery" for item in payload["unresolved_actions"])
+    assert any(item["severity"] == "critical" for item in payload["critical_alerts_open"])
+
+
+def test_head_weekly_review_csv_exports_team_scope(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    prepare_manager_scope_data(
+        db_session_factory=db_session_factory,
+        seeded_data=seeded_data,
+    )
+    admin_b = seeded_data["admin_b"]
+
+    login(client, email=admin_b.email, password="AdminPass123!")
+
+    response = client.get("/dashboard/manager-insights/weekly-review?format=csv")
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment; filename=" in response.headers["content-disposition"]
+    assert "section,name,scope_type" in response.text
+    assert "team" in response.text
+
+
+def test_weekly_review_rejects_invalid_format_and_sales_role(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    prepare_manager_scope_data(
+        db_session_factory=db_session_factory,
+        seeded_data=seeded_data,
+    )
+    manager_b = seeded_data["manager_b"]
+    marketing_b = seeded_data["marketing_b"]
+
+    login(client, email=manager_b.email, password="ManagerPass123!")
+    invalid_response = client.get("/dashboard/manager-insights/weekly-review?format=xml")
+    assert invalid_response.status_code == 400, invalid_response.text
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+    denied_response = client.get("/dashboard/manager-insights/weekly-review")
+    assert denied_response.status_code == 403, denied_response.text

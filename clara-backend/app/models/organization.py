@@ -62,3 +62,18 @@ class Organization(Base):
         back_populates="organization",
         cascade="all, delete-orphan",
     )
+    performance_actions = relationship(
+        "PerformanceAction",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )
+    sales_performance_snapshots = relationship(
+        "SalesPerformanceSnapshot",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )
+    team_performance_snapshots = relationship(
+        "TeamPerformanceSnapshot",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+    )
