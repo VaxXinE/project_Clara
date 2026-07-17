@@ -692,7 +692,10 @@ export default function CrmPage() {
 
         {!isLoading && !errorMessage && (
           <>
-            <section className="clara-card rounded-[30px] p-6">
+            <section
+              data-onboarding-id="sales-crm-hero"
+              className="clara-card rounded-[30px] p-6"
+            >
               <p className="clara-kicker text-xs">Ringkasan leads</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
@@ -762,7 +765,10 @@ export default function CrmPage() {
               </div>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section
+              data-onboarding-id="sales-crm-metrics"
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+            >
               <BoardMetric
                 label={isLeadershipWorkspace ? "Butuh perhatian" : "Perlu tindakan"}
                 value={String(summary.needsAction)}
@@ -804,7 +810,10 @@ export default function CrmPage() {
               )}
             </section>
 
-            <section className="clara-card rounded-[30px] p-6">
+            <section
+              data-onboarding-id="sales-crm-filters"
+              className="clara-card rounded-[30px] p-6"
+            >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-2xl">
                   <p className="clara-kicker text-xs">Filter lead</p>
@@ -1129,7 +1138,7 @@ export default function CrmPage() {
                   <>
                     <div className="flex min-h-0 flex-col gap-4 xl:max-h-[780px]">
                       <div className="clara-scrollbar min-h-0 flex-1 space-y-3 rounded-[24px] border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(35,25,17,0.82)_0%,rgba(17,13,10,0.86)_100%)] p-3 xl:overflow-y-auto">
-                        {renderedBucketSections.map((section) => (
+                        {renderedBucketSections.map((section, index) => (
                           <Fragment key={section.title}>
                             {renderBucketSection({
                               title: section.title,
@@ -1137,6 +1146,8 @@ export default function CrmPage() {
                               leads: section.leads,
                               selectedLeadId: effectiveSelectedLeadId,
                               setSelectedLeadId,
+                              onboardingTargetId:
+                                index === 0 ? "sales-crm-list" : undefined,
                             })}
                           </Fragment>
                         ))}
@@ -1177,7 +1188,7 @@ export default function CrmPage() {
                       ) : null}
                     </div>
 
-                    <div>
+                    <div data-onboarding-id="sales-crm-preview">
                       {selectedLead ? (
                         <>
                           <div className="border-b border-[#f0cb73]/12 pb-4">
@@ -1379,12 +1390,14 @@ function renderBucketSection({
   leads,
   selectedLeadId,
   setSelectedLeadId,
+  onboardingTargetId,
 }: {
   title: string;
   description: string;
   leads: LeadListItem[];
   selectedLeadId: string | null;
   setSelectedLeadId: (leadId: string) => void;
+  onboardingTargetId?: string;
 }) {
   if (!leads.length) return null;
 
@@ -1403,11 +1416,12 @@ function renderBucketSection({
       </div>
 
       <div className="space-y-3">
-        {leads.map((lead) => (
+        {leads.map((lead, index) => (
           <LeadListRow
             key={lead.id}
             lead={lead}
             isSelected={selectedLeadId === lead.id}
+            onboardingTargetId={index === 0 ? onboardingTargetId : undefined}
             onSelect={() => setSelectedLeadId(lead.id)}
           />
         ))}
@@ -1419,10 +1433,12 @@ function renderBucketSection({
 function LeadListRow({
   lead,
   isSelected,
+  onboardingTargetId,
   onSelect,
 }: {
   lead: LeadListItem;
   isSelected: boolean;
+  onboardingTargetId?: string;
   onSelect: () => void;
 }) {
   const isOverdue = isOverdueLead(lead);
@@ -1441,6 +1457,7 @@ function LeadListRow({
   return (
     <button
       type="button"
+      data-onboarding-id={onboardingTargetId}
       onClick={onSelect}
       className={`block w-full rounded-[22px] border p-4 text-left transition ${
         isSelected

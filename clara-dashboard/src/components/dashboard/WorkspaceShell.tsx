@@ -25,6 +25,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
+import { resetDashboardOnboardingState } from "@/components/dashboard/SalesOnboardingTour";
 import { apiFetch } from "@/lib/api";
 import {
   canAccessQueueAndActionCenter,
@@ -280,7 +281,9 @@ function getGlobalAlertNotifications(
   const activeItems = notifications.filter(
     (item) =>
       item.status === "active" &&
-      (!normalizedRole || item.target_role === normalizedRole),
+      (!normalizedRole ||
+        item.target_role === normalizedRole ||
+        item.target_role === "all"),
   );
   const prioritizedItems = activeItems.sort((left, right) => {
     const leftIsDealSync = left.source_type === "deal_metrics_sync" ? 1 : 0;
@@ -323,6 +326,9 @@ export function WorkspaceShell({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountMenuPathname, setAccountMenuPathname] = useState(pathname);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [resolvingNotificationId, setResolvingNotificationId] = useState<
+    string | null
+  >(null);
   const [globalNotifications, setGlobalNotifications] = useState<
     OpsNotificationItem[]
   >([]);
@@ -400,6 +406,40 @@ export function WorkspaceShell({
     }
   }
 
+  function handleRestartOnboarding() {
+    if (!resolvedCurrentUser?.id) {
+      return;
+    }
+
+    if (
+      normalizedRole === "sales" ||
+      normalizedRole === "manager" ||
+      normalizedRole === "head"
+    ) {
+      resetDashboardOnboardingState(resolvedCurrentUser.id, normalizedRole);
+    }
+    setAccountMenuOpen(false);
+    window.location.href = "/workspace";
+  }
+
+  async function handleResolveGlobalNotification(notificationId: string) {
+    setResolvingNotificationId(notificationId);
+
+    try {
+      await apiFetch(`/dashboard/notifications/${notificationId}/resolve`, {
+        method: "PATCH",
+        body: { resolution_note: "Ditutup dari ringkasan global." },
+      });
+      setGlobalNotifications((current) =>
+        current.filter((item) => item.id !== notificationId),
+      );
+    } catch {
+      // Keep the card visible if resolve fails.
+    } finally {
+      setResolvingNotificationId(null);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-transparent text-slate-900">
       <div className="relative min-h-screen xl:grid xl:grid-cols-[292px_minmax(0,1fr)] xl:items-start">
@@ -415,6 +455,15 @@ export function WorkspaceShell({
 
         <aside
           id="clara-mobile-sidebar"
+          data-onboarding-id={
+            normalizedRole === "sales"
+              ? "sales-shell-sidebar"
+              : normalizedRole === "manager"
+                ? "manager-shell-sidebar"
+                : normalizedRole === "head"
+                  ? "head-shell-sidebar"
+                : undefined
+          }
           className={`fixed inset-y-0 left-0 z-50 flex w-[292px] max-w-[86vw] flex-col overflow-hidden border-r border-[#f0cb73]/14 bg-[linear-gradient(180deg,#15100a_0%,#0f0b07_48%,#090705_100%)] text-white shadow-[0_24px_48px_rgba(0,0,0,0.4)] transition-transform duration-300 xl:sticky xl:top-0 xl:z-auto xl:h-screen xl:w-auto xl:max-w-none xl:translate-x-0 xl:shadow-none ${
             mobileNavOpen ? "translate-x-0" : "-translate-x-full"
           }`}
@@ -571,6 +620,17 @@ export function WorkspaceShell({
                         >
                           Profile
                         </Link>
+                        {normalizedRole === "sales" ||
+                        normalizedRole === "manager" ||
+                        normalizedRole === "head" ? (
+                          <button
+                            type="button"
+                            onClick={handleRestartOnboarding}
+                            className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#f0cb73] transition hover:bg-[#f0cb73]/10"
+                          >
+                            Ulangi onboarding
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => void handleLogout()}
@@ -618,7 +678,14 @@ export function WorkspaceShell({
                 </div>
 
                 {actions ? (
-                  <div className="flex w-full flex-wrap gap-3 lg:w-auto lg:max-w-[520px] lg:flex-none lg:justify-end">
+                  <div
+                    data-onboarding-id={
+                      normalizedRole === "sales"
+                        ? "sales-shell-actions"
+                        : undefined
+                    }
+                    className="flex w-full flex-wrap gap-3 lg:w-auto lg:max-w-[520px] lg:flex-none lg:justify-end"
+                  >
                     {actions}
                   </div>
                 ) : null}
@@ -667,6 +734,18 @@ export function WorkspaceShell({
                         >
                           Buka notification center
                         </Link>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleResolveGlobalNotification(notification.id)
+                          }
+                          disabled={resolvingNotificationId === notification.id}
+                          className="inline-flex items-center rounded-full border border-[#f0cb73]/18 bg-transparent px-4 py-2.5 text-sm font-semibold text-[#c9b17a] hover:border-[#f0cb73]/30 hover:text-[#f3d694] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {resolvingNotificationId === notification.id
+                            ? "Menutup..."
+                            : "Tutup"}
+                        </button>
                       </div>
                     </div>
                   </div>

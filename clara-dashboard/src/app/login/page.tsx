@@ -3,9 +3,10 @@
 import { faEye, faEyeSlash } from "@fortawesome/free-regular-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { getRoleDisplayLabel } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 
 type LoginResponse = {
@@ -13,9 +14,15 @@ type LoginResponse = {
   user: CurrentUser;
 };
 
-function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
+type LoginOptionItem = {
+  role: string;
+  name: string;
+  email: string;
+};
+
+type LoginOptionsResponse = {
+  items: LoginOptionItem[];
+};
 
 function getDashboardPathForRole(role: string): string {
   switch (role) {
@@ -30,27 +37,145 @@ function getDashboardPathForRole(role: string): string {
 
 export default function LoginPage() {
   const router = useRouter();
+  const superadminTapCountRef = useRef(0);
+  const superadminTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [email, setEmail] = useState("owner@clara.local");
+  const [loginOptions, setLoginOptions] = useState<LoginOptionItem[]>([]);
+  const [isSuperadminMode, setIsSuperadminMode] = useState(false);
+  const [selectedRole, setSelectedRole] = useState("");
+  const [selectedEmail, setSelectedEmail] = useState("");
+  const [superadminEmail, setSuperadminEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [isLoadingOptions, setIsLoadingOptions] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const roleOptions = useMemo(
+    () => Array.from(new Set(loginOptions.map((item) => item.role))),
+    [loginOptions],
+  );
 
-    const normalizedEmail = email.trim().toLowerCase();
-    setErrorMessage("");
+  const emailOptions = useMemo(() => {
+    if (!selectedRole) {
+      return [];
+    }
 
-    if (!normalizedEmail) {
-      setErrorMessage("Email wajib diisi.");
+    return loginOptions.filter((item) => item.role === selectedRole);
+  }, [loginOptions, selectedRole]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadLoginOptions() {
+      setIsLoadingOptions(true);
+      setErrorMessage("");
+
+      try {
+        const response = await apiFetch<LoginOptionsResponse>("/auth/login-options");
+        if (isCancelled) {
+          return;
+        }
+
+        setLoginOptions(response.items);
+        const firstRole = response.items[0]?.role ?? "";
+        setSelectedRole(firstRole);
+        setSelectedEmail(
+          response.items.find((item) => item.role === firstRole)?.email ?? "",
+        );
+      } catch (error) {
+        if (!isCancelled) {
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Gagal memuat daftar akun login.",
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingOptions(false);
+        }
+      }
+    }
+
+    void loadLoginOptions();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedRole) {
+      setSelectedEmail("");
       return;
     }
 
-    if (!isValidEmail(normalizedEmail)) {
-      setErrorMessage("Format email belum valid.");
+    const firstEmailForRole = emailOptions[0]?.email ?? "";
+    const selectedEmailStillValid = emailOptions.some(
+      (item) => item.email === selectedEmail,
+    );
+
+    if (!selectedEmailStillValid) {
+      setSelectedEmail(firstEmailForRole);
+    }
+  }, [emailOptions, selectedEmail, selectedRole]);
+
+  useEffect(() => {
+    return () => {
+      if (superadminTapTimerRef.current) {
+        clearTimeout(superadminTapTimerRef.current);
+      }
+    };
+  }, []);
+
+  function handleHiddenSuperadminUnlock() {
+    if (isSuperadminMode) {
       return;
+    }
+
+    superadminTapCountRef.current += 1;
+
+    if (superadminTapTimerRef.current) {
+      clearTimeout(superadminTapTimerRef.current);
+    }
+
+    if (superadminTapCountRef.current >= 5) {
+      superadminTapCountRef.current = 0;
+      setIsSuperadminMode(true);
+      setErrorMessage("");
+      setPassword("");
+      return;
+    }
+
+    superadminTapTimerRef.current = setTimeout(() => {
+      superadminTapCountRef.current = 0;
+    }, 1800);
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage("");
+
+    const resolvedEmail = isSuperadminMode
+      ? superadminEmail.trim().toLowerCase()
+      : selectedEmail.trim().toLowerCase();
+
+    if (isSuperadminMode) {
+      if (!resolvedEmail) {
+        setErrorMessage("Email superadmin wajib diisi.");
+        return;
+      }
+    } else {
+      if (!selectedRole) {
+        setErrorMessage("Role wajib dipilih.");
+        return;
+      }
+
+      if (!selectedEmail) {
+        setErrorMessage("Email wajib dipilih.");
+        return;
+      }
     }
 
     if (!password.trim()) {
@@ -64,7 +189,7 @@ export default function LoginPage() {
       const response = await apiFetch<LoginResponse>("/auth/login", {
         method: "POST",
         body: {
-          email: normalizedEmail,
+          email: resolvedEmail,
           password,
         },
       });
@@ -85,7 +210,12 @@ export default function LoginPage() {
           className="clara-card rounded-[34px] p-6 sm:p-8"
         >
           <div>
-            <p className="clara-kicker">Login Dashboard</p>
+            <p
+              className="clara-kicker cursor-default select-none"
+              onClick={handleHiddenSuperadminUnlock}
+            >
+              Login Dashboard
+            </p>
             <h2 className="mt-3 text-3xl font-bold tracking-[-0.04em] text-slate-950">
               Selamat datang di Clara Dashboard!
             </h2>
@@ -96,17 +226,78 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-6 space-y-4">
-            <div>
-              <label className="clara-label">Email</label>
-              <input
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                type="email"
-                className="clara-input mt-2"
-                placeholder="owner@clara.local"
-                autoComplete="email"
-              />
-            </div>
+            {isSuperadminMode ? (
+              <div>
+                <label className="clara-label">Email Superadmin</label>
+                <input
+                  value={superadminEmail}
+                  onChange={(event) => setSuperadminEmail(event.target.value)}
+                  type="email"
+                  className="clara-input mt-2"
+                  placeholder="Masukkan email superadmin"
+                  autoComplete="username"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSuperadminMode(false);
+                    superadminTapCountRef.current = 0;
+                    setSuperadminEmail("");
+                    setErrorMessage("");
+                  }}
+                  className="mt-2 text-xs font-semibold text-[#8d6a29] hover:text-[#b8872f]"
+                >
+                  Kembali ke login role biasa
+                </button>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="clara-label">Role</label>
+                  <select
+                    value={selectedRole}
+                    onChange={(event) => setSelectedRole(event.target.value)}
+                    className="clara-input mt-2"
+                    disabled={isLoadingOptions || roleOptions.length === 0}
+                  >
+                    <option value="">Pilih role dulu</option>
+                    {roleOptions.map((role) => (
+                      <option key={role} value={role}>
+                        {getRoleDisplayLabel(role)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="clara-label">Email</label>
+                  <select
+                    value={selectedEmail}
+                    onChange={(event) => setSelectedEmail(event.target.value)}
+                    className="clara-input mt-2"
+                    disabled={
+                      isLoadingOptions || !selectedRole || emailOptions.length === 0
+                    }
+                  >
+                    <option value="">
+                      {selectedRole ? "Pilih email sesuai role" : "Pilih role dulu"}
+                    </option>
+                    {emailOptions.map((item) => (
+                      <option key={item.email} value={item.email}>
+                        {item.email}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedEmail ? (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Akun terpilih:{" "}
+                      {emailOptions.find((item) => item.email === selectedEmail)?.name ??
+                        selectedEmail}
+                    </p>
+                  ) : null}
+                </div>
+              </>
+            )}
 
             <div>
               <label className="clara-label">Password</label>
@@ -145,10 +336,14 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingOptions}
             className="clara-button clara-button-primary mt-6 w-full"
           >
-            {isSubmitting ? "Logging in..." : "Masuk ke Dashboard"}
+            {isLoadingOptions
+              ? "Memuat akun..."
+              : isSubmitting
+                ? "Logging in..."
+                : "Masuk ke Dashboard"}
           </button>
         </form>
       </div>

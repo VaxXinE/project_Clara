@@ -1,8 +1,14 @@
+import json
+import re
+from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.core.security import require_roles
+from app.core.config import settings
 from app.models.user import User
 from app.db.session import get_db
 from app.schemas.dashboard_schema import (
@@ -72,9 +78,79 @@ from app.services.marketing_snapshot_service import (
     generate_marketing_snapshot,
     list_marketing_snapshots,
 )
-from fastapi import Request
+from app.services.role_service import normalize_role
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+GLOBAL_EXTENSION_BUILD_KEY = "global"
+EXTENSION_BUILD_SUFFIXES = {".zip", ".crx"}
+EXTENSION_BUILD_MAX_SIZE_BYTES = 50 * 1024 * 1024
+EXTENSION_FILENAME_SANITIZER = re.compile(r"[^a-zA-Z0-9._-]+")
+
+
+def get_extension_distribution_dir() -> Path:
+    return Path(settings.extension_distribution_dir).resolve()
+
+
+def get_extension_manifest_path() -> Path:
+    return get_extension_distribution_dir() / "manifest.json"
+
+
+def read_extension_manifest() -> dict[str, dict[str, object]]:
+    manifest_path = get_extension_manifest_path()
+    if not manifest_path.exists():
+        return {}
+
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+    if not isinstance(payload, dict):
+        return {}
+
+    return {
+        str(role): metadata
+        for role, metadata in payload.items()
+        if isinstance(role, str) and isinstance(metadata, dict)
+    }
+
+
+def write_extension_manifest(manifest: dict[str, dict[str, object]]) -> None:
+    extension_dir = get_extension_distribution_dir()
+    extension_dir.mkdir(parents=True, exist_ok=True)
+    get_extension_manifest_path().write_text(
+        json.dumps(manifest, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
+def build_extension_build_item(current_user: User) -> dict[str, object]:
+    metadata = read_extension_manifest().get(GLOBAL_EXTENSION_BUILD_KEY, {})
+    can_manage = normalize_role(current_user.role) == "superadmin"
+
+    return {
+        "role": "all",
+        "available": bool(metadata),
+        "version": metadata.get("version"),
+        "file_name": metadata.get("file_name"),
+        "size_bytes": metadata.get("size_bytes"),
+        "uploaded_at": metadata.get("uploaded_at"),
+        "uploaded_by_email": metadata.get("uploaded_by_email"),
+        "can_download": bool(metadata),
+        "can_manage": can_manage,
+    }
+
+
+def get_extension_build_or_raise() -> dict[str, object]:
+    metadata = read_extension_manifest().get(GLOBAL_EXTENSION_BUILD_KEY)
+    if not metadata:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package extension global belum diupload.",
+        )
+
+    return metadata
 
 
 @router.get("/channels", response_model=ChannelOverviewResponse)
@@ -758,3 +834,121 @@ def admin_ops_overview(
     current_user: User = Depends(require_roles("superadmin")),
 ):
     return get_ops_database_overview(db=db, current_user=current_user)
+
+
+@router.get("/extension-builds")
+def list_extension_builds(
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+):
+    return build_extension_build_item(current_user)
+
+
+@router.post("/extension-builds")
+async def upload_extension_build(
+    request: Request,
+    version: str = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("superadmin")),
+):
+    normalized_version = version.strip()
+    if len(normalized_version) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Versi extension wajib diisi.",
+        )
+
+    raw_file_name = Path(file.filename or "").name
+    suffix = Path(raw_file_name).suffix.lower()
+    if suffix not in EXTENSION_BUILD_SUFFIXES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File extension harus berekstensi .zip atau .crx.",
+        )
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File extension tidak boleh kosong.",
+        )
+
+    if len(content) > EXTENSION_BUILD_MAX_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Ukuran file extension terlalu besar. Maksimum 50MB.",
+        )
+
+    safe_version = EXTENSION_FILENAME_SANITIZER.sub("-", normalized_version).strip("-") or "build"
+    extension_dir = get_extension_distribution_dir()
+    extension_dir.mkdir(parents=True, exist_ok=True)
+    stored_file_name = f"clara-extension-{safe_version}{suffix}"
+    file_path = extension_dir / stored_file_name
+    file_path.write_bytes(content)
+
+    manifest = read_extension_manifest()
+    uploaded_at = datetime.now(timezone.utc).isoformat()
+    manifest[GLOBAL_EXTENSION_BUILD_KEY] = {
+        "role": "all",
+        "version": normalized_version,
+        "file_name": raw_file_name or stored_file_name,
+        "stored_file_name": stored_file_name,
+        "content_type": file.content_type or "application/octet-stream",
+        "size_bytes": len(content),
+        "uploaded_at": uploaded_at,
+        "uploaded_by_email": current_user.email,
+    }
+    write_extension_manifest(manifest)
+
+    create_audit_log(
+        db=db,
+        action="extension_build.upload",
+        resource_type="extension_build",
+        resource_id=GLOBAL_EXTENSION_BUILD_KEY,
+        current_user=current_user,
+        request=request,
+        metadata={
+            "role": "all",
+            "version": normalized_version,
+            "file_name": raw_file_name or stored_file_name,
+            "size_bytes": len(content),
+        },
+    )
+
+    return manifest[GLOBAL_EXTENSION_BUILD_KEY]
+
+
+@router.get("/extension-builds/download")
+def download_extension_build(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+):
+    metadata = get_extension_build_or_raise()
+    file_path = get_extension_distribution_dir() / str(metadata.get("stored_file_name") or "")
+
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File package extension tidak ditemukan di storage.",
+        )
+
+    create_audit_log(
+        db=db,
+        action="extension_build.download",
+        resource_type="extension_build",
+        resource_id=GLOBAL_EXTENSION_BUILD_KEY,
+        current_user=current_user,
+        request=request,
+        metadata={
+            "role": "all",
+            "version": metadata.get("version"),
+            "file_name": metadata.get("file_name"),
+        },
+    )
+
+    return FileResponse(
+        file_path,
+        filename=str(metadata.get("file_name") or file_path.name),
+        media_type=str(metadata.get("content_type") or "application/octet-stream"),
+    )

@@ -466,6 +466,70 @@ def get_extension_conversation_or_raise(
     return conversation
 
 
+def is_extension_analysis_fresh(
+    *,
+    conversation: Conversation,
+    extraction: AIExtraction | None,
+) -> bool:
+    if extraction is None:
+        return False
+
+    latest_message_created_at = max(
+        (message.created_at for message in conversation.messages),
+        default=None,
+    )
+    if latest_message_created_at is None:
+        return True
+
+    return extraction.created_at >= latest_message_created_at
+
+
+def ensure_extension_analysis_current(
+    db: Session,
+    *,
+    channel_context: ExtensionChannelContext,
+    conversation_id: UUID,
+) -> AIExtraction | None:
+    conversation = get_extension_conversation_or_raise(
+        db=db,
+        channel_context=channel_context,
+        conversation_id=conversation_id,
+    )
+    latest_extraction = get_latest_ai_extraction_for_conversation(
+        db=db,
+        conversation_id=conversation_id,
+    )
+    if is_extension_analysis_fresh(
+        conversation=conversation,
+        extraction=latest_extraction,
+    ):
+        return latest_extraction
+
+    return analyze_conversation(
+        db=db,
+        conversation_id=conversation_id,
+    )
+
+
+def try_auto_analyze_extension_conversation(
+    db: Session,
+    *,
+    channel_context: ExtensionChannelContext,
+    conversation_id: UUID | None,
+) -> None:
+    if conversation_id is None:
+        return
+
+    try:
+        ensure_extension_analysis_current(
+            db=db,
+            channel_context=channel_context,
+            conversation_id=conversation_id,
+        )
+    except Exception:
+        db.rollback()
+
+
 def sync_extension_messages(
     db: Session,
     *,
@@ -660,6 +724,11 @@ def sync_extension_snapshot(
     )
 
     if conversation is not None and (conversation.raw_text or "").strip() == transcript:
+        try_auto_analyze_extension_conversation(
+            db=db,
+            channel_context=channel_context,
+            conversation_id=conversation.id,
+        )
         return ExtensionSnapshotSyncResponse(
             status="duplicate",
             duplicate=True,
@@ -730,6 +799,12 @@ def sync_extension_snapshot(
 
     db.commit()
     db.refresh(conversation)
+
+    try_auto_analyze_extension_conversation(
+        db=db,
+        channel_context=channel_context,
+        conversation_id=conversation.id,
+    )
 
     return ExtensionSnapshotSyncResponse(
         status=status_value,
@@ -843,10 +918,17 @@ def generate_extension_reply_suggestions_for_channel(
             cached=True,
         )
 
-    extraction = analyze_conversation(
-        db=db,
-        conversation_id=snapshot_result.conversation_id,
-    )
+    if is_extension_analysis_fresh(
+        conversation=conversation,
+        extraction=latest_extraction,
+    ):
+        extraction = latest_extraction
+    else:
+        extraction = analyze_conversation(
+            db=db,
+            conversation_id=snapshot_result.conversation_id,
+        )
+
     suggestion = create_reply_suggestion(
         db=db,
         conversation_id=snapshot_result.conversation_id,

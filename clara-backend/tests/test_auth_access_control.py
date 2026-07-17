@@ -101,6 +101,23 @@ def test_inactive_user_cannot_login(
     assert response.json()["detail"] == "Akun user ini sedang nonaktif."
 
 
+def test_login_options_lists_active_users_grouped_by_role(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    inactive_user = seeded_data["inactive_user"]
+
+    response = client.get("/auth/login-options")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["items"]
+    assert all(item["email"] != inactive_user.email for item in payload["items"])
+    assert all(item["role"] != "superadmin" for item in payload["items"])
+    assert payload["items"][0]["role"] == "head"
+    assert any(item["role"] == "sales" for item in payload["items"])
+
+
 def test_head_cannot_reset_password_via_access_control_api(
     client: TestClient,
     seeded_data: dict[str, object],

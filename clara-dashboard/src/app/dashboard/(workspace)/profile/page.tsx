@@ -2,6 +2,8 @@
 
 import {
   faBuildingShield,
+  faCloudArrowDown,
+  faCloudArrowUp,
   faEnvelope,
   faUser,
 } from "@fortawesome/free-solid-svg-icons";
@@ -11,10 +13,11 @@ import { useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getPasswordStrength } from "@/lib/format";
-import { getRoleDisplayLabel } from "@/lib/roles";
+import { canAccessAdminPages, getRoleDisplayLabel } from "@/lib/roles";
 import type {
   ChangePasswordRequest,
   CurrentUser,
+  ExtensionBuildItem,
   UpdateUserRequest,
 } from "@/types/dashboard";
 
@@ -30,6 +33,7 @@ const EMPTY_PASSWORD_FORM: ChangePasswordRequest = {
 
 export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [extensionBuild, setExtensionBuild] = useState<ExtensionBuildItem | null>(null);
   const [profileForm, setProfileForm] = useState<UpdateUserRequest>(
     EMPTY_PROFILE_FORM,
   );
@@ -45,6 +49,16 @@ export default function ProfilePage() {
   const [profileSuccessMessage, setProfileSuccessMessage] = useState("");
   const [passwordErrorMessage, setPasswordErrorMessage] = useState("");
   const [passwordSuccessMessage, setPasswordSuccessMessage] = useState("");
+  const [extensionErrorMessage, setExtensionErrorMessage] = useState("");
+  const [extensionSuccessMessage, setExtensionSuccessMessage] = useState("");
+  const [isUploadingExtension, setIsUploadingExtension] = useState(false);
+  const [extensionUploadVersion, setExtensionUploadVersion] = useState("");
+  const [extensionUploadFile, setExtensionUploadFile] = useState<File | null>(null);
+
+  async function loadExtensionBuilds() {
+    const build = await apiFetch<ExtensionBuildItem>("/dashboard/extension-builds");
+    setExtensionBuild(build);
+  }
 
   useEffect(() => {
     async function loadProfile() {
@@ -58,6 +72,7 @@ export default function ProfilePage() {
           name: me.name,
           email: me.email,
         });
+        await loadExtensionBuilds();
       } catch (error) {
         setLoadErrorMessage(
           error instanceof Error ? error.message : "Gagal memuat profil akun.",
@@ -133,7 +148,50 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleUploadExtensionBuild(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    setExtensionErrorMessage("");
+    setExtensionSuccessMessage("");
+
+    if (!extensionUploadFile) {
+      setExtensionErrorMessage("Pilih file extension .zip atau .crx dulu.");
+      return;
+    }
+
+    if (extensionUploadVersion.trim().length < 2) {
+      setExtensionErrorMessage("Versi extension wajib diisi.");
+      return;
+    }
+
+    setIsUploadingExtension(true);
+
+    try {
+      const formData = new FormData();
+      formData.set("version", extensionUploadVersion.trim());
+      formData.set("file", extensionUploadFile);
+
+      await apiFetch<ExtensionBuildItem>("/dashboard/extension-builds", {
+        method: "POST",
+        body: formData,
+      });
+
+      await loadExtensionBuilds();
+      setExtensionUploadFile(null);
+      setExtensionUploadVersion("");
+      setExtensionSuccessMessage("Package extension berhasil diupload.");
+    } catch (error) {
+      setExtensionErrorMessage(
+        error instanceof Error ? error.message : "Gagal upload package extension.",
+      );
+    } finally {
+      setIsUploadingExtension(false);
+    }
+  }
+
   const passwordStrength = getPasswordStrength(passwordForm.new_password);
+  const canManageExtensionBuilds = canAccessAdminPages(currentUser?.role);
 
   return (
     <WorkspaceShell
@@ -300,6 +358,113 @@ export default function ProfilePage() {
                 </form>
               </Panel>
             </section>
+
+            <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_0.9fr]">
+              <Panel title="Clara Extension" eyebrow="Distribution">
+                {extensionErrorMessage ? (
+                  <div className="rounded-2xl border border-[#7a5520]/18 bg-[#38250f] px-4 py-3 text-sm text-[#e1c27c]">
+                    {extensionErrorMessage}
+                  </div>
+                ) : null}
+
+                {extensionSuccessMessage ? (
+                  <div className="rounded-2xl border border-[#f0cb73]/18 bg-[#20170f] px-4 py-3 text-sm text-[#f0cb73]">
+                    {extensionSuccessMessage}
+                  </div>
+                ) : null}
+
+                <article
+                  data-onboarding-id="profile-extension-download"
+                  className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d6737]">
+                        Package Global
+                      </p>
+                      <p className="mt-2 text-lg font-semibold text-[#fff0c9]">
+                        {extensionBuild?.available
+                          ? extensionBuild.version || "Tanpa versi"
+                          : "Belum ada package"}
+                      </p>
+                    </div>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
+                      <FontAwesomeIcon icon={faCloudArrowDown} className="h-4 w-4" />
+                    </span>
+                  </div>
+
+                  <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
+                    {extensionBuild?.available
+                      ? `File: ${extensionBuild.file_name ?? "-"}`
+                      : "Superadmin belum upload package extension global."}
+                  </p>
+                  <p className="mt-2 text-xs text-[#b89a62]">
+                    {extensionBuild?.uploaded_at
+                      ? `Upload: ${formatDateTime(extensionBuild.uploaded_at)} • ${extensionBuild.uploaded_by_email ?? "-"}`
+                      : "Begitu package global diupload, semua role akan download file yang sama dari sini."}
+                  </p>
+
+                  {extensionBuild?.available ? (
+                    <a
+                      href="/api/dashboard/extension-builds/download"
+                      className="mt-4 inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
+                    >
+                      Download Extension
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="mt-4 inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#8d6737] disabled:cursor-not-allowed"
+                    >
+                      Belum bisa didownload
+                    </button>
+                  )}
+                </article>
+              </Panel>
+
+              {canManageExtensionBuilds ? (
+                <Panel
+                  title="Upload Extension Package"
+                  eyebrow="Admin Only"
+                  onboardingId="profile-extension-upload"
+                >
+                  <form onSubmit={handleUploadExtensionBuild} className="space-y-4">
+                    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.92)_0%,rgba(18,13,10,0.92)_100%)] p-4 text-sm leading-6 text-[#d6bb84]">
+                      Superadmin upload sekali untuk semua user. File lama langsung tergantikan dan semua role akan download package yang sama.
+                    </div>
+
+                    <InputField
+                      label="Versi package"
+                      value={extensionUploadVersion}
+                      onChange={setExtensionUploadVersion}
+                      placeholder="Contoh: v0.1.2"
+                    />
+
+                    <div>
+                      <label className="text-sm font-semibold text-[#fff0c9]">File extension</label>
+                      <input
+                        accept=".zip,.crx"
+                        onChange={(event) =>
+                          setExtensionUploadFile(event.target.files?.[0] ?? null)
+                        }
+                        type="file"
+                        className="mt-2 block w-full rounded-2xl border border-[#f0cb73]/20 bg-[#17120d]/90 px-4 py-3 text-sm text-[#f7e7b7] outline-none file:mr-4 file:rounded-full file:border-0 file:bg-[#f0cb73] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#140f08]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isUploadingExtension}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_12px_28px_rgba(0,0,0,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <FontAwesomeIcon icon={faCloudArrowUp} className="h-4 w-4" />
+                      {isUploadingExtension ? "Uploading..." : "Upload Package"}
+                    </button>
+                  </form>
+                </Panel>
+              ) : null}
+            </section>
           </>
         ) : null}
       </div>
@@ -310,14 +475,16 @@ export default function ProfilePage() {
 function Panel({
   eyebrow,
   title,
+  onboardingId,
   children,
 }: {
   eyebrow: string;
   title: string;
+  onboardingId?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="clara-card rounded-[30px] p-6">
+    <section data-onboarding-id={onboardingId} className="clara-card rounded-[30px] p-6">
       <p className="clara-kicker text-xs">{eyebrow}</p>
       <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
         {title}

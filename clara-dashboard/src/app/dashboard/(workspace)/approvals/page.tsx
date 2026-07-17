@@ -287,7 +287,10 @@ export default function ChatReviewCenterPage() {
 
         {queue && !isLoading && !errorMessage && (
           <>
-            <section className="clara-card rounded-[32px] p-6">
+            <section
+              data-onboarding-id="manager-approvals-summary"
+              className="clara-card rounded-[32px] p-6"
+            >
               <p className="clara-kicker text-xs">
                 {isHeadView ? "Ringkasan arahan" : "Ringkasan review"}
               </p>
@@ -320,7 +323,10 @@ export default function ChatReviewCenterPage() {
               </div>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section
+              data-onboarding-id="manager-approvals-metrics"
+              className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+            >
               <QueueMetric
                 label={isHeadView ? "Perlu Keputusan Head" : "Butuh Keputusan"}
                 value={String(decisionCount)}
@@ -356,7 +362,10 @@ export default function ChatReviewCenterPage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_320px]">
-              <div className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+              <div
+                data-onboarding-id="manager-approvals-filters"
+                className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
+              >
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
                     {isHeadView ? "Saring daftar arahan" : "Saring daftar review"}
@@ -475,7 +484,10 @@ export default function ChatReviewCenterPage() {
                 </div>
               </div>
 
-            <section className="clara-card rounded-[28px] p-5">
+            <section
+              data-onboarding-id="manager-approvals-guide"
+              className="clara-card rounded-[28px] p-5"
+            >
                 <p className="clara-kicker text-xs">Urutan kerja cepat</p>
                 <div className="mt-4 space-y-3">
                   <StepHint
@@ -521,12 +533,15 @@ export default function ChatReviewCenterPage() {
                   Tidak ada item review yang cocok dengan filter saat ini. Halaman ini hanya memuat chat yang benar-benar perlu analisis, draft, approval, escalation, atau sudah stale.
                 </div>
               ) : (
-                queue.items.map((item) => (
+                queue.items.map((item, index) => (
                   <ReviewCard
                     key={item.conversation_id}
                     item={item}
                     isHeadView={isHeadView}
                     actionKey={actionKey}
+                    onboardingTargetId={
+                      index === 0 ? "manager-approvals-queue" : undefined
+                    }
                     onAnalyze={handleAnalyze}
                     onGenerateReply={handleGenerateReply}
                   />
@@ -544,12 +559,14 @@ function ReviewCard({
   item,
   isHeadView,
   actionKey,
+  onboardingTargetId,
   onAnalyze,
   onGenerateReply,
 }: {
   item: ChatReviewQueueItem;
   isHeadView: boolean;
   actionKey: string | null;
+  onboardingTargetId?: string;
   onAnalyze: (conversationId: string) => Promise<void>;
   onGenerateReply: (conversationId: string) => Promise<void>;
 }) {
@@ -609,7 +626,10 @@ function ReviewCard({
               : "Buka conversation untuk review detail.";
 
   return (
-    <article className="clara-card rounded-[28px] p-6">
+    <article
+      data-onboarding-id={onboardingTargetId}
+      className="clara-card rounded-[28px] p-6"
+    >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">

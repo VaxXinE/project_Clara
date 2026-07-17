@@ -231,6 +231,7 @@ export function WhatsAppUploadForm() {
 
   return (
     <form
+      data-onboarding-id="sales-upload-form"
       onSubmit={handleUpload}
       className="clara-card space-y-5 rounded-[30px] p-5 sm:p-6"
     >

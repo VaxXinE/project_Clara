@@ -1264,3 +1264,15 @@ export type OpsDatabaseOverview = {
     created_at: string;
   }[];
 };
+
+export type ExtensionBuildItem = {
+  role: string;
+  available: boolean;
+  version: string | null;
+  file_name: string | null;
+  size_bytes: number | null;
+  uploaded_at: string | null;
+  uploaded_by_email: string | null;
+  can_download: boolean;
+  can_manage: boolean;
+};

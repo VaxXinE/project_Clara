@@ -375,7 +375,10 @@ export default function FollowUpPage() {
 
         {!isLoading && worklist && (
           <>
-            <section className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
+            <section
+              data-onboarding-id="sales-followup-focus"
+              className="grid gap-4 xl:grid-cols-[1.5fr_1fr]"
+            >
               <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_50%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                   Fokus kerja sekarang
@@ -400,7 +403,10 @@ export default function FollowUpPage() {
                 </div>
               </article>
 
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+              <div
+                data-onboarding-id="sales-followup-metrics"
+                className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2"
+              >
                 <MetricCard label="Telat berat" value={String(worklist.overdue_24h_count)} />
                 <MetricCard label="Harus hari ini" value={String(worklist.due_today_count)} />
                 <MetricCard label="Siap dikirim" value={String(worklist.ready_to_send_count)} />
@@ -408,7 +414,10 @@ export default function FollowUpPage() {
               </div>
             </section>
 
-            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+            <section
+              data-onboarding-id="sales-followup-filters"
+              className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
+            >
               <div className="space-y-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-4 backdrop-blur-sm">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                   <div className="max-w-2xl">
@@ -484,7 +493,7 @@ export default function FollowUpPage() {
                     Belum ada task prioritas. Inbox Anda sedang relatif aman.
                   </div>
                 ) : (
-                  todaySections.map((section) => (
+                  todaySections.map((section, sectionIndex) => (
                     <div key={section.bucket} className="space-y-4">
                       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                         <div>
@@ -506,6 +515,11 @@ export default function FollowUpPage() {
                           item={item}
                           index={index}
                           bucket={section.bucket}
+                          onboardingTargetId={
+                            sectionIndex === 0 && index === 0
+                              ? "sales-followup-list"
+                              : undefined
+                          }
                           isUpdating={
                             updatingTaskId === (item.task_id ?? item.lead_id)
                           }
@@ -518,7 +532,10 @@ export default function FollowUpPage() {
               </div>
             </section>
 
-            <section className="clara-card rounded-[28px] p-5">
+            <section
+              data-onboarding-id="sales-followup-upcoming"
+              className="clara-card rounded-[28px] p-5"
+            >
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -576,12 +593,14 @@ function WorklistRow({
   item,
   index,
   bucket,
+  onboardingTargetId,
   isUpdating,
   onTaskAction,
 }: {
   item: SalesWorklistItem;
   index: number;
   bucket: ActionBucketKey;
+  onboardingTargetId?: string;
   isUpdating: boolean;
   onTaskAction: (
     item: SalesWorklistItem,
@@ -608,7 +627,10 @@ function WorklistRow({
   const isItemOverdue = isOverdue(item);
 
   return (
-    <article className="clara-card rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5">
+    <article
+      data-onboarding-id={onboardingTargetId}
+      className="clara-card rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">

@@ -106,7 +106,10 @@ export default function CustomerListPage() {
       description={pageDescription}
     >
       <div className="space-y-6">
-        <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <section
+          data-onboarding-id="sales-customers-hero"
+          className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
+        >
           <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
               {isLeadershipWorkspace
@@ -142,7 +145,10 @@ export default function CustomerListPage() {
           </div>
         </section>
 
-        <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.2)]">
+        <section
+          data-onboarding-id="sales-customers-filters"
+          className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.2)]"
+        >
           <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr_auto]">
             <label className="space-y-2 text-sm text-[#d8b977]">
               <span className="font-semibold text-[#fff0c9]">
@@ -217,9 +223,12 @@ export default function CustomerListPage() {
                 Belum ada customer yang cocok dengan filter ini.
               </div>
             ) : (
-              customers.map((customer) => (
+              customers.map((customer, index) => (
                 <article
                   key={customer.id}
+                  data-onboarding-id={
+                    index === 0 ? "sales-customers-list" : undefined
+                  }
                   className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(20,14,10,0.98)_46%,rgba(50,36,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
                 >
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">

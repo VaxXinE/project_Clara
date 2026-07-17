@@ -72,7 +72,7 @@ export function canAccessAdminPages(role?: string | null): boolean {
 export function getRoleDisplayLabel(role?: string | null): string {
   switch (normalizeWorkspaceRole(role)) {
     case "sales":
-      return "sales";
+      return "customer sales";
     case "manager":
       return "manager";
     case "head":

@@ -328,7 +328,10 @@ export default function DashboardHomePage() {
 
         {isSalesWorkspace ? (
           <>
-            <section className="clara-card rounded-[32px] p-6">
+            <section
+              data-onboarding-id="sales-home-summary"
+              className="clara-card rounded-[32px] p-6"
+            >
               <p className="clara-kicker text-xs">Ringkasan hari ini</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
@@ -357,7 +360,10 @@ export default function DashboardHomePage() {
               </div>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2">
+            <section
+              data-onboarding-id="sales-home-metrics"
+              className="grid gap-4 md:grid-cols-2"
+            >
               <MetricCard
                 label="Chat Perlu Dibalas"
                 value={isLoading ? "..." : String(pendingAiCount)}
@@ -375,7 +381,8 @@ export default function DashboardHomePage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
-              <PanelFrame
+              <div data-onboarding-id="sales-home-next-action">
+                <PanelFrame
                 eyebrow={salesNextAction.eyebrow}
                 title={salesNextAction.title}
                 actionLabel={salesNextAction.label}
@@ -417,9 +424,11 @@ export default function DashboardHomePage() {
                     icon={faTriangleExclamation}
                   />
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Aktivitas terakhir" title="Percakapan terbaru">
+              <div data-onboarding-id="sales-home-latest-conversation">
+                <PanelFrame eyebrow="Aktivitas terakhir" title="Percakapan terbaru">
                 {latestConversation ? (
                   <div className="space-y-4">
                     <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
@@ -468,11 +477,13 @@ export default function DashboardHomePage() {
                     Input Chat untuk mengisi pipeline kerja Sales.
                   </div>
                 )}
-              </PanelFrame>
+                </PanelFrame>
+              </div>
             </section>
 
             <section className="grid gap-6 xl:grid-cols-3">
-              <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
+              <div data-onboarding-id="sales-home-quick-nav">
+                <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
                 <div className="grid gap-3">
                   <Link
                     href="/dashboard/sales"
@@ -499,9 +510,11 @@ export default function DashboardHomePage() {
                     Input Chat
                   </Link>
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Mulai kerja" title="Fokus kerja Sales hari ini">
+              <div data-onboarding-id="sales-home-focus">
+                <PanelFrame eyebrow="Mulai kerja" title="Fokus kerja Sales hari ini">
                 <div className="grid gap-4 md:grid-cols-2">
                   <MiniInsightCard
                     label="Prioritas utama"
@@ -544,20 +557,26 @@ export default function DashboardHomePage() {
                     Buka Leads
                   </Link>
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Kondisi kerja" title="Angka penting hari ini">
+              <div data-onboarding-id="sales-home-health">
+                <PanelFrame eyebrow="Kondisi kerja" title="Angka penting hari ini">
                 <div className="space-y-3">
                   <PulseRow label="Sudah dibaca AI" value={String(metrics.analyzedCount)} />
                   <PulseRow label="Risiko tinggi" value={String(metrics.highRiskCount)} />
                   <PulseRow label="Coverage AI" value={aiCoverage} />
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
             </section>
           </>
         ) : isManagerWorkspace ? (
           <>
-            <section className="clara-card rounded-[32px] p-6">
+            <section
+              data-onboarding-id="manager-home-summary"
+              className="clara-card rounded-[32px] p-6"
+            >
               <p className="clara-kicker text-xs">Ringkasan hari ini</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
@@ -587,12 +606,13 @@ export default function DashboardHomePage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
-              <PanelFrame
-                eyebrow={managerNextAction.eyebrow}
-                title={managerNextAction.title}
-                actionLabel={managerNextAction.label}
-                actionHref={managerNextAction.href}
-              >
+              <div data-onboarding-id="manager-home-next-action">
+                <PanelFrame
+                  eyebrow={managerNextAction.eyebrow}
+                  title={managerNextAction.title}
+                  actionLabel={managerNextAction.label}
+                  actionHref={managerNextAction.href}
+                >
                 <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5">
                   <p className="text-sm leading-7 text-slate-600">
                     {managerNextAction.description}
@@ -650,14 +670,16 @@ export default function DashboardHomePage() {
                     Buka Lead Tim
                   </Link>
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame
-                eyebrow="Kondisi tim"
-                title="Ringkasan singkat manager"
-                actionLabel="Buka Monitor Tim"
-                actionHref="/dashboard/manager-insights"
-              >
+              <div data-onboarding-id="manager-home-health">
+                <PanelFrame
+                  eyebrow="Kondisi tim"
+                  title="Ringkasan singkat manager"
+                  actionLabel="Buka Monitor Tim"
+                  actionHref="/dashboard/manager-insights"
+                >
                 <div className="space-y-3">
                   <PulseRow
                     label="Tim dipantau"
@@ -687,11 +709,13 @@ export default function DashboardHomePage() {
                       ? `${managerOverdueCount} follow-up mulai terlambat meskipun belum muncul banyak alert besar.`
                       : "Belum ada alert tim yang menonjol saat ini."}
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
             </section>
 
             <section className="grid gap-6 xl:grid-cols-3">
-              <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
+              <div data-onboarding-id="manager-home-quick-nav">
+                <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
                 <div className="grid gap-3">
                   <Link
                     href="/dashboard/approvals"
@@ -712,9 +736,11 @@ export default function DashboardHomePage() {
                     Lead Tim
                   </Link>
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Prioritas kerja" title="Urutan kerja manager">
+              <div data-onboarding-id="manager-home-priority">
+                <PanelFrame eyebrow="Prioritas kerja" title="Urutan kerja manager">
                 <div className="space-y-3">
                   <ActionChecklistRow
                     step="1"
@@ -732,9 +758,11 @@ export default function DashboardHomePage() {
                     description="Buka lead spesifik kalau butuh konteks lebih detail."
                   />
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Angka penting" title="Yang perlu dibaca cepat">
+              <div data-onboarding-id="manager-home-metrics">
+                <PanelFrame eyebrow="Angka penting" title="Yang perlu dibaca cepat">
                 <div className="space-y-3">
                   <PulseRow
                     label="Lead aktif"
@@ -749,7 +777,8 @@ export default function DashboardHomePage() {
                     value={isLoading ? "..." : String(managerOverdueCount)}
                   />
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
             </section>
           </>
         ) : isHeadWorkspace ? (
@@ -824,12 +853,13 @@ export default function DashboardHomePage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
-              <PanelFrame
-                eyebrow={headNextAction.eyebrow}
-                title={headNextAction.title}
-                actionLabel={headNextAction.label}
-                actionHref={headNextAction.href}
-              >
+              <div data-onboarding-id="head-home-next-action">
+                <PanelFrame
+                  eyebrow={headNextAction.eyebrow}
+                  title={headNextAction.title}
+                  actionLabel={headNextAction.label}
+                  actionHref={headNextAction.href}
+                >
                 <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5">
                   <p className="text-sm leading-7 text-slate-600">
                     {headNextAction.description}
@@ -887,14 +917,16 @@ export default function DashboardHomePage() {
                     Buka Arahan Tim
                   </Link>
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame
-                eyebrow="Pantauan cepat"
-                title="Ringkasan lintas tim"
-                actionLabel="Buka Monitor Tim"
-                actionHref="/dashboard/manager-insights"
-              >
+              <div data-onboarding-id="head-home-health">
+                <PanelFrame
+                  eyebrow="Pantauan cepat"
+                  title="Ringkasan lintas tim"
+                  actionLabel="Buka Monitor Tim"
+                  actionHref="/dashboard/manager-insights"
+                >
                 <div className="space-y-3">
                   <PulseRow
                     label="Kepatuhan follow-up"
@@ -922,11 +954,13 @@ export default function DashboardHomePage() {
                     ? `Ada ${managerInsights?.boundary_alerts.length ?? 0} area yang sudah cukup besar untuk masuk radar Head.`
                     : "Belum ada area tim yang sangat menonjol saat ini."}
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
             </section>
 
             <section className="grid gap-6 xl:grid-cols-3">
-              <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
+              <div data-onboarding-id="head-home-quick-nav">
+                <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
                 <div className="grid gap-3">
                   <Link
                     href="/dashboard/notifications"
@@ -947,9 +981,11 @@ export default function DashboardHomePage() {
                     Arahan Tim
                   </Link>
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Urutan kerja" title="Cara baca beranda Head">
+              <div data-onboarding-id="head-home-priority">
+                <PanelFrame eyebrow="Urutan kerja" title="Cara baca beranda Head">
                 <div className="space-y-3">
                   <ActionChecklistRow
                     step="1"
@@ -967,9 +1003,11 @@ export default function DashboardHomePage() {
                     description="Putuskan siapa yang harus bergerak: sales, manager, atau eskalasi lain."
                   />
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
 
-              <PanelFrame eyebrow="Angka penting" title="Yang perlu dibaca cepat">
+              <div data-onboarding-id="head-home-metrics">
+                <PanelFrame eyebrow="Angka penting" title="Yang perlu dibaca cepat">
                 <div className="space-y-3">
                   <PulseRow
                     label="Lead aktif lintas tim"
@@ -984,7 +1022,8 @@ export default function DashboardHomePage() {
                     value={isLoading ? "..." : String(managerOverdueCount)}
                   />
                 </div>
-              </PanelFrame>
+                </PanelFrame>
+              </div>
             </section>
           </>
         ) : (

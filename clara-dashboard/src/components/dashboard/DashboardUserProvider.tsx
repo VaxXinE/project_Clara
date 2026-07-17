@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 
+import { SalesOnboardingTour } from "@/components/dashboard/SalesOnboardingTour";
 import { apiFetch } from "@/lib/api";
 import type { CurrentUser } from "@/types/dashboard";
 
@@ -89,6 +90,7 @@ export function DashboardUserProvider({
   return (
     <DashboardUserContext.Provider value={value}>
       {children}
+      <SalesOnboardingTour />
     </DashboardUserContext.Provider>
   );
 }
