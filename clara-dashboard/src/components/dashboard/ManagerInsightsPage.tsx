@@ -150,6 +150,7 @@ function getCoachingPriorityAction(item: {
 }
 
 export function ManagerInsightsPage() {
+  const salesPageSize = 4;
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [insights, setInsights] = useState<ManagerInsightsResponse | null>(null);
@@ -160,6 +161,7 @@ export function ManagerInsightsPage() {
   const [salesSlaFilter, setSalesSlaFilter] = useState("all");
   const [salesDisciplineFilter, setSalesDisciplineFilter] = useState("all");
   const [salesSortBy, setSalesSortBy] = useState("overdue");
+  const [salesPage, setSalesPage] = useState(1);
   const [selectedSalesUserId, setSelectedSalesUserId] = useState<string | null>(null);
   const [salesDetail, setSalesDetail] = useState<SalesPerformanceDetailResponse | null>(null);
   const [salesDetailLoadingId, setSalesDetailLoadingId] = useState<string | null>(null);
@@ -252,7 +254,25 @@ export function ManagerInsightsPage() {
       ),
     [actionList?.items],
   );
+  const salesPageCount = Math.max(
+    1,
+    Math.ceil(filteredSalesPerformance.length / salesPageSize),
+  );
+  const paginatedSalesPerformance = useMemo(() => {
+    const startIndex = (salesPage - 1) * salesPageSize;
+    return filteredSalesPerformance.slice(startIndex, startIndex + salesPageSize);
+  }, [filteredSalesPerformance, salesPage, salesPageSize]);
   const actionAssigneeOptions = insights?.sales_performance ?? [];
+
+  useEffect(() => {
+    setSalesPage(1);
+  }, [salesSlaFilter, salesDisciplineFilter, salesSortBy, performanceRange]);
+
+  useEffect(() => {
+    if (salesPage > salesPageCount) {
+      setSalesPage(salesPageCount);
+    }
+  }, [salesPage, salesPageCount]);
 
   async function loadPerformanceActions() {
     try {
@@ -1218,11 +1238,48 @@ export function ManagerInsightsPage() {
                   </select>
                 </div>
 
-                <div className="mt-4 space-y-3">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#f0cb73]/12 bg-[#1b140e] px-4 py-3 text-sm text-[#d6bb84]">
+                  <p>
+                    Menampilkan{" "}
+                    <span className="font-semibold text-[#fff0c9]">
+                      {paginatedSalesPerformance.length}
+                    </span>{" "}
+                    dari{" "}
+                    <span className="font-semibold text-[#fff0c9]">
+                      {filteredSalesPerformance.length}
+                    </span>{" "}
+                    sales
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSalesPage((current) => Math.max(1, current - 1))}
+                      disabled={salesPage === 1}
+                      className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-1.5 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Sebelumnya
+                    </button>
+                    <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1.5 text-xs font-semibold text-[#f0cb73]">
+                      Halaman {salesPage} / {salesPageCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSalesPage((current) => Math.min(salesPageCount, current + 1))
+                      }
+                      disabled={salesPage === salesPageCount}
+                      className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-1.5 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Berikutnya
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 max-h-[1600px] space-y-3 overflow-y-auto pr-2">
                   {filteredSalesPerformance.length === 0 ? (
                     <EmptyText text="Belum ada data performa sales yang cocok dengan filter ini." />
                   ) : (
-                    filteredSalesPerformance.map((item) => (
+                    paginatedSalesPerformance.map((item) => (
                       <div key={item.sales_user_id} className="space-y-3">
                         <article className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
                           <div className="flex flex-wrap items-start justify-between gap-3">
