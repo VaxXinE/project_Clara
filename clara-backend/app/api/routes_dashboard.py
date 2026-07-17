@@ -36,6 +36,7 @@ from app.schemas.dashboard_schema import (
     SalesApprovalQueueResponse,
     SalesConversationDetail,
     SalesInboxItem,
+    SalesPerformanceDetailResponse,
     SalesWorklistResponse,
 )
 from app.schemas.channel_schema import ChannelOverviewResponse
@@ -64,6 +65,7 @@ from app.services.dashboard_service import (
     get_sales_approval_queue,
     get_sales_conversation_detail,
     get_sales_inbox,
+    get_sales_performance_detail,
     get_sales_worklist,
     list_kpi_alert_records,
     list_kpi_snapshots,
@@ -187,6 +189,7 @@ def sales_worklist(
 @router.get("/manager-insights", response_model=ManagerInsightsResponse)
 def manager_insights(
     account_category: str | None = Query(default=None),
+    range: str = Query(default="7d"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("manager", "head", "superadmin")),
 ):
@@ -194,7 +197,37 @@ def manager_insights(
         db=db,
         current_user=current_user,
         account_category=account_category,
+        range_label=range,
     )
+
+
+@router.get(
+    "/manager-insights/sales/{sales_user_id}",
+    response_model=SalesPerformanceDetailResponse,
+)
+def manager_sales_performance_detail(
+    sales_user_id: UUID,
+    range: str = Query(default="7d"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    try:
+        return get_sales_performance_detail(
+            db=db,
+            sales_user_id=sales_user_id,
+            current_user=current_user,
+            range_label=range,
+        )
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/sales/approval-queue", response_model=SalesApprovalQueueResponse)

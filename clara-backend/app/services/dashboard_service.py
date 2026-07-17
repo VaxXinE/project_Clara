@@ -1,6 +1,6 @@
 import json
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID
 
@@ -48,6 +48,8 @@ from app.schemas.dashboard_schema import (
     ManagerTeamMemberItem,
     ManagerInsightsResponse,
     ManagerObjectionTrendItem,
+    ManagerSalesPerformanceItem,
+    ManagerSalesPerformanceSummary,
     ManagerTeamDisciplineRow,
     KpiAlertHistoryResponse,
     KpiAlertItem,
@@ -82,6 +84,18 @@ from app.schemas.dashboard_schema import (
     MarketingPlanningItem,
     SalesApprovalQueueItem,
     SalesApprovalQueueResponse,
+    SalesCoachingSignal,
+    SalesPerformanceConversationItem,
+    SalesPerformanceDetailResponse,
+    SalesPerformanceDetailSummary,
+    SalesPerformanceTrend,
+    SalesPerformanceDetailUser,
+    SalesPerformanceFollowUpItem,
+    SalesPerformanceLeadItem,
+    TeamPerformanceItem,
+    TeamPerformanceSummary,
+    TeamTopContributorItem,
+    TopCoachingTargetItem,
     SalesPerformanceRow,
     SalesConversationDetail,
     SalesInboxItem,
@@ -108,7 +122,12 @@ from app.services.source_intelligence_service import (
     normalize_source_channel,
     normalize_source_key,
 )
-from app.services.role_service import is_head_like, is_sales_like, is_superadmin_like
+from app.services.role_service import (
+    is_head_like,
+    is_sales_like,
+    is_superadmin_like,
+    normalize_role,
+)
 
 
 GLOBAL_EXTENSION_BUILD_KEY = "global"
@@ -1472,13 +1491,589 @@ def _manager_priority_score(
     return score
 
 
+def _resolve_sales_performance_sla_status(
+    *,
+    needs_reply_count: int,
+    overdue_follow_up_count: int,
+    hot_leads_count: int,
+    needs_analysis_count: int,
+) -> str:
+    if overdue_follow_up_count > 0 or (needs_reply_count >= 2 and hot_leads_count > 0):
+        return "critical"
+    if needs_reply_count > 0 or needs_analysis_count > 0:
+        return "warning"
+    return "healthy"
+
+
+def _resolve_sales_performance_discipline_status(
+    *,
+    stale_log_count: int,
+    overdue_follow_up_count: int,
+) -> str:
+    if stale_log_count > 0 or overdue_follow_up_count > 0:
+        return "needs_attention"
+    return "disciplined"
+
+
+def _normalize_sales_performance_range(range_label: str | None) -> tuple[str, int]:
+    if range_label in {"14d", "30d"}:
+        return range_label, int(range_label[:-1])
+    return "7d", 7
+
+
+def _is_between(
+    value: datetime | None,
+    *,
+    start: datetime,
+    end: datetime,
+) -> bool:
+    normalized_value = ensure_aware_utc(value)
+    if normalized_value is None:
+        return False
+    return start <= normalized_value <= end
+
+
+def _lead_activity_timestamps(lead: Lead) -> list[datetime]:
+    timestamps: list[datetime] = []
+    for candidate in [
+        ensure_aware_utc(lead.last_contact_at),
+        ensure_aware_utc(lead.updated_at),
+        ensure_aware_utc(lead.next_follow_up_at),
+    ]:
+        if candidate is not None:
+            timestamps.append(candidate)
+    return timestamps
+
+
+def _conversation_activity_timestamps(
+    conversation: Conversation,
+    latest_message: Message | None,
+    latest_extraction: AIExtraction | None,
+    latest_suggestion: ReplySuggestion | None,
+) -> list[datetime]:
+    timestamps: list[datetime] = []
+    for candidate in [
+        ensure_aware_utc(conversation.last_message_at),
+        ensure_aware_utc(conversation.created_at),
+        ensure_aware_utc(latest_message.message_timestamp if latest_message else None),
+        ensure_aware_utc(latest_extraction.created_at if latest_extraction else None),
+        ensure_aware_utc(latest_suggestion.created_at if latest_suggestion else None),
+    ]:
+        if candidate is not None:
+            timestamps.append(candidate)
+    return timestamps
+
+
+def _resolve_sales_performance_momentum(
+    *,
+    delta_overdue_follow_up: int,
+    delta_needs_reply: int,
+    delta_won_deals: int,
+    delta_analyzed_conversations: int,
+    current_discipline_status: str,
+    previous_discipline_status: str,
+) -> str:
+    if (
+        delta_overdue_follow_up > 0
+        or delta_needs_reply > 0
+        or (
+            previous_discipline_status == "disciplined"
+            and current_discipline_status == "needs_attention"
+        )
+    ):
+        return "declining"
+    if (
+        delta_overdue_follow_up < 0
+        or delta_needs_reply < 0
+        or delta_won_deals > 0
+        or (
+            delta_analyzed_conversations > 0
+            and current_discipline_status == "disciplined"
+        )
+    ):
+        return "improving"
+    return "stable"
+
+
+def _build_sales_coaching_signal(
+    *,
+    active_leads_count: int,
+    needs_reply_count: int,
+    overdue_follow_up_count: int,
+    hot_leads_count: int,
+    needs_analysis_count: int,
+    crm_discipline_status: str,
+    trend: SalesPerformanceTrend,
+) -> SalesCoachingSignal:
+    priority_score = 0
+
+    if overdue_follow_up_count > 0:
+        priority_score += 40
+    if trend.delta_overdue_follow_up > 0:
+        priority_score += 20
+    if needs_reply_count > 0:
+        priority_score += 25
+    if trend.momentum_label == "declining":
+        priority_score += 20
+    if crm_discipline_status == "needs_attention":
+        priority_score += 15
+    if hot_leads_count > 0 and overdue_follow_up_count > 0:
+        priority_score += 10
+    if needs_analysis_count > 0:
+        priority_score += 10
+    if (
+        trend.delta_won_deals > 0
+        and overdue_follow_up_count == 0
+        and needs_reply_count == 0
+    ):
+        priority_score = max(priority_score - 15, 0)
+
+    if overdue_follow_up_count > 0:
+        return SalesCoachingSignal(
+            priority_score=priority_score,
+            priority_label=(
+                "urgent"
+                if priority_score >= 70
+                else "high" if priority_score >= 40 else "normal"
+            ),
+            primary_reason=(
+                "Follow-up overdue masih menumpuk"
+                if trend.delta_overdue_follow_up <= 0
+                else "Follow-up overdue naik dibanding periode sebelumnya"
+            ),
+            recommended_action=(
+                "Cek follow-up overdue dulu, lalu rapikan next action di CRM."
+            ),
+            focus_area="follow_up",
+        )
+
+    if needs_reply_count > 0:
+        return SalesCoachingSignal(
+            priority_score=priority_score,
+            priority_label=(
+                "urgent"
+                if priority_score >= 70
+                else "high" if priority_score >= 40 else "normal"
+            ),
+            primary_reason="Conversation yang perlu dibalas masih menumpuk.",
+            recommended_action=(
+                "Buka conversation yang belum dibalas dan prioritaskan hot lead."
+            ),
+            focus_area="reply_backlog",
+        )
+
+    if crm_discipline_status == "needs_attention":
+        return SalesCoachingSignal(
+            priority_score=priority_score,
+            priority_label="high" if priority_score >= 40 else "normal",
+            primary_reason="Disiplin CRM mulai longgar dan perlu dirapikan lagi.",
+            recommended_action=(
+                "Rapikan log yang stale lalu pastikan next follow-up selalu terisi."
+            ),
+            focus_area="discipline",
+        )
+
+    if needs_analysis_count > 0:
+        return SalesCoachingSignal(
+            priority_score=priority_score,
+            priority_label="normal",
+            primary_reason="Masih ada chat baru yang belum sempat dibaca ulang AI.",
+            recommended_action=(
+                "Jalankan analysis pada chat terbaru sebelum backlog jawaban ikut naik."
+            ),
+            focus_area="analysis",
+        )
+
+    if trend.delta_won_deals > 0 or active_leads_count > 0:
+        return SalesCoachingSignal(
+            priority_score=max(priority_score, 0),
+            priority_label="stable" if priority_score < 15 else "normal",
+            primary_reason="Pipeline masih bergerak dan belum ada backlog yang menonjol.",
+            recommended_action="Sales ini stabil, cukup monitor tanpa intervensi tambahan.",
+            focus_area="conversion",
+        )
+
+    return SalesCoachingSignal(
+        priority_score=max(priority_score, 0),
+        priority_label="stable",
+        primary_reason="Belum ada sinyal operasional yang cukup kuat untuk diintervensi.",
+        recommended_action="Cukup monitor ritmenya, belum perlu intervensi tambahan.",
+        focus_area="conversion",
+    )
+
+
+def _collect_sales_performance_metrics(
+    *,
+    owned_leads: list[Lead],
+    owned_conversations: list[Conversation],
+    now: datetime,
+    start: datetime | None = None,
+    end: datetime | None = None,
+) -> dict[str, int | str | datetime | None]:
+    active_leads_count = 0
+    overdue_follow_up_count = 0
+    hot_lead_keys: set[str] = set()
+    won_deals_count = 0
+    lost_deals_count = 0
+    open_deals_count = 0
+    stale_log_count = 0
+    latest_activity_candidates: list[datetime] = []
+
+    for lead in owned_leads:
+        lead_timestamps = _lead_activity_timestamps(lead)
+        in_range = (
+            True
+            if start is None or end is None
+            else any(_is_between(candidate, start=start, end=end) for candidate in lead_timestamps)
+        )
+        if not in_range:
+            continue
+
+        if not lead_has_closed_outcome(lead):
+            active_leads_count += 1
+            open_deals_count += 1
+
+        if lead.current_stage == "won" or (
+            lead.deal is not None and lead.deal.status == "won"
+        ):
+            won_deals_count += 1
+        elif lead.current_stage == "lost" or (
+            lead.deal is not None and lead.deal.status == "lost"
+        ):
+            lost_deals_count += 1
+
+        if lead.lead_temperature == "hot":
+            hot_lead_keys.add(f"lead:{lead.id}")
+
+        next_follow_up_at = ensure_aware_utc(lead.next_follow_up_at)
+        if next_follow_up_at is not None and next_follow_up_at <= now:
+            overdue_follow_up_count += 1
+
+        latest_log = get_latest_discipline_log_for_lead(lead)
+        if latest_log is None:
+            stale_log_count += 1
+        elif start is None or end is None:
+            if latest_log.log_date != now.date():
+                stale_log_count += 1
+        else:
+            latest_log_at = datetime.combine(
+                latest_log.log_date,
+                datetime.min.time(),
+                tzinfo=timezone.utc,
+            )
+            if not _is_between(latest_log_at, start=start, end=end):
+                stale_log_count += 1
+
+        latest_activity_candidates.extend(lead_timestamps)
+
+    needs_reply_count = 0
+    analyzed_conversations_count = 0
+    needs_analysis_count = 0
+
+    for conversation in owned_conversations:
+        latest_message = get_latest_message(conversation)
+        latest_extraction = get_latest_extraction(conversation)
+        latest_suggestion = get_latest_reply_suggestion(conversation)
+        latest_sent_message = get_latest_sent_message(conversation)
+        activity_timestamps = _conversation_activity_timestamps(
+            conversation,
+            latest_message,
+            latest_extraction,
+            latest_suggestion,
+        )
+        in_range = (
+            True
+            if start is None or end is None
+            else any(_is_between(candidate, start=start, end=end) for candidate in activity_timestamps)
+        )
+        if not in_range:
+            continue
+
+        current_sent_message = resolve_current_sent_message(
+            latest_message,
+            latest_sent_message,
+        )
+        ui_status = determine_ui_status(
+            latest_message,
+            latest_extraction,
+            latest_suggestion,
+            current_sent_message,
+        )
+
+        if latest_extraction is not None:
+            analyzed_conversations_count += 1
+            extraction_in_range = (
+                start is None
+                or end is None
+                or _is_between(latest_extraction.created_at, start=start, end=end)
+            )
+            if extraction_in_range and latest_extraction.lead_temperature == "hot":
+                hot_lead_keys.add(
+                    f"lead:{conversation.lead_id}"
+                    if conversation.lead_id is not None
+                    else f"conversation:{conversation.id}"
+                )
+        if ui_status == "needs_analysis":
+            needs_analysis_count += 1
+        if ui_status in {"needs_reply_suggestion", "needs_approval", "needs_escalation"}:
+            needs_reply_count += 1
+
+        latest_activity_candidates.extend(activity_timestamps)
+
+    crm_discipline_status = _resolve_sales_performance_discipline_status(
+        stale_log_count=stale_log_count,
+        overdue_follow_up_count=overdue_follow_up_count,
+    )
+
+    return {
+        "active_leads_count": active_leads_count,
+        "needs_reply_count": needs_reply_count,
+        "overdue_follow_up_count": overdue_follow_up_count,
+        "hot_leads_count": len(hot_lead_keys),
+        "analyzed_conversations_count": analyzed_conversations_count,
+        "needs_analysis_count": needs_analysis_count,
+        "won_deals_count": won_deals_count,
+        "lost_deals_count": lost_deals_count,
+        "open_deals_count": open_deals_count,
+        "latest_activity_at": max(latest_activity_candidates, default=None),
+        "avg_response_sla_status": _resolve_sales_performance_sla_status(
+            needs_reply_count=needs_reply_count,
+            overdue_follow_up_count=overdue_follow_up_count,
+            hot_leads_count=len(hot_lead_keys),
+            needs_analysis_count=needs_analysis_count,
+        ),
+        "crm_discipline_status": crm_discipline_status,
+        "stale_log_count": stale_log_count,
+    }
+
+
+def _build_sales_performance_summary_item(
+    *,
+    sales_user: User,
+    owned_leads: list[Lead],
+    owned_conversations: list[Conversation],
+    now: datetime,
+    range_label: str = "7d",
+) -> ManagerSalesPerformanceItem:
+    normalized_range_label, range_days = _normalize_sales_performance_range(range_label)
+    current_start = now - timedelta(days=range_days)
+    previous_start = now - timedelta(days=range_days * 2)
+    previous_end = current_start
+
+    current_metrics = _collect_sales_performance_metrics(
+        owned_leads=owned_leads,
+        owned_conversations=owned_conversations,
+        now=now,
+        start=current_start,
+        end=now,
+    )
+    previous_metrics = _collect_sales_performance_metrics(
+        owned_leads=owned_leads,
+        owned_conversations=owned_conversations,
+        now=previous_end,
+        start=previous_start,
+        end=previous_end,
+    )
+
+    current_discipline_status = str(current_metrics["crm_discipline_status"])
+    previous_discipline_status = str(previous_metrics["crm_discipline_status"])
+    delta_active_leads = int(current_metrics["active_leads_count"]) - int(
+        previous_metrics["active_leads_count"]
+    )
+    delta_needs_reply = int(current_metrics["needs_reply_count"]) - int(
+        previous_metrics["needs_reply_count"]
+    )
+    delta_overdue_follow_up = int(current_metrics["overdue_follow_up_count"]) - int(
+        previous_metrics["overdue_follow_up_count"]
+    )
+    delta_hot_leads = int(current_metrics["hot_leads_count"]) - int(
+        previous_metrics["hot_leads_count"]
+    )
+    delta_analyzed_conversations = int(
+        current_metrics["analyzed_conversations_count"]
+    ) - int(previous_metrics["analyzed_conversations_count"])
+    delta_won_deals = int(current_metrics["won_deals_count"]) - int(
+        previous_metrics["won_deals_count"]
+    )
+    trend = SalesPerformanceTrend(
+        range_label=normalized_range_label,
+        previous_range_label=f"prev_{normalized_range_label}",
+        delta_active_leads=delta_active_leads,
+        delta_needs_reply=delta_needs_reply,
+        delta_overdue_follow_up=delta_overdue_follow_up,
+        delta_hot_leads=delta_hot_leads,
+        delta_analyzed_conversations=delta_analyzed_conversations,
+        delta_won_deals=delta_won_deals,
+        momentum_label=_resolve_sales_performance_momentum(
+            delta_overdue_follow_up=delta_overdue_follow_up,
+            delta_needs_reply=delta_needs_reply,
+            delta_won_deals=delta_won_deals,
+            delta_analyzed_conversations=delta_analyzed_conversations,
+            current_discipline_status=current_discipline_status,
+            previous_discipline_status=previous_discipline_status,
+        ),
+    )
+    coaching_signal = _build_sales_coaching_signal(
+        active_leads_count=int(current_metrics["active_leads_count"]),
+        needs_reply_count=int(current_metrics["needs_reply_count"]),
+        overdue_follow_up_count=int(current_metrics["overdue_follow_up_count"]),
+        hot_leads_count=int(current_metrics["hot_leads_count"]),
+        needs_analysis_count=int(current_metrics["needs_analysis_count"]),
+        crm_discipline_status=current_discipline_status,
+        trend=trend,
+    )
+
+    return ManagerSalesPerformanceItem(
+        sales_user_id=sales_user.id,
+        sales_name=sales_user.name,
+        role=normalize_role(sales_user.role),
+        active_leads_count=int(current_metrics["active_leads_count"]),
+        needs_reply_count=int(current_metrics["needs_reply_count"]),
+        overdue_follow_up_count=int(current_metrics["overdue_follow_up_count"]),
+        hot_leads_count=int(current_metrics["hot_leads_count"]),
+        analyzed_conversations_count=int(current_metrics["analyzed_conversations_count"]),
+        needs_analysis_count=int(current_metrics["needs_analysis_count"]),
+        won_deals_count=int(current_metrics["won_deals_count"]),
+        lost_deals_count=int(current_metrics["lost_deals_count"]),
+        open_deals_count=int(current_metrics["open_deals_count"]),
+        latest_activity_at=current_metrics["latest_activity_at"],
+        avg_response_sla_status=str(current_metrics["avg_response_sla_status"]),
+        crm_discipline_status=current_discipline_status,
+        trend=trend,
+        coaching_signal=coaching_signal,
+    )
+
+
+def _merge_sales_performance_status(
+    values: list[str],
+    *,
+    critical_value: str,
+    warning_value: str,
+    healthy_value: str,
+) -> str:
+    if critical_value in values:
+        return critical_value
+    if warning_value in values:
+        return warning_value
+    return healthy_value
+
+
+def _build_team_performance_item(
+    *,
+    team: SalesTeam | None,
+    sales_items: list[ManagerSalesPerformanceItem],
+    normalized_range_label: str,
+) -> TeamPerformanceItem:
+    total_active_leads = sum(item.active_leads_count for item in sales_items)
+    total_needs_reply = sum(item.needs_reply_count for item in sales_items)
+    total_overdue_follow_up = sum(item.overdue_follow_up_count for item in sales_items)
+    total_hot_leads = sum(item.hot_leads_count for item in sales_items)
+    total_needs_analysis = sum(item.needs_analysis_count for item in sales_items)
+    total_analyzed = sum(item.analyzed_conversations_count for item in sales_items)
+    total_won_deals = sum(item.won_deals_count for item in sales_items)
+    latest_activity_at = max(
+        (item.latest_activity_at for item in sales_items if item.latest_activity_at is not None),
+        default=None,
+    )
+    avg_response_sla_status = _merge_sales_performance_status(
+        [item.avg_response_sla_status for item in sales_items],
+        critical_value="critical",
+        warning_value="warning",
+        healthy_value="healthy",
+    )
+    crm_discipline_status = _merge_sales_performance_status(
+        [item.crm_discipline_status for item in sales_items],
+        critical_value="needs_attention",
+        warning_value="needs_attention",
+        healthy_value="disciplined",
+    )
+    trend = SalesPerformanceTrend(
+        range_label=normalized_range_label,
+        previous_range_label=f"prev_{normalized_range_label}",
+        delta_active_leads=sum(item.trend.delta_active_leads for item in sales_items),
+        delta_needs_reply=sum(item.trend.delta_needs_reply for item in sales_items),
+        delta_overdue_follow_up=sum(
+            item.trend.delta_overdue_follow_up for item in sales_items
+        ),
+        delta_hot_leads=sum(item.trend.delta_hot_leads for item in sales_items),
+        delta_analyzed_conversations=sum(
+            item.trend.delta_analyzed_conversations for item in sales_items
+        ),
+        delta_won_deals=sum(item.trend.delta_won_deals for item in sales_items),
+        momentum_label=_resolve_sales_performance_momentum(
+            delta_overdue_follow_up=sum(
+                item.trend.delta_overdue_follow_up for item in sales_items
+            ),
+            delta_needs_reply=sum(item.trend.delta_needs_reply for item in sales_items),
+            delta_won_deals=sum(item.trend.delta_won_deals for item in sales_items),
+            delta_analyzed_conversations=sum(
+                item.trend.delta_analyzed_conversations for item in sales_items
+            ),
+            current_discipline_status=crm_discipline_status,
+            previous_discipline_status=crm_discipline_status,
+        ),
+    )
+    coaching_signal = _build_sales_coaching_signal(
+        active_leads_count=total_active_leads,
+        needs_reply_count=total_needs_reply,
+        overdue_follow_up_count=total_overdue_follow_up,
+        hot_leads_count=total_hot_leads,
+        needs_analysis_count=total_needs_analysis,
+        crm_discipline_status=crm_discipline_status,
+        trend=trend,
+    )
+    top_sales_contributors = [
+        TeamTopContributorItem(
+            sales_user_id=item.sales_user_id,
+            sales_name=item.sales_name,
+            priority_label=item.coaching_signal.priority_label,
+            primary_reason=item.coaching_signal.primary_reason,
+        )
+        for item in sorted(
+            sales_items,
+            key=lambda item: (
+                item.coaching_signal.priority_score,
+                item.overdue_follow_up_count,
+                item.needs_reply_count,
+                item.hot_leads_count,
+                item.latest_activity_at or datetime.min.replace(tzinfo=timezone.utc),
+            ),
+            reverse=True,
+        )[:3]
+    ]
+
+    return TeamPerformanceItem(
+        team_id=team.id if team else None,
+        team_name=team.name if team else "Tanpa team",
+        unit_id=team.unit_id if team else None,
+        unit_name=team.unit.name if team and team.unit else None,
+        manager_user_name=team.manager_user.name if team and team.manager_user else None,
+        member_count=len(sales_items),
+        active_leads_count=total_active_leads,
+        needs_reply_count=total_needs_reply,
+        overdue_follow_up_count=total_overdue_follow_up,
+        hot_leads_count=total_hot_leads,
+        analyzed_conversations_count=total_analyzed,
+        needs_analysis_count=total_needs_analysis,
+        won_deals_count=total_won_deals,
+        latest_activity_at=latest_activity_at,
+        avg_response_sla_status=avg_response_sla_status,
+        crm_discipline_status=crm_discipline_status,
+        trend=trend,
+        coaching_signal=coaching_signal,
+        top_sales_contributors=top_sales_contributors,
+    )
+
+
 def get_manager_insights(
     db: Session,
     *,
     current_user: User,
     account_category: str | None = None,
+    range_label: str = "7d",
 ) -> ManagerInsightsResponse:
     now = datetime.now(timezone.utc)
+    normalized_range_label, _ = _normalize_sales_performance_range(range_label)
 
     if current_user.organization_id is None and not is_superadmin_like(current_user.role):
         return ManagerInsightsResponse(
@@ -1497,6 +2092,26 @@ def get_manager_insights(
             coaching_priority=[],
             objection_trends=[],
             boundary_alerts=[],
+            sales_performance_summary=ManagerSalesPerformanceSummary(
+                sales_count=0,
+                total_active_leads=0,
+                total_needs_reply=0,
+                total_overdue_follow_up=0,
+                range_label=normalized_range_label,
+                previous_range_label=f"prev_{normalized_range_label}",
+                delta_total_needs_reply=0,
+                delta_total_overdue_follow_up=0,
+            ),
+            sales_performance=[],
+            team_performance_summary=TeamPerformanceSummary(
+                team_count=0,
+                total_needs_reply=0,
+                total_overdue_follow_up=0,
+                range_label=normalized_range_label,
+                previous_range_label=f"prev_{normalized_range_label}",
+            ),
+            team_performance=[],
+            top_coaching_targets=[],
         )
 
     accessible_user_ids = get_accessible_sales_user_ids(
@@ -1507,6 +2122,7 @@ def get_manager_insights(
     lead_statement = select(Lead).options(
         selectinload(Lead.assigned_user).selectinload(User.sales_team),
         selectinload(Lead.discipline_logs),
+        selectinload(Lead.deal),
     )
     if not is_superadmin_like(current_user.role):
         lead_statement = lead_statement.where(Lead.organization_id == current_user.organization_id)
@@ -1528,6 +2144,8 @@ def get_manager_insights(
         selectinload(Conversation.sales_user).selectinload(User.sales_team),
         selectinload(Conversation.messages),
         selectinload(Conversation.ai_extractions),
+        selectinload(Conversation.reply_suggestions),
+        selectinload(Conversation.sent_messages),
         selectinload(Conversation.chat_review_case).selectinload(
             ChatReviewCase.reviewer_user
         ),
@@ -1567,10 +2185,36 @@ def get_manager_insights(
             or any(member.id in accessible_user_ids for member in team.members)
         ]
 
+    sales_user_statement = select(User)
+    if not is_superadmin_like(current_user.role):
+        sales_user_statement = sales_user_statement.where(
+            User.organization_id == current_user.organization_id
+        )
+    if accessible_user_ids is not None:
+        sales_user_statement = sales_user_statement.where(User.id.in_(accessible_user_ids))
+    sales_users = [
+        user
+        for user in db.scalars(sales_user_statement).all()
+        if is_sales_like(user.role)
+    ]
+    sales_users.sort(key=lambda user: user.name.lower())
+
     team_lead_map: dict[UUID | None, list[Lead]] = {}
     for lead in leads:
         team_id = lead.assigned_user.team_id if lead.assigned_user else None
         team_lead_map.setdefault(team_id, []).append(lead)
+
+    lead_user_map: dict[UUID, list[Lead]] = {}
+    for lead in leads:
+        if lead.assigned_user_id is None:
+            continue
+        lead_user_map.setdefault(lead.assigned_user_id, []).append(lead)
+
+    conversation_user_map: dict[UUID, list[Conversation]] = {}
+    for conversation in conversations:
+        if conversation.sales_user_id is None:
+            continue
+        conversation_user_map.setdefault(conversation.sales_user_id, []).append(conversation)
 
     open_review_cases: list[ChatReviewCase] = []
     pending_proposals = 0
@@ -1782,6 +2426,69 @@ def get_manager_insights(
         reverse=True,
     )
 
+    sales_performance: list[ManagerSalesPerformanceItem] = []
+    for sales_user in sales_users:
+        owned_leads = lead_user_map.get(sales_user.id, [])
+        owned_conversations = conversation_user_map.get(sales_user.id, [])
+        sales_performance.append(
+            _build_sales_performance_summary_item(
+                sales_user=sales_user,
+                owned_leads=owned_leads,
+                owned_conversations=owned_conversations,
+                now=now,
+                range_label=normalized_range_label,
+            )
+        )
+
+    sales_performance.sort(
+        key=lambda item: (
+            item.coaching_signal.priority_score,
+            item.overdue_follow_up_count,
+            item.needs_reply_count,
+            item.hot_leads_count,
+            item.latest_activity_at or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )
+    top_coaching_targets = [
+        TopCoachingTargetItem(
+            sales_user_id=item.sales_user_id,
+            sales_name=item.sales_name,
+            priority_label=item.coaching_signal.priority_label,
+            primary_reason=item.coaching_signal.primary_reason,
+            recommended_action=item.coaching_signal.recommended_action,
+        )
+        for item in sales_performance[:3]
+    ]
+    team_map = {team.id: team for team in teams}
+    sales_user_team_map = {sales_user.id: sales_user.team_id for sales_user in sales_users}
+    team_performance_groups: dict[UUID | None, list[ManagerSalesPerformanceItem]] = {}
+    for item in sales_performance:
+        team_performance_groups.setdefault(
+            sales_user_team_map.get(item.sales_user_id),
+            [],
+        ).append(item)
+
+    team_performance = [
+        _build_team_performance_item(
+            team=team_map.get(team_id) if team_id is not None else None,
+            sales_items=items,
+            normalized_range_label=normalized_range_label,
+        )
+        for team_id, items in team_performance_groups.items()
+        if items
+    ]
+    team_performance.sort(
+        key=lambda item: (
+            item.coaching_signal.priority_score,
+            item.overdue_follow_up_count,
+            item.needs_reply_count,
+            item.hot_leads_count,
+            item.latest_activity_at or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )
+
     scope_label = (
         "Organization-wide manager view"
         if is_head_like(current_user.role)
@@ -1814,6 +2521,305 @@ def get_manager_insights(
             for objection, count in objection_counter.most_common(6)
         ],
         boundary_alerts=boundary_alerts[:8],
+        sales_performance_summary=ManagerSalesPerformanceSummary(
+            sales_count=len(sales_performance),
+            total_active_leads=sum(item.active_leads_count for item in sales_performance),
+            total_needs_reply=sum(item.needs_reply_count for item in sales_performance),
+            total_overdue_follow_up=sum(
+                item.overdue_follow_up_count for item in sales_performance
+            ),
+            range_label=normalized_range_label,
+            previous_range_label=f"prev_{normalized_range_label}",
+            delta_total_needs_reply=sum(
+                item.trend.delta_needs_reply for item in sales_performance
+            ),
+            delta_total_overdue_follow_up=sum(
+                item.trend.delta_overdue_follow_up for item in sales_performance
+            ),
+        ),
+        sales_performance=sales_performance,
+        team_performance_summary=TeamPerformanceSummary(
+            team_count=len(team_performance),
+            total_needs_reply=sum(item.needs_reply_count for item in team_performance),
+            total_overdue_follow_up=sum(
+                item.overdue_follow_up_count for item in team_performance
+            ),
+            range_label=normalized_range_label,
+            previous_range_label=f"prev_{normalized_range_label}",
+        ),
+        team_performance=team_performance,
+        top_coaching_targets=top_coaching_targets,
+    )
+
+
+def get_sales_performance_detail(
+    db: Session,
+    *,
+    sales_user_id: UUID,
+    current_user: User,
+    range_label: str = "7d",
+) -> SalesPerformanceDetailResponse:
+    now = datetime.now(timezone.utc)
+    normalized_range_label, range_days = _normalize_sales_performance_range(range_label)
+    current_start = now - timedelta(days=range_days)
+    accessible_user_ids = get_accessible_sales_user_ids(
+        db=db,
+        current_user=current_user,
+    )
+
+    sales_user = db.scalar(
+        select(User)
+        .options(selectinload(User.sales_team).selectinload(SalesTeam.unit))
+        .where(User.id == sales_user_id)
+    )
+    if sales_user is None or not is_sales_like(sales_user.role):
+        raise ValueError("Sales user not found.")
+
+    if (
+        not is_superadmin_like(current_user.role)
+        and current_user.organization_id != sales_user.organization_id
+    ):
+        raise PermissionError("Sales user not found.")
+
+    if accessible_user_ids is not None and sales_user.id not in accessible_user_ids:
+        raise PermissionError("Sales user not found.")
+
+    lead_statement = (
+        select(Lead)
+        .where(Lead.assigned_user_id == sales_user.id)
+        .options(
+            selectinload(Lead.assigned_user).selectinload(User.sales_team),
+            selectinload(Lead.discipline_logs),
+            selectinload(Lead.deal),
+            selectinload(Lead.tasks),
+        )
+        .order_by(desc(Lead.updated_at), desc(Lead.created_at))
+    )
+    if not is_superadmin_like(current_user.role):
+        lead_statement = lead_statement.where(
+            Lead.organization_id == current_user.organization_id
+        )
+    owned_leads = list(db.scalars(lead_statement).all())
+    lead_by_id = {lead.id: lead for lead in owned_leads}
+
+    conversation_statement = (
+        select(Conversation)
+        .where(Conversation.sales_user_id == sales_user.id)
+        .options(
+            selectinload(Conversation.lead),
+            selectinload(Conversation.sales_user).selectinload(User.sales_team),
+            selectinload(Conversation.messages),
+            selectinload(Conversation.ai_extractions),
+            selectinload(Conversation.reply_suggestions),
+            selectinload(Conversation.sent_messages),
+        )
+        .order_by(desc(Conversation.last_message_at), desc(Conversation.created_at))
+    )
+    if not is_superadmin_like(current_user.role):
+        conversation_statement = conversation_statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
+    owned_conversations = [
+        conversation
+        for conversation in db.scalars(conversation_statement).all()
+        if conversation.lead_id is None or conversation.lead_id in lead_by_id
+    ]
+
+    summary_item = _build_sales_performance_summary_item(
+        sales_user=sales_user,
+        owned_leads=owned_leads,
+        owned_conversations=owned_conversations,
+        now=now,
+        range_label=normalized_range_label,
+    )
+
+    lead_items = sorted(
+        [
+            SalesPerformanceLeadItem(
+                lead_id=lead.id,
+                lead_name=lead.display_name,
+                current_stage=lead.current_stage,
+                lead_temperature=lead.lead_temperature,
+                next_follow_up_at=lead.next_follow_up_at,
+                last_contact_at=lead.last_contact_at,
+                discipline_status=_resolve_sales_performance_discipline_status(
+                    stale_log_count=(
+                        0
+                        if (
+                            latest_log := get_latest_discipline_log_for_lead(lead)
+                        ) is not None
+                        and latest_log.log_date == now.date()
+                        else 1
+                    ),
+                    overdue_follow_up_count=(
+                        1
+                        if (
+                            next_follow_up_at := ensure_aware_utc(lead.next_follow_up_at)
+                        ) is not None
+                        and next_follow_up_at <= now
+                        else 0
+                    ),
+                ),
+                target_href=f"/dashboard/crm/{lead.id}",
+            )
+            for lead in owned_leads
+            if any(
+                _is_between(timestamp, start=current_start, end=now)
+                for timestamp in _lead_activity_timestamps(lead)
+            )
+        ],
+        key=lambda item: (
+            item.discipline_status != "needs_attention",
+            item.lead_temperature != "hot",
+            item.next_follow_up_at or datetime.max.replace(tzinfo=timezone.utc),
+            item.last_contact_at or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+    )
+
+    conversation_items: list[SalesPerformanceConversationItem] = []
+    for conversation in owned_conversations:
+        latest_message = get_latest_message(conversation)
+        latest_extraction = get_latest_extraction(conversation)
+        latest_suggestion = get_latest_reply_suggestion(conversation)
+        latest_sent_message = get_latest_sent_message(conversation)
+        if not any(
+            _is_between(timestamp, start=current_start, end=now)
+            for timestamp in _conversation_activity_timestamps(
+                conversation,
+                latest_message,
+                latest_extraction,
+                latest_suggestion,
+            )
+        ):
+            continue
+        current_sent_message = resolve_current_sent_message(
+            latest_message,
+            latest_sent_message,
+        )
+        ui_status = determine_ui_status(
+            latest_message,
+            latest_extraction,
+            latest_suggestion,
+            current_sent_message,
+        )
+        risk_level = (
+            latest_extraction.risk_level
+            if latest_extraction is not None
+            else (latest_suggestion.risk_level if latest_suggestion is not None else None)
+        )
+
+        if ui_status not in {
+            "needs_analysis",
+            "needs_reply_suggestion",
+            "needs_approval",
+            "needs_escalation",
+            "approved_ready_to_send",
+        } and risk_level != "high":
+            continue
+
+        conversation_items.append(
+            SalesPerformanceConversationItem(
+                conversation_id=conversation.id,
+                conversation_title=conversation.title,
+                ui_status=ui_status,
+                source_channel=normalize_source_channel(conversation.source),
+                risk_level=risk_level,
+                last_message_at=conversation.last_message_at,
+                target_href=f"/dashboard/sales/conversations/{conversation.id}",
+            )
+        )
+
+    conversation_items.sort(
+        key=lambda item: (
+            item.ui_status not in {"needs_escalation", "needs_approval"},
+            item.risk_level != "high",
+            item.last_message_at or datetime.min.replace(tzinfo=timezone.utc),
+        ),
+        reverse=True,
+    )
+
+    follow_up_items_by_lead: dict[UUID, SalesPerformanceFollowUpItem] = {}
+    for lead in owned_leads:
+        if not any(
+            _is_between(timestamp, start=current_start, end=now)
+            for timestamp in _lead_activity_timestamps(lead)
+        ):
+            continue
+        overdue_tasks = sorted(
+            [
+                task
+                for task in lead.tasks
+                if task.status in {"open", "snoozed"}
+                and (task_due_at := ensure_aware_utc(task.due_at)) is not None
+                and task_due_at <= now
+            ],
+            key=lambda task: ensure_aware_utc(task.due_at) or now,
+        )
+        next_follow_up_at = ensure_aware_utc(lead.next_follow_up_at)
+        top_task = overdue_tasks[0] if overdue_tasks else None
+        due_at = ensure_aware_utc(top_task.due_at) if top_task is not None else next_follow_up_at
+
+        if due_at is None or due_at > now:
+            continue
+
+        priority_label = "sedang"
+        if lead.lead_temperature == "hot" or (now - due_at).total_seconds() >= 86400:
+            priority_label = "tinggi"
+        elif (now - due_at).total_seconds() <= 7200:
+            priority_label = "rendah"
+
+        follow_up_items_by_lead[lead.id] = SalesPerformanceFollowUpItem(
+            lead_id=lead.id,
+            lead_name=lead.display_name,
+            task_type=top_task.task_type if top_task is not None else "overdue_follow_up",
+            due_at=due_at,
+            priority_label=priority_label,
+            target_href=f"/dashboard/crm/{lead.id}",
+        )
+
+    follow_up_items = sorted(
+        follow_up_items_by_lead.values(),
+        key=lambda item: (
+            item.priority_label != "tinggi",
+            item.due_at or datetime.max.replace(tzinfo=timezone.utc),
+        ),
+    )
+
+    return SalesPerformanceDetailResponse(
+        generated_at=now,
+        sales_user=SalesPerformanceDetailUser(
+            id=sales_user.id,
+            name=sales_user.name,
+            role=normalize_role(sales_user.role),
+            team_name=sales_user.sales_team.name if sales_user.sales_team else None,
+            unit_name=(
+                sales_user.sales_team.unit.name
+                if sales_user.sales_team and sales_user.sales_team.unit
+                else None
+            ),
+            is_active=sales_user.is_active,
+        ),
+        summary=SalesPerformanceDetailSummary(
+            range_label=normalized_range_label,
+            previous_range_label=f"prev_{normalized_range_label}",
+            active_leads_count=summary_item.active_leads_count,
+            needs_reply_count=summary_item.needs_reply_count,
+            overdue_follow_up_count=summary_item.overdue_follow_up_count,
+            hot_leads_count=summary_item.hot_leads_count,
+            analyzed_conversations_count=summary_item.analyzed_conversations_count,
+            needs_analysis_count=summary_item.needs_analysis_count,
+            won_deals_count=summary_item.won_deals_count,
+            lost_deals_count=summary_item.lost_deals_count,
+            open_deals_count=summary_item.open_deals_count,
+            latest_activity_at=summary_item.latest_activity_at,
+            avg_response_sla_status=summary_item.avg_response_sla_status,
+            crm_discipline_status=summary_item.crm_discipline_status,
+            trend=summary_item.trend,
+            coaching_signal=summary_item.coaching_signal,
+        ),
+        lead_items=lead_items[:6],
+        conversation_items=conversation_items[:6],
+        follow_up_items=follow_up_items[:6],
     )
 
 
