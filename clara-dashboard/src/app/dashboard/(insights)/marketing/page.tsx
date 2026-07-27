@@ -1007,7 +1007,7 @@ function Panel({
 }) {
   return (
     <section className="clara-card rounded-[28px] p-5">
-      <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+      <h2 className="text-lg font-semibold clara-text-primary">{title}</h2>
       <p className="mt-1 text-sm text-slate-300">{description}</p>
       <div className="mt-4">{children}</div>
     </section>
@@ -1062,7 +1062,7 @@ function BreakdownGroup({
               <span className="text-sm text-slate-300">
                 {formatStatusLabel(item.label)}
               </span>
-              <span className="text-sm font-semibold text-slate-950">
+              <span className="text-sm font-semibold clara-text-primary">
                 {item.count}
               </span>
             </div>

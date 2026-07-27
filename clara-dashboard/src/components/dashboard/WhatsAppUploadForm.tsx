@@ -274,7 +274,7 @@ export function WhatsAppUploadForm() {
         <div>
           <label
             htmlFor="channelType"
-            className="text-sm font-semibold text-slate-900"
+            className="text-sm font-semibold clara-text-primary"
           >
             1. Pilih channel
           </label>
@@ -285,7 +285,7 @@ export function WhatsAppUploadForm() {
               setSelectedChannel(event.target.value);
               setDetectionMessage("");
             }}
-            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm clara-text-primary"
           >
             {channelOptions.map((option) => (
               <option key={option.key} value={option.key}>
@@ -303,7 +303,7 @@ export function WhatsAppUploadForm() {
         <div>
           <label
             htmlFor="conversationTitle"
-            className="text-sm font-semibold text-slate-900"
+            className="text-sm font-semibold clara-text-primary"
           >
             2. Isi nama customer
           </label>
@@ -315,7 +315,7 @@ export function WhatsAppUploadForm() {
               setConversationTitle(event.target.value);
             }}
             placeholder="Contoh: Rina Pratama"
-            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm clara-text-primary"
           />
           <p className="mt-2 text-xs text-slate-500">
             Nama ini dipakai sebagai judul percakapan dan identitas awal customer.
@@ -339,7 +339,7 @@ export function WhatsAppUploadForm() {
               );
               setErrorMessage("");
             }}
-            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900"
+            className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-3 text-sm clara-text-primary"
           >
             {INPUT_MODE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>

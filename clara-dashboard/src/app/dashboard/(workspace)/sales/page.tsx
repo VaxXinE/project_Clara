@@ -485,7 +485,7 @@ export default function SalesInboxPage() {
               <p className="clara-kicker text-xs">Ringkasan cepat</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                  <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
                     Mulai dari chat yang paling butuh respons
                   </h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
@@ -542,7 +542,7 @@ export default function SalesInboxPage() {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-2xl">
                   <p className="clara-kicker text-xs">Filter kerja</p>
-                  <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                  <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] clara-text-primary">
                     Cari dan rapikan antrean chat
                   </h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
@@ -616,7 +616,7 @@ export default function SalesInboxPage() {
             <section className="grid gap-4">
               {filteredInboxItems.length === 0 ? (
                 <div className="clara-empty-state">
-                  <h2 className="text-xl font-semibold text-slate-900">
+                  <h2 className="text-xl font-semibold clara-text-primary">
                     {inboxItems.length === 0
                       ? archiveScope === "archived"
                         ? "Belum ada conversation archived"
@@ -668,7 +668,7 @@ export default function SalesInboxPage() {
                           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                             {section.config.label}
                           </p>
-                          <h2 className="mt-1 text-2xl font-bold text-slate-950">
+                          <h2 className="mt-1 text-2xl font-bold clara-text-primary">
                             {section.items.length} chat
                           </h2>
                         </div>
@@ -749,7 +749,7 @@ export default function SalesInboxPage() {
                               <div className="flex h-full flex-col gap-4">
                                 <div className="min-w-0 space-y-4">
                                   <div className="flex flex-wrap items-center gap-2.5">
-                                    <h3 className="line-clamp-2 text-lg font-semibold leading-7 text-slate-950">
+                                    <h3 className="line-clamp-2 text-lg font-semibold leading-7 clara-text-primary">
                                       {item.title}
                                     </h3>
                                   </div>

@@ -123,7 +123,7 @@ export default function AdminOpsPage() {
                         className="rounded-xl border border-slate-200 p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-950">
+                          <p className="text-sm font-semibold clara-text-primary">
                             {user.email}
                           </p>
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -161,7 +161,7 @@ export default function AdminOpsPage() {
                         key={organization.id}
                         className="rounded-xl border border-slate-200 p-4"
                       >
-                        <p className="text-sm font-semibold text-slate-950">
+                        <p className="text-sm font-semibold clara-text-primary">
                           {organization.name}
                         </p>
                         <p className="mt-1 text-xs text-slate-500">
@@ -192,7 +192,7 @@ export default function AdminOpsPage() {
                         className="rounded-xl border border-slate-200 p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-950">
+                          <p className="text-sm font-semibold clara-text-primary">
                             {conversation.title}
                           </p>
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -233,7 +233,7 @@ export default function AdminOpsPage() {
                         key={log.id}
                         className="rounded-xl border border-slate-200 p-4"
                       >
-                        <p className="text-sm font-semibold text-slate-950">
+                        <p className="text-sm font-semibold clara-text-primary">
                           {log.action}
                         </p>
                         <div className="mt-2 grid gap-1 text-xs text-slate-500">
@@ -266,7 +266,7 @@ export default function AdminOpsPage() {
                         className="rounded-xl border border-slate-200 p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-950">
+                          <p className="text-sm font-semibold clara-text-primary">
                             {item.title}
                           </p>
                           <span
@@ -305,7 +305,7 @@ export default function AdminOpsPage() {
                         className="rounded-xl border border-slate-200 p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-950">
+                          <p className="text-sm font-semibold clara-text-primary">
                             {snapshot.period_start} s/d {snapshot.period_end}
                           </p>
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -346,7 +346,7 @@ function InfoCard({
   return (
     <article className="clara-card rounded-[24px] p-5">
       <p className="clara-kicker text-xs text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+      <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
         {value}
       </p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
@@ -358,7 +358,7 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <article className="clara-card rounded-2xl p-5">
       <p className="text-sm font-medium text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+      <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
         {value}
       </p>
     </article>
@@ -377,7 +377,7 @@ function Panel({
   return (
     <section className="clara-card rounded-[28px] p-5">
       <div>
-        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+        <h2 className="text-lg font-semibold clara-text-primary">{title}</h2>
         <p className="mt-1 text-sm text-slate-600">{description}</p>
       </div>
       <div className="mt-5">{children}</div>

@@ -335,7 +335,7 @@ export default function DashboardHomePage() {
               <p className="clara-kicker text-xs">Ringkasan hari ini</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                  <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
                     Mulai dari pekerjaan yang paling dekat ke customer
                   </h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
@@ -446,7 +446,7 @@ export default function DashboardHomePage() {
                           </span>
                         ) : null}
                       </div>
-                      <p className="text-base font-semibold text-slate-950">
+                      <p className="text-base font-semibold clara-text-primary">
                         {latestConversation.title}
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -580,7 +580,7 @@ export default function DashboardHomePage() {
               <p className="clara-kicker text-xs">Ringkasan hari ini</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                  <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
                     Mulai dari bottleneck tim, lalu turun ke review sales
                   </h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
@@ -787,7 +787,7 @@ export default function DashboardHomePage() {
               <p className="clara-kicker text-xs">Ringkasan hari ini</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                  <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
                     Mulai dari sinyal lintas tim yang butuh keputusan Head
                   </h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
@@ -1123,7 +1123,7 @@ export default function DashboardHomePage() {
                 {latestConversation ? (
                   <div className="space-y-4">
                     <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
-                      <p className="text-base font-semibold text-slate-950">
+                      <p className="text-base font-semibold clara-text-primary">
                         {latestConversation.title}
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1227,12 +1227,12 @@ function MetricCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="clara-kicker text-xs">{label}</p>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+          <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
             {value}
           </p>
         </div>
         <span
-          className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-slate-900`}
+          className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-[var(--color-text-inverse)]`}
         >
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />
         </span>
@@ -1260,7 +1260,7 @@ function PanelFrame({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="clara-kicker text-xs">{eyebrow}</p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] clara-text-primary">
             {title}
           </h2>
         </div>
@@ -1282,7 +1282,7 @@ function PulseRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="clara-card-soft flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
       <span className="text-slate-600">{label}</span>
-      <span className="font-semibold text-slate-950">{value}</span>
+      <span className="font-semibold clara-text-primary">{value}</span>
     </div>
   );
 }
@@ -1302,7 +1302,7 @@ function ActionChecklistRow({
         {step}
       </div>
       <div>
-        <p className="text-sm font-semibold text-slate-950">{title}</p>
+        <p className="text-sm font-semibold clara-text-primary">{title}</p>
         <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
       </div>
     </div>
@@ -1328,7 +1328,7 @@ function MiniInsightCard({
         </span>
         <div>
           <p className="clara-kicker text-xs">{label}</p>
-          <h3 className="text-base font-semibold text-slate-950">{title}</h3>
+          <h3 className="text-base font-semibold clara-text-primary">{title}</h3>
           <p className="mt-1.5 text-sm leading-6 text-slate-600">
             {description}
           </p>

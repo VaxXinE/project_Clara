@@ -112,7 +112,7 @@ export default function UploadWhatsAppPage() {
           className="clara-card rounded-[28px] p-5 sm:p-6"
         >
           <p className="clara-kicker">Contoh format</p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] clara-text-primary">
             Format chat yang bisa dibaca Clara
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
