@@ -424,7 +424,7 @@ export default function FollowUpPage() {
                     <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                       Filter kerja
                     </p>
-                    <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                    <h2 className="mt-2 text-lg font-semibold tracking-tight clara-text-primary">
                       Cari dulu yang mau dibereskan
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-[#e3c990]">
@@ -478,7 +478,7 @@ export default function FollowUpPage() {
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Kerjakan sekarang
                   </p>
-                  <h2 className="mt-1 text-2xl font-bold text-slate-950">
+                  <h2 className="mt-1 text-2xl font-bold clara-text-primary">
                     {filteredVisibleItems.length} follow-up siap dibereskan
                   </h2>
                 </div>
@@ -500,7 +500,7 @@ export default function FollowUpPage() {
                           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                             {section.config.label}
                           </p>
-                          <h3 className="mt-1 text-xl font-bold text-slate-950">
+                          <h3 className="mt-1 text-xl font-bold clara-text-primary">
                             {section.items.length} item
                           </h3>
                         </div>
@@ -541,7 +541,7 @@ export default function FollowUpPage() {
                   <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Simpan untuk berikutnya
                   </p>
-                  <h2 className="mt-1 text-2xl font-bold text-slate-950">
+                  <h2 className="mt-1 text-2xl font-bold clara-text-primary">
                     {visibleUpcomingItems.length} follow-up belum perlu dikerjakan hari ini
                   </h2>
                 </div>
@@ -637,7 +637,7 @@ function WorklistRow({
             <span className="rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-2.5 py-1 text-xs font-semibold text-[#140f08]">
               #{index + 1}
             </span>
-            <h3 className="text-lg font-semibold text-slate-950">{item.lead_name}</h3>
+            <h3 className="text-lg font-semibold clara-text-primary">{item.lead_name}</h3>
             <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
               {bucketConfig.label}
             </span>
@@ -667,7 +667,7 @@ function WorklistRow({
             </span>
           </div>
 
-          <p className="mt-3 text-sm font-semibold text-slate-900">{item.task_label}</p>
+          <p className="mt-3 text-sm font-semibold clara-text-primary">{item.task_label}</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{item.reason}</p>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">

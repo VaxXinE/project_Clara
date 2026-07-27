@@ -373,7 +373,7 @@ export function RoleBasedStartGuide({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               {roleStartCopy.eyebrow}
             </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+            <h2 className="mt-2 text-2xl font-bold tracking-tight clara-text-primary">
               {roleStartCopy.title}
             </h2>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
@@ -408,7 +408,7 @@ export function RoleBasedStartGuide({
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
                 {item.step}
               </span>
-              <h3 className="mt-4 text-lg font-semibold text-slate-950">
+              <h3 className="mt-4 text-lg font-semibold clara-text-primary">
                 {item.title}
               </h3>
               <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -462,7 +462,7 @@ export function RoleBasedStartGuide({
                     </div>
                     <h3
                       className={`mt-4 text-base font-semibold ${
-                        isHighlighted ? "text-white" : "text-slate-950"
+                        isHighlighted ? "text-white" : "clara-text-primary"
                       }`}
                     >
                       {featureSet.title}
@@ -505,7 +505,7 @@ export function RoleBasedStartGuide({
                   href={task.href}
                   className="block rounded-[22px] border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white"
                 >
-                  <h3 className="text-base font-semibold text-slate-950">
+                  <h3 className="text-base font-semibold clara-text-primary">
                     {task.title}
                   </h3>
                    <p className="mt-2 text-sm leading-5 text-slate-600">
@@ -519,27 +519,27 @@ export function RoleBasedStartGuide({
                 Cara Baca Menu
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Queue</span>:
+                <span className="font-semibold clara-text-primary">Queue</span>:
                 chat yang harus ditangani.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Lead Management</span>:
+                <span className="font-semibold clara-text-primary">Lead Management</span>:
                 progres dan status lead.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Action Center</span>:
+                <span className="font-semibold clara-text-primary">Action Center</span>:
                 follow-up harian.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Review Sales</span>:
+                <span className="font-semibold clara-text-primary">Review Sales</span>:
                 review jawaban dan arahan ke Sales.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Alert Center</span>:
+                <span className="font-semibold clara-text-primary">Alert Center</span>:
                 alert follow-up tim.
               </p>
               <p>
-                <span className="font-semibold text-slate-950">Chat Insight / Ops Dashboard</span>:
+                <span className="font-semibold clara-text-primary">Chat Insight / Ops Dashboard</span>:
                 insight dan kondisi operasional.
               </p>
             </div>
