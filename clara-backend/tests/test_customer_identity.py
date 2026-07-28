@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 from uuid import UUID
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
@@ -76,6 +77,7 @@ def test_same_customer_name_across_channels_links_to_one_customer_profile(
     telegram_lead = db.get(Lead, telegram_conversation.lead_id)
     assert whatsapp_lead is not None
     assert telegram_lead is not None
+    assert whatsapp_lead.id != telegram_lead.id
     assert whatsapp_lead.customer_profile_id is not None
     assert whatsapp_lead.customer_profile_id == telegram_lead.customer_profile_id
 
@@ -223,3 +225,145 @@ def test_customer_profile_merge_candidates_and_manual_merge(
     refreshed_second_lead = db.get(Lead, second_lead.id)
     assert refreshed_second_lead is not None
     assert refreshed_second_lead.customer_profile_id == first_lead.customer_profile_id
+
+
+def test_same_thread_continuation_preserves_lead_and_profile(
+    client,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+    headers = csrf_headers(client)
+
+    first_response = client.post(
+        "/upload/whatsapp-text",
+        json={
+            "title": "Rani",
+            "raw_text": "12/04/26, 09.12 - Rani: Halo kak.",
+        },
+        headers=headers,
+    )
+    continued_response = client.post(
+        "/upload/whatsapp-text",
+        json={
+            "title": "Rani",
+            "raw_text": "12/04/26, 09.15 - Rani: Saya lanjut bertanya ya.",
+        },
+        headers=headers,
+    )
+    assert first_response.status_code == 201, first_response.text
+    assert continued_response.status_code == 201, continued_response.text
+    assert continued_response.json()["conversation_id"] == first_response.json()[
+        "conversation_id"
+    ]
+
+    db = db_session_factory()
+    conversations = list(
+        db.scalars(
+            select(Conversation).where(
+                Conversation.organization_id == marketing_a.organization_id,
+                Conversation.title == "Rani",
+            )
+        ).all()
+    )
+    assert len(conversations) == 1
+    assert conversations[0].lead_id is not None
+    lead = db.get(Lead, conversations[0].lead_id)
+    assert lead is not None and lead.customer_profile_id is not None
+    assert len(
+        db.scalars(
+            select(Lead).where(
+                Lead.organization_id == marketing_a.organization_id,
+                Lead.display_name == "Rani",
+            )
+        ).all()
+    ) == 1
+    assert len(
+        db.scalars(
+            select(CustomerProfile).where(
+                CustomerProfile.organization_id == marketing_a.organization_id,
+                CustomerProfile.canonical_key == "rani",
+            )
+        ).all()
+    ) == 1
+
+
+def test_customer_profile_identity_is_isolated_by_organization(
+    client,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    marketing_other_org = seeded_data["marketing_other_org"]
+
+    for user in (marketing_a, marketing_other_org):
+        login(client, email=user.email, password="MarketingPass123!")
+        response = client.post(
+            "/upload/whatsapp-text",
+            json={
+                "title": "Dina",
+                "raw_text": "12/04/26, 09.12 - Dina: Halo kak.",
+            },
+            headers=csrf_headers(client),
+        )
+        assert response.status_code == 201, response.text
+
+    db = db_session_factory()
+    profiles = list(
+        db.scalars(
+            select(CustomerProfile).where(CustomerProfile.canonical_key == "dina")
+        ).all()
+    )
+    assert len(profiles) == 2
+    assert {profile.organization_id for profile in profiles} == {
+        marketing_a.organization_id,
+        marketing_other_org.organization_id,
+    }
+    assert all(
+        lead.organization_id == profile.organization_id
+        for profile in profiles
+        for lead in profile.leads
+    )
+
+
+def test_profile_resolution_failure_rolls_back_new_conversation_graph(
+    client,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    def fail_profile_resolution(*_args, **_kwargs):
+        raise RuntimeError("profile resolution failed")
+
+    monkeypatch.setattr(
+        "app.services.lead_service.ensure_customer_profile_for_lead",
+        fail_profile_resolution,
+    )
+
+    with pytest.raises(RuntimeError, match="profile resolution failed"):
+        client.post(
+            "/upload/whatsapp-text",
+            json={
+                "title": "Atomic Customer",
+                "raw_text": "12/04/26, 09.12 - Atomic Customer: Halo kak.",
+            },
+            headers=csrf_headers(client),
+        )
+
+    db = db_session_factory()
+    assert db.scalar(
+        select(Conversation).where(
+            Conversation.organization_id == marketing_a.organization_id,
+            Conversation.title == "Atomic Customer",
+        )
+    ) is None
+    assert db.scalar(
+        select(Lead).where(
+            Lead.organization_id == marketing_a.organization_id,
+            Lead.display_name == "Atomic Customer",
+        )
+    ) is None
