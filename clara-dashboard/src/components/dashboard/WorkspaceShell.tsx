@@ -757,7 +757,7 @@ export function WorkspaceShell({
           </div>
 
           <div className="space-y-4">
-            <header className="border-b border-[var(--color-border-subtle)] pb-5 pt-1">
+            <header className="clara-page-hero border-b border-[var(--color-border-default)] px-4 pb-5 pt-4 sm:px-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="min-w-0 flex-1">
                   {backHref && backLabel ? (

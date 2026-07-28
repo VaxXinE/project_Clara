@@ -1179,7 +1179,7 @@ function PanelFrame({
 }) {
   return (
     <section className="clara-card rounded-[32px] p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="clara-kicker text-xs">{eyebrow}</p>
           <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] clara-text-primary">
@@ -1188,7 +1188,10 @@ function PanelFrame({
         </div>
 
         {actionHref && actionLabel ? (
-          <Link href={actionHref} className="clara-button clara-button-ghost">
+          <Link
+            href={actionHref}
+            className="clara-button clara-button-ghost shrink-0 whitespace-nowrap"
+          >
             {actionLabel}
             <FontAwesomeIcon icon={faArrowRight} className="h-3 w-3" />
           </Link>
