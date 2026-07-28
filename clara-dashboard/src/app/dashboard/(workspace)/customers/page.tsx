@@ -110,23 +110,23 @@ export default function CustomerListPage() {
           data-onboarding-id="sales-customers-hero"
           className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
         >
-          <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+          <article className="clara-card p-5 sm:p-6">
+            <p className="clara-kicker text-xs">
               {isLeadershipWorkspace
                 ? "Prioritas customer tim"
                 : "Fokus customer sekarang"}
             </p>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#fff3cf]">
+            <h2 className="mt-2 break-words text-xl font-bold tracking-tight clara-text-primary sm:text-2xl">
               {topCustomer
                 ? `${topCustomer.display_name} paling layak dibuka dulu.`
                 : "Belum ada customer yang menonjol untuk diprioritaskan."}
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[#e3c990]">
+            <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
               {topCustomerSummary}
             </p>
           </article>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <MetricCard label="Jumlah customer" value={String(customers.length)} />
             <MetricCard label="Customer aktif" value={String(activeCount)} />
             <MetricCard label="Punya hot lead" value={String(hotCustomerCount)} />
@@ -147,25 +147,27 @@ export default function CustomerListPage() {
 
         <section
           data-onboarding-id="sales-customers-filters"
-          className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.2)]"
+          className="clara-card p-4 sm:p-5"
         >
           <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr_auto]">
-            <label className="space-y-2 text-sm text-[#d8b977]">
-              <span className="font-semibold text-[#fff0c9]">
+            <div>
+              <label htmlFor="customer-search" className="clara-label">
                 Cari Customer
-              </span>
+              </label>
               <input
+                id="customer-search"
                 value={filters.q}
                 onChange={(event) => {
                   setFilters((prev) => ({ ...prev, q: event.target.value }));
                 }}
-                className="w-full rounded-2xl border border-[#f0cb73]/18 bg-[rgba(20,14,10,0.92)] px-4 py-3 text-sm text-[#fff0c9] outline-none transition placeholder:text-[#a7864d] focus:border-[#f0cb73]/42"
+                className="clara-input mt-2"
                 placeholder="Cari nama, telepon, email, atau PIC..."
               />
-            </label>
-            <label className="space-y-2 text-sm text-[#d8b977]">
-              <span className="font-semibold text-[#fff0c9]">Status</span>
+            </div>
+            <div>
+              <label htmlFor="customer-status" className="clara-label">Status</label>
               <select
+                id="customer-status"
                 value={filters.status}
                 onChange={(event) => {
                   setFilters((prev) => ({
@@ -173,27 +175,27 @@ export default function CustomerListPage() {
                     status: event.target.value,
                   }));
                 }}
-                className="w-full rounded-2xl border border-[#f0cb73]/18 bg-[rgba(20,14,10,0.92)] px-4 py-3 text-sm text-[#fff0c9] outline-none transition focus:border-[#f0cb73]/42"
+                className="clara-select mt-2"
               >
                 <option value="all">Semua status</option>
                 <option value="active">Aktif</option>
                 <option value="inactive">Tidak aktif</option>
               </select>
-            </label>
+            </div>
             <div className="flex items-end">
               <button
                 type="button"
                 onClick={() => {
                   setFilters({ q: "", status: "all" });
                 }}
-                className="inline-flex rounded-full border border-[#7a5520]/24 bg-[rgba(43,28,15,0.94)] px-5 py-3 text-sm font-semibold text-[#e1c27c] transition hover:bg-[#362312]"
+                className="clara-button clara-button-ghost"
               >
                 Reset Filter
               </button>
             </div>
           </div>
 
-          <div className="mt-5 rounded-[22px] bg-[rgba(24,17,11,0.92)] px-4 py-3 text-sm text-[#f3d694]">
+          <div className="clara-card-soft mt-4 p-3 text-sm clara-text-secondary">
             Menampilkan <span className="font-semibold">{customers.length}</span>{" "}
             customer pada daftar ini.
             {isLeadershipWorkspace ? (
@@ -205,22 +207,22 @@ export default function CustomerListPage() {
         </section>
 
         {isLoading ? (
-          <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-8 text-center text-sm text-[#e5c98b]">
+          <div role="status" aria-live="polite" className="clara-empty-state">
             Memuat daftar customer...
           </div>
         ) : null}
 
         {errorMessage ? (
-          <div className="rounded-2xl border border-[#9c4f28]/30 bg-[linear-gradient(180deg,rgba(68,39,17,0.94)_0%,rgba(44,27,15,0.96)_100%)] p-5 text-sm text-[#f3d694]">
+          <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         ) : null}
 
-        {!isLoading && !errorMessage ? (
+        {!isLoading ? (
           <section className="space-y-4">
             {customers.length === 0 ? (
-              <div className="rounded-[28px] border border-dashed border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-8 text-center text-sm leading-7 text-[#d7bb7e]">
-                Belum ada customer yang cocok dengan filter ini.
+              <div className="clara-empty-state text-sm leading-7">
+                Belum ada customer yang cocok. Coba ubah pencarian atau status.
               </div>
             ) : (
               customers.map((customer, index) => (
@@ -229,12 +231,12 @@ export default function CustomerListPage() {
                   data-onboarding-id={
                     index === 0 ? "sales-customers-list" : undefined
                   }
-                  className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(20,14,10,0.98)_46%,rgba(50,36,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
+                  className="clara-card p-4 sm:p-5"
                 >
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-lg font-semibold text-[#fff0c9]">
+                        <h2 className="min-w-0 break-words text-lg font-semibold clara-text-primary">
                           {customer.display_name}
                         </h2>
                         <span
@@ -260,17 +262,17 @@ export default function CustomerListPage() {
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-3 text-sm leading-7 text-[#d7bb7e]">
+                      <p className="mt-3 break-words text-sm leading-6 clara-text-secondary">
                         PIC:{" "}
-                        <span className="font-medium text-[#fff0c9]">
+                        <span className="font-medium clara-text-primary">
                           {customer.assigned_user_name ?? "Belum ada"}
                         </span>
                         {" • "}Kontak terakhir:{" "}
-                        <span className="font-medium text-[#fff0c9]">
+                        <span className="font-medium clara-text-primary">
                           {formatDateTime(customer.last_contact_at)}
                         </span>
                       </p>
-                      <p className="mt-3 text-sm leading-7 text-[#d7bb7e]">
+                      <p className="mt-3 text-sm leading-6 clara-text-secondary">
                         {customer.hot_lead_count > 0
                           ? isLeadershipWorkspace
                             ? `Customer ini sedang terkait dengan ${customer.hot_lead_count} hot lead. Manager cukup cek apakah owner, ritme follow-up, dan arah lead-nya masih sehat.`
@@ -339,7 +341,7 @@ export default function CustomerListPage() {
                       ) : null}
                       <Link
                         href={`/dashboard/customers/${customer.id}`}
-                        className="inline-flex items-center justify-center rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-5 py-3 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
+                        className="clara-button clara-button-primary"
                       >
                         {isLeadershipWorkspace
                           ? "Buka Monitor Customer"
@@ -359,22 +361,20 @@ export default function CustomerListPage() {
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-        {label}
-      </p>
-      <p className="mt-3 text-2xl font-semibold text-[#fff0c9]">{value}</p>
+    <div className="clara-card-soft p-4">
+      <p className="text-sm clara-text-secondary">{label}</p>
+      <p className="mt-1 text-2xl font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }
 
 function CompactMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[rgba(255,255,255,0.04)] p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#caa45c]">
+    <div className="clara-card-soft min-w-0 p-4">
+      <p className="text-xs font-semibold clara-text-muted">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
+      <p className="mt-2 break-words text-sm font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }
