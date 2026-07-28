@@ -6,8 +6,6 @@ import {
   faBullseye,
   faChartLine,
   faComments,
-  faListCheck,
-  faMessage,
   faTriangleExclamation,
   faWandSparkles,
 } from "@fortawesome/free-solid-svg-icons";
@@ -18,11 +16,8 @@ import { useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import {
-  formatChannelLabel,
   formatDateTime,
   formatStatusLabel,
-  getChannelBadgeClass,
-  isExperimentalChannel,
 } from "@/lib/format";
 import { canAccessQueueAndActionCenter, isAdminLike } from "@/lib/roles";
 import type {
@@ -321,7 +316,7 @@ export default function DashboardHomePage() {
     >
       <div className="space-y-6">
         {errorMessage && (
-          <section className="clara-alert clara-alert-danger">
+          <section role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </section>
         )}
@@ -330,245 +325,146 @@ export default function DashboardHomePage() {
           <>
             <section
               data-onboarding-id="sales-home-summary"
-              className="clara-card rounded-[32px] p-6"
+              className="clara-card p-5 sm:p-6"
             >
               <p className="clara-kicker text-xs">Ringkasan hari ini</p>
-              <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="mt-3">
                 <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
-                    Mulai dari pekerjaan yang paling dekat ke customer
+                  <h2 className="text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl">
+                    Kerjakan yang paling dekat ke customer
                   </h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
                     {salesDailySummary}
                   </p>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Link
-                    href="/dashboard/sales"
-                    className="clara-button clara-button-primary justify-center"
-                  >
-                    Buka Chat Masuk
-                  </Link>
-                  <Link
-                    href="/dashboard/follow-up"
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    Buka Tindak Lanjut
-                  </Link>
                 </div>
               </div>
             </section>
 
             <section
               data-onboarding-id="sales-home-metrics"
-              className="grid gap-4 md:grid-cols-2"
+              className="grid gap-3 sm:grid-cols-3"
             >
-              <MetricCard
-                label="Chat Perlu Dibalas"
-                value={isLoading ? "..." : String(pendingAiCount)}
-                hint="Chat yang masih perlu dibaca, dicek, atau dibalas."
-                icon={faMessage}
-                accent="from-[#f7dfa2] to-[#be8d2f]"
-              />
-              <MetricCard
-                label="Follow-up Aktif"
-                value={isLoading ? "..." : String(openTaskCount)}
-                hint="Pekerjaan tindak lanjut yang masih berjalan."
-                icon={faListCheck}
-                accent="from-[#f3d48a] to-[#9f7121]"
-              />
-            </section>
-
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
-              <div data-onboarding-id="sales-home-next-action">
-                <PanelFrame
-                eyebrow={salesNextAction.eyebrow}
-                title={salesNextAction.title}
-                actionLabel={salesNextAction.label}
-                actionHref={salesNextAction.href}
-              >
-                <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5">
-                  <p className="text-sm leading-7 text-slate-600">
-                    {salesNextAction.description}
+              {[
+                ["Chat perlu respons", pendingAiCount],
+                ["Follow-up aktif", openTaskCount],
+                ["Risiko tinggi", metrics.highRiskCount],
+              ].map(([label, value]) => (
+                <div key={label} className="clara-card-soft p-4">
+                  <p className="text-sm clara-text-secondary">{label}</p>
+                  <p className="mt-1 text-2xl font-bold clara-text-primary">
+                    {isLoading ? "..." : value}
                   </p>
                 </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <MiniInsightCard
-                    label="Status AI"
-                    title={
-                      metrics.analyzedCount > 0
-                        ? `${metrics.analyzedCount} chat sudah siap dibantu Clara`
-                        : "Belum ada chat yang selesai dibaca AI"
-                    }
-                    description={
-                      metrics.analyzedCount > 0
-                        ? "Kalau butuh balasan cepat, mulai dari chat yang konteksnya sudah siap dipakai Clara."
-                        : "Kalau belum ada konteks AI yang siap, buka chat terbaru dulu lalu jalankan proses bacanya."
-                    }
-                    icon={faWandSparkles}
-                  />
-                  <MiniInsightCard
-                    label="Tekanan follow-up"
-                    title={
-                      metrics.highRiskCount > 0
-                        ? `${metrics.highRiskCount} percakapan masuk perhatian cepat`
-                        : "Belum ada percakapan risiko tinggi"
-                    }
-                    description={
-                      metrics.highRiskCount > 0
-                        ? "Setelah chat utama beres, cek juga percakapan yang ritmenya mulai turun supaya tidak bocor."
-                        : "Ritme follow-up masih aman. Fokus ke chat aktif dan lead yang sedang jalan dulu."
-                    }
-                    icon={faTriangleExclamation}
-                  />
-                </div>
-                </PanelFrame>
-              </div>
-
-              <div data-onboarding-id="sales-home-latest-conversation">
-                <PanelFrame eyebrow="Aktivitas terakhir" title="Percakapan terbaru">
-                {latestConversation ? (
-                  <div className="space-y-4">
-                    <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
-                      <div className="mb-3 flex flex-wrap gap-2">
-                        <span
-                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getChannelBadgeClass(
-                            latestConversation.source_channel,
-                          )}`}
-                        >
-                          {formatChannelLabel(latestConversation.source_channel)}
-                        </span>
-                        {isExperimentalChannel(latestConversation.source_channel) ? (
-                          <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                            Experimental
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="text-base font-semibold clara-text-primary">
-                        {latestConversation.title}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
-                        {latestConversation.latest_message?.message_text ??
-                          "Belum ada pesan terakhir yang bisa ditampilkan."}
-                      </p>
-                    </div>
-                    <div className="space-y-3">
-                      <PulseRow
-                        label="Status"
-                        value={formatStatusLabel(latestConversation.ui_status)}
-                      />
-                      <PulseRow
-                        label="Update terakhir"
-                        value={formatDateTime(latestConversation.last_message_at)}
-                      />
-                    </div>
-                    <Link
-                      href={latestActivityHref}
-                      className="clara-button clara-button-ghost w-full justify-center"
-                    >
-                      {latestActivityLabel}
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="rounded-[24px] border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-slate-600">
-                    Belum ada percakapan yang tampil. Mulai dari Chat Masuk atau
-                    Input Chat untuk mengisi pipeline kerja Sales.
-                  </div>
-                )}
-                </PanelFrame>
-              </div>
+              ))}
             </section>
 
-            <section className="grid gap-6 xl:grid-cols-3">
-              <div data-onboarding-id="sales-home-quick-nav">
-                <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
-                <div className="grid gap-3">
+            <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
+              <article
+                data-onboarding-id="sales-home-next-action"
+                className="clara-card p-5 sm:p-6"
+              >
+                <p className="clara-kicker text-xs">{salesNextAction.eyebrow}</p>
+                <h2 className="mt-2 break-words text-xl font-bold clara-text-primary">
+                  {salesNextAction.title}
+                </h2>
+                <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                  {salesNextAction.description}
+                </p>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <Link
-                    href="/dashboard/sales"
+                    href={salesNextAction.href}
                     className="clara-button clara-button-primary justify-center"
                   >
-                    Chat Masuk
+                    {salesNextAction.label}
                   </Link>
                   <Link
                     href="/dashboard/follow-up"
                     className="clara-button clara-button-ghost justify-center"
                   >
-                    Tindak Lanjut
-                  </Link>
-                  <Link
-                    href="/dashboard/crm"
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    Leads
-                  </Link>
-                  <Link
-                    href="/dashboard/upload"
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    Input Chat
+                    Lihat semua follow-up
                   </Link>
                 </div>
-                </PanelFrame>
-              </div>
+              </article>
 
+              <article
+                data-onboarding-id="sales-home-latest-conversation"
+                className="clara-card-outline p-5 sm:p-6"
+              >
+                <p className="clara-kicker text-xs">Percakapan terbaru</p>
+                {latestConversation ? (
+                  <>
+                    <h2 className="mt-2 break-words text-lg font-semibold clara-text-primary">
+                      {latestConversation.title}
+                    </h2>
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 clara-text-secondary">
+                      {latestConversation.latest_message?.message_text ??
+                        "Belum ada pesan terakhir yang bisa ditampilkan."}
+                    </p>
+                    <dl className="mt-4 grid gap-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="clara-text-muted">Status</dt>
+                        <dd className="text-right font-medium clara-text-primary">
+                          {formatStatusLabel(latestConversation.ui_status)}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="clara-text-muted">Terakhir aktif</dt>
+                        <dd className="text-right font-medium clara-text-primary">
+                          {formatDateTime(latestConversation.last_message_at)}
+                        </dd>
+                      </div>
+                    </dl>
+                    <Link
+                      href={latestActivityHref}
+                      className="clara-button clara-button-ghost mt-4 w-full justify-center"
+                    >
+                      {latestActivityLabel}
+                    </Link>
+                  </>
+                ) : (
+                  <div className="clara-empty-state mt-3 p-4">
+                    <p className="text-sm leading-6 clara-text-secondary">
+                      Belum ada percakapan. Input chat baru jika percakapan datang
+                      dari luar extension.
+                    </p>
+                    <Link
+                      href="/dashboard/upload"
+                      className="clara-button clara-button-ghost mt-3 justify-center"
+                    >
+                      Buka Input Chat
+                    </Link>
+                  </div>
+                )}
+              </article>
+            </section>
+
+            <section
+              data-onboarding-id="sales-home-quick-nav"
+              className="clara-card-outline flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
               <div data-onboarding-id="sales-home-focus">
-                <PanelFrame eyebrow="Mulai kerja" title="Fokus kerja Sales hari ini">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <MiniInsightCard
-                    label="Prioritas utama"
-                    title={
-                      pendingAiCount > 0
-                        ? `${pendingAiCount} chat perlu langkah berikutnya`
-                        : "Inbox relatif aman"
-                    }
-                    description={
-                      pendingAiCount > 0
-                        ? "Mulai dari Chat Masuk untuk melihat percakapan yang harus dibalas atau butuh draft."
-                        : "Kalau tidak ada chat mendesak, cek Leads dan Tindak Lanjut untuk bersihkan pekerjaan lain."
-                    }
-                    icon={faComments}
-                  />
-                  <MiniInsightCard
-                    label="Tindak lanjut"
-                    title={
-                      openTaskCount > 0
-                        ? `${openTaskCount} follow-up masih terbuka`
-                        : "Belum ada follow-up aktif"
-                    }
-                    description={
-                      openTaskCount > 0
-                        ? "Buka Tindak Lanjut untuk lihat mana yang overdue, hot lead, atau siap dikirim."
-                        : "Belum ada pekerjaan follow-up yang mendesak saat ini."
-                    }
-                    icon={faBullseye}
-                  />
-                </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <Link href="/dashboard/sales" className="clara-button clara-button-primary justify-center">
-                    Buka Chat Masuk
-                  </Link>
-                  <Link href="/dashboard/follow-up" className="clara-button clara-button-ghost justify-center">
-                    Buka Tindak Lanjut
-                  </Link>
-                  <Link href="/dashboard/crm" className="clara-button clara-button-ghost justify-center">
-                    Buka Leads
-                  </Link>
-                </div>
-                </PanelFrame>
+                <h2 className="text-sm font-semibold clara-text-primary">
+                  Jalur kerja lain
+                </h2>
+                <p
+                  data-onboarding-id="sales-home-health"
+                  className="mt-1 text-sm clara-text-secondary"
+                >
+                  {metrics.analyzedCount} chat sudah dianalisis dari{" "}
+                  {metrics.inboxCount} chat aktif.
+                </p>
               </div>
-
-              <div data-onboarding-id="sales-home-health">
-                <PanelFrame eyebrow="Kondisi kerja" title="Angka penting hari ini">
-                <div className="space-y-3">
-                  <PulseRow label="Sudah dibaca AI" value={String(metrics.analyzedCount)} />
-                  <PulseRow label="Risiko tinggi" value={String(metrics.highRiskCount)} />
-                  <PulseRow label="Coverage AI" value={aiCoverage} />
-                </div>
-                </PanelFrame>
-              </div>
+              <nav aria-label="Jalur kerja Sales" className="flex flex-wrap gap-2">
+                <Link href="/dashboard/crm" className="clara-button clara-button-ghost">
+                  Leads
+                </Link>
+                <Link
+                  href="/dashboard/upload"
+                  className="clara-button clara-button-ghost"
+                >
+                  Input Chat
+                </Link>
+              </nav>
             </section>
           </>
         ) : isManagerWorkspace ? (

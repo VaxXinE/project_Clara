@@ -21,31 +21,31 @@ type RoleFeatureSet = {
 const SALES_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Terima Chat Nasabah",
-    description: "Buka Queue dan pilih chat aktif.",
+    title: "Buka Chat Masuk",
+    description: "Mulai dari chat yang paling perlu respons.",
     href: "/dashboard/sales",
-    cta: "Buka Queue",
+    cta: "Buka Chat Masuk",
   },
   {
     step: "2",
-    title: "Pakai AI untuk Jawaban",
-    description: "Jalankan analisis lalu siapkan draft.",
+    title: "Tinjau Konteks",
+    description: "Baca percakapan, hasil AI, dan langkah berikutnya.",
     href: "/dashboard/sales",
-    cta: "Buka Conversation",
+    cta: "Pilih Percakapan",
   },
   {
     step: "3",
-    title: "Kirim Jawaban",
-    description: "Kirim balasan lalu cek progres prospect.",
-    href: "/dashboard/crm",
-    cta: "Buka Lead Management",
+    title: "Selesaikan Follow-up",
+    description: "Kerjakan yang overdue dan jatuh tempo hari ini.",
+    href: "/dashboard/follow-up",
+    cta: "Buka Tindak Lanjut",
   },
   {
     step: "4",
-    title: "Follow-up Bila Perlu",
-    description: "Buka Action Center untuk tindak lanjut.",
-    href: "/dashboard/follow-up",
-    cta: "Buka Action Center",
+    title: "Input Chat Baru",
+    description: "Upload atau paste chat yang datang dari luar extension.",
+    href: "/dashboard/upload",
+    cta: "Buka Input Chat",
   },
 ] as const;
 
@@ -266,24 +266,24 @@ function buildRoleTasks(role?: string) {
 
   return [
     {
-      title: "Saya mau input chat baru",
-      description: "Upload atau paste chat baru.",
-      href: "/dashboard/upload",
-    },
-    {
       title: "Saya mau balas customer",
-      description: "Buka Queue lalu siapkan jawaban.",
+      description: "Buka chat yang paling perlu respons.",
       href: "/dashboard/sales",
     },
     {
-      title: "Saya mau lihat progress prospect",
-      description: "Lihat lead aktif dan progresnya.",
-      href: "/dashboard/crm",
+      title: "Saya mau meninjau konteks",
+      description: "Pilih percakapan lalu baca konteks dan hasil AI.",
+      href: "/dashboard/sales",
     },
     {
-      title: "Saya mau lihat prioritas follow-up",
-      description: "Buka Action Center.",
+      title: "Saya mau menyelesaikan follow-up",
+      description: "Kerjakan yang overdue atau jatuh tempo hari ini.",
       href: "/dashboard/follow-up",
+    },
+    {
+      title: "Saya mau input chat baru",
+      description: "Upload file .txt atau paste chat baru.",
+      href: "/dashboard/upload",
     },
   ];
 }
@@ -345,11 +345,11 @@ function buildRoleStartCopy(role?: string) {
     eyebrow: "Sales flow",
     title: "Mulai dari chat masuk",
     description:
-      "Baca chat, pakai AI, kirim jawaban, lalu follow-up.",
+      "Buka chat, tinjau konteks, selesaikan follow-up, lalu input chat baru bila dibutuhkan.",
     primaryHref: "/dashboard/sales",
-    primaryLabel: "Buka Queue",
-    secondaryHref: "/dashboard/sales",
-    secondaryLabel: "Buka Conversation",
+    primaryLabel: "Buka Chat Masuk",
+    secondaryHref: "/dashboard/follow-up",
+    secondaryLabel: "Buka Tindak Lanjut",
   };
 }
 
