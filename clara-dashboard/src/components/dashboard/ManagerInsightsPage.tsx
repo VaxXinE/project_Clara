@@ -548,16 +548,18 @@ export function ManagerInsightsPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="clara-empty-state text-sm text-[#d6bb84]">
+          <div role="status" className="clara-empty-state text-sm text-[#d6bb84]">
             {isHeadView ? "Loading head insight..." : "Loading monitor tim..."}
           </div>
         )}
 
         {errorMessage && (
-          <div className="clara-alert clara-alert-danger">{errorMessage}</div>
+          <div role="alert" className="clara-alert clara-alert-danger">
+            {errorMessage}
+          </div>
         )}
 
-        {insights && !isLoading && !errorMessage ? (
+        {insights && !isLoading ? (
           <>
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_320px]">
               <section
@@ -575,6 +577,10 @@ export function ManagerInsightsPage() {
                   </h2>
                   <p className="mt-4 max-w-3xl text-base leading-7 text-[#d6bb84]">
                     {monitorSummary}
+                  </p>
+                  <p className="mt-3 max-w-3xl text-xs leading-5 text-[#a98f63]">
+                    Metrik membantu review manusia dan tidak boleh dipakai
+                    sebagai keputusan otomatis atas performa anggota tim.
                   </p>
                 </div>
 
@@ -839,7 +845,9 @@ export function ManagerInsightsPage() {
                 </div>
 
                 {actionListError ? (
-                  <div className="mt-4 clara-alert clara-alert-danger">{actionListError}</div>
+                  <div role="alert" className="mt-4 clara-alert clara-alert-danger">
+                    {actionListError}
+                  </div>
                 ) : null}
 
                 <div className="mt-4 space-y-3">
@@ -1405,13 +1413,15 @@ export function ManagerInsightsPage() {
                         {selectedSalesUserId === item.sales_user_id ? (
                           <>
                             {salesDetailLoadingId === item.sales_user_id ? (
-                              <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[#1b140e] p-5 text-sm text-[#d6bb84]">
+                              <div role="status" className="rounded-[22px] border border-[#f0cb73]/16 bg-[#1b140e] p-5 text-sm text-[#d6bb84]">
                                 Clara sedang memuat detail operasional sales ini...
                               </div>
                             ) : null}
 
                             {!salesDetailLoadingId && salesDetailError ? (
-                              <div className="clara-alert clara-alert-danger">{salesDetailError}</div>
+                              <div role="alert" className="clara-alert clara-alert-danger">
+                                {salesDetailError}
+                              </div>
                             ) : null}
 
                             {!salesDetailLoadingId

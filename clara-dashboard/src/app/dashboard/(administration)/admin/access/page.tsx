@@ -32,6 +32,7 @@ export default function AdminAccessPage() {
   const [units, setUnits] = useState<SalesUnitItem[]>([]);
   const [teams, setTeams] = useState<SalesTeamItem[]>([]);
   const [users, setUsers] = useState<CurrentUser[]>([]);
+  const [hasLoadedAccessData, setHasLoadedAccessData] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -75,6 +76,7 @@ export default function AdminAccessPage() {
     setUnits(unitData);
     setTeams(teamData);
     setUsers(userData);
+    setHasLoadedAccessData(true);
 
     if (activeUser && !isOwnerLike(activeUser.role)) {
       router.replace("/workspace");
@@ -109,6 +111,15 @@ export default function AdminAccessPage() {
   }, [router]);
 
   async function handleToggleActive(user: CurrentUser) {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `${user.is_active ? "Nonaktifkan" : "Aktifkan"} user ${user.email}?`,
+      )
+    ) {
+      return;
+    }
+
     setActionUserId(user.id);
     setErrorMessage("");
     setSuccessMessage("");
@@ -239,6 +250,28 @@ export default function AdminAccessPage() {
   }
 
   async function handleUpdateTeam(teamId: string) {
+    const team = teams.find((item) => item.id === teamId);
+    if (
+      team &&
+      team.manager_user_id !== editingTeamForm.manager_user_id
+    ) {
+      const previousManager =
+        users.find((user) => user.id === team.manager_user_id)?.email ??
+        "tanpa manager";
+      const nextManager =
+        users.find((user) => user.id === editingTeamForm.manager_user_id)?.email ??
+        "tanpa manager";
+
+      if (
+        typeof window !== "undefined" &&
+        !window.confirm(
+          `Ubah manager team ${team.name} dari ${previousManager} menjadi ${nextManager}?`,
+        )
+      ) {
+        return;
+      }
+    }
+
     setStructureActionKey(`team:${teamId}`);
     setErrorMessage("");
     setSuccessMessage("");
@@ -300,6 +333,14 @@ export default function AdminAccessPage() {
     const startIndex = (effectiveUserPage - 1) * userPageSize;
     return filteredUsers.slice(startIndex, startIndex + userPageSize);
   }, [effectiveUserPage, filteredUsers]);
+  const hasUsableAccessData =
+    hasLoadedAccessData ||
+    organizations.length > 0 ||
+    units.length > 0 ||
+    teams.length > 0 ||
+    users.length > 0;
+  const shouldRenderAccessWorkspace =
+    !isLoading && (!errorMessage || hasUsableAccessData);
 
   return (
     <WorkspaceShell
@@ -322,20 +363,26 @@ export default function AdminAccessPage() {
     >
       <div className="mx-auto space-y-6">
         {isLoading ? (
-          <div className="clara-empty-state text-sm text-[#d6bb84]">
+          <div role="status" className="clara-empty-state text-sm text-[#d6bb84]">
             Loading access management...
           </div>
         ) : null}
 
         {errorMessage ? (
-          <div className="clara-alert clara-alert-danger">{errorMessage}</div>
+          <div role="alert" className="clara-alert clara-alert-danger">
+            {errorMessage}
+          </div>
         ) : null}
 
         {successMessage ? (
-          <div className="clara-alert clara-alert-success">{successMessage}</div>
+          <div role="status" className="clara-alert clara-alert-success">
+            {successMessage}
+          </div>
         ) : null}
 
-        {!isLoading && currentUser && isOwnerLike(currentUser.role) ? (
+        {shouldRenderAccessWorkspace &&
+        currentUser &&
+        isOwnerLike(currentUser.role) ? (
           <>
             <section className="grid gap-6 lg:grid-cols-3">
               <Panel

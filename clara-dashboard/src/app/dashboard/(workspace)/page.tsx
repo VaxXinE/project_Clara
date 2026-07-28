@@ -71,6 +71,7 @@ export default function DashboardHomePage() {
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
   const [managerInsights, setManagerInsights] =
     useState<ManagerInsightsResponse | null>(null);
+  const [hasLeadershipData, setHasLeadershipData] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -100,19 +101,33 @@ export default function DashboardHomePage() {
         }
 
         if (["superadmin", "head"].includes(me.role)) {
-          try {
-            const [insights, kpiResponse] = await Promise.all([
-              apiFetch<MarketingInsightsPreview>(
-                "/dashboard/marketing/insights-preview",
-              ),
-              apiFetch<KpiCommandCenterResponse>("/dashboard/kpi/command-center"),
-            ]);
-            nextMetrics.insightConversationCount = insights.total_conversations;
+          const [insightsResult, kpiResult] = await Promise.allSettled([
+            apiFetch<MarketingInsightsPreview>(
+              "/dashboard/marketing/insights-preview",
+            ),
+            apiFetch<KpiCommandCenterResponse>("/dashboard/kpi/command-center"),
+          ]);
+
+          if (insightsResult.status === "fulfilled") {
+            nextMetrics.insightConversationCount =
+              insightsResult.value.total_conversations;
             nextMetrics.highRiskCount =
-              insights.kpi_summary.high_risk_conversation_count;
-            setKpi(kpiResponse);
-          } catch {
-            // Keep homepage usable even if insight snapshots are not available yet.
+              insightsResult.value.kpi_summary.high_risk_conversation_count;
+            setHasLeadershipData(true);
+          }
+
+          if (kpiResult.status === "fulfilled") {
+            setKpi(kpiResult.value);
+            setHasLeadershipData(true);
+          }
+
+          if (
+            insightsResult.status === "rejected" ||
+            kpiResult.status === "rejected"
+          ) {
+            setErrorMessage(
+              "Sebagian ringkasan strategis gagal dimuat. Data yang berhasil dimuat tetap ditampilkan.",
+            );
           }
         }
 
@@ -122,8 +137,11 @@ export default function DashboardHomePage() {
               "/dashboard/manager-insights",
             );
             setManagerInsights(response);
+            setHasLeadershipData(true);
           } catch {
-            // Manager homepage should still render even if monitoring snapshot fails.
+            setErrorMessage(
+              "Ringkasan monitor tim gagal dimuat. Coba muat ulang halaman.",
+            );
           }
         }
 
@@ -146,6 +164,8 @@ export default function DashboardHomePage() {
   const isSalesWorkspace = currentUser?.role === "sales";
   const isManagerWorkspace = currentUser?.role === "manager";
   const isHeadWorkspace = currentUser?.role === "head";
+  const shouldRenderLeadershipWorkspace =
+    !isLoading && (!errorMessage || hasLeadershipData);
   const canAccessInsights = currentUser !== null && isAdminLike(currentUser.role);
   const aiCoverage =
     metrics.inboxCount > 0
@@ -321,6 +341,12 @@ export default function DashboardHomePage() {
           </section>
         )}
 
+        {currentUser && !isSalesWorkspace && isLoading ? (
+          <div role="status" className="clara-empty-state text-sm text-slate-600">
+            Loading leadership overview...
+          </div>
+        ) : null}
+
         {isSalesWorkspace ? (
           <>
             <section
@@ -467,7 +493,7 @@ export default function DashboardHomePage() {
               </nav>
             </section>
           </>
-        ) : isManagerWorkspace ? (
+        ) : !shouldRenderLeadershipWorkspace ? null : isManagerWorkspace ? (
           <>
             <section
               data-onboarding-id="manager-home-summary"

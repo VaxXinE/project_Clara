@@ -87,16 +87,18 @@ export default function AdminOpsPage() {
         </section>
 
         {isLoading && (
-          <div className="clara-empty-state text-sm text-slate-600">
+          <div role="status" className="clara-empty-state text-sm text-slate-600">
             Loading database overview...
           </div>
         )}
 
         {errorMessage && (
-          <div className="clara-alert clara-alert-danger">{errorMessage}</div>
+          <div role="alert" className="clara-alert clara-alert-danger">
+            {errorMessage}
+          </div>
         )}
 
-        {overview && !isLoading && !errorMessage && (
+        {overview && !isLoading && (
           <>
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {overview.table_counts.map((item) => (
