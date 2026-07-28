@@ -276,16 +276,18 @@ export default function ChatReviewCenterPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="clara-empty-state text-sm text-[#d6bb84]">
+          <div role="status" className="clara-empty-state text-sm text-[#d6bb84]">
             Loading review sales...
           </div>
         )}
 
         {errorMessage && (
-          <div className="clara-alert clara-alert-danger">{errorMessage}</div>
+          <div role="alert" className="clara-alert clara-alert-danger">
+            {errorMessage}
+          </div>
         )}
 
-        {queue && !isLoading && !errorMessage && (
+        {queue && !isLoading && (
           <>
             <section
               data-onboarding-id="manager-approvals-summary"

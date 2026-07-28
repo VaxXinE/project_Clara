@@ -272,19 +272,23 @@ export default function MarketingInsightsPage() {
       <div className="space-y-6">
 
         {isLoading && (
-          <div className="clara-empty-state text-sm text-slate-300">
+          <div role="status" className="clara-empty-state text-sm text-slate-300">
             Loading marketing insights...
           </div>
         )}
 
         {errorMessage && (
-          <div className="clara-alert clara-alert-danger">
+          <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         )}
 
-        {insights && !isLoading && !errorMessage && (
+        {insights && !isLoading && (
           <>
+            <p className="text-sm leading-6 text-slate-400">
+              Sinyal dan outcome membantu menentukan prioritas; korelasi data
+              tidak otomatis membuktikan sebab-akibat.
+            </p>
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Total Conversations"

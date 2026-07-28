@@ -44,6 +44,7 @@ export default function ProductKnowledgePage() {
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(
     null,
   );
+  const [hasLoadedKnowledgeList, setHasLoadedKnowledgeList] = useState(false);
   const canManageKnowledge = currentUser?.role === "superadmin";
   const canReviewProposals = ["superadmin"].includes(
     currentUser?.role ?? "",
@@ -81,7 +82,7 @@ export default function ProductKnowledgePage() {
       const includeProposalQueue =
         options?.includeProposalQueue ?? canSeeProposalQueue;
 
-      const [data, proposalData] = await Promise.all([
+      const [dataResult, proposalResult] = await Promise.allSettled([
         apiFetch<ProductKnowledgeItem[]>(path),
         includeProposalQueue
           ? apiFetch<KnowledgeUpdateProposalItem[]>(
@@ -89,8 +90,21 @@ export default function ProductKnowledgePage() {
             )
           : Promise.resolve([]),
       ]);
-      setItems(data);
-      setProposals(proposalData);
+      if (dataResult.status === "fulfilled") {
+        setItems(dataResult.value);
+        setHasLoadedKnowledgeList(true);
+      }
+      if (proposalResult.status === "fulfilled") {
+        setProposals(proposalResult.value);
+      }
+      if (
+        dataResult.status === "rejected" ||
+        proposalResult.status === "rejected"
+      ) {
+        setErrorMessage(
+          "Sebagian data knowledge gagal dimuat. Data yang berhasil dimuat tetap ditampilkan.",
+        );
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -195,11 +209,18 @@ export default function ProductKnowledgePage() {
     }
   }
 
-  async function handleDelete(knowledgeId: string) {
+  async function handleDelete(knowledgeId: string, title: string) {
     if (!canManageKnowledge) {
       setErrorMessage(
         "Hanya superadmin yang boleh menghapus product knowledge.",
       );
+      return;
+    }
+
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Hapus knowledge entry "${title}"? Aksi ini tidak bisa dibatalkan.`)
+    ) {
       return;
     }
 
@@ -282,6 +303,10 @@ export default function ProductKnowledgePage() {
   }
 
   const activeItemsCount = items.filter((item) => item.is_active).length;
+  const hasUsableKnowledgeData =
+    hasLoadedKnowledgeList || items.length > 0 || proposals.length > 0;
+  const shouldRenderKnowledgeWorkspace =
+    !isLoading && (!errorMessage || hasUsableKnowledgeData);
   const selectedKnowledge =
     items.find((item) => item.id === effectiveSelectedKnowledgeId) ??
     items[0] ??
@@ -320,25 +345,39 @@ export default function ProductKnowledgePage() {
       }
     >
       <div className="mx-auto space-y-6">
-        <section className="grid gap-4 md:grid-cols-3">
-          <InfoCard
-            label="Total Entry"
-            value={isLoading ? "..." : String(items.length)}
-            description="Seluruh knowledge yang tersedia untuk dibaca dari workspace."
-          />
-          <InfoCard
-            label="Entry Aktif"
-            value={isLoading ? "..." : String(activeItemsCount)}
-            description="Entry aktif akan dipakai Clara sebagai grounding jawaban."
-          />
-          <InfoCard
-            label="Hak Akses"
-            value={canManageKnowledge ? "Superadmin" : "Read Only"}
-            description="Hanya superadmin yang bisa menambah, mengubah, menghapus, dan publish knowledge resmi."
-          />
-        </section>
+        {errorMessage ? (
+          <div role="alert" className="clara-alert clara-alert-danger">
+            {errorMessage}
+          </div>
+        ) : null}
 
-        {canSeeProposalQueue && (
+        {successMessage ? (
+          <div role="status" className="clara-alert clara-alert-success">
+            {successMessage}
+          </div>
+        ) : null}
+
+        {shouldRenderKnowledgeWorkspace ? (
+          <section className="grid gap-4 md:grid-cols-3">
+            <InfoCard
+              label="Total Entry"
+              value={isLoading ? "..." : String(items.length)}
+              description="Seluruh knowledge yang tersedia untuk dibaca dari workspace."
+            />
+            <InfoCard
+              label="Entry Aktif"
+              value={isLoading ? "..." : String(activeItemsCount)}
+              description="Entry aktif akan dipakai Clara sebagai grounding jawaban."
+            />
+            <InfoCard
+              label="Hak Akses"
+              value={canManageKnowledge ? "Superadmin" : "Read Only"}
+              description="Hanya superadmin yang bisa menambah, mengubah, menghapus, dan publish knowledge resmi."
+            />
+          </section>
+        ) : null}
+
+        {shouldRenderKnowledgeWorkspace && canSeeProposalQueue && (
           <section className="clara-card rounded-[30px] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -451,13 +490,14 @@ export default function ProductKnowledgePage() {
           </section>
         )}
 
-        <section
-          className={
-            canManageKnowledge
-              ? "grid gap-6 lg:grid-cols-[0.95fr_1.05fr]"
-              : "space-y-4"
-          }
-        >
+        {(isLoading || shouldRenderKnowledgeWorkspace) && (
+          <section
+            className={
+              canManageKnowledge
+                ? "grid gap-6 lg:grid-cols-[0.95fr_1.05fr]"
+                : "space-y-4"
+            }
+          >
           {canManageKnowledge && (
             <form
               onSubmit={handleSubmit}
@@ -563,16 +603,6 @@ export default function ProductKnowledgePage() {
                 />
                 Entry aktif dan boleh dipakai untuk grounding AI
               </label>
-
-              {errorMessage && (
-                <p className="clara-alert clara-alert-danger">{errorMessage}</p>
-              )}
-
-              {successMessage && (
-                <p className="clara-alert clara-alert-success">
-                  {successMessage}
-                </p>
-              )}
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
@@ -705,20 +735,8 @@ export default function ProductKnowledgePage() {
               </form>
             </div>
 
-            {!canManageKnowledge && errorMessage && (
-              <div className="clara-alert clara-alert-danger">
-                {errorMessage}
-              </div>
-            )}
-
-            {!canManageKnowledge && successMessage && (
-              <div className="clara-alert clara-alert-success">
-                {successMessage}
-              </div>
-            )}
-
             {isLoading && (
-              <div className="clara-empty-state text-sm text-slate-600">
+              <div role="status" className="clara-empty-state text-sm text-slate-600">
                 Loading product knowledge...
               </div>
             )}
@@ -879,7 +897,10 @@ export default function ProductKnowledgePage() {
                           <button
                             type="button"
                             onClick={() =>
-                              void handleDelete(selectedKnowledge.id)
+                              void handleDelete(
+                                selectedKnowledge.id,
+                                selectedKnowledge.title,
+                              )
                             }
                             disabled={deletingId === selectedKnowledge.id}
                             className="clara-button border border-red-200 bg-white/70 text-red-700"
@@ -930,7 +951,8 @@ export default function ProductKnowledgePage() {
               </section>
             )}
           </section>
-        </section>
+          </section>
+        )}
       </div>
     </WorkspaceShell>
   );
