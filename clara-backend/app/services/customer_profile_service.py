@@ -36,7 +36,7 @@ def _get_customer_profile_column_names(db: Session) -> set[str]:
     if cached is not None:
         return cached
 
-    inspector = sqlalchemy_inspect(bind)
+    inspector = sqlalchemy_inspect(db.connection())
     columns = {
         column["name"]
         for column in inspector.get_columns("customer_profiles")
