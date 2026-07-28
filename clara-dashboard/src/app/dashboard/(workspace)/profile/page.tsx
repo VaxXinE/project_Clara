@@ -486,7 +486,7 @@ function Panel({
   return (
     <section data-onboarding-id={onboardingId} className="clara-card rounded-[30px] p-6">
       <p className="clara-kicker text-xs">{eyebrow}</p>
-      <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] clara-text-primary">
+      <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
         {title}
       </h2>
       <div className="mt-5">{children}</div>
@@ -510,7 +510,7 @@ function ProfileStat({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="clara-kicker text-xs">{label}</p>
-          <p className="mt-3 text-xl font-bold tracking-tight clara-text-primary">
+          <p className="mt-3 text-xl font-bold tracking-tight text-slate-950">
             {value}
           </p>
         </div>
@@ -529,7 +529,7 @@ function ProfileField({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d6737]">
         {label}
       </p>
-      <p className="mt-1.5 text-sm font-semibold clara-text-primary">{value}</p>
+      <p className="mt-1.5 text-sm font-semibold text-slate-950">{value}</p>
     </div>
   );
 }

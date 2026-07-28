@@ -356,27 +356,19 @@ export default function FollowUpPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="clara-empty-state text-sm clara-text-secondary"
-          >
-            Memuat daftar tindak lanjut...
+          <div className="clara-empty-state text-sm text-slate-600">
+            Loading tindak lanjut...
           </div>
         )}
 
         {errorMessage && (
-          <div role="alert" className="clara-alert clara-alert-danger">
+          <div className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         )}
 
         {successMessage && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="clara-alert clara-alert-success"
-          >
+          <div className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4 text-sm text-[#f0cb73]">
             {successMessage}
           </div>
         )}
@@ -385,72 +377,79 @@ export default function FollowUpPage() {
           <>
             <section
               data-onboarding-id="sales-followup-focus"
-              className="grid gap-4 xl:grid-cols-[1.4fr_1fr]"
+              className="grid gap-4 xl:grid-cols-[1.5fr_1fr]"
             >
-              <article className="clara-card p-5 sm:p-6">
-                <p className="clara-kicker text-xs">
+              <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_50%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                   Fokus kerja sekarang
                 </p>
-                <h2 className="mt-2 text-xl font-bold tracking-tight clara-text-primary sm:text-2xl">
+                <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#fff3cf]">
                   {salesActionSummary.focusLabel}
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 clara-text-secondary">
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-[#e3c990]">
                   {salesActionSummary.focusHelper}
                 </p>
 
-                <p className="mt-4 text-sm clara-text-muted">
-                  {filteredVisibleItems.length} prioritas hari ini ·{" "}
-                  {visibleUpcomingItems.length} berikutnya ·{" "}
-                  {worklist.completed_today_count} selesai hari ini
-                </p>
+                <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#e9d4a0]">
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                    Prioritas hari ini: <span className="font-semibold text-[#fff3cf]">{filteredVisibleItems.length}</span>
+                  </span>
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                    Berikutnya: <span className="font-semibold text-[#fff3cf]">{visibleUpcomingItems.length}</span>
+                  </span>
+                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
+                    Dibuat: <span className="font-semibold text-[#fff3cf]">{formatDateTime(worklist.generated_at)}</span>
+                  </span>
+                </div>
               </article>
 
               <div
                 data-onboarding-id="sales-followup-metrics"
-                className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1"
+                className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2"
               >
                 <MetricCard label="Telat berat" value={String(worklist.overdue_24h_count)} />
                 <MetricCard label="Harus hari ini" value={String(worklist.due_today_count)} />
                 <MetricCard label="Siap dikirim" value={String(worklist.ready_to_send_count)} />
+                <MetricCard label="Sudah selesai hari ini" value={String(worklist.completed_today_count)} />
               </div>
             </section>
 
             <section
               data-onboarding-id="sales-followup-filters"
-              className="clara-card p-4 sm:p-5"
+              className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-semibold clara-text-primary">
-                  Cari dan filter
-                </h2>
-                <p className="text-sm clara-text-secondary">
-                  {filteredVisibleItems.length} dari {visibleItems.length} aktif
-                </p>
-              </div>
+              <div className="space-y-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(28,21,15,0.94)_0%,rgba(18,13,10,0.96)_100%)] p-4 backdrop-blur-sm">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="max-w-2xl">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                      Filter kerja
+                    </p>
+                    <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                      Cari dulu yang mau dibereskan
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-[#e3c990]">
+                      Sales cukup pakai dua hal ini: cari lead yang sedang dicari, lalu pilih prioritas kerja yang ingin difokuskan.
+                    </p>
+                  </div>
+                </div>
 
-                <div className="mt-4 grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-                  <div>
-                    <label htmlFor="followup-search" className="clara-label">
-                      Cari lead atau alasan follow-up
-                    </label>
+                <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                    <span>Cari lead atau alasan follow-up</span>
                     <input
-                      id="followup-search"
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
                       placeholder="Cari nama lead, alasan, atau aksi berikutnya..."
-                      className="clara-input mt-2 w-full"
+                      className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none placeholder:text-[#907953]"
                     />
-                  </div>
+                  </label>
 
-                  <div>
-                    <label htmlFor="followup-priority" className="clara-label">
-                      Pilih prioritas
-                    </label>
+                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
+                    <span>Pilih prioritas</span>
                     <select
-                      id="followup-priority"
                       value={actionBucketFilter}
                       onChange={(event) => setActionBucketFilter(event.target.value)}
-                      className="clara-select mt-2 w-full"
+                      className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none"
                     >
                       {ACTION_BUCKET_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -458,21 +457,32 @@ export default function FollowUpPage() {
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </label>
                 </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[22px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] px-4 py-3 text-sm text-[#d8bc84] shadow-[0_12px_24px_rgba(0,0,0,0.18)]">
+                <span className="rounded-full bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                  Hasil
+                </span>
+                <span>
+                  Menampilkan <span className="font-semibold text-[#fff0c9]">{filteredVisibleItems.length}</span> dari{" "}
+                  <span className="font-semibold text-[#fff0c9]">{visibleItems.length}</span> follow-up aktif hari ini.
+                </span>
+              </div>
             </section>
 
-            <section className="clara-card p-4 sm:p-5">
+            <section className="clara-card rounded-[28px] p-5">
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <p className="text-sm font-semibold clara-text-primary">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Kerjakan sekarang
                   </p>
-                  <h2 className="mt-1 text-xl font-bold clara-text-primary">
+                  <h2 className="mt-1 text-2xl font-bold text-slate-950">
                     {filteredVisibleItems.length} follow-up siap dibereskan
                   </h2>
                 </div>
-                <p className="text-sm clara-text-secondary">
+                <p className="text-sm text-slate-500">
                   Urutkan dari yang paling butuh tindakan dulu, lalu tandai selesai satu per satu.
                 </p>
               </div>
@@ -487,14 +497,14 @@ export default function FollowUpPage() {
                     <div key={section.bucket} className="space-y-4">
                       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                         <div>
-                          <p className="text-sm font-semibold clara-text-primary">
+                          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                             {section.config.label}
                           </p>
-                          <h3 className="mt-1 text-lg font-bold clara-text-primary">
+                          <h3 className="mt-1 text-xl font-bold text-slate-950">
                             {section.items.length} item
                           </h3>
                         </div>
-                        <p className="max-w-2xl text-sm leading-6 clara-text-secondary">
+                        <p className="max-w-2xl text-sm leading-6 text-slate-500">
                           {section.config.description}
                         </p>
                       </div>
@@ -524,18 +534,18 @@ export default function FollowUpPage() {
 
             <section
               data-onboarding-id="sales-followup-upcoming"
-              className="clara-card-outline p-4 opacity-90 sm:p-5"
+              className="clara-card rounded-[28px] p-5"
             >
               <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <p className="text-sm font-semibold clara-text-primary">
+                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Simpan untuk berikutnya
                   </p>
-                  <h2 className="mt-1 text-xl font-bold clara-text-primary">
+                  <h2 className="mt-1 text-2xl font-bold text-slate-950">
                     {visibleUpcomingItems.length} follow-up belum perlu dikerjakan hari ini
                   </h2>
                 </div>
-                <p className="text-sm clara-text-secondary">
+                <p className="text-sm text-slate-500">
                   Item ini tetap aktif, tapi belum jadi fokus sesi kerja sekarang.
                 </p>
               </div>
@@ -570,9 +580,9 @@ export default function FollowUpPage() {
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <article className="clara-card-soft p-4">
-      <p className="text-sm clara-text-secondary">{label}</p>
-      <p className="mt-1 text-2xl font-bold tracking-tight clara-text-primary">
+    <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#140f08]">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
         {value}
       </p>
     </article>
@@ -615,12 +625,11 @@ function WorklistRow({
   const bucketConfig = getActionBucketConfig(bucket);
   const slaLabel = getTimeLabel(item.next_follow_up_at);
   const isItemOverdue = isOverdue(item);
-  const fieldId = `${item.task_id ?? item.lead_id}-${index}`;
 
   return (
     <article
       data-onboarding-id={onboardingTargetId}
-      className="clara-card-outline p-4 sm:p-5"
+      className="clara-card rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
@@ -628,7 +637,7 @@ function WorklistRow({
             <span className="rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-2.5 py-1 text-xs font-semibold text-[#140f08]">
               #{index + 1}
             </span>
-            <h3 className="min-w-0 break-words text-lg font-semibold clara-text-primary">{item.lead_name}</h3>
+            <h3 className="text-lg font-semibold text-slate-950">{item.lead_name}</h3>
             <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
               {bucketConfig.label}
             </span>
@@ -658,7 +667,7 @@ function WorklistRow({
             </span>
           </div>
 
-          <p className="mt-3 text-sm font-semibold clara-text-primary">{item.task_label}</p>
+          <p className="mt-3 text-sm font-semibold text-slate-900">{item.task_label}</p>
           <p className="mt-2 text-sm leading-6 text-slate-600">{item.reason}</p>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -681,11 +690,10 @@ function WorklistRow({
 
           <div className="mt-4 grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
             <div>
-              <label htmlFor={`result-${fieldId}`} className="clara-label">
+              <label className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 Hasil aksi
               </label>
               <select
-                id={`result-${fieldId}`}
                 value={reasonTag}
                 onChange={(event) => setReasonTag(event.target.value)}
                 className="clara-select mt-2"
@@ -700,11 +708,10 @@ function WorklistRow({
             </div>
 
             <div>
-              <label htmlFor={`note-${fieldId}`} className="clara-label">
+              <label className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 Catatan opsional
               </label>
               <input
-                id={`note-${fieldId}`}
                 value={reasonNote}
                 onChange={(event) => setReasonNote(event.target.value)}
                 className="clara-input mt-2"
@@ -736,7 +743,7 @@ function WorklistRow({
             onClick={() => {
               void onTaskAction(item, buildPayload("done"));
             }}
-            className="clara-button clara-button-secondary"
+            className="clara-button border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08]"
           >
             {isUpdating ? "Memproses..." : "Tandai Selesai"}
           </button>
@@ -792,7 +799,7 @@ function WorklistRow({
             onClick={() => {
               void onTaskAction(item, buildPayload("dismiss"));
             }}
-            className="clara-button clara-button-ghost"
+            className="clara-button border border-[#f0cb73]/20 bg-[#2c1f12] text-[#f0cb73]"
           >
             Sembunyikan
           </button>

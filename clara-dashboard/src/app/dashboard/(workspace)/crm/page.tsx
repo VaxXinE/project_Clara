@@ -699,7 +699,7 @@ export default function CrmPage() {
               <p className="clara-kicker text-xs">Ringkasan leads</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
+                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
                     {heroTitle}
                   </h2>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
@@ -817,7 +817,7 @@ export default function CrmPage() {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-2xl">
                   <p className="clara-kicker text-xs">Filter lead</p>
-                  <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] clara-text-primary">
+                  <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
                     {isHeadWorkspace
                       ? "Saring lead tim untuk cepat melihat yang butuh keputusan"
                       : isManagerWorkspace
@@ -1116,7 +1116,7 @@ export default function CrmPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
                     Lead List
                   </p>
-                  <h3 className="mt-2 text-xl font-bold tracking-tight clara-text-primary">
+                  <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                     {leadListTitle}
                   </h3>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-[#c8ad75]">
@@ -1196,7 +1196,7 @@ export default function CrmPage() {
                               {previewTitle}
                             </p>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
-                              <h3 className="text-xl font-bold tracking-tight clara-text-primary">
+                              <h3 className="text-xl font-bold tracking-tight text-slate-950">
                                 {selectedLead.display_name}
                               </h3>
                               <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
@@ -1469,7 +1469,7 @@ function LeadListRow({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold clara-text-primary">
+              <h2 className="text-base font-semibold text-slate-950">
                 {lead.display_name}
               </h2>
               <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">

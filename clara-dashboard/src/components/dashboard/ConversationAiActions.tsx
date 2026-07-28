@@ -66,7 +66,7 @@ export function ConversationAiActions({
   return (
     <div className="clara-card rounded-[30px] p-5">
       <p className="clara-kicker">Aksi Clara</p>
-      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
         Siapkan konteks dan jawaban
       </h2>
       <p className="mt-2 text-sm text-slate-600">

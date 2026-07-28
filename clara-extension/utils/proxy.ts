@@ -3,23 +3,12 @@ import type { Channel } from "~/types/channel"
 
 const DEFAULT_PROXY_URL = "http://127.0.0.1:9898/reply-suggestions"
 const DEFAULT_CHAT_SNAPSHOT_PROXY_URL = "http://127.0.0.1:9898/chat-snapshots"
-const DEFAULT_LOCAL_CLARA_API_BASE_URL = "http://127.0.0.1:8000"
-const DEFAULT_LOCAL_CLARA_DASHBOARD_URL = "http://localhost:3000"
-const DEFAULT_PRODUCTION_CLARA_API_BASE_URL = "https://crm.sg-berjangka.com/api"
-const DEFAULT_PRODUCTION_CLARA_DASHBOARD_URL = "https://crm.sg-berjangka.com"
+const DEFAULT_CLARA_API_BASE_URL = "http://127.0.0.1:8000"
+const DEFAULT_CLARA_DASHBOARD_URL = "http://localhost:3000"
 const DEFAULT_AUTH_COOKIE_NAME = "clara_access_token"
 const DEFAULT_DEV_FALLBACK_FLAG = "false"
 
 const isProductionBuild = () => process.env.NODE_ENV === "production"
-
-const isLoopbackUrl = (value: string) => {
-  try {
-    const url = new URL(value)
-    return url.hostname === "localhost" || url.hostname === "127.0.0.1"
-  } catch (_error) {
-    return false
-  }
-}
 
 export const isDevFallbackAllowed = () => {
   if (isProductionBuild()) {
@@ -37,12 +26,7 @@ export const isDevFallbackAllowed = () => {
 }
 
 const buildClaraApiUrl = (apiBaseUrl: string, routePath: string) => {
-  const normalizedBaseUrl = (
-    apiBaseUrl ||
-    (isProductionBuild()
-      ? DEFAULT_PRODUCTION_CLARA_API_BASE_URL
-      : DEFAULT_LOCAL_CLARA_API_BASE_URL)
-  ).trim()
+  const normalizedBaseUrl = (apiBaseUrl || DEFAULT_CLARA_API_BASE_URL).trim()
   const normalizedRoutePath = routePath.startsWith("/")
     ? routePath
     : `/${routePath}`
@@ -61,21 +45,7 @@ export const getConfiguredProxyUrl = () =>
   (process.env.PLASMO_PUBLIC_OPENAI_PROXY_URL || DEFAULT_PROXY_URL).trim()
 
 export const getConfiguredClaraApiBaseUrl = () =>
-  (() => {
-    const configured = (process.env.PLASMO_PUBLIC_CLARA_API_BASE_URL || "").trim()
-
-    if (configured) {
-      if (isProductionBuild() && isLoopbackUrl(configured)) {
-        return DEFAULT_PRODUCTION_CLARA_API_BASE_URL
-      }
-
-      return configured
-    }
-
-    return isProductionBuild()
-      ? DEFAULT_PRODUCTION_CLARA_API_BASE_URL
-      : DEFAULT_LOCAL_CLARA_API_BASE_URL
-  })()
+  (process.env.PLASMO_PUBLIC_CLARA_API_BASE_URL || "").trim()
 
 export const getConfiguredClaraApiToken = () =>
   isDevFallbackAllowed()
@@ -83,21 +53,9 @@ export const getConfiguredClaraApiToken = () =>
     : ""
 
 export const getConfiguredClaraDashboardUrl = () =>
-  (() => {
-    const configured = (process.env.PLASMO_PUBLIC_CLARA_DASHBOARD_URL || "").trim()
-
-    if (configured) {
-      if (isProductionBuild() && isLoopbackUrl(configured)) {
-        return DEFAULT_PRODUCTION_CLARA_DASHBOARD_URL
-      }
-
-      return configured
-    }
-
-    return isProductionBuild()
-      ? DEFAULT_PRODUCTION_CLARA_DASHBOARD_URL
-      : DEFAULT_LOCAL_CLARA_DASHBOARD_URL
-  })()
+  (
+    process.env.PLASMO_PUBLIC_CLARA_DASHBOARD_URL || DEFAULT_CLARA_DASHBOARD_URL
+  ).trim()
 
 export const getClaraDashboardLoginUrl = () => {
   try {
@@ -108,7 +66,7 @@ export const getClaraDashboardLoginUrl = () => {
 
     return url.toString()
   } catch (_error) {
-    return `${isProductionBuild() ? DEFAULT_PRODUCTION_CLARA_DASHBOARD_URL : DEFAULT_LOCAL_CLARA_DASHBOARD_URL}/login`
+    return `${DEFAULT_CLARA_DASHBOARD_URL}/login`
   }
 }
 

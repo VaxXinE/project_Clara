@@ -138,7 +138,7 @@ export function ReplySuggestionActions({
       <div className="clara-card space-y-4 rounded-[30px] p-5">
         <div>
           <p className="clara-kicker">Jawaban siap kirim</p>
-          <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+          <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
             Jawaban sudah siap dipakai
           </h3>
           <p className="mt-2 text-sm text-slate-600">
@@ -166,7 +166,7 @@ export function ReplySuggestionActions({
     <div className="clara-card space-y-5 rounded-[30px] p-5">
       <div>
         <p className="clara-kicker">Jawaban Clara</p>
-        <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+        <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
           Pilih jawaban yang paling pas
         </h3>
         <p className="mt-2 text-sm text-slate-600">
@@ -198,7 +198,7 @@ export function ReplySuggestionActions({
                 }}
               />
               <div>
-                <p className="text-sm font-semibold capitalize clara-text-primary">
+                <p className="text-sm font-semibold capitalize text-slate-900">
                   {reply.tone}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
