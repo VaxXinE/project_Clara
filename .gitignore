@@ -15,3 +15,6 @@ infra/.env
 infra/.env.prod
 scripts/deploy-prod.sh
 scripts/docker-up.sh
+# macOS Finder metadata
+.DS_Store
+**/.DS_Store
