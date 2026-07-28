@@ -772,7 +772,7 @@ export default function LeadDetailPage() {
                     <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
                       Snapshot lead
                     </p>
-                    <h2 className="mt-2 text-xl font-semibold text-slate-950">
+                    <h2 className="mt-2 text-xl font-semibold clara-text-primary">
                       {isHeadWorkspace
                         ? "Kondisi inti yang perlu dibaca head"
                         : isLeadershipWorkspace
@@ -830,7 +830,7 @@ export default function LeadDetailPage() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       {isSalesWorkspace
                         ? "Update Status Lead"
                         : isHeadWorkspace
@@ -955,7 +955,7 @@ export default function LeadDetailPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       {isSalesWorkspace
                         ? "Catatan Follow-up Harian"
                         : isHeadWorkspace
@@ -1153,7 +1153,7 @@ export default function LeadDetailPage() {
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
-                            <h3 className="text-sm font-semibold text-slate-950">
+                            <h3 className="text-sm font-semibold clara-text-primary">
                               {log.activity_type.replaceAll("_", " ")} ·{" "}
                               {log.result_status.replaceAll("_", " ")}
                             </h3>
@@ -1196,7 +1196,7 @@ export default function LeadDetailPage() {
                 className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
               >
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       {isSalesWorkspace
                         ? "Profil Customer Terkait"
                         : isHeadWorkspace
@@ -1221,7 +1221,7 @@ export default function LeadDetailPage() {
                     <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
-                          <h3 className="text-lg font-semibold text-slate-950">
+                          <h3 className="text-lg font-semibold clara-text-primary">
                             {lead.customer_profile.display_name}
                           </h3>
                           <p className="mt-1 text-sm text-slate-500">
@@ -1277,7 +1277,7 @@ export default function LeadDetailPage() {
                             className="rounded-[24px] border border-slate-200 bg-white p-4"
                           >
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-sm font-semibold text-slate-950">
+                              <h3 className="text-sm font-semibold clara-text-primary">
                                 {relatedLead.display_name}
                               </h3>
                               <span
@@ -1337,7 +1337,7 @@ export default function LeadDetailPage() {
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       {isSalesWorkspace
                         ? "Nilai Deal"
                         : isHeadWorkspace
@@ -1509,7 +1509,7 @@ export default function LeadDetailPage() {
 
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div>
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       {isSalesWorkspace
                         ? "Tugas Follow-up"
                         : isHeadWorkspace
@@ -1548,7 +1548,7 @@ export default function LeadDetailPage() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <h3 className="text-sm font-semibold text-slate-950">
+                            <h3 className="text-sm font-semibold clara-text-primary">
                               {task.title}
                             </h3>
                             <p className="mt-1 text-xs text-slate-500">
@@ -1631,7 +1631,7 @@ export default function LeadDetailPage() {
 
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-950">
+                  <h2 className="text-xl font-semibold clara-text-primary">
                     {isSalesWorkspace
                       ? "Riwayat Aktivitas"
                       : isHeadWorkspace
@@ -1666,7 +1666,7 @@ export default function LeadDetailPage() {
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div>
-                                <h3 className="text-sm font-semibold text-slate-950">
+                                <h3 className="text-sm font-semibold clara-text-primary">
                                   {event.title}
                                 </h3>
                                 <p className="mt-1 text-xs text-slate-500">
@@ -1809,7 +1809,7 @@ function DetailSelect({
         aria-haspopup="listbox"
         disabled={disabled}
         onClick={() => setIsOpen((previous) => !previous)}
-        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium text-slate-900 outline-none transition hover:border-slate-300 focus-visible:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium clara-text-primary outline-none transition hover:border-slate-300 focus-visible:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
       >
         <span>{getOptionLabel(value)}</span>
         <span
@@ -1886,7 +1886,7 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+      <p className="mt-2 text-sm font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }

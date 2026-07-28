@@ -5,7 +5,7 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from app.core.security import require_roles
 from app.core.config import settings
@@ -32,15 +32,27 @@ from app.schemas.dashboard_schema import (
     OpsNotificationItem,
     OpsNotificationResolveRequest,
     OpsNotificationResponse,
+    PerformanceActionCreateRequest,
+    PerformanceActionItem,
+    PerformanceActionListResponse,
+    PerformanceSnapshotGenerationResponse,
+    PerformanceActionUpdateRequest,
     PersistedKpiAlertRecord,
     SalesApprovalQueueResponse,
     SalesConversationDetail,
     SalesInboxItem,
     SalesPerformanceDetailResponse,
+    SalesPerformanceHistoryResponse,
     SalesWorklistResponse,
+    TeamPerformanceHistoryResponse,
+    WeeklyReviewSummaryResponse,
 )
 from app.schemas.channel_schema import ChannelOverviewResponse
 from app.services.audit_service import create_audit_log
+from app.services.access_control_service import (
+    get_accessible_sales_user_ids,
+    get_accessible_team_ids,
+)
 from app.services.chat_review_service import (
     ChatReviewError,
     add_chat_review_note,
@@ -58,6 +70,7 @@ from app.services.dashboard_service import (
     get_kpi_command_center,
     get_marketing_insights_preview,
     get_manager_insights,
+    build_weekly_review_csv,
     get_ops_database_overview,
     get_sales_chat_review_center,
     list_ops_notifications,
@@ -66,15 +79,24 @@ from app.services.dashboard_service import (
     get_sales_conversation_detail,
     get_sales_inbox,
     get_sales_performance_detail,
+    get_sales_performance_history,
+    get_team_performance_history,
+    ensure_weekly_performance_snapshots,
     get_sales_worklist,
     list_kpi_alert_records,
     list_kpi_snapshots,
     list_marketing_execution_items,
     refresh_kpi_command_center,
+    ignore_ops_notification,
     resolve_ops_notification,
     reopen_kpi_alert,
     resolve_kpi_alert,
     update_marketing_execution_item,
+)
+from app.services.performance_action_service import (
+    create_performance_action,
+    list_performance_actions,
+    update_performance_action_status,
 )
 from app.services.marketing_snapshot_service import (
     generate_marketing_snapshot,
@@ -201,6 +223,125 @@ def manager_insights(
     )
 
 
+@router.get("/manager-insights/weekly-review", response_model=WeeklyReviewSummaryResponse)
+def manager_weekly_review(
+    account_category: str | None = Query(default=None),
+    format: str = Query(default="json"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    if format not in {"json", "csv"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Format weekly review tidak valid.",
+        )
+    insights = get_manager_insights(
+        db=db,
+        current_user=current_user,
+        account_category=account_category,
+        range_label="7d",
+    )
+    review = insights.weekly_review
+    if review is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Weekly review belum tersedia.",
+        )
+    if format == "csv":
+        csv_payload = build_weekly_review_csv(review)
+        filename = f"clara-weekly-review-{review.review_end.isoformat()}.csv"
+        return Response(
+            content=csv_payload,
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    return review
+
+
+@router.get(
+    "/performance-actions",
+    response_model=PerformanceActionListResponse,
+)
+def dashboard_performance_actions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+):
+    return list_performance_actions(db=db, current_user=current_user)
+
+
+@router.post(
+    "/performance-actions",
+    response_model=PerformanceActionItem,
+    status_code=status.HTTP_201_CREATED,
+)
+def dashboard_create_performance_action(
+    payload: PerformanceActionCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    return create_performance_action(
+        db=db,
+        payload=payload,
+        current_user=current_user,
+    )
+
+
+@router.patch(
+    "/performance-actions/{action_id}",
+    response_model=PerformanceActionItem,
+)
+def dashboard_update_performance_action(
+    action_id: UUID,
+    payload: PerformanceActionUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    return update_performance_action_status(
+        db=db,
+        action_id=action_id,
+        payload=payload,
+        current_user=current_user,
+    )
+
+
+@router.post(
+    "/performance-snapshots/generate",
+    response_model=PerformanceSnapshotGenerationResponse,
+)
+def dashboard_generate_performance_snapshots(
+    weeks: int = Query(default=4, ge=2, le=8),
+    organization_id: UUID | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    target_organization_id = current_user.organization_id
+    if normalize_role(current_user.role) == "superadmin":
+        target_organization_id = organization_id
+
+    if target_organization_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Organization scope is required.",
+        )
+
+    sales_user_ids = get_accessible_sales_user_ids(
+        db=db,
+        current_user=current_user,
+    )
+    team_ids = get_accessible_team_ids(
+        db=db,
+        current_user=current_user,
+    )
+
+    return ensure_weekly_performance_snapshots(
+        db=db,
+        organization_id=target_organization_id,
+        sales_user_ids=sales_user_ids,
+        team_ids=team_ids,
+        weeks=weeks,
+    )
+
+
 @router.get(
     "/manager-insights/sales/{sales_user_id}",
     response_model=SalesPerformanceDetailResponse,
@@ -217,6 +358,64 @@ def manager_sales_performance_detail(
             sales_user_id=sales_user_id,
             current_user=current_user,
             range_label=range,
+        )
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/manager-insights/sales/{sales_user_id}/history",
+    response_model=SalesPerformanceHistoryResponse,
+)
+def manager_sales_performance_history(
+    sales_user_id: UUID,
+    weeks: int = Query(default=4, ge=2, le=8),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    try:
+        return get_sales_performance_history(
+            db=db,
+            sales_user_id=sales_user_id,
+            current_user=current_user,
+            weeks=weeks,
+        )
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/manager-insights/teams/{team_id}/history",
+    response_model=TeamPerformanceHistoryResponse,
+)
+def manager_team_performance_history(
+    team_id: UUID,
+    weeks: int = Query(default=4, ge=2, le=8),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    try:
+        return get_team_performance_history(
+            db=db,
+            team_id=team_id,
+            current_user=current_user,
+            weeks=weeks,
         )
     except PermissionError as exc:
         raise HTTPException(
@@ -479,6 +678,42 @@ def resolve_ops_notification_endpoint(
         current_user=current_user,
         request=request,
         metadata={"status": notification.status, "escalation_level": notification.escalation_level},
+    )
+    return notification
+
+
+@router.patch(
+    "/notifications/{notification_id}/ignore",
+    response_model=OpsNotificationItem,
+)
+def ignore_ops_notification_endpoint(
+    notification_id: UUID,
+    payload: OpsNotificationResolveRequest | None,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("manager", "head", "superadmin")),
+):
+    try:
+        notification = ignore_ops_notification(
+            db=db,
+            notification_id=notification_id,
+            payload=payload,
+            current_user=current_user,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
+
+    create_audit_log(
+        db=db,
+        action="ops_notification.ignore",
+        resource_type="ops_notification",
+        resource_id=str(notification.id),
+        current_user=current_user,
+        request=request,
+        metadata={"status": notification.status, "source_type": notification.source_type},
     )
     return notification
 

@@ -2287,7 +2287,7 @@ function ClaraSidePanel() {
   }, [])
 
   useEffect(() => {
-    if (!isClaraWorkspace || isAuthenticated || authStatus === "misconfigured") {
+    if (isAuthenticated || authStatus === "misconfigured") {
       return
     }
 
@@ -2300,13 +2300,9 @@ function ClaraSidePanel() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [authStatus, isAuthenticated, isClaraWorkspace])
+  }, [authStatus, isAuthenticated])
 
   useEffect(() => {
-    if (!isClaraWorkspace) {
-      return
-    }
-
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") {
         return
@@ -2330,10 +2326,10 @@ function ClaraSidePanel() {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       window.removeEventListener("focus", handleFocus)
     }
-  }, [isClaraWorkspace])
+  }, [])
 
   useEffect(() => {
-    if (!isClaraWorkspace || !chrome.cookies?.onChanged) {
+    if (!chrome.cookies?.onChanged) {
       return
     }
 
@@ -2361,7 +2357,7 @@ function ClaraSidePanel() {
     return () => {
       chrome.cookies.onChanged.removeListener(listener)
     }
-  }, [isClaraWorkspace])
+  }, [])
 
   const openDashboardLogin = async () => {
     await chrome.tabs.create({

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DashboardLatestMessage(BaseModel):
@@ -337,6 +337,57 @@ class SalesPerformanceTrend(BaseModel):
     momentum_label: str
 
 
+class WeeklyPerformanceSnapshotItem(BaseModel):
+    snapshot_date: date
+    snapshot_granularity: str
+    member_count: int | None = None
+    active_leads_count: int
+    needs_reply_count: int
+    overdue_follow_up_count: int
+    hot_leads_count: int
+    analyzed_conversations_count: int
+    needs_analysis_count: int
+    won_deals_count: int
+    lost_deals_count: int | None = None
+    open_deals_count: int | None = None
+    avg_response_sla_status: str
+    crm_discipline_status: str
+    coaching_priority_score: int
+    coaching_priority_label: str
+
+
+class HistoricalPerformanceSummary(BaseModel):
+    trend_label: str
+    delta_needs_reply: int
+    delta_overdue_follow_up: int
+    delta_won_deals: int
+    latest_snapshot_date: date | None
+    previous_snapshot_date: date | None
+
+
+class OperationalScorecard(BaseModel):
+    overall_score: int
+    score_label: str
+    response_discipline_score: int
+    follow_up_discipline_score: int
+    hot_lead_handling_score: int
+    pipeline_movement_score: int
+    crm_hygiene_score: int
+    primary_reason: str
+    secondary_reason: str | None = None
+    recommended_action: str
+    score_delta_vs_previous: int = 0
+    score_trend_label: str = "stable"
+
+
+class ManagerHistoricalSummary(BaseModel):
+    trend_label: str
+    delta_total_needs_reply: int
+    delta_total_overdue_follow_up: int
+    latest_snapshot_date: date | None
+    previous_snapshot_date: date | None
+
+
 class SalesCoachingSignal(BaseModel):
     priority_score: int
     priority_label: str
@@ -386,8 +437,110 @@ class TeamPerformanceItem(BaseModel):
     avg_response_sla_status: str
     crm_discipline_status: str
     trend: SalesPerformanceTrend
+    scorecard: OperationalScorecard
     coaching_signal: SalesCoachingSignal
     top_sales_contributors: list[TeamTopContributorItem]
+    weekly_history: list[WeeklyPerformanceSnapshotItem] = Field(default_factory=list)
+    history_summary: HistoricalPerformanceSummary | None = None
+
+
+class PerformanceActionCreateRequest(BaseModel):
+    assigned_to_user_id: UUID
+    team_id: UUID | None = None
+    sales_user_id: UUID | None = None
+    source_type: str
+    source_reference_id: UUID | None = None
+    title: str
+    description: str
+    action_type: str
+    priority_label: str
+    due_at: datetime | None = None
+
+
+class PerformanceActionUpdateRequest(BaseModel):
+    status: str
+    resolution_note: str | None = None
+
+
+class PerformanceActionItem(BaseModel):
+    id: UUID
+    organization_id: UUID | None
+    created_by_user_id: UUID | None
+    created_by_user_name: str | None
+    assigned_to_user_id: UUID | None
+    assigned_to_user_name: str | None
+    team_id: UUID | None
+    team_name: str | None
+    sales_user_id: UUID | None
+    sales_name: str | None
+    source_type: str
+    source_reference_id: UUID | None
+    title: str
+    description: str
+    action_type: str
+    status: str
+    priority_label: str
+    due_at: datetime | None
+    resolution_note: str | None
+    completed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PerformanceActionListResponse(BaseModel):
+    generated_at: datetime
+    open_count: int
+    in_progress_count: int
+    done_count: int
+    skipped_count: int
+    items: list[PerformanceActionItem]
+
+
+class WeeklyReviewEntityItem(BaseModel):
+    scope_type: str
+    sales_user_id: UUID | None = None
+    team_id: UUID | None = None
+    label: str
+    team_name: str | None = None
+    score: int
+    score_label: str
+    trend_label: str
+    score_delta: int
+    backlog_count: int
+    overdue_count: int
+    action_open_count: int
+    critical_alert_count: int
+    summary: str
+    target_href: str | None = None
+
+
+class WeeklyReviewAlertItem(BaseModel):
+    notification_id: UUID
+    alert_type: str | None = None
+    title: str
+    description: str
+    severity: str
+    status: str
+    team_name: str | None = None
+    sales_name: str | None = None
+    target_href: str | None = None
+    triggered_at: datetime | None = None
+
+
+class WeeklyReviewSummaryResponse(BaseModel):
+    generated_at: datetime
+    review_start: date
+    review_end: date
+    scope_label: str
+    healthy_team_count: int
+    teams_needing_attention_count: int
+    unresolved_action_count: int
+    critical_alert_open_count: int
+    top_improvers: list[WeeklyReviewEntityItem]
+    biggest_risks: list[WeeklyReviewEntityItem]
+    teams_needing_intervention: list[WeeklyReviewEntityItem]
+    unresolved_actions: list[PerformanceActionItem]
+    critical_alerts_open: list[WeeklyReviewAlertItem]
 
 
 class ManagerSalesPerformanceItem(BaseModel):
@@ -407,7 +560,10 @@ class ManagerSalesPerformanceItem(BaseModel):
     avg_response_sla_status: str
     crm_discipline_status: str
     trend: SalesPerformanceTrend
+    scorecard: OperationalScorecard
     coaching_signal: SalesCoachingSignal
+    weekly_history: list[WeeklyPerformanceSnapshotItem] = Field(default_factory=list)
+    history_summary: HistoricalPerformanceSummary | None = None
 
 
 class SalesPerformanceDetailUser(BaseModel):
@@ -435,7 +591,10 @@ class SalesPerformanceDetailSummary(BaseModel):
     avg_response_sla_status: str
     crm_discipline_status: str
     trend: SalesPerformanceTrend
+    scorecard: OperationalScorecard
     coaching_signal: SalesCoachingSignal
+    weekly_history: list[WeeklyPerformanceSnapshotItem] = Field(default_factory=list)
+    history_summary: HistoricalPerformanceSummary | None = None
 
 
 class SalesPerformanceLeadItem(BaseModel):
@@ -493,11 +652,40 @@ class ManagerInsightsResponse(BaseModel):
     coaching_priority: list[ManagerCoachingPriorityItem]
     objection_trends: list[ManagerObjectionTrendItem]
     boundary_alerts: list[ManagerBoundaryAlertItem]
+    historical_summary: ManagerHistoricalSummary | None = None
+    weekly_review: WeeklyReviewSummaryResponse | None = None
     sales_performance_summary: ManagerSalesPerformanceSummary
     sales_performance: list[ManagerSalesPerformanceItem]
     top_coaching_targets: list[TopCoachingTargetItem]
     team_performance_summary: TeamPerformanceSummary
     team_performance: list[TeamPerformanceItem]
+
+
+class SalesPerformanceHistoryResponse(BaseModel):
+    generated_at: datetime
+    sales_user: SalesPerformanceDetailUser
+    history_summary: HistoricalPerformanceSummary
+    weekly_history: list[WeeklyPerformanceSnapshotItem]
+
+
+class TeamPerformanceHistoryResponse(BaseModel):
+    generated_at: datetime
+    team_id: UUID
+    team_name: str
+    unit_id: UUID | None
+    unit_name: str | None
+    manager_user_name: str | None
+    history_summary: HistoricalPerformanceSummary
+    weekly_history: list[WeeklyPerformanceSnapshotItem]
+
+
+class PerformanceSnapshotGenerationResponse(BaseModel):
+    generated_at: datetime
+    snapshot_granularity: str
+    weeks: int
+    snapshot_dates: list[date]
+    sales_snapshot_count: int
+    team_snapshot_count: int
 
 
 class ChatReviewCaseUpsertRequest(BaseModel):
@@ -534,8 +722,13 @@ class OpsNotificationItem(BaseModel):
     id: UUID
     organization_id: UUID | None
     user_id: UUID | None
+    team_id: UUID | None = None
+    team_name: str | None = None
+    sales_user_id: UUID | None = None
     source_type: str
     source_key: str
+    source_reference_id: UUID | None = None
+    alert_type: str | None = None
     workflow_scope: str
     owner_role: str
     target_role: str
@@ -551,12 +744,17 @@ class OpsNotificationItem(BaseModel):
     delivery_status: str
     escalation_level: str
     resolution_note: str | None
+    metadata_json: dict | None = None
     age_bucket: str
     acknowledged_by_user_id: UUID | None
     acknowledged_at: datetime | None
+    resolved_by_user_id: UUID | None = None
     delivered_at: datetime | None
     escalated_at: datetime | None
     resolved_at: datetime | None
+    ignored_by_user_id: UUID | None = None
+    ignored_at: datetime | None = None
+    triggered_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -566,6 +764,7 @@ class OpsNotificationResponse(BaseModel):
     active_count: int
     acknowledged_count: int
     resolved_count: int
+    ignored_count: int = 0
     escalated_count: int
     items: list[OpsNotificationItem]
 

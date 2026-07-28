@@ -270,7 +270,7 @@ export default function CustomerProfilePage() {
                       ? "Ringkasan monitor customer"
                       : "Ringkasan customer"}
                   </p>
-                  <h2 className="mt-4 max-w-4xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-slate-950">
+                  <h2 className="mt-4 max-w-4xl text-3xl font-semibold leading-tight tracking-[-0.04em] clara-text-primary">
                     {isLeadershipWorkspace
                       ? `${profile.display_name} dibaca Clara sebagai satu customer dengan beberapa lead yang perlu dijaga tetap sinkron.`
                       : `${profile.display_name} dibaca Clara sebagai satu customer meskipun muncul di beberapa lead atau channel.`}
@@ -311,7 +311,7 @@ export default function CustomerProfilePage() {
                     <div className="mt-5 flex flex-wrap gap-3">
                       <Link
                         href={`/dashboard/crm/${topPriorityLead.id}`}
-                        className="inline-flex rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-[0_10px_24px_rgba(15,23,42,0.22)] ring-1 ring-white/80"
+                        className="inline-flex rounded-full bg-white px-4 py-2.5 text-sm font-semibold clara-text-primary shadow-[0_10px_24px_rgba(15,23,42,0.22)] ring-1 ring-white/80"
                       >
                         Buka Lead Prioritas
                       </Link>
@@ -394,7 +394,7 @@ export default function CustomerProfilePage() {
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       {isLeadershipWorkspace
                         ? "Status Customer"
                         : "Data Customer"}
@@ -441,7 +441,7 @@ export default function CustomerProfilePage() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
                     Alamat
                   </p>
-                  <p className="mt-3 text-base leading-7 text-slate-900">
+                  <p className="mt-3 text-base leading-7 clara-text-primary">
                     {profile.address ?? "Belum diisi"}
                   </p>
                 </div>
@@ -469,7 +469,7 @@ export default function CustomerProfilePage() {
                   <div className="mt-6 border-t border-slate-200 pt-6">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="max-w-2xl">
-                        <h3 className="text-lg font-semibold text-slate-950">Edit data customer</h3>
+                        <h3 className="text-lg font-semibold clara-text-primary">Edit data customer</h3>
                         <p className="mt-2 text-sm leading-7 text-slate-600">
                           Isi seperlunya. Fokus ke nama, telepon, status customer, dan kategori akun supaya pembacaan tim tetap rapi.
                         </p>
@@ -484,7 +484,7 @@ export default function CustomerProfilePage() {
 
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                       <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Nama Customer</span>
+                        <span className="font-semibold clara-text-primary">Nama Customer</span>
                         <input
                           value={profileForm.display_name}
                           onChange={(event) => {
@@ -493,12 +493,12 @@ export default function CustomerProfilePage() {
                               display_name: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm clara-text-primary outline-none transition focus:border-slate-950"
                           placeholder="Masukkan nama customer"
                         />
                       </label>
                       <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Telepon</span>
+                        <span className="font-semibold clara-text-primary">Telepon</span>
                         <input
                           value={profileForm.phone}
                           onChange={(event) => {
@@ -507,12 +507,12 @@ export default function CustomerProfilePage() {
                               phone: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm clara-text-primary outline-none transition focus:border-slate-950"
                           placeholder="08xxxx atau +62xxxx"
                         />
                       </label>
                       <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Email</span>
+                        <span className="font-semibold clara-text-primary">Email</span>
                         <input
                           type="email"
                           value={profileForm.email}
@@ -522,12 +522,12 @@ export default function CustomerProfilePage() {
                               email: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm clara-text-primary outline-none transition focus:border-slate-950"
                           placeholder="customer@email.com"
                         />
                       </label>
                       <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Status Customer</span>
+                        <span className="font-semibold clara-text-primary">Status Customer</span>
                         <select
                           value={profileForm.status}
                           onChange={(event) => {
@@ -536,14 +536,14 @@ export default function CustomerProfilePage() {
                               status: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm clara-text-primary outline-none transition focus:border-slate-950"
                         >
                           <option value="active">Aktif</option>
                           <option value="inactive">Tidak aktif</option>
                         </select>
                       </label>
                       <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Temperature Customer</span>
+                        <span className="font-semibold clara-text-primary">Temperature Customer</span>
                         <select
                           value={profileForm.temperature}
                           onChange={(event) => {
@@ -552,7 +552,7 @@ export default function CustomerProfilePage() {
                               temperature: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm clara-text-primary outline-none transition focus:border-slate-950"
                         >
                           <option value="unknown">Belum ditentukan</option>
                           <option value="cold">Cold</option>
@@ -561,7 +561,7 @@ export default function CustomerProfilePage() {
                         </select>
                       </label>
                       <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Kategori Akun</span>
+                        <span className="font-semibold clara-text-primary">Kategori Akun</span>
                         <select
                           value={profileForm.account_category}
                           onChange={(event) => {
@@ -570,7 +570,7 @@ export default function CustomerProfilePage() {
                               account_category: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm clara-text-primary outline-none transition focus:border-slate-950"
                         >
                           <option value="unknown">Belum ditentukan</option>
                           <option value="mini">Mini</option>
@@ -580,7 +580,7 @@ export default function CustomerProfilePage() {
                     </div>
 
                     <label className="mt-4 block space-y-2 text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">Alamat</span>
+                      <span className="font-semibold clara-text-primary">Alamat</span>
                       <textarea
                         value={profileForm.address}
                         onChange={(event) => {
@@ -590,7 +590,7 @@ export default function CustomerProfilePage() {
                           }));
                         }}
                         rows={4}
-                        className="w-full rounded-[24px] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                        className="w-full rounded-[24px] border border-slate-300 bg-white px-4 py-3 text-sm clara-text-primary outline-none transition focus:border-slate-950"
                         placeholder="Isi alamat customer jika memang sudah diketahui"
                       />
                     </label>
@@ -630,7 +630,7 @@ export default function CustomerProfilePage() {
               </article>
 
               <article className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-                <h2 className="text-xl font-semibold text-slate-950">
+                <h2 className="text-xl font-semibold clara-text-primary">
                   {isLeadershipWorkspace
                     ? "Urutan baca manager"
                     : "Yang Perlu Dicek Dulu"}
@@ -672,7 +672,7 @@ export default function CustomerProfilePage() {
               <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       Merge Candidates
                     </h2>
                     <p className="mt-2 text-sm leading-7 text-slate-600">
@@ -685,7 +685,7 @@ export default function CustomerProfilePage() {
                       setMergeNotes(event.target.value);
                     }}
                     placeholder="Catatan merge opsional..."
-                    className="min-h-[88px] w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm text-slate-900 lg:w-80"
+                    className="min-h-[88px] w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm clara-text-primary lg:w-80"
                   />
                 </div>
 
@@ -701,7 +701,7 @@ export default function CustomerProfilePage() {
                         className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold text-slate-950">
+                          <h3 className="text-base font-semibold clara-text-primary">
                             {candidate.display_name}
                           </h3>
                           <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
@@ -762,7 +762,7 @@ export default function CustomerProfilePage() {
               <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">Lead Terkait</h2>
+                    <h2 className="text-xl font-semibold clara-text-primary">Lead Terkait</h2>
                     <p className="mt-2 max-w-3xl text-sm leading-7 text-[#5a421f]">
                       {isLeadershipWorkspace
                         ? "Bagian ini menunjukkan semua lead yang masih dianggap milik customer yang sama. Manager tidak perlu buka semuanya. Mulai dari prioritas teratas, lalu cek apakah owner dan ritme follow-up-nya konsisten."
@@ -771,7 +771,7 @@ export default function CustomerProfilePage() {
                   </div>
                   <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     Prioritas baca:
-                    <span className="ml-2 font-semibold text-slate-950">
+                    <span className="ml-2 font-semibold clara-text-primary">
                       hot &gt; warm &gt; kontak terbaru
                     </span>
                   </div>
@@ -786,7 +786,7 @@ export default function CustomerProfilePage() {
                         <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-semibold text-white">
                           Prioritas {index + 1}
                         </span>
-                        <h3 className="text-base font-semibold text-slate-950">{lead.display_name}</h3>
+                        <h3 className="text-base font-semibold clara-text-primary">{lead.display_name}</h3>
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
                             lead.lead_temperature
@@ -849,7 +849,7 @@ function Metric({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
         {label}
       </p>
-      <p className="mt-3 text-lg font-semibold text-slate-950">{value}</p>
+      <p className="mt-3 text-lg font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }
@@ -857,7 +857,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 function ActionHint({ title, description }: { title: string; description: string }) {
   return (
     <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
+      <p className="text-sm font-semibold clara-text-primary">{title}</p>
       <p className="mt-2 text-sm leading-7 text-slate-600">{description}</p>
     </div>
   );
@@ -893,7 +893,7 @@ function CompactInfoRow({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-base font-semibold text-slate-950">{value}</p>
+      <p className="mt-2 text-base font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }
@@ -930,7 +930,7 @@ function InlineMetric({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
         {label}
       </p>
-      <p className="mt-3 text-xl font-semibold text-slate-950">{value}</p>
+      <p className="mt-3 text-xl font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }

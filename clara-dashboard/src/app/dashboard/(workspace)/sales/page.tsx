@@ -461,18 +461,30 @@ export default function SalesInboxPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="clara-empty-state text-sm text-slate-600">
-            Loading inbox...
+          <div
+            role="status"
+            aria-live="polite"
+            className="clara-empty-state text-sm clara-text-secondary"
+          >
+            Memuat antrean chat...
           </div>
         )}
 
         {errorMessage && (
-          <div className="clara-alert clara-alert-danger">
-            {errorMessage}. Coba login ulang di{" "}
-            <Link href="/login" className="font-semibold underline">
-              halaman login
-            </Link>
-            .
+          <div role="alert" className="clara-alert clara-alert-danger">
+            <p>{errorMessage}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="clara-button clara-button-secondary"
+              >
+                Coba lagi
+              </button>
+              <Link href="/login" className="clara-button clara-button-ghost">
+                Login ulang
+              </Link>
+            </div>
           </div>
         )}
 
@@ -480,43 +492,24 @@ export default function SalesInboxPage() {
           <>
             <section
               data-onboarding-id="sales-inbox-hero"
-              className="clara-card rounded-[30px] p-6"
+              className="clara-card p-5 sm:p-6"
             >
-              <p className="clara-kicker text-xs">Ringkasan cepat</p>
-              <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
-                    Mulai dari chat yang paling butuh respons
-                  </h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {highRiskCount > 0
-                      ? `Ada ${highRiskCount} chat risiko tinggi yang sebaiknya dicek lebih dulu. Setelah itu lanjut ke chat yang belum dianalisis atau belum punya draft.`
-                      : analyzedCount < inboxItems.length
-                        ? `Masih ada ${inboxItems.length - analyzedCount} chat yang belum selesai dibaca AI. Jalankan analisis dulu supaya balasan tidak dimulai dari nol.`
-                        : `Mayoritas chat sudah siap diproses. Lanjutkan ke conversation yang belum dibalas atau yang masih menunggu follow-up.`}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Link
-                    href="/dashboard/follow-up"
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    Buka Tindak Lanjut
-                  </Link>
-                  <Link
-                    href="/dashboard/upload"
-                    className="clara-button clara-button-primary justify-center"
-                  >
-                    Input Chat
-                  </Link>
-                </div>
-              </div>
+              <p className="clara-kicker text-xs">Status antrean</p>
+              <h2 className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl">
+                Kerjakan chat yang paling butuh respons
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
+                {highRiskCount > 0
+                  ? `${highRiskCount} chat risiko tinggi berada di urutan pertama.`
+                  : analyzedCount < inboxItems.length
+                    ? `${inboxItems.length - analyzedCount} chat masih perlu dianalisis sebelum dibalas.`
+                    : "Antrean aktif sudah siap diproses berdasarkan prioritas di bawah."}
+              </p>
             </section>
 
             <section
               data-onboarding-id="sales-inbox-metrics"
-              className="grid gap-4 md:grid-cols-3"
+              className="grid gap-3 sm:grid-cols-3"
             >
               <OverviewTile
                 label="Perlu Analisis"
@@ -537,41 +530,40 @@ export default function SalesInboxPage() {
 
             <section
               data-onboarding-id="sales-inbox-filters"
-              className="clara-card rounded-[30px] p-6"
+              className="clara-card p-4 sm:p-5"
             >
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-2xl">
-                  <p className="clara-kicker text-xs">Filter kerja</p>
-                  <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
-                    Cari dan rapikan antrean chat
-                  </h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    Gunakan pencarian dan filter sederhana supaya cepat ketemu chat yang harus dikerjakan duluan.
-                  </p>
-                </div>
-                <div className="rounded-full bg-[#f0cb73]/10 px-4 py-2 text-sm text-[#f0cb73]">
-                  Menampilkan <span className="font-semibold">{filteredInboxItems.length}</span> dari{" "}
-                  <span className="font-semibold">{inboxItems.length}</span> chat
-                </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold clara-text-primary">
+                  Cari dan filter
+                </h2>
+                <p className="text-sm clara-text-secondary">
+                  {filteredInboxItems.length} dari {inboxItems.length} chat
+                </p>
               </div>
 
-              <div className="mt-5 grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
-                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                  <span>Cari chat</span>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+                <div>
+                  <label htmlFor="sales-search" className="clara-label">
+                    Cari chat
+                  </label>
                   <input
+                    id="sales-search"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Cari nama atau isi pesan..."
-                    className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
+                    className="clara-input mt-2 w-full"
                   />
-                </label>
+                </div>
 
-                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                  <span>Status chat</span>
+                <div>
+                  <label htmlFor="sales-archive" className="clara-label">
+                    Status chat
+                  </label>
                   <select
+                    id="sales-archive"
                     value={archiveScope}
                     onChange={(event) => setArchiveScope(event.target.value)}
-                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                    className="clara-select mt-2 w-full"
                   >
                     {ARCHIVE_SCOPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -579,14 +571,17 @@ export default function SalesInboxPage() {
                       </option>
                     ))}
                   </select>
-                </label>
+                </div>
 
-                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                  <span>Channel</span>
+                <div>
+                  <label htmlFor="sales-channel" className="clara-label">
+                    Channel
+                  </label>
                   <select
+                    id="sales-channel"
                     value={sourceChannelFilter}
                     onChange={(event) => setSourceChannelFilter(event.target.value)}
-                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                    className="clara-select mt-2 w-full"
                   >
                     {SOURCE_CHANNEL_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -594,14 +589,17 @@ export default function SalesInboxPage() {
                       </option>
                     ))}
                   </select>
-                </label>
+                </div>
 
-                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                  <span>Prioritas</span>
+                <div>
+                  <label htmlFor="sales-priority" className="clara-label">
+                    Prioritas
+                  </label>
                   <select
+                    id="sales-priority"
                     value={queueBucketFilter}
                     onChange={(event) => setQueueBucketFilter(event.target.value)}
-                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                    className="clara-select mt-2 w-full"
                   >
                     {QUEUE_BUCKET_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -609,21 +607,21 @@ export default function SalesInboxPage() {
                       </option>
                     ))}
                   </select>
-                </label>
+                </div>
               </div>
             </section>
 
             <section className="grid gap-4">
               {filteredInboxItems.length === 0 ? (
                 <div className="clara-empty-state">
-                  <h2 className="text-xl font-semibold text-slate-900">
+                  <h2 className="text-xl font-semibold clara-text-primary">
                     {inboxItems.length === 0
                       ? archiveScope === "archived"
                         ? "Belum ada conversation archived"
                         : "Belum ada conversation"
                       : "Tidak ada conversation yang cocok dengan filter ini"}
                   </h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
                     {inboxItems.length === 0
                       ? archiveScope === "archived"
                         ? "Chat lama yang tidak aktif akan muncul di tab ini setelah melewati batas inactivity yang ditentukan sistem."
@@ -661,31 +659,31 @@ export default function SalesInboxPage() {
                       data-onboarding-id={
                         sectionIndex === 0 ? "sales-inbox-queue" : undefined
                       }
-                      className="clara-card rounded-[28px] p-5"
+                      className="clara-card p-4 sm:p-5"
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                         <div>
-                          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          <p className="text-sm font-semibold clara-text-primary">
                             {section.config.label}
                           </p>
-                          <h2 className="mt-1 text-2xl font-bold text-slate-950">
+                          <h2 className="mt-1 text-lg font-bold clara-text-primary">
                             {section.items.length} chat
                           </h2>
                         </div>
-                        <p className="max-w-xl text-sm leading-6 text-slate-500">
+                        <p className="max-w-xl text-sm leading-6 clara-text-secondary">
                           {section.config.description}
                         </p>
                       </div>
 
                       {totalPages > 1 ? (
-                        <div className="mt-4 flex flex-col gap-3 rounded-[22px] border border-[#f0cb73]/14 bg-[#1d150d] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                          <p className="text-sm text-[#d6bb82]">
+                        <div className="clara-card-soft mt-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-sm clara-text-secondary">
                             Menampilkan{" "}
-                            <span className="font-semibold text-[#fff0c9]">
+                            <span className="font-semibold clara-text-primary">
                               {paginatedItems.length}
                             </span>{" "}
                             dari{" "}
-                            <span className="font-semibold text-[#fff0c9]">
+                            <span className="font-semibold clara-text-primary">
                               {section.items.length}
                             </span>{" "}
                             conversation
@@ -700,11 +698,11 @@ export default function SalesInboxPage() {
                                   currentPage - 1,
                                 )
                               }
-                              className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/8 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f0cb73] hover:bg-[#f0cb73]/12 disabled:cursor-not-allowed disabled:opacity-45"
+                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-45"
                             >
                               Sebelumnya
                             </button>
-                            <span className="px-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#d6bb82]">
+                            <span className="px-1 text-sm clara-text-secondary">
                               Halaman {currentPage} / {totalPages}
                             </span>
                             <button
@@ -716,7 +714,7 @@ export default function SalesInboxPage() {
                                   currentPage + 1,
                                 )
                               }
-                              className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/8 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#f0cb73] hover:bg-[#f0cb73]/12 disabled:cursor-not-allowed disabled:opacity-45"
+                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-45"
                             >
                               Berikutnya
                             </button>
@@ -724,7 +722,7 @@ export default function SalesInboxPage() {
                         </div>
                       ) : null}
 
-                      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <div className="mt-4 grid gap-3">
                         {paginatedItems.map((item, itemIndex) => {
                           const extraction = item.latest_ai_extraction;
                           const provider = inferProviderFromSource(item.source);
@@ -744,12 +742,12 @@ export default function SalesInboxPage() {
                                   ? "sales-inbox-upcoming-actions"
                                   : undefined
                               }
-                              className="clara-card rounded-[30px] p-5"
+                              className="clara-card-outline p-4 sm:p-5"
                             >
                               <div className="flex h-full flex-col gap-4">
                                 <div className="min-w-0 space-y-4">
                                   <div className="flex flex-wrap items-center gap-2.5">
-                                    <h3 className="line-clamp-2 text-lg font-semibold leading-7 text-slate-950">
+                                    <h3 className="min-w-0 break-words text-lg font-semibold leading-6 clara-text-primary">
                                       {item.title}
                                     </h3>
                                   </div>
@@ -867,7 +865,7 @@ export default function SalesInboxPage() {
                                   </div>
                                 </div>
 
-                                <div className="clara-card-soft rounded-[24px] p-4">
+                                <div className="clara-card-soft p-4">
                                   <p className="clara-kicker text-[11px]">
                                     Langkah berikutnya
                                   </p>
@@ -903,7 +901,7 @@ export default function SalesInboxPage() {
                                           item.conversation_id,
                                         );
                                       }}
-                                      className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
+                                      className="clara-button clara-button-secondary disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                       {isActing ? "Menganalisis..." : "Analisis AI"}
                                     </button>
@@ -918,7 +916,7 @@ export default function SalesInboxPage() {
                                           item.conversation_id,
                                         );
                                       }}
-                                      className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-3.5 py-2 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14 disabled:cursor-not-allowed disabled:opacity-70"
+                                      className="clara-button clara-button-secondary disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                       {isActing
                                         ? "Membuat..."
@@ -928,7 +926,7 @@ export default function SalesInboxPage() {
 
                                   <Link
                                     href={`/dashboard/sales/conversations/${item.conversation_id}`}
-                                    className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
+                                    className="clara-button clara-button-primary"
                                   >
                                     Buka Percakapan
                                   </Link>
@@ -959,23 +957,10 @@ function OverviewTile({
   value: string;
   tone: "slate" | "blue" | "green" | "amber";
 }) {
-  const toneClass =
-    tone === "blue"
-      ? "from-[#f3d48a] to-[#9f7121]"
-      : tone === "green"
-        ? "from-[#f1cf7a] to-[#7f5a1a]"
-        : tone === "amber"
-          ? "from-[#f6dc9d] to-[#b67d27]"
-          : "from-[#f7dfa2] to-[#be8d2f]";
-
   return (
-    <article
-      className={`rounded-[26px] border border-[#f0cb73]/18 bg-gradient-to-br p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)] ${toneClass}`}
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#140f08]">
-        {label}
-      </p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
+    <article data-tone={tone} className="clara-card-soft p-4">
+      <p className="text-sm clara-text-secondary">{label}</p>
+      <p className="mt-1 text-2xl font-bold tracking-tight clara-text-primary">
         {value}
       </p>
     </article>
