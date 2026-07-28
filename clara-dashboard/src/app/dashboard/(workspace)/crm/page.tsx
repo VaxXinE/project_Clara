@@ -571,6 +571,10 @@ export default function CrmPage() {
     }
   }
 
+  const hasUsableLeadData = leads.length > 0;
+  const shouldRenderLeadWorkspace =
+    !isLoading && (!errorMessage || hasUsableLeadData);
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
@@ -640,7 +644,7 @@ export default function CrmPage() {
           </div>
         )}
 
-        {!isLoading && (
+        {shouldRenderLeadWorkspace && (
           <>
             <section
               data-onboarding-id="sales-crm-hero"

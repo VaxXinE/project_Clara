@@ -98,6 +98,10 @@ export default function CustomerListPage() {
       ? "Belum ada customer yang menonjol. Manager bisa pakai halaman ini untuk cari customer berdasarkan owner, status, atau intensitas aktivitas."
       : "Gunakan daftar ini untuk mencari customer berdasarkan nama, PIC, atau status, lalu buka profilnya untuk melihat lead terkait.";
 
+  const hasUsableCustomerData = customers.length > 0;
+  const shouldRenderCustomerWorkspace =
+    !isLoading && (!errorMessage || hasUsableCustomerData);
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
@@ -106,105 +110,109 @@ export default function CustomerListPage() {
       description={pageDescription}
     >
       <div className="space-y-6">
-        <section
-          data-onboarding-id="sales-customers-hero"
-          className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
-        >
-          <article className="clara-card p-5 sm:p-6">
-            <p className="clara-kicker text-xs">
-              {isLeadershipWorkspace
-                ? "Prioritas customer tim"
-                : "Fokus customer sekarang"}
-            </p>
-            <h2 className="mt-2 break-words text-xl font-bold tracking-tight clara-text-primary sm:text-2xl">
-              {topCustomer
-                ? `${topCustomer.display_name} paling layak dibuka dulu.`
-                : "Belum ada customer yang menonjol untuk diprioritaskan."}
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
-              {topCustomerSummary}
-            </p>
-          </article>
+        {shouldRenderCustomerWorkspace ? (
+          <>
+            <section
+              data-onboarding-id="sales-customers-hero"
+              className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]"
+            >
+              <article className="clara-card p-5 sm:p-6">
+                <p className="clara-kicker text-xs">
+                  {isLeadershipWorkspace
+                    ? "Prioritas customer tim"
+                    : "Fokus customer sekarang"}
+                </p>
+                <h2 className="mt-2 break-words text-xl font-bold tracking-tight clara-text-primary sm:text-2xl">
+                  {topCustomer
+                    ? `${topCustomer.display_name} paling layak dibuka dulu.`
+                    : "Belum ada customer yang menonjol untuk diprioritaskan."}
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
+                  {topCustomerSummary}
+                </p>
+              </article>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <MetricCard label="Jumlah customer" value={String(customers.length)} />
-            <MetricCard label="Customer aktif" value={String(activeCount)} />
-            <MetricCard label="Punya hot lead" value={String(hotCustomerCount)} />
-            <MetricCard
-              label={
-                isLeadershipWorkspace
-                  ? "Perlu perhatian"
-                  : "Pernah ada kontak"
-              }
-              value={String(
-                isLeadershipWorkspace
-                  ? customersNeedingAttention
-                  : customersWithRecentActivity,
-              )}
-            />
-          </div>
-        </section>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <MetricCard label="Jumlah customer" value={String(customers.length)} />
+                <MetricCard label="Customer aktif" value={String(activeCount)} />
+                <MetricCard label="Punya hot lead" value={String(hotCustomerCount)} />
+                <MetricCard
+                  label={
+                    isLeadershipWorkspace
+                      ? "Perlu perhatian"
+                      : "Pernah ada kontak"
+                  }
+                  value={String(
+                    isLeadershipWorkspace
+                      ? customersNeedingAttention
+                      : customersWithRecentActivity,
+                  )}
+                />
+              </div>
+            </section>
 
-        <section
-          data-onboarding-id="sales-customers-filters"
-          className="clara-card p-4 sm:p-5"
-        >
-          <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr_auto]">
-            <div>
-              <label htmlFor="customer-search" className="clara-label">
-                Cari Customer
-              </label>
-              <input
-                id="customer-search"
-                value={filters.q}
-                onChange={(event) => {
-                  setFilters((prev) => ({ ...prev, q: event.target.value }));
-                }}
-                className="clara-input mt-2"
-                placeholder="Cari nama, telepon, email, atau PIC..."
-              />
-            </div>
-            <div>
-              <label htmlFor="customer-status" className="clara-label">Status</label>
-              <select
-                id="customer-status"
-                value={filters.status}
-                onChange={(event) => {
-                  setFilters((prev) => ({
-                    ...prev,
-                    status: event.target.value,
-                  }));
-                }}
-                className="clara-select mt-2"
-              >
-                <option value="all">Semua status</option>
-                <option value="active">Aktif</option>
-                <option value="inactive">Tidak aktif</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setFilters({ q: "", status: "all" });
-                }}
-                className="clara-button clara-button-ghost"
-              >
-                Reset Filter
-              </button>
-            </div>
-          </div>
+            <section
+              data-onboarding-id="sales-customers-filters"
+              className="clara-card p-4 sm:p-5"
+            >
+              <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr_auto]">
+                <div>
+                  <label htmlFor="customer-search" className="clara-label">
+                    Cari Customer
+                  </label>
+                  <input
+                    id="customer-search"
+                    value={filters.q}
+                    onChange={(event) => {
+                      setFilters((prev) => ({ ...prev, q: event.target.value }));
+                    }}
+                    className="clara-input mt-2"
+                    placeholder="Cari nama, telepon, email, atau PIC..."
+                  />
+                </div>
+                <div>
+                  <label htmlFor="customer-status" className="clara-label">Status</label>
+                  <select
+                    id="customer-status"
+                    value={filters.status}
+                    onChange={(event) => {
+                      setFilters((prev) => ({
+                        ...prev,
+                        status: event.target.value,
+                      }));
+                    }}
+                    className="clara-select mt-2"
+                  >
+                    <option value="all">Semua status</option>
+                    <option value="active">Aktif</option>
+                    <option value="inactive">Tidak aktif</option>
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters({ q: "", status: "all" });
+                    }}
+                    className="clara-button clara-button-ghost"
+                  >
+                    Reset Filter
+                  </button>
+                </div>
+              </div>
 
-          <div className="clara-card-soft mt-4 p-3 text-sm clara-text-secondary">
-            Menampilkan <span className="font-semibold">{customers.length}</span>{" "}
-            customer pada daftar ini.
-            {isLeadershipWorkspace ? (
-              <span className="ml-2 text-[#d2b57b]">
-                Mulai dari customer yang punya hot lead atau lead aktif paling banyak.
-              </span>
-            ) : null}
-          </div>
-        </section>
+              <div className="clara-card-soft mt-4 p-3 text-sm clara-text-secondary">
+                Menampilkan <span className="font-semibold">{customers.length}</span>{" "}
+                customer pada daftar ini.
+                {isLeadershipWorkspace ? (
+                  <span className="ml-2 text-[#d2b57b]">
+                    Mulai dari customer yang punya hot lead atau lead aktif paling banyak.
+                  </span>
+                ) : null}
+              </div>
+            </section>
+          </>
+        ) : null}
 
         {isLoading ? (
           <div role="status" aria-live="polite" className="clara-empty-state">
@@ -218,7 +226,7 @@ export default function CustomerListPage() {
           </div>
         ) : null}
 
-        {!isLoading ? (
+        {shouldRenderCustomerWorkspace ? (
           <section className="space-y-4">
             {customers.length === 0 ? (
               <div className="clara-empty-state text-sm leading-7">
