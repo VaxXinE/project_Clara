@@ -1050,6 +1050,42 @@ export function SalesOnboardingTour() {
 
     return activeRoute.steps[tourState.stepIndex] ?? null;
   }, [activeRoute, tourState]);
+  const isTourVisible = Boolean(activeStep);
+
+  useEffect(() => {
+    if (!isTourVisible) {
+      return;
+    }
+
+    const previouslyFocusedElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrameId = window.requestAnimationFrame(() => {
+      popupRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      setTourState((current) =>
+        current
+          ? {
+              ...current,
+              completed: true,
+              dismissed: true,
+            }
+          : current,
+      );
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(focusFrameId);
+      window.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedElement?.focus();
+    };
+  }, [isTourVisible]);
 
   useEffect(() => {
     if (!activeStep) {
@@ -1078,7 +1114,9 @@ export function SalesOnboardingTour() {
 
       if (isOutOfView) {
         target.scrollIntoView({
-          behavior: "smooth",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto"
+            : "smooth",
           block: "center",
           inline: "nearest",
         });
@@ -1253,7 +1291,7 @@ export function SalesOnboardingTour() {
 
       {targetRect ? (
         <div
-          className="pointer-events-none fixed z-[71] rounded-[24px] border-[3px] border-[#f6d98c] bg-transparent shadow-[0_0_0_2px_rgba(255,243,207,0.42),0_0_28px_rgba(240,203,115,0.38),0_0_0_9999px_rgba(0,0,0,0.14)] transition-all"
+          className="pointer-events-none fixed z-[71] rounded-[24px] border-[3px] border-[#f6d98c] bg-transparent shadow-[0_0_0_2px_rgba(255,243,207,0.42),0_0_28px_rgba(240,203,115,0.38),0_0_0_9999px_rgba(0,0,0,0.14)] transition-all motion-reduce:transition-none"
           style={{
             left: highlightLeft,
             top: highlightTop,
@@ -1264,8 +1302,10 @@ export function SalesOnboardingTour() {
       ) : null}
 
       <div
+        aria-labelledby="sales-onboarding-title"
         className="fixed z-[72] w-[340px] max-w-[calc(100vw-2rem)] rounded-[24px] border border-[#f6d98c]/40 bg-[linear-gradient(180deg,rgba(43,31,19,0.99)_0%,rgba(20,14,10,0.99)_100%)] p-5 text-[#fff4d6] shadow-[0_28px_64px_rgba(0,0,0,0.58),0_0_0_1px_rgba(246,217,140,0.18)]"
         ref={popupRef}
+        role="dialog"
         style={{
           left: popupLeft,
           top: popupTop,
@@ -1280,14 +1320,17 @@ export function SalesOnboardingTour() {
                   ? "Onboarding Head"
                   : "Onboarding Sales"}
             </p>
-            <h2 className="mt-2 text-xl font-bold leading-7 text-[#fff6de]">
+            <h2
+              id="sales-onboarding-title"
+              className="mt-2 text-xl font-bold leading-7 text-[#fff6de]"
+            >
               {activeStep.title}
             </h2>
           </div>
           <button
             type="button"
             onClick={handleSkip}
-            className="rounded-full border border-[#f6d98c]/28 bg-[rgba(246,217,140,0.08)] px-3 py-1.5 text-xs font-semibold text-[#f6d98c] hover:bg-[rgba(246,217,140,0.14)]"
+            className="rounded-full border border-[#f6d98c]/28 bg-[rgba(246,217,140,0.08)] px-3 py-1.5 text-xs font-semibold text-[#f6d98c] hover:bg-[rgba(246,217,140,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6d98c]"
           >
             Lewati
           </button>
@@ -1315,7 +1358,7 @@ export function SalesOnboardingTour() {
           <button
             type="button"
             onClick={handleNext}
-            className="rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
+            className="rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6d98c] focus-visible:ring-offset-2 focus-visible:ring-offset-[#140f08]"
           >
             {isLastStepOnRoute
               ? isLastRoute
