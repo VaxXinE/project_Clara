@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -64,6 +64,7 @@ function resolveNotificationTargetHref(
 }
 
 export default function NotificationsPage() {
+  const resolutionNoteId = useId();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [notifications, setNotifications] = useState<OpsNotificationResponse | null>(
     null
@@ -399,18 +400,18 @@ export default function NotificationsPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
+          <div role="status" className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
             Loading alert center...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
+          <div role="alert" className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
             {errorMessage}
           </div>
         )}
 
-        {notifications && !isLoading && !errorMessage && (
+        {notifications && !isLoading && (
           <>
             {isHeadMonitorView ? (
               <section
@@ -516,10 +517,14 @@ export default function NotificationsPage() {
                         />
                         {!isOversightAlertView ? (
                           <div className="rounded-[28px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-6 md:col-span-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                            <label
+                              htmlFor={resolutionNoteId}
+                              className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]"
+                            >
                               Resolution Note
-                            </p>
+                            </label>
                             <textarea
+                              id={resolutionNoteId}
                               value={resolutionNote}
                               onChange={(event) => {
                                 setResolutionNote(event.target.value);

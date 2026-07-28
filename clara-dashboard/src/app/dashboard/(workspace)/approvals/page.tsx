@@ -276,16 +276,18 @@ export default function ChatReviewCenterPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="clara-empty-state text-sm text-[#d6bb84]">
+          <div role="status" className="clara-empty-state text-sm text-[#d6bb84]">
             Loading review sales...
           </div>
         )}
 
         {errorMessage && (
-          <div className="clara-alert clara-alert-danger">{errorMessage}</div>
+          <div role="alert" className="clara-alert clara-alert-danger">
+            {errorMessage}
+          </div>
         )}
 
-        {queue && !isLoading && !errorMessage && (
+        {queue && !isLoading && (
           <>
             <section
               data-onboarding-id="manager-approvals-summary"
@@ -296,7 +298,7 @@ export default function ChatReviewCenterPage() {
               </p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
+                  <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
                     {isHeadView
                       ? "Mulai dari kasus tim yang paling butuh keputusan Head"
                       : "Mulai dari balasan sales yang paling butuh keputusan"}
@@ -520,7 +522,7 @@ export default function ChatReviewCenterPage() {
                 </div>
                 <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   {isHeadView ? "Sudah relatif aman:" : "Siap dikirim:"}
-                  <span className="ml-2 font-semibold text-slate-950">
+                  <span className="ml-2 font-semibold clara-text-primary">
                     {readyToSendCount} item
                   </span>
                 </div>
@@ -633,7 +635,7 @@ function ReviewCard({
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold text-slate-950">
+            <h2 className="text-lg font-semibold clara-text-primary">
               {item.lead_name}
             </h2>
             <span
@@ -869,7 +871,7 @@ function StepHint({
         {number}
       </div>
       <div>
-        <p className="text-sm font-semibold text-slate-950">{title}</p>
+        <p className="text-sm font-semibold clara-text-primary">{title}</p>
         <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
       </div>
     </div>
