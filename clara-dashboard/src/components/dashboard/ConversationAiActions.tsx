@@ -24,6 +24,8 @@ export function ConversationAiActions({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGeneratingReply, setIsGeneratingReply] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const isBusy = isAnalyzing || isGeneratingReply;
+  const shouldPrioritizeAnalysis = !hasAiExtraction || analysisNeedsRefresh;
 
   async function handleAnalyze() {
     setErrorMessage("");
@@ -64,17 +66,21 @@ export function ConversationAiActions({
   }
 
   return (
-    <div className="clara-card rounded-[30px] p-5">
+    <section className="clara-card p-5" aria-labelledby="clara-actions-title">
       <p className="clara-kicker">Aksi Clara</p>
-      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+      <h2
+        id="clara-actions-title"
+        className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary"
+      >
         Siapkan konteks dan jawaban
       </h2>
-      <p className="mt-2 text-sm text-slate-600">
-        Jalankan pembacaan chat lalu buat jawaban terbaik langsung dari halaman ini.
+      <p className="mt-2 text-sm leading-6 clara-text-secondary">
+        Hasil AI adalah saran. Baca konteks terbaru dan review jawaban sebelum
+        menyetujuinya.
       </p>
 
       {analysisNeedsRefresh || replyNeedsRefresh ? (
-        <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div role="alert" className="clara-alert clara-alert-warning mt-4">
           {analysisNeedsRefresh
             ? "Ada pesan customer baru sejak analisis terakhir. Jalankan ulang AI analysis dulu."
             : "Draft lama sudah tertinggal dari chat terbaru. Generate ulang reply suggestion setelah baca konteks baru."}
@@ -85,8 +91,12 @@ export function ConversationAiActions({
         <button
           type="button"
           onClick={handleAnalyze}
-          disabled={isAnalyzing}
-          className="clara-button clara-button-primary"
+          disabled={isBusy}
+          className={`clara-button ${
+            shouldPrioritizeAnalysis
+              ? "clara-button-primary"
+              : "clara-button-ghost"
+          }`}
         >
           {isAnalyzing
             ? "Menganalisis..."
@@ -100,8 +110,12 @@ export function ConversationAiActions({
         <button
           type="button"
           onClick={handleGenerateReply}
-          disabled={isGeneratingReply || !hasAiExtraction}
-          className="clara-button clara-button-ghost"
+          disabled={isBusy || !hasAiExtraction}
+          className={`clara-button ${
+            shouldPrioritizeAnalysis
+              ? "clara-button-ghost"
+              : "clara-button-primary"
+          }`}
         >
           {isGeneratingReply
             ? "Membuat jawaban..."
@@ -117,11 +131,21 @@ export function ConversationAiActions({
             Jalankan analisis dulu sebelum membuat jawaban terbaik.
           </p>
         )}
+
+        {isBusy ? (
+          <p role="status" aria-live="polite" className="clara-helper">
+            {isAnalyzing
+              ? "Clara sedang menganalisis percakapan."
+              : "Clara sedang membuat draft jawaban."}
+          </p>
+        ) : null}
       </div>
 
       {errorMessage && (
-        <p className="clara-alert clara-alert-danger mt-4">{errorMessage}</p>
+        <p role="alert" className="clara-alert clara-alert-danger mt-4">
+          {errorMessage}
+        </p>
       )}
-    </div>
+    </section>
   );
 }
