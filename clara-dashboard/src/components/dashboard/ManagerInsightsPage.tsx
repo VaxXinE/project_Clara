@@ -1362,7 +1362,7 @@ export function ManagerInsightsPage() {
 
                           <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className={getFocusAreaClass(item.coaching_signal.focus_area)}>
+                              <span className={getFocusAreaClass()}>
                                 Fokus {formatStatusLabel(item.coaching_signal.focus_area)}
                               </span>
                               <span className="text-xs text-[#b89a62]">
@@ -2066,7 +2066,7 @@ function TeamPerformanceCard({
 
       <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={getFocusAreaClass(item.coaching_signal.focus_area)}>
+          <span className={getFocusAreaClass()}>
             Fokus {formatStatusLabel(item.coaching_signal.focus_area)}
           </span>
           <span className="text-xs text-[#b89a62]">
@@ -2342,7 +2342,7 @@ function SalesPerformanceDetailPanel({
           <span className={getCoachingPriorityClass(summary.coaching_signal.priority_label)}>
             {formatStatusLabel(summary.coaching_signal.priority_label)}
           </span>
-          <span className={getFocusAreaClass(summary.coaching_signal.focus_area)}>
+          <span className={getFocusAreaClass()}>
             Fokus {formatStatusLabel(summary.coaching_signal.focus_area)}
           </span>
           <span className="text-xs text-[#b89a62]">
@@ -2561,7 +2561,7 @@ function getCoachingPriorityClass(priorityLabel: string) {
   return "rounded-full border border-[#3c2c16] bg-[#22190f] px-2.5 py-1 text-xs font-semibold text-[#c8ad75]";
 }
 
-function getFocusAreaClass(focusArea: string) {
+function getFocusAreaClass() {
   return "rounded-full border border-[#f0cb73]/18 bg-[#1f160d] px-2.5 py-1 text-xs font-semibold text-[#d6bb84]";
 }
 

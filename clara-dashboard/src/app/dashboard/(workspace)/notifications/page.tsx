@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
@@ -64,6 +64,7 @@ function resolveNotificationTargetHref(
 }
 
 export default function NotificationsPage() {
+  const resolutionNoteId = useId();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [notifications, setNotifications] = useState<OpsNotificationResponse | null>(
     null
@@ -517,13 +518,13 @@ export default function NotificationsPage() {
                         {!isOversightAlertView ? (
                           <div className="rounded-[28px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-6 md:col-span-2">
                             <label
-                              htmlFor="notification-resolution-note"
+                              htmlFor={resolutionNoteId}
                               className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]"
                             >
                               Resolution Note
                             </label>
                             <textarea
-                              id="notification-resolution-note"
+                              id={resolutionNoteId}
                               value={resolutionNote}
                               onChange={(event) => {
                                 setResolutionNote(event.target.value);

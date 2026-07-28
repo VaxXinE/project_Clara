@@ -423,7 +423,6 @@ export default function CrmPage() {
       won: leads.filter((lead) => lead.current_stage === "won").length,
     };
   }, [leads]);
-  const isSalesWorkspace = currentUser?.role === "sales";
   const isManagerWorkspace = isManagerRole(currentUser?.role);
   const isHeadWorkspace = isHeadRole(currentUser?.role);
   const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;

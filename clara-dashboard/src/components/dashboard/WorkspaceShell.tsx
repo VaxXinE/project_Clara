@@ -673,8 +673,9 @@ export function WorkspaceShell({
                       );
                     }}
                     className="flex h-11 max-w-[min(15rem,48vw)] items-center gap-2 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-muted)] px-2.5 text-left hover:border-[var(--color-border-strong)]"
-                    aria-label="Buka menu akun"
-                    aria-haspopup="menu"
+                    aria-label={
+                      isAccountMenuVisible ? "Tutup menu akun" : "Buka menu akun"
+                    }
                     aria-expanded={isAccountMenuVisible}
                     aria-controls="account-menu"
                   >
@@ -703,7 +704,6 @@ export function WorkspaceShell({
                   {isAccountMenuVisible ? (
                     <div
                       id="account-menu"
-                      role="menu"
                       aria-label="Menu akun"
                       className="absolute right-0 top-[calc(100%+0.5rem)] z-40 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-overlay)] shadow-[var(--shadow-floating)]"
                     >
@@ -726,7 +726,6 @@ export function WorkspaceShell({
                       <div className="p-2">
                         <Link
                           href={getAccountProfileHref()}
-                          role="menuitem"
                           className="block min-h-11 rounded-lg px-3 py-3 text-sm font-medium hover:bg-[var(--color-surface-muted)]"
                         >
                           Profil
@@ -736,7 +735,6 @@ export function WorkspaceShell({
                         normalizedRole === "head" ? (
                           <button
                             type="button"
-                            role="menuitem"
                             onClick={handleRestartOnboarding}
                             className="block min-h-11 w-full rounded-lg px-3 py-3 text-left text-sm font-medium hover:bg-[var(--color-surface-muted)]"
                           >
@@ -745,7 +743,6 @@ export function WorkspaceShell({
                         ) : null}
                         <button
                           type="button"
-                          role="menuitem"
                           onClick={() => void handleLogout()}
                           disabled={isLoggingOut}
                           className="block min-h-11 w-full rounded-lg px-3 py-3 text-left text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-surface)] disabled:cursor-not-allowed disabled:opacity-60"

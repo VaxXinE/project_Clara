@@ -9,7 +9,6 @@ import type {
   WhatsAppReadResponse,
   WhatsAppSuggestionResult
 } from "~/types/whatsapp"
-import { readWhatsAppFromPage } from "~/utils/whatsapp-page"
 import {
   getChatSnapshotProxyUrl,
   getClaraAuthHeaders,
@@ -21,10 +20,11 @@ import {
   getConfiguredClaraAuthCookieName,
   getConfiguredProxyUrl,
   getCurrentClaraSessionUser,
-  isDevFallbackAllowed,
   getProxyCandidates,
-  getSnapshotSyncCandidates
+  getSnapshotSyncCandidates,
+  isDevFallbackAllowed
 } from "~/utils/proxy"
+import { readWhatsAppFromPage } from "~/utils/whatsapp-page"
 
 import chatWallpaper from "./assets/eb24786e5579a01bdd4bb103695b8286.jpg"
 
@@ -40,6 +40,9 @@ const CHATGPT_EMBED_URL =
   "https://chatgpt.com/g/g-69cde65d2fa081919907393fcd892e6e-solid-prime-sales"
 const CHATGPT_CONTEXT_MESSAGE_LIMIT = 12
 const CHATGPT_CONTEXT_TEXT_LIMIT = 280
+const CHATGPT_CONTEXT_REGION_ID = "clara-chatgpt-context-details"
+const CHATGPT_CONTEXT_PROMPT_ID = "clara-chatgpt-context-prompt"
+const DRAFT_REPLY_TEXTAREA_ID = "clara-draft-reply"
 
 const panelCss = `
   html,
@@ -64,10 +67,7 @@ const panelCss = `
     --clara-accent-strong: #c29032;
     --clara-warm: #e1b24a;
     --clara-danger: #e17c54;
-    background:
-      radial-gradient(circle at top left, rgba(240,203,115,0.16), rgba(240,203,115,0) 28%),
-      radial-gradient(circle at 100% 0%, rgba(194,144,50,0.14), rgba(194,144,50,0) 32%),
-      linear-gradient(180deg, #120d08 0%, #0b0805 42%, #070503 100%);
+    background: linear-gradient(180deg, #120d08 0%, #070503 100%);
     color: var(--clara-ink);
     font-family: "Aptos", "Segoe UI Variable Display", "Trebuchet MS", "Segoe UI", sans-serif;
     min-height: 100vh;
@@ -107,14 +107,10 @@ const panelCss = `
   }
 
   .clara-hero {
-    background:
-      radial-gradient(circle at top right, rgba(240, 203, 115, 0.28), rgba(240, 203, 115, 0) 30%),
-      linear-gradient(155deg, #171008 0%, #24180e 48%, #3a260f 100%);
+    background: #171008;
     border: 1px solid rgba(240, 203, 115, 0.14);
-    border-radius: 22px;
-    box-shadow:
-      0 24px 54px rgba(0, 0, 0, 0.28),
-      inset 0 1px 0 rgba(255, 240, 201, 0.08);
+    border-radius: 16px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
     color: #fff0c9;
     overflow: hidden;
     padding: 14px;
@@ -122,19 +118,7 @@ const panelCss = `
   }
 
   .clara-hero::after {
-    background:
-      linear-gradient(90deg, rgba(255,240,201,0.08), rgba(240,203,115,0)),
-      repeating-linear-gradient(
-        135deg,
-        rgba(240,203,115,0.04),
-        rgba(240,203,115,0.04) 10px,
-        rgba(255,255,255,0) 10px,
-        rgba(255,255,255,0) 20px
-      );
-    content: "";
-    inset: 0;
-    pointer-events: none;
-    position: absolute;
+    content: none;
   }
 
   .clara-hero__top,
@@ -291,12 +275,10 @@ const panelCss = `
   }
 
   .clara-pane {
-    background: linear-gradient(180deg, rgba(28,20,13,0.96), rgba(16,12,9,0.96));
+    background: var(--clara-surface);
     border: 1px solid rgba(240, 203, 115, 0.14);
-    border-radius: 22px;
-    box-shadow:
-      0 20px 42px rgba(0, 0, 0, 0.2),
-      inset 0 1px 0 rgba(255, 240, 201, 0.06);
+    border-radius: 16px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
     display: grid;
     gap: 12px;
     min-width: 0;
@@ -329,6 +311,11 @@ const panelCss = `
     gap: 8px;
     max-height: none;
     overflow: hidden;
+  }
+
+  .clara-chatgpt-context__details {
+    display: grid;
+    gap: 10px;
   }
 
   .clara-chatgpt-context::-webkit-scrollbar {
@@ -701,6 +688,8 @@ const panelCss = `
     overflow-x: hidden;
     overflow-y: auto;
     padding: 12px;
+    margin: 0;
+    list-style: none;
   }
 
   .clara-thread::-webkit-scrollbar {
@@ -1032,6 +1021,18 @@ const panelCss = `
     word-break: break-word;
   }
 
+  .clara-field-label {
+    color: var(--clara-muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .clara-panel button:focus-visible,
+  .clara-panel textarea:focus-visible {
+    outline: 2px solid var(--clara-accent);
+    outline-offset: 2px;
+  }
+
   .clara-draft__reason {
     background: rgba(255, 240, 201, 0.06);
     border-radius: 14px;
@@ -1088,6 +1089,21 @@ const panelCss = `
   @media (max-width: 380px) {
     .clara-hero__title {
       font-size: 24px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .clara-panel *,
+    .clara-panel *::before,
+    .clara-panel *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
+
+    .clara-panel button:hover {
+      transform: none;
     }
   }
 `
@@ -1233,66 +1249,66 @@ const insertReplyIntoPage = (text: string): WhatsAppActionResponse => {
     return null
   }
 
-const getComposeText = (composeBox: HTMLElement) =>
-  composeBox.innerText.replace(/\s+/g, " ").trim()
+  const getComposeText = (composeBox: HTMLElement) =>
+    composeBox.innerText.replace(/\s+/g, " ").trim()
 
-const getComposeFooter = () => getComposeBox()?.closest("footer") || document
+  const getComposeFooter = () => getComposeBox()?.closest("footer") || document
 
-const clickElement = (node: HTMLElement) => {
-  node.dispatchEvent(
-    new MouseEvent("mousedown", {
-      bubbles: true,
-      cancelable: true,
-      view: window
-    })
-  )
-  node.dispatchEvent(
-    new MouseEvent("mouseup", {
-      bubbles: true,
-      cancelable: true,
-      view: window
-    })
-  )
-  node.click()
-}
-
-const getSendButtonTarget = (): HTMLElement | null => {
-  const searchRoot = getComposeFooter()
-  const selectors = [
-    '[data-testid="compose-btn-send"]',
-    'button[aria-label="Send"]',
-    'button[aria-label="Kirim"]',
-    '[aria-label="Send"]',
-    '[aria-label="Kirim"]',
-    '[data-icon="send"]'
-  ]
-
-  for (const selector of selectors) {
-    const node = searchRoot.querySelector<HTMLElement>(selector)
-
-    if (!node) {
-      continue
-    }
-
-    const clickableTarget =
-      node.tagName === "BUTTON"
-        ? node
-        : node.closest<HTMLElement>('button, [role="button"], [tabindex]')
-
-    const target = clickableTarget || node
-
-    if (
-      target instanceof HTMLButtonElement &&
-      (target.disabled || target.hasAttribute("disabled"))
-    ) {
-      continue
-    }
-
-    return target
+  const clickElement = (node: HTMLElement) => {
+    node.dispatchEvent(
+      new MouseEvent("mousedown", {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      })
+    )
+    node.dispatchEvent(
+      new MouseEvent("mouseup", {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      })
+    )
+    node.click()
   }
 
-  return null
-}
+  const getSendButtonTarget = (): HTMLElement | null => {
+    const searchRoot = getComposeFooter()
+    const selectors = [
+      '[data-testid="compose-btn-send"]',
+      'button[aria-label="Send"]',
+      'button[aria-label="Kirim"]',
+      '[aria-label="Send"]',
+      '[aria-label="Kirim"]',
+      '[data-icon="send"]'
+    ]
+
+    for (const selector of selectors) {
+      const node = searchRoot.querySelector<HTMLElement>(selector)
+
+      if (!node) {
+        continue
+      }
+
+      const clickableTarget =
+        node.tagName === "BUTTON"
+          ? node
+          : node.closest<HTMLElement>('button, [role="button"], [tabindex]')
+
+      const target = clickableTarget || node
+
+      if (
+        target instanceof HTMLButtonElement &&
+        (target.disabled || target.hasAttribute("disabled"))
+      ) {
+        continue
+      }
+
+      return target
+    }
+
+    return null
+  }
 
   const chatRoot = getChatRoot()
 
@@ -1442,7 +1458,9 @@ const sendReplyFromPanel = async (
         index,
         text: getMessageText(container)
       }))
-      .filter((message) => message.direction === "outgoing" && message.text.trim())
+      .filter(
+        (message) => message.direction === "outgoing" && message.text.trim()
+      )
 
     const latestOutgoingMessage = outgoingMessages[outgoingMessages.length - 1]
 
@@ -1482,7 +1500,10 @@ const sendReplyFromPanel = async (
         return true
       }
 
-      if (!composeText.trim() && normalizedLatestOutgoing === normalizedExpected) {
+      if (
+        !composeText.trim() &&
+        normalizedLatestOutgoing === normalizedExpected
+      ) {
         return true
       }
     }
@@ -1575,8 +1596,7 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
         : typeof payload?.action_mode === "string"
           ? payload.action_mode
           : undefined,
-    cached:
-      typeof payload?.cached === "boolean" ? payload.cached : undefined,
+    cached: typeof payload?.cached === "boolean" ? payload.cached : undefined,
     conversationId:
       typeof payload?.conversationId === "string"
         ? payload.conversationId
@@ -1630,7 +1650,9 @@ const isTikTokMessagesTabUrl = (url: string | undefined) =>
   Boolean(url?.startsWith("https://www.tiktok.com/messages"))
 
 const isSupportedLiveSyncTabUrl = (url: string | undefined) =>
-  isWhatsAppTabUrl(url) || isInstagramDmTabUrl(url) || isTikTokMessagesTabUrl(url)
+  isWhatsAppTabUrl(url) ||
+  isInstagramDmTabUrl(url) ||
+  isTikTokMessagesTabUrl(url)
 
 const getSupportedLiveSyncTabMessage = () =>
   "Buka WhatsApp Web, Instagram DM, atau TikTok Messages dulu di tab aktif."
@@ -1640,7 +1662,7 @@ const getContentScriptUnavailableMessage = (url: string | undefined) =>
     ? "Content script Clara belum aktif di halaman Instagram ini. Refresh halaman Instagram DM lalu coba lagi."
     : isTikTokMessagesTabUrl(url)
       ? "Content script Clara belum aktif di halaman TikTok Messages ini. Refresh halaman lalu coba lagi."
-    : "Content script Clara belum aktif di halaman ini. Refresh tab lalu coba lagi."
+      : "Content script Clara belum aktif di halaman ini. Refresh tab lalu coba lagi."
 
 const getChannelLabel = (channel?: string | null) =>
   channel === "instagram"
@@ -1649,7 +1671,10 @@ const getChannelLabel = (channel?: string | null) =>
       ? "TikTok DM"
       : "WhatsApp Web"
 
-const getPromptSafeText = (value: string, maxLength = CHATGPT_CONTEXT_TEXT_LIMIT) => {
+const getPromptSafeText = (
+  value: string,
+  maxLength = CHATGPT_CONTEXT_TEXT_LIMIT
+) => {
   const normalized = value.replace(/\s+/g, " ").trim()
 
   if (normalized.length <= maxLength) {
@@ -1889,10 +1914,15 @@ const isIncomingSnapshotLikelyStale = (
     return false
   }
 
-  const incomingFingerprints = new Set(incoming.messages.map(getMessageFingerprint))
+  const incomingFingerprints = new Set(
+    incoming.messages.map(getMessageFingerprint)
+  )
   const currentLastFingerprint = getSnapshotLastFingerprint(current)
 
-  if (currentLastFingerprint && !incomingFingerprints.has(currentLastFingerprint)) {
+  if (
+    currentLastFingerprint &&
+    !incomingFingerprints.has(currentLastFingerprint)
+  ) {
     return true
   }
 
@@ -1924,22 +1954,29 @@ const findBestMessageOverlap = (
 ) => {
   const existingKeys = existing.map(getMessageFingerprint)
   const incomingKeys = incoming.map(getMessageFingerprint)
-  let best:
-    | {
-        existingStart: number
-        incomingStart: number
-        length: number
-      }
-    | null = null
+  let best: {
+    existingStart: number
+    incomingStart: number
+    length: number
+  } | null = null
 
-  for (let existingStart = 0; existingStart < existingKeys.length; existingStart += 1) {
-    for (let incomingStart = 0; incomingStart < incomingKeys.length; incomingStart += 1) {
+  for (
+    let existingStart = 0;
+    existingStart < existingKeys.length;
+    existingStart += 1
+  ) {
+    for (
+      let incomingStart = 0;
+      incomingStart < incomingKeys.length;
+      incomingStart += 1
+    ) {
       let length = 0
 
       while (
         existingStart + length < existingKeys.length &&
         incomingStart + length < incomingKeys.length &&
-        existingKeys[existingStart + length] === incomingKeys[incomingStart + length]
+        existingKeys[existingStart + length] ===
+          incomingKeys[incomingStart + length]
       ) {
         length += 1
       }
@@ -2084,6 +2121,7 @@ function ClaraSidePanel() {
   const [isLoading, setIsLoading] = useState(false)
   const [isInsertingIndex, setIsInsertingIndex] = useState<number | null>(null)
   const [isSuggesting, setIsSuggesting] = useState(false)
+  const [hasEditedSuggestion, setHasEditedSuggestion] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [draftSuggestions, setDraftSuggestions] = useState<string[]>([])
   const [editingSuggestionIndex, setEditingSuggestionIndex] = useState<
@@ -2106,6 +2144,7 @@ function ClaraSidePanel() {
   const panelScrollTopRef = useRef(0)
   const authStatusRef = useRef(authStatus)
   const authUserRef = useRef<ClaraExtensionSessionUser | null>(authUser)
+  const editSuggestionButtonRef = useRef<HTMLButtonElement | null>(null)
 
   const isClaraWorkspace = activeWorkspace === "clara"
   const isAuthenticated = authStatus === "authenticated"
@@ -2452,6 +2491,7 @@ function ClaraSidePanel() {
     setFeedback("")
     setSuggestions([])
     setDraftSuggestions([])
+    setHasEditedSuggestion(false)
     setEditingSuggestionIndex(null)
     setReplySuggestionId("")
 
@@ -2576,9 +2616,19 @@ function ClaraSidePanel() {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [chatSignature, isClaraWorkspace, isInsertingIndex, isLoading, isSuggesting])
+  }, [
+    chatSignature,
+    isClaraWorkspace,
+    isInsertingIndex,
+    isLoading,
+    isSuggesting
+  ])
 
   const handleSuggestReplies = async () => {
+    if (isSuggesting) {
+      return
+    }
+
     setIsSuggesting(true)
     setError("")
     setFeedback("")
@@ -2610,6 +2660,7 @@ function ClaraSidePanel() {
 
       setSuggestions([bestSuggestion])
       setDraftSuggestions([bestSuggestion])
+      setHasEditedSuggestion(false)
       setEditingSuggestionIndex(null)
       setReplySuggestionId(suggestionResult.replySuggestionId || "")
       setFeedback(
@@ -2625,6 +2676,7 @@ function ClaraSidePanel() {
 
       setSuggestions([])
       setDraftSuggestions([])
+      setHasEditedSuggestion(false)
       setEditingSuggestionIndex(null)
       setReplySuggestionId("")
       setError(message)
@@ -2684,6 +2736,10 @@ function ClaraSidePanel() {
   }
 
   const handleInsertSuggestion = async (suggestion: string, index: number) => {
+    if (isInsertingIndex !== null) {
+      return
+    }
+
     if (!(await ensureAuthenticated())) {
       return
     }
@@ -2750,7 +2806,7 @@ function ClaraSidePanel() {
       }
 
       setFeedback(
-        "Saran jawaban sudah dimasukkan ke chatbox. Kalau user kirim manual dari WhatsApp, Clara akan ikut menandainya sebagai approved + sent."
+        "Draft sudah dimasukkan ke kolom balasan. Periksa kembali lalu kirim manual; Clara akan menyinkronkan status jika didukung."
       )
     } catch (err) {
       setError(
@@ -2796,8 +2852,10 @@ function ClaraSidePanel() {
       )
     )
     setEditingSuggestionIndex(null)
+    setHasEditedSuggestion(true)
     setError("")
     setFeedback("Draft balasan berhasil diperbarui.")
+    window.requestAnimationFrame(() => editSuggestionButtonRef.current?.focus())
   }
 
   const handleCancelEditingSuggestion = (index: number) => {
@@ -2809,13 +2867,19 @@ function ClaraSidePanel() {
     setEditingSuggestionIndex(null)
     setError("")
     setFeedback("")
+    window.requestAnimationFrame(() => editSuggestionButtonRef.current?.focus())
   }
 
   const handleSendSuggestion = async (suggestion: string, index: number) => {
+    if (isInsertingIndex !== null) {
+      return
+    }
+
     if (!(await ensureAuthenticated())) {
       return
     }
 
+    let wasSent = false
     setIsInsertingIndex(index)
     setError("")
     setFeedback("")
@@ -2864,12 +2928,16 @@ function ClaraSidePanel() {
       }
 
       if (!response?.ok) {
-        throw new Error(response?.error || "Gagal mengirim saran ke WhatsApp.")
+        throw new Error(
+          response?.error || "Gagal mengirim draft ke chat aktif."
+        )
       }
+
+      wasSent = true
 
       if (!replySuggestionId) {
         setFeedback(
-          "Pesan terkirim ke WhatsApp, tapi belum bisa ditandai di Clara karena reply suggestion id tidak tersedia."
+          "Pesan terkirim, tetapi belum bisa ditandai di Clara karena reply suggestion id tidak tersedia."
         )
         return
       }
@@ -2881,7 +2949,7 @@ function ClaraSidePanel() {
 
       if (!claraSendUrl) {
         setFeedback(
-          "Pesan terkirim ke WhatsApp, tapi sinkronisasi status ke Clara belum dikonfigurasi."
+          "Pesan terkirim, tetapi sinkronisasi status ke Clara belum dikonfigurasi."
         )
         return
       }
@@ -2905,7 +2973,7 @@ function ClaraSidePanel() {
         throw new Error(
           syncPayload?.detail ||
             syncPayload?.error ||
-            "Pesan terkirim ke WhatsApp, tapi gagal ditandai sebagai sent di Clara."
+            "Pesan terkirim, tetapi gagal ditandai sebagai sent di Clara."
         )
       }
 
@@ -2916,21 +2984,37 @@ function ClaraSidePanel() {
 
       setFeedback(
         syncPayload?.auto_approved
-          ? "Pesan terkirim ke WhatsApp dan otomatis dianggap approved + sent di Clara."
-          : "Pesan terkirim ke WhatsApp dan status sent sudah tercatat di Clara."
+          ? "Pesan terkirim dan otomatis dianggap approved + sent di Clara."
+          : "Pesan terkirim dan status sent sudah tercatat di Clara."
       )
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Terjadi kendala saat mengirim saran ke WhatsApp."
+          : wasSent
+            ? "Pesan terkirim, tetapi status sent gagal disinkronkan ke Clara."
+            : "Terjadi kendala saat mengirim draft ke chat aktif."
+
+      setError(
+        wasSent && !message.toLowerCase().includes("terkirim")
+          ? `Pesan terkirim, tetapi sinkronisasi Clara gagal: ${message}`
+          : message
       )
     } finally {
       setIsInsertingIndex(null)
     }
   }
 
-  const isWhatsAppTab = tabUrl.startsWith("https://web.whatsapp.com/")
+  const isSupportedTab = isSupportedLiveSyncTabUrl(tabUrl)
+  const activeChannelLabel = chatData
+    ? getChannelLabel(chatData.channel)
+    : isInstagramDmTabUrl(tabUrl)
+      ? "Instagram DM"
+      : isTikTokMessagesTabUrl(tabUrl)
+        ? "TikTok DM"
+        : isWhatsAppTabUrl(tabUrl)
+          ? "WhatsApp Web"
+          : "Belum terdeteksi"
   const authStatusLabel =
     authStatus === "authenticated"
       ? "Connected"
@@ -2940,7 +3024,9 @@ function ClaraSidePanel() {
           ? "Setup needed"
           : "Login needed"
   const draftStatusLabel = suggestions.length
-    ? "Jawaban terbaik siap"
+    ? hasEditedSuggestion
+      ? "Draft diedit"
+      : "Draft dari Clara"
     : isSuggesting
       ? "Sedang menyusun jawaban"
       : "Belum ada jawaban"
@@ -2963,12 +3049,14 @@ function ClaraSidePanel() {
         <section className="clara-hero">
           <div className="clara-workspace-switcher">
             <button
+              aria-pressed={isClaraWorkspace}
               className={`clara-workspace-tab ${isClaraWorkspace ? "clara-workspace-tab--active" : ""}`}
               onClick={() => setActiveWorkspace("clara")}
               type="button">
               Clara Ops
             </button>
             <button
+              aria-pressed={!isClaraWorkspace}
               className={`clara-workspace-tab ${!isClaraWorkspace ? "clara-workspace-tab--active" : ""}`}
               onClick={() => setActiveWorkspace("chatgpt")}
               type="button">
@@ -2976,6 +3064,9 @@ function ClaraSidePanel() {
             </button>
           </div>
           <div className="clara-hero__footer">
+            <div className="clara-chip clara-chip--soft" role="status">
+              {authStatusLabel} · {activeChannelLabel}
+            </div>
             <div className="clara-build-badge">{EXTENSION_BUILD_LABEL}</div>
           </div>
         </section>
@@ -2996,18 +3087,23 @@ function ClaraSidePanel() {
                       : "Seluruh fitur extension dikunci sampai kamu login di web Clara dengan akun yang benar."}
                 </p>
                 <p className="clara-pane__copy">
-                  Setelah login berhasil, Clara Ops dan workspace ChatGPT baru bisa dipakai.
+                  Setelah login berhasil, Clara Ops dan workspace ChatGPT baru
+                  bisa dipakai.
                 </p>
               </div>
 
-              <div className="clara-chip clara-chip--warn">
+              <div
+                aria-live="polite"
+                className="clara-chip clara-chip--warn"
+                role={authStatus === "misconfigured" ? "alert" : "status"}>
                 {authStatusLabel}
               </div>
             </div>
 
             <button
               className="clara-button clara-button--primary clara-button--block"
-              onClick={openDashboardLogin}>
+              onClick={openDashboardLogin}
+              type="button">
               Buka Dashboard Login
             </button>
           </section>
@@ -3020,12 +3116,14 @@ function ClaraSidePanel() {
                 referrerPolicy="strict-origin-when-cross-origin"
                 sandbox="allow-downloads allow-forms allow-popups allow-same-origin allow-scripts"
                 src={CHATGPT_EMBED_URL}
-                title="ChatGPT Embed"
+                title="ChatGPT sales workspace"
               />
             </div>
             <div
               className={`clara-chatgpt-context ${
-                isChatGptContextExpanded ? "" : "clara-chatgpt-context--collapsed"
+                isChatGptContextExpanded
+                  ? ""
+                  : "clara-chatgpt-context--collapsed"
               }`}>
               <div className="clara-chatgpt-context__top">
                 <div className="clara-chatgpt-context__summary">
@@ -3049,6 +3147,8 @@ function ClaraSidePanel() {
               </div>
 
               <button
+                aria-controls={CHATGPT_CONTEXT_REGION_ID}
+                aria-expanded={isChatGptContextExpanded}
                 className="clara-chatgpt-context__toggle"
                 onClick={() =>
                   setIsChatGptContextExpanded((current) => !current)
@@ -3062,67 +3162,81 @@ function ClaraSidePanel() {
                   : "Tampilkan detail context"}
               </button>
 
-              {chatGptContextError ? (
-                <div className="clara-note clara-note--error">
-                  {chatGptContextError}
-                </div>
-              ) : null}
-
-              {chatGptContextFeedback ? (
-                <div className="clara-note clara-note--success">
-                  {chatGptContextFeedback}
-                </div>
-              ) : null}
-
-              <div className="clara-chatgpt-context__actions">
-                <button
-                  className="clara-button clara-button--ghost clara-button--block"
-                  disabled={isRefreshingChatGptContext}
-                  onClick={handleRefreshChatGptContext}
-                  type="button">
-                  {isRefreshingChatGptContext
-                    ? "Membaca context..."
-                    : "Refresh Context"}
-                </button>
-                <button
-                  className="clara-button clara-button--primary clara-button--block"
-                  disabled={!chatGptContextPrompt.trim()}
-                  onClick={handleCopyChatGptContextPrompt}
-                  type="button">
-                  Copy Context Prompt
-                </button>
-              </div>
-
-              {isChatGptContextExpanded && chatGptContextData ? (
-                <>
-                  <div className="clara-chatgpt-context__meta">
-                    <div>
-                      <strong>Channel:</strong>{" "}
-                      {getChannelLabel(chatGptContextData.channel)}
-                    </div>
-                    <div>
-                      <strong>Percakapan:</strong>{" "}
-                      {chatGptContextData.chatTitle || "-"}
-                    </div>
-                    <div>
-                      <strong>Pesan terbaru:</strong>{" "}
-                      {latestChatGptContextMessage?.text || "-"}
-                    </div>
+              <div
+                className="clara-chatgpt-context__details"
+                id={CHATGPT_CONTEXT_REGION_ID}>
+                {chatGptContextError ? (
+                  <div className="clara-note clara-note--error" role="alert">
+                    {chatGptContextError}
                   </div>
+                ) : null}
 
-                  <textarea
-                    className="clara-input clara-input--textarea clara-chatgpt-context__prompt"
-                    readOnly
-                    value={chatGptContextPrompt}
-                  />
-                </>
-              ) : isChatGptContextExpanded ? (
-                <div className="clara-note clara-note--warn">
-                  Buka chat aktif di WhatsApp Web, Instagram DM, atau TikTok
-                  Messages, lalu klik <strong>Refresh Context</strong>. Clara
-                  hanya membaca percakapan aktif, bukan seluruh inbox.
+                {chatGptContextFeedback ? (
+                  <div
+                    aria-live="polite"
+                    className="clara-note clara-note--success"
+                    role="status">
+                    {chatGptContextFeedback}
+                  </div>
+                ) : null}
+
+                <div className="clara-chatgpt-context__actions">
+                  <button
+                    aria-busy={isRefreshingChatGptContext}
+                    className="clara-button clara-button--ghost clara-button--block"
+                    disabled={isRefreshingChatGptContext}
+                    onClick={handleRefreshChatGptContext}
+                    type="button">
+                    {isRefreshingChatGptContext
+                      ? "Membaca context..."
+                      : "Refresh Context"}
+                  </button>
+                  <button
+                    className="clara-button clara-button--primary clara-button--block"
+                    disabled={!chatGptContextPrompt.trim()}
+                    onClick={handleCopyChatGptContextPrompt}
+                    type="button">
+                    Copy Context Prompt
+                  </button>
                 </div>
-              ) : null}
+
+                {isChatGptContextExpanded && chatGptContextData ? (
+                  <>
+                    <div className="clara-chatgpt-context__meta">
+                      <div>
+                        <strong>Channel:</strong>{" "}
+                        {getChannelLabel(chatGptContextData.channel)}
+                      </div>
+                      <div>
+                        <strong>Percakapan:</strong>{" "}
+                        {chatGptContextData.chatTitle || "-"}
+                      </div>
+                      <div>
+                        <strong>Pesan terbaru:</strong>{" "}
+                        {latestChatGptContextMessage?.text || "-"}
+                      </div>
+                    </div>
+
+                    <label
+                      className="clara-field-label"
+                      htmlFor={CHATGPT_CONTEXT_PROMPT_ID}>
+                      Context prompt siap salin
+                    </label>
+                    <textarea
+                      className="clara-input clara-input--textarea clara-chatgpt-context__prompt"
+                      id={CHATGPT_CONTEXT_PROMPT_ID}
+                      readOnly
+                      value={chatGptContextPrompt}
+                    />
+                  </>
+                ) : isChatGptContextExpanded ? (
+                  <div className="clara-note clara-note--warn" role="status">
+                    Buka chat aktif di WhatsApp Web, Instagram DM, atau TikTok
+                    Messages, lalu klik <strong>Refresh Context</strong>. Clara
+                    hanya membaca percakapan aktif, bukan seluruh inbox.
+                  </div>
+                ) : null}
+              </div>
             </div>
           </section>
         ) : null}
@@ -3137,7 +3251,8 @@ function ClaraSidePanel() {
                     Ambil percakapan yang sedang dibuka
                   </div>
                   <p className="clara-pane__copy">
-                    Baca isi chat dari WhatsApp Web untuk dijadikan konteks.
+                    Baca percakapan aktif dari channel yang didukung untuk
+                    dijadikan konteks.
                   </p>
                   <p className="clara-pane__copy">
                     Build aktif: <strong>{EXTENSION_BUILD_LABEL}</strong>
@@ -3151,11 +3266,10 @@ function ClaraSidePanel() {
                 </div>
               </div>
 
-              {!isWhatsAppTab && !chatData && (
-                <div className="clara-note clara-note--warn">
-                  Tab aktif saat ini bukan WhatsApp Web. Buka{" "}
-                  <strong>https://web.whatsapp.com/</strong>, pilih percakapan,
-                  lalu jalankan pembacaan chat dari panel ini.
+              {!isSupportedTab && !chatData && (
+                <div className="clara-note clara-note--warn" role="status">
+                  Buka percakapan aktif di WhatsApp Web, Instagram DM, atau
+                  TikTok Messages, lalu jalankan pembacaan chat dari panel ini.
                 </div>
               )}
 
@@ -3176,6 +3290,7 @@ function ClaraSidePanel() {
                         </div>
                       </div>
                       <div className="clara-chip clara-chip--soft">
+                        {getChannelLabel(chatData.channel)} ·{" "}
                         {chatData.messages.length} pesan
                       </div>
                     </div>
@@ -3186,15 +3301,17 @@ function ClaraSidePanel() {
                       </div>
                     ) : null}
 
-                    <div className="clara-thread">
+                    <ol
+                      aria-label="Pesan dalam percakapan aktif"
+                      className="clara-thread">
                       {chatData.messages.length === 0 ? (
-                        <div className="clara-empty">
+                        <li className="clara-empty">
                           Belum ada pesan teks yang berhasil diambil dari
                           percakapan ini.
-                        </div>
+                        </li>
                       ) : (
                         chatData.messages.map((message) => (
-                          <article
+                          <li
                             className={`clara-thread-message clara-thread-message--${message.direction === "outgoing" ? "out" : "in"}`}
                             key={message.id}>
                             {message.direction !== "outgoing" ? (
@@ -3208,7 +3325,8 @@ function ClaraSidePanel() {
                                   Membalas{" "}
                                   {message.replyContextSenderType === "outgoing"
                                     ? "pesan sales"
-                                    : message.replyContextSenderType === "incoming"
+                                    : message.replyContextSenderType ===
+                                        "incoming"
                                       ? "pesan customer"
                                       : "pesan sebelumnya"}
                                 </div>
@@ -3221,15 +3339,17 @@ function ClaraSidePanel() {
                               {message.text}
                             </div>
                             <div className="clara-thread-message__footer">
-                              {message.timestampLabel ||
-                                (message.direction === "outgoing"
-                                  ? "Anda"
-                                  : "Diterima")}
+                              {message.direction === "outgoing"
+                                ? "Pesan keluar"
+                                : "Pesan masuk"}
+                              {message.timestampLabel
+                                ? ` · ${message.timestampLabel}`
+                                : ""}
                             </div>
-                          </article>
+                          </li>
                         ))
                       )}
-                    </div>
+                    </ol>
                   </div>
                 </div>
               ) : (
@@ -3238,7 +3358,7 @@ function ClaraSidePanel() {
                     Belum ada percakapan yang ditampilkan
                   </div>
                   <div className="clara-empty__meta">
-                    Buka dulu chat di WhatsApp Web, lalu klik{" "}
+                    Buka percakapan di channel yang didukung, lalu klik{" "}
                     <strong>Baca Chat Aktif</strong>. Setelah itu isi percakapan
                     akan muncul di area ini dan tombol generate bisa langsung
                     dipakai di sebelahnya.
@@ -3251,9 +3371,14 @@ function ClaraSidePanel() {
               <div className="clara-action-bridge__line" />
               <div className="clara-action-bridge__actions">
                 <button
+                  aria-busy={isLoading}
+                  aria-live="polite"
                   className="clara-button clara-button--ghost clara-button--block clara-button--compact"
-                  disabled={isLoading}
-                  onClick={handleReadChat}>
+                  disabled={
+                    isLoading || isSuggesting || isInsertingIndex !== null
+                  }
+                  onClick={handleReadChat}
+                  type="button">
                   {isLoading
                     ? "Membaca chat..."
                     : chatData
@@ -3261,9 +3386,17 @@ function ClaraSidePanel() {
                       : "Baca Chat Aktif"}
                 </button>
                 <button
+                  aria-busy={isSuggesting}
+                  aria-live="polite"
                   className="clara-button clara-button--primary clara-button--block clara-button--compact"
-                  disabled={isSuggesting || isLoading || !chatData}
-                  onClick={handleSuggestReplies}>
+                  disabled={
+                    isSuggesting ||
+                    isLoading ||
+                    isInsertingIndex !== null ||
+                    !chatData
+                  }
+                  onClick={handleSuggestReplies}
+                  type="button">
                   {isSuggesting ? "Generate..." : "Generate Jawaban"}
                 </button>
               </div>
@@ -3278,11 +3411,15 @@ function ClaraSidePanel() {
                     Satu jawaban terbaik yang siap dipakai
                   </div>
                   <p className="clara-pane__copy">
-                    Clara fokus kasih satu hasil generate terbaik biar lebih cepat dan praktis.
+                    Clara fokus kasih satu hasil generate terbaik biar lebih
+                    cepat dan praktis.
                   </p>
                 </div>
 
-                <div className="clara-chip clara-chip--soft">
+                <div
+                  aria-live="polite"
+                  className="clara-chip clara-chip--soft"
+                  role="status">
                   {draftStatusLabel}
                 </div>
               </div>
@@ -3297,73 +3434,85 @@ function ClaraSidePanel() {
                             Jawaban Terbaik
                           </div>
                           <div className="clara-draft__tone">
-                            Siap dipakai langsung
+                            Periksa sebelum digunakan
                           </div>
                         </div>
 
-                        <div className="clara-draft__hint">
-                          Hasil tercepat Clara
-                        </div>
+                        <div className="clara-draft__hint">Draft Clara</div>
                       </div>
 
                       {editingSuggestionIndex === 0 ? (
-                          <div className="clara-draft__editor">
-                            <textarea
-                              className="clara-input clara-input--textarea"
-                              onChange={(event) =>
-                                handleDraftSuggestionChange(0, event.target.value)
-                              }
-                              rows={6}
-                              value={primaryDraftSuggestion}
-                            />
-                            <div className="clara-draft__actions">
-                              <button
-                                className="clara-button clara-button--ghost"
-                                onClick={() => handleCancelEditingSuggestion(0)}>
-                                Batal
-                              </button>
-                              <button
-                                className="clara-button clara-button--insert"
-                                onClick={() => handleSaveEditedSuggestion(0)}>
-                                Simpan
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                        <div className="clara-draft__text">
-                          {primarySuggestion}
-                        </div>
-                        )}
-
-                      {editingSuggestionIndex !== 0 ? (
+                        <div className="clara-draft__editor">
+                          <label
+                            className="clara-field-label"
+                            htmlFor={DRAFT_REPLY_TEXTAREA_ID}>
+                            Edit draft balasan
+                          </label>
+                          <textarea
+                            autoFocus
+                            className="clara-input clara-input--textarea"
+                            id={DRAFT_REPLY_TEXTAREA_ID}
+                            onChange={(event) =>
+                              handleDraftSuggestionChange(0, event.target.value)
+                            }
+                            rows={6}
+                            value={primaryDraftSuggestion}
+                          />
                           <div className="clara-draft__actions">
                             <button
                               className="clara-button clara-button--ghost"
-                              onClick={() => handleStartEditingSuggestion(0)}>
-                              Edit
+                              onClick={() => handleCancelEditingSuggestion(0)}
+                              type="button">
+                              Batal
                             </button>
                             <button
                               className="clara-button clara-button--insert"
-                              disabled={isInsertingIndex === 0}
-                              onClick={() =>
-                                handleInsertSuggestion(primarySuggestion, 0)
-                              }>
-                              {isInsertingIndex === 0
-                                ? "Memasukkan..."
-                                : "Masukkan ke Chat"}
-                            </button>
-                            <button
-                              className="clara-button clara-button--send"
-                              disabled={isInsertingIndex === 0}
-                              onClick={() =>
-                                handleSendSuggestion(primarySuggestion, 0)
-                              }>
-                              {isInsertingIndex === 0
-                                ? "Mengirim..."
-                                : "Kirim Sekarang"}
+                              onClick={() => handleSaveEditedSuggestion(0)}
+                              type="button">
+                              Simpan
                             </button>
                           </div>
-                        ) : null}
+                        </div>
+                      ) : (
+                        <div className="clara-draft__text">
+                          {primarySuggestion}
+                        </div>
+                      )}
+
+                      {editingSuggestionIndex !== 0 ? (
+                        <div className="clara-draft__actions">
+                          <button
+                            className="clara-button clara-button--ghost"
+                            disabled={isInsertingIndex !== null}
+                            onClick={() => handleStartEditingSuggestion(0)}
+                            ref={editSuggestionButtonRef}
+                            type="button">
+                            Edit
+                          </button>
+                          <button
+                            className="clara-button clara-button--insert"
+                            disabled={isInsertingIndex !== null}
+                            onClick={() =>
+                              handleInsertSuggestion(primarySuggestion, 0)
+                            }
+                            type="button">
+                            {isInsertingIndex === 0
+                              ? "Memasukkan..."
+                              : "Masukkan ke Chat"}
+                          </button>
+                          <button
+                            className="clara-button clara-button--send"
+                            disabled={isInsertingIndex !== null}
+                            onClick={() =>
+                              handleSendSuggestion(primarySuggestion, 0)
+                            }
+                            type="button">
+                            {isInsertingIndex === 0
+                              ? "Mengirim..."
+                              : "Kirim Sekarang"}
+                          </button>
+                        </div>
+                      ) : null}
                     </article>
                   </div>
                 </>
@@ -3381,11 +3530,18 @@ function ClaraSidePanel() {
               )}
 
               {feedback ? (
-                <div className="clara-note clara-note--success">{feedback}</div>
+                <div
+                  aria-live="polite"
+                  className="clara-note clara-note--success"
+                  role="status">
+                  {feedback}
+                </div>
               ) : null}
 
               {error ? (
-                <div className="clara-note clara-note--error">{error}</div>
+                <div className="clara-note clara-note--error" role="alert">
+                  {error}
+                </div>
               ) : null}
             </section>
           </>
