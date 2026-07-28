@@ -180,6 +180,7 @@ export default function LeadDetailPage() {
   const [isPrefillingDisciplineLog, setIsPrefillingDisciplineLog] =
     useState(false);
   const [isSavingDeal, setIsSavingDeal] = useState(false);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [dealSuccessMessage, setDealSuccessMessage] = useState("");
@@ -630,6 +631,7 @@ export default function LeadDetailPage() {
     }
 
     setTaskErrorMessage("");
+    setUpdatingTaskId(taskId);
 
     try {
       const payload: LeadTaskUpdateRequest = { status };
@@ -644,6 +646,8 @@ export default function LeadDetailPage() {
       setTaskErrorMessage(
         error instanceof Error ? error.message : "Gagal mengubah status task.",
       );
+    } finally {
+      setUpdatingTaskId(null);
     }
   }
 
@@ -669,13 +673,13 @@ export default function LeadDetailPage() {
             <>
               <Link
                 href="/dashboard/notifications"
-                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                className="clara-button clara-button-ghost"
               >
                 Buka Alert Tim
               </Link>
               <Link
                 href="/dashboard/approvals"
-                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                className="clara-button clara-button-ghost"
               >
                 Buka Arahan Tim
               </Link>
@@ -683,7 +687,7 @@ export default function LeadDetailPage() {
           ) : isLeadershipWorkspace ? (
             <Link
               href="/dashboard/manager-insights"
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              className="clara-button clara-button-ghost"
             >
               Monitor Tim
             </Link>
@@ -691,7 +695,7 @@ export default function LeadDetailPage() {
           {lead?.customer_profile_id ? (
             <Link
               href={`/dashboard/customers/${lead.customer_profile_id}`}
-              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+              className="clara-button clara-button-ghost"
             >
               Buka Profil Customer
             </Link>
@@ -699,7 +703,7 @@ export default function LeadDetailPage() {
           {lead?.latest_conversation_id ? (
             <Link
               href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
-              className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+              className="clara-button clara-button-primary"
             >
               Buka Percakapan
             </Link>
@@ -709,55 +713,55 @@ export default function LeadDetailPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
-            Loading lead detail...
+          <div role="status" aria-live="polite" className="clara-empty-state">
+            Memuat detail lead...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         )}
 
-        {lead && !isLoading && !errorMessage && (
+        {lead && !isLoading && (
           <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
             <section className="space-y-6">
               <section
                 data-onboarding-id="sales-lead-detail-focus"
-                className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
+                className="clara-card p-5 sm:p-6"
               >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                <p className="clara-kicker text-xs">
                   {isHeadWorkspace
                     ? "Prioritas head"
                     : isLeadershipWorkspace
                       ? "Prioritas manager"
                       : "Fokus kerja lead ini"}
                 </p>
-                <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#fff3cf]">
+                <h2 className="mt-2 break-words text-xl font-bold tracking-tight clara-text-primary sm:text-2xl">
                   {isLeadershipWorkspace
                     ? leadershipLeadFocus.headline
                     : salesLeadFocus.headline}
                 </h2>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-[#e3c990]">
+                <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
                   {isLeadershipWorkspace
                     ? leadershipLeadFocus.helper
                     : salesLeadFocus.helper}
                 </p>
 
-                <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#e9d4a0]">
-                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
-                    Stage: <span className="font-semibold text-[#fff3cf]">{formatStageLabel(lead.current_stage)}</span>
+                <div className="mt-4 flex flex-wrap gap-2 text-sm clara-text-secondary">
+                  <span className="clara-chip">
+                    Stage: <span className="font-semibold clara-text-primary">{formatStageLabel(lead.current_stage)}</span>
                   </span>
-                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
-                    Suhu lead: <span className="font-semibold text-[#fff3cf]">{lead.lead_temperature.toUpperCase()}</span>
+                  <span className="clara-chip">
+                    Suhu: <span className="font-semibold clara-text-primary">{lead.lead_temperature.toUpperCase()}</span>
                   </span>
-                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
-                    Owner: <span className="font-semibold text-[#fff3cf]">{lead.assigned_user_name ?? "Belum ada"}</span>
+                  <span className="clara-chip">
+                    Owner: <span className="break-words font-semibold clara-text-primary">{lead.assigned_user_name ?? "Belum ada"}</span>
                   </span>
                   {lead.needs_deal_sync ? (
-                    <span className="rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-3 py-1.5">
-                      Sinkron KPI: <span className="font-semibold text-[#fff3cf]">Perlu dicek</span>
+                    <span className="clara-chip">
+                      Sinkron KPI: <span className="font-semibold clara-text-primary">Perlu dicek</span>
                     </span>
                   ) : null}
                 </div>
@@ -765,7 +769,7 @@ export default function LeadDetailPage() {
 
               <div
                 data-onboarding-id="sales-lead-detail-snapshot"
-                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+                className="clara-card-outline p-5 sm:p-6"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -826,7 +830,7 @@ export default function LeadDetailPage() {
               <form
                 data-onboarding-id="sales-lead-detail-context"
                 onSubmit={(event) => void handleSaveLead(event)}
-                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+                className="clara-card p-5 sm:p-6"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -850,7 +854,7 @@ export default function LeadDetailPage() {
                     </p>
                   </div>
                   {successMessage && (
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    <span role="status" aria-live="polite" className="clara-alert clara-alert-success">
                       {successMessage}
                     </span>
                   )}
@@ -889,7 +893,7 @@ export default function LeadDetailPage() {
                       type="datetime-local"
                       value={followUpInput}
                       onChange={(event) => setFollowUpInput(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      className="clara-input"
                     />
                   </Field>
 
@@ -900,7 +904,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setAssignedUserInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400 disabled:bg-slate-100"
+                        className="clara-select"
                       >
                         <option value="">Belum ada assignee</option>
                         {users.map((user) => (
@@ -919,7 +923,7 @@ export default function LeadDetailPage() {
                       value={summaryInput}
                       onChange={(event) => setSummaryInput(event.target.value)}
                       rows={4}
-                      className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
+                      className="clara-textarea"
                     />
                   </Field>
 
@@ -933,7 +937,7 @@ export default function LeadDetailPage() {
                           ? "Tulis konteks singkat: kebutuhan customer, keberatan utama, dan arah follow-up berikutnya."
                           : undefined
                       }
-                      className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
+                      className="clara-textarea"
                     />
                   </Field>
                 </div>
@@ -942,7 +946,7 @@ export default function LeadDetailPage() {
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="clara-button clara-button-primary disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isSaving ? "Menyimpan..." : "Simpan Update Lead"}
                   </button>
@@ -951,7 +955,7 @@ export default function LeadDetailPage() {
 
               <section
                 data-onboarding-id="sales-lead-detail-discipline"
-                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+                className="clara-card p-5 sm:p-6"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -975,7 +979,7 @@ export default function LeadDetailPage() {
                     </p>
                   </div>
                   {disciplineSuccessMessage ? (
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    <span role="status" aria-live="polite" className="clara-alert clara-alert-success">
                       {disciplineSuccessMessage}
                     </span>
                   ) : null}
@@ -1009,7 +1013,7 @@ export default function LeadDetailPage() {
                 </div>
 
                 {disciplineErrorMessage ? (
-                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  <div role="alert" className="clara-alert clara-alert-danger mt-4">
                     {disciplineErrorMessage}
                   </div>
                 ) : null}
@@ -1026,7 +1030,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setDisciplineLogDateInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-input"
                       />
                     </Field>
 
@@ -1036,7 +1040,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setDisciplineActivityTypeInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-select"
                       >
                         {DISCIPLINE_ACTIVITY_OPTIONS.map((option) => (
                           <option key={option} value={option}>
@@ -1052,7 +1056,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setDisciplineResultStatusInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-select"
                       >
                         {DISCIPLINE_RESULT_OPTIONS.map((option) => (
                           <option key={option} value={option}>
@@ -1068,7 +1072,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setDisciplineMoodInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-select"
                       >
                         {DISCIPLINE_MOOD_OPTIONS.map((option) => (
                           <option key={option} value={option}>
@@ -1087,7 +1091,7 @@ export default function LeadDetailPage() {
                           setDisciplineObjectionInput(event.target.value)
                         }
                         placeholder="Contoh: legalitas, harga, trust"
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-input"
                       />
                     </Field>
 
@@ -1098,7 +1102,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setDisciplineFollowUpInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-input"
                       />
                     </Field>
                   </div>
@@ -1111,7 +1115,7 @@ export default function LeadDetailPage() {
                       }
                       rows={4}
                       placeholder="Tulis hasil follow-up hari ini, sinyal customer, dan langkah berikutnya."
-                      className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
+                      className="clara-textarea"
                     />
                   </Field>
 
@@ -1121,7 +1125,7 @@ export default function LeadDetailPage() {
                         type="button"
                         onClick={() => void handlePrefillDisciplineLog()}
                         disabled={isPrefillingDisciplineLog}
-                        className="inline-flex rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                        className="clara-button clara-button-secondary disabled:cursor-not-allowed disabled:opacity-70"
                       >
                         {isPrefillingDisciplineLog
                           ? "Clara sedang mengisi..."
@@ -1130,7 +1134,7 @@ export default function LeadDetailPage() {
                       <button
                         type="submit"
                         disabled={isCreatingDisciplineLog}
-                        className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                        className="clara-button clara-button-primary disabled:cursor-not-allowed disabled:opacity-70"
                       >
                         {isCreatingDisciplineLog
                           ? "Menyimpan log..."
@@ -1193,7 +1197,7 @@ export default function LeadDetailPage() {
             <aside className="space-y-6">
               <section
                 data-onboarding-id="sales-lead-detail-timeline"
-                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+                className="clara-card p-5 sm:p-6"
               >
                   <div>
                     <h2 className="text-xl font-semibold clara-text-primary">
@@ -1232,7 +1236,7 @@ export default function LeadDetailPage() {
                         </div>
                         <Link
                           href={`/dashboard/customers/${lead.customer_profile.id}`}
-                          className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400"
+                          className="clara-button clara-button-ghost px-3 py-2 text-xs"
                         >
                           Detail Profil
                         </Link>
@@ -1334,7 +1338,7 @@ export default function LeadDetailPage() {
                 )}
               </section>
 
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <section className="clara-card p-5 sm:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold clara-text-primary">
@@ -1357,14 +1361,14 @@ export default function LeadDetailPage() {
                     </p>
                   </div>
                   {dealSuccessMessage && (
-                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    <span role="status" aria-live="polite" className="clara-alert clara-alert-success">
                       {dealSuccessMessage}
                     </span>
                   )}
                 </div>
 
                 {dealErrorMessage && (
-                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  <div role="alert" className="clara-alert clara-alert-danger mt-4">
                     {dealErrorMessage}
                   </div>
                 )}
@@ -1396,7 +1400,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setDealStatusInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-select"
                       >
                         {DEAL_STATUS_OPTIONS.map((option) => (
                           <option key={option} value={option}>
@@ -1412,7 +1416,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setDealCurrencyInput(event.target.value.toUpperCase())
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-input"
                       />
                     </Field>
 
@@ -1425,7 +1429,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setExpectedValueInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-input"
                       />
                     </Field>
 
@@ -1438,7 +1442,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setDepositAmountInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-input"
                       />
                     </Field>
 
@@ -1449,7 +1453,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setExpectedCloseDateInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-input"
                       />
                     </Field>
 
@@ -1460,7 +1464,7 @@ export default function LeadDetailPage() {
                         onChange={(event) =>
                           setDealClosedAtInput(event.target.value)
                         }
-                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                        className="clara-input"
                       />
                     </Field>
                   </div>
@@ -1472,7 +1476,7 @@ export default function LeadDetailPage() {
                         setDealNotesInput(event.target.value)
                       }
                       rows={3}
-                      className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
+                      className="clara-textarea"
                     />
                   </Field>
 
@@ -1497,7 +1501,7 @@ export default function LeadDetailPage() {
                   <button
                     type="submit"
                     disabled={isSavingDeal}
-                    className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="clara-button clara-button-primary disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isSavingDeal
                       ? "Menyimpan deal..."
@@ -1507,7 +1511,7 @@ export default function LeadDetailPage() {
               </form>
               </section>
 
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <section className="clara-card p-5 sm:p-6">
                 <div>
                     <h2 className="text-xl font-semibold clara-text-primary">
                       {isSalesWorkspace
@@ -1530,7 +1534,7 @@ export default function LeadDetailPage() {
                   </div>
 
                 {taskErrorMessage && (
-                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  <div role="alert" className="clara-alert clara-alert-danger mt-4">
                     {taskErrorMessage}
                   </div>
                 )}
@@ -1556,14 +1560,16 @@ export default function LeadDetailPage() {
                             </p>
                           </div>
                           <select
+                            aria-label={`Status tugas ${task.title}`}
                             value={task.status}
+                            disabled={updatingTaskId === task.id}
                             onChange={(event) =>
                               void handleTaskStatusChange(
                                 task.id,
                                 event.target.value,
                               )
                             }
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-400"
+                            className="clara-select w-auto text-xs"
                           >
                             <option value="open">Open</option>
                             <option value="snoozed">Snoozed</option>
@@ -1592,7 +1598,7 @@ export default function LeadDetailPage() {
                         setTaskTitleInput(event.target.value)
                       }
                       placeholder="Contoh: Follow up soal legalitas"
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      className="clara-input"
                     />
                   </Field>
 
@@ -1604,7 +1610,7 @@ export default function LeadDetailPage() {
                       }
                       rows={3}
                       placeholder="Tulis konteks singkat supaya sales berikutnya tidak kehilangan arah."
-                      className="w-full rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none focus:border-slate-400"
+                      className="clara-textarea"
                     />
                   </Field>
 
@@ -1615,21 +1621,21 @@ export default function LeadDetailPage() {
                       onChange={(event) =>
                         setTaskDueAtInput(event.target.value)
                       }
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none focus:border-slate-400"
+                      className="clara-input"
                     />
                   </Field>
 
                   <button
                     type="submit"
                     disabled={isCreatingTask}
-                    className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="clara-button clara-button-primary disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isCreatingTask ? "Membuat tugas..." : "Tambah Tugas"}
                   </button>
                 </form>
               </section>
 
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <section className="clara-card-outline p-5 sm:p-6">
                 <div>
                   <h2 className="text-xl font-semibold clara-text-primary">
                     {isSalesWorkspace
@@ -1717,7 +1723,7 @@ export default function LeadDetailPage() {
                                 )
                               }
                               disabled={effectiveTimelinePage === 1}
-                              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Sebelumnya
                             </button>
@@ -1729,7 +1735,7 @@ export default function LeadDetailPage() {
                                 )
                               }
                               disabled={effectiveTimelinePage === timelineTotalPages}
-                              className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Berikutnya
                             </button>
@@ -1751,7 +1757,7 @@ export default function LeadDetailPage() {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+      <span className="clara-label mb-2 block">
         {label}
       </span>
       {children}
@@ -1882,11 +1888,9 @@ function DetailSelect({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </p>
-      <p className="mt-2 text-sm font-semibold clara-text-primary">{value}</p>
+    <div className="clara-card-soft min-w-0 p-4">
+      <p className="text-xs font-semibold clara-text-muted">{label}</p>
+      <p className="mt-2 break-words text-sm font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }
