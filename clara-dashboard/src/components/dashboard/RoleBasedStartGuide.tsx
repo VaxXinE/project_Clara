@@ -21,31 +21,31 @@ type RoleFeatureSet = {
 const SALES_WORKFLOW_STEPS = [
   {
     step: "1",
-    title: "Buka Chat Masuk",
-    description: "Mulai dari chat yang paling perlu respons.",
+    title: "Terima Chat Nasabah",
+    description: "Buka Queue dan pilih chat aktif.",
     href: "/dashboard/sales",
-    cta: "Buka Chat Masuk",
+    cta: "Buka Queue",
   },
   {
     step: "2",
-    title: "Tinjau Konteks",
-    description: "Baca percakapan, hasil AI, dan langkah berikutnya.",
+    title: "Pakai AI untuk Jawaban",
+    description: "Jalankan analisis lalu siapkan draft.",
     href: "/dashboard/sales",
-    cta: "Pilih Percakapan",
+    cta: "Buka Conversation",
   },
   {
     step: "3",
-    title: "Selesaikan Follow-up",
-    description: "Kerjakan yang overdue dan jatuh tempo hari ini.",
-    href: "/dashboard/follow-up",
-    cta: "Buka Tindak Lanjut",
+    title: "Kirim Jawaban",
+    description: "Kirim balasan lalu cek progres prospect.",
+    href: "/dashboard/crm",
+    cta: "Buka Lead Management",
   },
   {
     step: "4",
-    title: "Input Chat Baru",
-    description: "Upload atau paste chat yang datang dari luar extension.",
-    href: "/dashboard/upload",
-    cta: "Buka Input Chat",
+    title: "Follow-up Bila Perlu",
+    description: "Buka Action Center untuk tindak lanjut.",
+    href: "/dashboard/follow-up",
+    cta: "Buka Action Center",
   },
 ] as const;
 
@@ -266,24 +266,24 @@ function buildRoleTasks(role?: string) {
 
   return [
     {
-      title: "Saya mau balas customer",
-      description: "Buka chat yang paling perlu respons.",
-      href: "/dashboard/sales",
-    },
-    {
-      title: "Saya mau meninjau konteks",
-      description: "Pilih percakapan lalu baca konteks dan hasil AI.",
-      href: "/dashboard/sales",
-    },
-    {
-      title: "Saya mau menyelesaikan follow-up",
-      description: "Kerjakan yang overdue atau jatuh tempo hari ini.",
-      href: "/dashboard/follow-up",
-    },
-    {
       title: "Saya mau input chat baru",
-      description: "Upload file .txt atau paste chat baru.",
+      description: "Upload atau paste chat baru.",
       href: "/dashboard/upload",
+    },
+    {
+      title: "Saya mau balas customer",
+      description: "Buka Queue lalu siapkan jawaban.",
+      href: "/dashboard/sales",
+    },
+    {
+      title: "Saya mau lihat progress prospect",
+      description: "Lihat lead aktif dan progresnya.",
+      href: "/dashboard/crm",
+    },
+    {
+      title: "Saya mau lihat prioritas follow-up",
+      description: "Buka Action Center.",
+      href: "/dashboard/follow-up",
     },
   ];
 }
@@ -345,11 +345,11 @@ function buildRoleStartCopy(role?: string) {
     eyebrow: "Sales flow",
     title: "Mulai dari chat masuk",
     description:
-      "Buka chat, tinjau konteks, selesaikan follow-up, lalu input chat baru bila dibutuhkan.",
+      "Baca chat, pakai AI, kirim jawaban, lalu follow-up.",
     primaryHref: "/dashboard/sales",
-    primaryLabel: "Buka Chat Masuk",
-    secondaryHref: "/dashboard/follow-up",
-    secondaryLabel: "Buka Tindak Lanjut",
+    primaryLabel: "Buka Queue",
+    secondaryHref: "/dashboard/sales",
+    secondaryLabel: "Buka Conversation",
   };
 }
 
@@ -373,7 +373,7 @@ export function RoleBasedStartGuide({
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               {roleStartCopy.eyebrow}
             </p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight clara-text-primary">
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
               {roleStartCopy.title}
             </h2>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
@@ -408,7 +408,7 @@ export function RoleBasedStartGuide({
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
                 {item.step}
               </span>
-              <h3 className="mt-4 text-lg font-semibold clara-text-primary">
+              <h3 className="mt-4 text-lg font-semibold text-slate-950">
                 {item.title}
               </h3>
               <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -462,7 +462,7 @@ export function RoleBasedStartGuide({
                     </div>
                     <h3
                       className={`mt-4 text-base font-semibold ${
-                        isHighlighted ? "text-white" : "clara-text-primary"
+                        isHighlighted ? "text-white" : "text-slate-950"
                       }`}
                     >
                       {featureSet.title}
@@ -505,7 +505,7 @@ export function RoleBasedStartGuide({
                   href={task.href}
                   className="block rounded-[22px] border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white"
                 >
-                  <h3 className="text-base font-semibold clara-text-primary">
+                  <h3 className="text-base font-semibold text-slate-950">
                     {task.title}
                   </h3>
                    <p className="mt-2 text-sm leading-5 text-slate-600">
@@ -519,27 +519,27 @@ export function RoleBasedStartGuide({
                 Cara Baca Menu
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Queue</span>:
+                <span className="font-semibold text-slate-950">Queue</span>:
                 chat yang harus ditangani.
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Lead Management</span>:
+                <span className="font-semibold text-slate-950">Lead Management</span>:
                 progres dan status lead.
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Action Center</span>:
+                <span className="font-semibold text-slate-950">Action Center</span>:
                 follow-up harian.
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Review Sales</span>:
+                <span className="font-semibold text-slate-950">Review Sales</span>:
                 review jawaban dan arahan ke Sales.
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Alert Center</span>:
+                <span className="font-semibold text-slate-950">Alert Center</span>:
                 alert follow-up tim.
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Chat Insight / Ops Dashboard</span>:
+                <span className="font-semibold text-slate-950">Chat Insight / Ops Dashboard</span>:
                 insight dan kondisi operasional.
               </p>
             </div>

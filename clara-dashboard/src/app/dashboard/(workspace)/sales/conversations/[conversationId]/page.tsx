@@ -795,7 +795,7 @@ function ConversationDetailHeader({
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
         <div>
           <p className="clara-kicker">Conversation Signal</p>
-          <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] clara-text-primary">
+          <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-slate-950">
             Ringkasan kondisi percakapan saat ini
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -1167,7 +1167,7 @@ function ConversationDetailContent({
             >
               <div>
                 <p className="clara-kicker">Area kerja sales</p>
-                <h3 className="mt-2 text-lg font-semibold clara-text-primary">
+                <h3 className="mt-2 text-lg font-semibold text-slate-950">
                   Baca konteks lalu pilih aksi
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1205,7 +1205,7 @@ function ConversationDetailContent({
                       className="rounded-[26px] border border-slate-200 bg-white p-5"
                     >
                       <p className="clara-kicker">Ringkasan Clara</p>
-                      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+                      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
                         Hasil baca percakapan
                       </h2>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1288,7 +1288,7 @@ function ConversationDetailContent({
                         />
                       ) : (
                         <div className="clara-card-outline rounded-[30px] p-5">
-                          <h2 className="text-lg font-semibold clara-text-primary">
+                          <h2 className="text-lg font-semibold text-slate-950">
                             Belum ada jawaban terbaik
                           </h2>
                           <p className="mt-2 text-sm text-slate-600">
@@ -1303,7 +1303,7 @@ function ConversationDetailContent({
                 {activePanel === "sent_logs" ? (
                   <div className="rounded-[26px] border border-slate-200 bg-white p-5">
                     <p className="clara-kicker">Riwayat kirim</p>
-                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
                       Balasan yang sudah ditandai terkirim
                     </h2>
 
@@ -1342,7 +1342,7 @@ function ConversationDetailContent({
             <section className="clara-card rounded-[30px] p-5">
           <div>
             <p className="clara-kicker">Workspace Panel</p>
-            <h3 className="mt-2 text-lg font-semibold clara-text-primary">
+            <h3 className="mt-2 text-lg font-semibold text-slate-950">
               Pilih area kerja
             </h3>
           </div>
@@ -1384,7 +1384,7 @@ function ConversationDetailContent({
 
                 <div className="rounded-[26px] border border-slate-200 bg-white p-5">
                   <p className="clara-kicker">AI Analysis</p>
-                  <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+                  <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
                     Hasil pembacaan Clara
                   </h2>
 
@@ -1449,7 +1449,7 @@ function ConversationDetailContent({
                   />
                 ) : (
                   <div className="clara-card-outline rounded-[30px] p-5">
-                    <h2 className="text-lg font-semibold clara-text-primary">
+                    <h2 className="text-lg font-semibold text-slate-950">
                       Belum ada reply suggestion
                     </h2>
                     <p className="mt-2 text-sm text-slate-600">
@@ -1466,7 +1466,7 @@ function ConversationDetailContent({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="clara-kicker">Coaching Review</p>
-                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
                       Review case manusia untuk manager dan head
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1653,7 +1653,7 @@ function ConversationDetailContent({
                   <div className="mt-6 space-y-4">
                     <div>
                       <p className="clara-kicker">Manager Notes</p>
-                      <h3 className="mt-2 text-lg font-semibold clara-text-primary">
+                      <h3 className="mt-2 text-lg font-semibold text-slate-950">
                         Catatan coaching yang tersimpan
                       </h3>
                     </div>
@@ -1720,7 +1720,7 @@ function ConversationDetailContent({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="clara-kicker">Knowledge Update Queue</p>
-                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
                       Usulan knowledge dari kasus lapangan
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1962,7 +1962,7 @@ function ConversationDetailContent({
             {activePanel === "sent_logs" ? (
               <div className="rounded-[26px] border border-slate-200 bg-white p-5">
                 <p className="clara-kicker">Sent Messages</p>
-                <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+                <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
                   Riwayat balasan terkirim
                 </h2>
 
@@ -2041,7 +2041,7 @@ function MetaPill({
   return (
     <div
       className={`flex items-center justify-between rounded-2xl px-4 py-3 ${
-        dark ? "bg-white/7 text-slate-100" : "bg-slate-50 clara-text-primary"
+        dark ? "bg-white/7 text-slate-100" : "bg-slate-50 text-slate-900"
       }`}
     >
       <span className={dark ? "text-slate-300" : "text-slate-600"}>

@@ -304,7 +304,7 @@ export function MetricIcon({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="clara-kicker text-xs">{label}</p>
-          <p className="mt-2 text-lg font-semibold clara-text-primary">{value}</p>
+          <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
         </div>
         <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />

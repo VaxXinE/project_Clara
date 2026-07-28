@@ -342,7 +342,7 @@ export default function ProductKnowledgePage() {
           <section className="clara-card rounded-[30px] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold clara-text-primary">
+                <h2 className="text-lg font-semibold text-slate-950">
                   Knowledge Update Queue
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
@@ -370,7 +370,7 @@ export default function ProductKnowledgePage() {
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold clara-text-primary">
+                          <h3 className="text-base font-semibold text-slate-950">
                             {proposal.title}
                           </h3>
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -464,7 +464,7 @@ export default function ProductKnowledgePage() {
               className="clara-card space-y-5 rounded-[30px] p-5 h-fit"
             >
               <div>
-                <h2 className="text-lg font-semibold clara-text-primary">
+                <h2 className="text-lg font-semibold text-slate-950">
                   {editingId
                     ? "Edit Knowledge Entry"
                     : "Tambah Knowledge Entry"}
@@ -480,7 +480,7 @@ export default function ProductKnowledgePage() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold clara-text-primary">
+                <label className="text-sm font-semibold text-slate-900">
                   Title
                 </label>
                 <input
@@ -498,7 +498,7 @@ export default function ProductKnowledgePage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold clara-text-primary">
+                  <label className="text-sm font-semibold text-slate-900">
                     Category
                   </label>
                   <input
@@ -515,7 +515,7 @@ export default function ProductKnowledgePage() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-semibold clara-text-primary">
+                  <label className="text-sm font-semibold text-slate-900">
                     Source Type
                   </label>
                   <input
@@ -533,7 +533,7 @@ export default function ProductKnowledgePage() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold clara-text-primary">
+                <label className="text-sm font-semibold text-slate-900">
                   Content
                 </label>
                 <textarea
@@ -610,7 +610,7 @@ export default function ProductKnowledgePage() {
             <div className="clara-card rounded-[30px] p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-2xl">
-                  <h2 className="text-lg font-semibold clara-text-primary">
+                  <h2 className="text-lg font-semibold text-slate-950">
                     Current Knowledge Entries
                   </h2>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -725,7 +725,7 @@ export default function ProductKnowledgePage() {
 
             {!isLoading && items.length === 0 && !errorMessage && (
               <div className="clara-empty-state">
-                <h2 className="text-lg font-semibold clara-text-primary">
+                <h2 className="text-lg font-semibold text-slate-900">
                   Belum ada knowledge entry
                 </h2>
                 <p className="mt-2 text-sm text-slate-600">
@@ -755,7 +755,7 @@ export default function ProductKnowledgePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <h3
                             className={`text-[1.05rem] font-semibold leading-7 ${
-                              isSelected ? "text-white" : "clara-text-primary"
+                              isSelected ? "text-white" : "text-slate-950"
                             }`}
                           >
                             {item.title}
@@ -832,7 +832,7 @@ export default function ProductKnowledgePage() {
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="max-w-3xl">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-xl font-semibold clara-text-primary">
+                          <h2 className="text-xl font-semibold text-slate-950">
                             {selectedKnowledge.title}
                           </h2>
                           <span
@@ -948,7 +948,7 @@ function InfoCard({
   return (
     <article className="clara-card rounded-[24px] p-5">
       <p className="clara-kicker text-xs text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
+      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
         {value}
       </p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
@@ -962,7 +962,7 @@ function QuickStat({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold leading-6 clara-text-primary">
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">
         {value}
       </p>
     </div>
@@ -975,7 +975,7 @@ function MetaPill({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold leading-6 clara-text-primary">
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate-950">
         {value}
       </p>
     </div>
@@ -1042,7 +1042,7 @@ function renderKnowledgeContent(content: string) {
 
                   return (
                     <p key={`${blockIndex}-${lineIndex}`}>
-                      <span className="font-semibold clara-text-primary">
+                      <span className="font-semibold text-slate-950">
                         {label}:
                       </span>{" "}
                       {rest.join(":").trim()}
@@ -1054,7 +1054,7 @@ function renderKnowledgeContent(content: string) {
                   return (
                     <p
                       key={`${blockIndex}-${lineIndex}`}
-                      className="text-base font-semibold tracking-tight clara-text-primary"
+                      className="text-base font-semibold tracking-tight text-slate-950"
                     >
                       {line}
                     </p>
