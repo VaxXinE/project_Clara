@@ -169,5 +169,9 @@ class TawkWebhookIngestResponse(BaseModel):
     event_id: str | None = None
     property_id: str | None = None
     chat_id: str | None = None
+    processed_messages: int = 0
+    duplicate_messages: int = 0
+    ignored_events: int = 0
+    conversation_ids: list[UUID] = Field(default_factory=list)
     transcript_message_count: int = 0
     received_at: datetime

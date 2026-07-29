@@ -9,7 +9,7 @@ from app.services.audit_service import create_audit_log
 from app.services.tawk_webhook_service import (
     TawkWebhookAuthError,
     TawkWebhookError,
-    build_tawk_ingest_response,
+    ingest_tawk_webhook,
     validate_tawk_signature,
 )
 
@@ -29,8 +29,9 @@ async def ingest_tawk_webhook(
             signature_header=request.headers.get("X-Tawk-Signature"),
         )
         payload = TawkWebhookEnvelope.model_validate(json.loads(raw_body.decode("utf-8")))
-        response = build_tawk_ingest_response(
-            payload,
+        response = ingest_tawk_webhook(
+            db,
+            payload=payload,
             event_id=request.headers.get("X-Hook-Event-Id"),
         )
     except json.JSONDecodeError as exc:
@@ -68,6 +69,10 @@ async def ingest_tawk_webhook(
             "event_id": response.event_id,
             "property_id": response.property_id,
             "chat_id": response.chat_id,
+            "processed_messages": response.processed_messages,
+            "duplicate_messages": response.duplicate_messages,
+            "ignored_events": response.ignored_events,
+            "conversation_ids": [str(item) for item in response.conversation_ids],
             "transcript_message_count": response.transcript_message_count,
         },
     )
