@@ -8,6 +8,12 @@ import type { WhatsAppReadResponse } from "~/types/whatsapp"
 import type { ChannelAdapter } from "./base"
 
 const MAX_VISIBLE_MESSAGES = 80
+const DRAFT_JS_SELECTOR = [
+  ".public-DraftEditor-content",
+  ".public-DraftStyleDefault-block",
+  ".DraftEditor-root",
+  ".DraftEditor-editorContainer"
+].join(", ")
 
 const normalizeText = (value: string) =>
   value
@@ -46,12 +52,9 @@ const describeComposeSubtree = (root: HTMLElement | null | undefined) => {
 }
 
 const isDraftJsEditor = (root: HTMLElement) =>
-  root.innerHTML.includes("public-DraftStyleDefault-") ||
-  Boolean(
-    root.querySelector(
-      ".public-DraftStyleDefault-block, .DraftEditor-root, .DraftEditor-editorContainer"
-    )
-  )
+  root.matches(DRAFT_JS_SELECTOR) ||
+  Boolean(root.closest(DRAFT_JS_SELECTOR)) ||
+  Boolean(root.querySelector(DRAFT_JS_SELECTOR))
 
 const getDeepestExistingCaretTarget = (
   root: HTMLElement
