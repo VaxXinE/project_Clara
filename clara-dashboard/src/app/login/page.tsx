@@ -216,9 +216,9 @@ export default function LoginPage() {
             >
               Login Dashboard
             </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-[-0.04em] text-slate-950">
+            <h1 className="clara-page-title mt-3">
               Selamat datang di Clara Dashboard!
-            </h2>
+            </h1>
             {/* <p className="mt-3 text-sm leading-6 text-slate-600">
               Gunakan akun internal untuk membuka queue, review balasan AI, dan
               workspace operasional lainnya.
@@ -228,8 +228,11 @@ export default function LoginPage() {
           <div className="mt-6 space-y-4">
             {isSuperadminMode ? (
               <div>
-                <label className="clara-label">Email Superadmin</label>
+                <label className="clara-label" htmlFor="superadmin-email">
+                  Email Superadmin
+                </label>
                 <input
+                  id="superadmin-email"
                   value={superadminEmail}
                   onChange={(event) => setSuperadminEmail(event.target.value)}
                   type="email"
@@ -245,7 +248,7 @@ export default function LoginPage() {
                     setSuperadminEmail("");
                     setErrorMessage("");
                   }}
-                  className="mt-2 text-xs font-semibold text-[#8d6a29] hover:text-[#b8872f]"
+                  className="clara-text-secondary mt-2 text-xs font-semibold hover:text-[var(--color-accent)]"
                 >
                   Kembali ke login role biasa
                 </button>
@@ -253,11 +256,14 @@ export default function LoginPage() {
             ) : (
               <>
                 <div>
-                  <label className="clara-label">Role</label>
+                  <label className="clara-label" htmlFor="login-role">
+                    Role
+                  </label>
                   <select
+                    id="login-role"
                     value={selectedRole}
                     onChange={(event) => setSelectedRole(event.target.value)}
-                    className="clara-input mt-2"
+                    className="clara-select mt-2"
                     disabled={isLoadingOptions || roleOptions.length === 0}
                   >
                     <option value="">Pilih role dulu</option>
@@ -270,11 +276,14 @@ export default function LoginPage() {
                 </div>
 
                 <div>
-                  <label className="clara-label">Email</label>
+                  <label className="clara-label" htmlFor="login-email">
+                    Email
+                  </label>
                   <select
+                    id="login-email"
                     value={selectedEmail}
                     onChange={(event) => setSelectedEmail(event.target.value)}
-                    className="clara-input mt-2"
+                    className="clara-select mt-2"
                     disabled={
                       isLoadingOptions || !selectedRole || emailOptions.length === 0
                     }
@@ -289,7 +298,7 @@ export default function LoginPage() {
                     ))}
                   </select>
                   {selectedEmail ? (
-                    <p className="mt-2 text-xs text-slate-500">
+                    <p className="clara-helper mt-2">
                       Akun terpilih:{" "}
                       {emailOptions.find((item) => item.email === selectedEmail)?.name ??
                         selectedEmail}
@@ -300,9 +309,12 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label className="clara-label">Password</label>
+              <label className="clara-label" htmlFor="login-password">
+                Password
+              </label>
               <div className="relative mt-2">
                 <input
+                  id="login-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   type={showPassword ? "text" : "password"}
@@ -329,7 +341,11 @@ export default function LoginPage() {
           </div>
 
           {errorMessage && (
-            <p className="clara-alert clara-alert-danger mt-5">
+            <p
+              className="clara-alert clara-alert-danger mt-5"
+              role="alert"
+              aria-live="polite"
+            >
               {errorMessage}
             </p>
           )}

@@ -130,6 +130,26 @@ class User(Base):
         foreign_keys="OpsNotification.acknowledged_by_user_id",
         back_populates="acknowledged_by_user",
     )
+    created_performance_actions = relationship(
+        "PerformanceAction",
+        foreign_keys="PerformanceAction.created_by_user_id",
+        back_populates="created_by_user",
+    )
+    assigned_performance_actions = relationship(
+        "PerformanceAction",
+        foreign_keys="PerformanceAction.assigned_to_user_id",
+        back_populates="assigned_to_user",
+    )
+    performance_actions_for_sales = relationship(
+        "PerformanceAction",
+        foreign_keys="PerformanceAction.sales_user_id",
+        back_populates="sales_user",
+    )
+    sales_performance_snapshots = relationship(
+        "SalesPerformanceSnapshot",
+        foreign_keys="SalesPerformanceSnapshot.sales_user_id",
+        back_populates="sales_user",
+    )
     managed_sales_teams = relationship(
         "SalesTeam",
         back_populates="manager_user",

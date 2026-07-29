@@ -22,9 +22,9 @@ from app.schemas.channel_schema import (
 )
 from app.models.user import User
 from app.services.audit_service import create_audit_log
+from app.services.conversation_lifecycle_service import ensure_aware_utc
 from app.services.customer_profile_service import sync_customer_profile_temperature
 from app.services.customer_profile_service import (
-    customer_profile_contact_fields_supported,
     ensure_customer_profile_for_lead,
     is_placeholder_profile_name,
     normalize_ai_email,
@@ -490,14 +490,16 @@ def create_or_update_conversation_from_messages(
         if parsed_messages:
             first_timestamp = parsed_messages[0].message_timestamp
             latest_timestamp = parsed_messages[-1].message_timestamp
+            started_at = ensure_aware_utc(existing_conversation.started_at)
+            last_message_at = ensure_aware_utc(existing_conversation.last_message_at)
             if (
-                existing_conversation.started_at is None
-                or first_timestamp < existing_conversation.started_at
+                started_at is None
+                or ensure_aware_utc(first_timestamp) < started_at
             ):
                 existing_conversation.started_at = first_timestamp
             if (
-                existing_conversation.last_message_at is None
-                or latest_timestamp > existing_conversation.last_message_at
+                last_message_at is None
+                or ensure_aware_utc(latest_timestamp) > last_message_at
             ):
                 existing_conversation.last_message_at = latest_timestamp
 
@@ -601,18 +603,9 @@ def create_or_update_conversation_from_messages(
         db=db,
         conversation=conversation,
         preferred_name=preferred_customer_name,
-        sync_customer_profile=False,
     )
     lead.last_contact_at = conversation.last_message_at
     db.commit()
-    persisted_lead = db.get(Lead, lead.id)
-    if persisted_lead is not None and customer_profile_contact_fields_supported(db):
-        ensure_customer_profile_for_lead(
-            db=db,
-            lead=persisted_lead,
-            preferred_name=preferred_customer_name,
-        )
-        db.commit()
     return conversation, "created", len(parsed_messages)
 
 

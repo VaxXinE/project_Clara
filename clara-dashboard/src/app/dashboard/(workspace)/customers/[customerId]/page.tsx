@@ -23,6 +23,7 @@ export default function CustomerProfilePage() {
   const [profile, setProfile] = useState<CustomerProfileSummaryItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [mergeNotes, setMergeNotes] = useState("");
   const [mergingCandidateId, setMergingCandidateId] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState({
@@ -82,6 +83,7 @@ export default function CustomerProfilePage() {
 
     setMergingCandidateId(candidateId);
     setErrorMessage("");
+    setSuccessMessage("");
 
     try {
       const payload: CustomerProfileMergeRequest = {
@@ -95,6 +97,7 @@ export default function CustomerProfilePage() {
       });
       setProfile(updated);
       setMergeNotes("");
+      setSuccessMessage("Profile customer berhasil digabung.");
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Gagal merge customer profile."
@@ -111,6 +114,7 @@ export default function CustomerProfilePage() {
 
     setIsSavingProfile(true);
     setErrorMessage("");
+    setSuccessMessage("");
 
     try {
       const payload: CustomerProfileUpdateRequest = {
@@ -136,6 +140,7 @@ export default function CustomerProfilePage() {
         temperature: updated.temperature,
         account_category: deriveEditableAccountCategory(updated.related_leads),
       });
+      setSuccessMessage("Data customer berhasil disimpan.");
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Gagal menyimpan data customer."
@@ -147,7 +152,6 @@ export default function CustomerProfilePage() {
 
   const relatedLeads = profile?.related_leads ?? [];
   const hotLeadCount = relatedLeads.filter((lead) => lead.lead_temperature === "hot").length;
-  const warmLeadCount = relatedLeads.filter((lead) => lead.lead_temperature === "warm").length;
   const activeLeadCount = relatedLeads.filter(
     (lead) => !["won", "lost", "archived"].includes(lead.current_stage)
   ).length;
@@ -168,13 +172,6 @@ export default function CustomerProfilePage() {
   const identityConfidenceLabel = profile
     ? describeIdentityConfidence(profile.identity_confidence)
     : "";
-  const overviewSummary = buildCustomerOverview({
-    profile,
-    activeLeadCount,
-    hotLeadCount,
-    warmLeadCount,
-    dominantSourceLabel,
-  });
   const actionSummary = buildCustomerActionSummary({
     topPriorityLead,
     latestLead,
@@ -189,12 +186,6 @@ export default function CustomerProfilePage() {
     latestLead,
     isLeadershipWorkspace,
   });
-  const managerProfileSummary =
-    topPriorityLead
-      ? `Customer ini masih aktif di tim dan lead paling penting saat ini adalah ${topPriorityLead.display_name}. Manager cukup pastikan owner, stage, dan follow-up lead ini masih sehat sebelum membaca lead lain.`
-      : latestLead
-        ? `Belum ada lead yang benar-benar dominan, jadi manager bisa mulai dari lead dengan kontak terbaru yaitu ${latestLead.display_name}.`
-        : "Belum ada lead dominan maupun kontak terbaru yang kuat. Fokus manager cukup ke validitas identitas customer dan distribusi lead-nya.";
   const managerNextAction = topPriorityLead
     ? "Buka lead prioritas lalu cek apakah follow-up, stage, dan konteks customer masih sinkron."
     : latestLead
@@ -218,127 +209,90 @@ export default function CustomerProfilePage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="rounded-[26px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(28,21,15,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-8 text-center text-sm text-[#d6bb84]">
-            Loading customer profile...
+          <div role="status" aria-live="polite" className="clara-empty-state">
+            Memuat profil customer...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-[26px] border border-[#e17c54]/28 bg-[linear-gradient(180deg,rgba(66,33,21,0.96)_0%,rgba(36,18,12,0.98)_100%)] p-5 text-sm text-[#f0bf9f]">
+          <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         )}
 
-        {profile && !isLoading && !errorMessage ? (
+        {successMessage && (
+          <div role="status" aria-live="polite" className="clara-alert clara-alert-success">
+            {successMessage}
+          </div>
+        )}
+
+        {profile && !isLoading ? (
           <>
             <section
               data-onboarding-id="sales-customer-detail-focus"
-              className="rounded-[34px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(71,49,19,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)]"
+              className="clara-card p-5 sm:p-6"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
-                {isLeadershipWorkspace
-                  ? "Fokus manager pada customer ini"
-                  : "Fokus customer ini"}
-              </p>
-              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#fff3cf]">
-                {profileFocus.headline}
-              </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-[#e3c990]">
-                {profileFocus.helper}
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3 text-sm text-[#e9d4a0]">
-                <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
-                  Lead aktif: <span className="font-semibold text-[#fff3cf]">{activeLeadCount}</span>
-                </span>
-                <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
-                  Channel: <span className="font-semibold text-[#fff3cf]">{dominantSourceLabel}</span>
-                </span>
-                <span className="rounded-full border border-[#f0cb73]/18 bg-[#1e160f] px-3 py-1.5">
-                  Kategori akun: <span className="font-semibold text-[#fff3cf]">{accountCategorySummary}</span>
-                </span>
-              </div>
-            </section>
-
-            <section
-              data-onboarding-id="sales-customer-detail-summary"
-              className="overflow-hidden rounded-[34px] border border-slate-200 bg-white p-7 shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
-            >
-              <div className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_380px] xl:items-start">
-                <div className="max-w-4xl">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-slate-500">
+              <div
+                data-onboarding-id="sales-customer-detail-summary"
+                className="grid gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]"
+              >
+                <div className="min-w-0">
+                  <p className="clara-kicker text-xs">
                     {isLeadershipWorkspace
-                      ? "Ringkasan monitor customer"
-                      : "Ringkasan customer"}
+                      ? "Fokus manager pada customer ini"
+                      : "Fokus customer ini"}
                   </p>
-                  <h2 className="mt-4 max-w-4xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-slate-950">
-                    {isLeadershipWorkspace
-                      ? `${profile.display_name} dibaca Clara sebagai satu customer dengan beberapa lead yang perlu dijaga tetap sinkron.`
-                      : `${profile.display_name} dibaca Clara sebagai satu customer meskipun muncul di beberapa lead atau channel.`}
+                  <h2 className="mt-2 break-words text-xl font-bold tracking-tight clara-text-primary sm:text-2xl">
+                    {profileFocus.headline}
                   </h2>
-                  <p className="mt-4 max-w-3xl text-[15px] leading-8 text-slate-700">
-                    {isLeadershipWorkspace
-                      ? managerProfileSummary
-                      : overviewSummary}
+                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                    {profileFocus.helper}
                   </p>
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <HeroPill
-                      label="Kategori akun"
-                      value={accountCategorySummary}
-                      accent="amber"
-                    />
-                    <HeroPill
-                      label="Channel utama"
-                      value={dominantSourceLabel}
-                      accent="slate"
-                    />
-                    <HeroPill
-                      label="Keyakinan identitas"
-                      value={`${Math.round(profile.identity_confidence * 100)}%`}
-                      accent="emerald"
-                    />
-                  </div>
+                  <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <Metric label="Lead aktif" value={String(activeLeadCount)} />
+                    <Metric label="Channel" value={dominantSourceLabel} />
+                    <Metric label="Kategori akun" value={accountCategorySummary} />
+                  </dl>
                 </div>
-                <div className="rounded-[30px] border border-slate-200 bg-slate-950 p-6 text-white shadow-[0_18px_38px_rgba(15,23,42,0.18)]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200">
+
+                <aside className="clara-card-soft p-4">
+                  <p className="text-sm font-semibold clara-text-primary">
                     Langkah berikutnya
                   </p>
-                  <p className="mt-4 text-[15px] leading-8 text-slate-100">
-                    {isLeadershipWorkspace
-                      ? managerNextAction
-                      : actionSummary}
+                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                    {isLeadershipWorkspace ? managerNextAction : actionSummary}
                   </p>
                   {topPriorityLead ? (
-                    <div className="mt-5 flex flex-wrap gap-3">
+                    <div className="mt-4 flex flex-col gap-2">
                       <Link
                         href={`/dashboard/crm/${topPriorityLead.id}`}
-                        className="inline-flex rounded-full bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 shadow-[0_10px_24px_rgba(15,23,42,0.22)] ring-1 ring-white/80"
+                        className="clara-button clara-button-primary justify-center"
                       >
                         Buka Lead Prioritas
                       </Link>
                       {topPriorityLead.latest_conversation_id ? (
                         <Link
                           href={`/dashboard/sales/conversations/${topPriorityLead.latest_conversation_id}`}
-                          className="inline-flex rounded-full border border-white/30 px-4 py-2.5 text-sm font-semibold text-white"
+                          className="clara-button clara-button-ghost justify-center"
                         >
                           Buka Percakapan Terbaru
                         </Link>
                       ) : null}
                     </div>
                   ) : null}
-                </div>
+                </aside>
               </div>
             </section>
-
             <section
               data-onboarding-id="sales-customer-detail-panels"
-              className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.05)]"
+              className="clara-card-outline p-4 sm:p-5"
             >
               <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                 <div className="max-w-3xl">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
                     Mulai dari sini
                   </p>
-                  <p className="mt-3 text-[15px] leading-8 text-slate-700">
+                  <p className="mt-3 text-sm leading-7 clara-text-secondary">
                     {isSalesWorkspace
                       ? "Cek dulu identitas customer dan lead yang paling aktif. Setelah itu baru turun ke lead terkait. Edit data customer hanya kalau memang ada data yang salah atau belum lengkap."
                       : isLeadershipWorkspace
@@ -346,7 +300,7 @@ export default function CustomerProfilePage() {
                         : "Mulai dari profil customer dulu untuk memastikan identitas dan kategori akunnya benar. Setelah itu baru turun ke lead terkait kalau tujuan Anda adalah kerja operasional. Buka merge hanya kalau data customer terasa pecah."}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2 rounded-[22px] border border-slate-200 bg-slate-50 p-2">
+                <div className="flex flex-wrap gap-2">
                   <PanelChip
                     active={activePanel === "profile"}
                     label="Ringkasan customer"
@@ -375,26 +329,14 @@ export default function CustomerProfilePage() {
               <Metric label="PIC" value={profile.assigned_user_name ?? "Belum ada"} />
             </section>
 
-            <section className="grid gap-4 md:grid-cols-3">
-              <Metric
-                label="Keyakinan identitas"
-                value={`${Math.round(profile.identity_confidence * 100)}% • ${identityConfidenceLabel}`}
-              />
-              <Metric label="Lead aktif" value={String(activeLeadCount)} />
-              <Metric
-                label="Minat tinggi"
-                value={`${hotLeadCount} hot • ${warmLeadCount} warm`}
-              />
-            </section>
-
             <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
               <article
                 data-onboarding-id="sales-customer-detail-profile"
-                className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
+                className="clara-card p-5 sm:p-6"
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       {isLeadershipWorkspace
                         ? "Status Customer"
                         : "Data Customer"}
@@ -411,7 +353,7 @@ export default function CustomerProfilePage() {
                       setActivePanel("profile");
                       setIsEditingProfile((prev) => !prev);
                     }}
-                    className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                    className="clara-button clara-button-secondary"
                   >
                     {isEditingProfile ? "Tutup Edit" : "Edit Data Customer"}
                   </button>
@@ -437,16 +379,16 @@ export default function CustomerProfilePage() {
                   />
                 </div>
 
-                <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                <div className="clara-card-soft mt-4 p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
                     Alamat
                   </p>
-                  <p className="mt-3 text-base leading-7 text-slate-900">
+                  <p className="mt-3 text-base leading-7 clara-text-primary">
                     {profile.address ?? "Belum diisi"}
                   </p>
                 </div>
 
-                <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
+                <div className="clara-card-soft mt-5 p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
                     Cakupan channel
                   </p>
@@ -454,7 +396,7 @@ export default function CustomerProfilePage() {
                     {profile.source_labels.map((label) => (
                       <span
                         key={label}
-                        className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm"
+                        className="clara-chip"
                       >
                         {label}
                       </span>
@@ -469,7 +411,7 @@ export default function CustomerProfilePage() {
                   <div className="mt-6 border-t border-slate-200 pt-6">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="max-w-2xl">
-                        <h3 className="text-lg font-semibold text-slate-950">Edit data customer</h3>
+                        <h3 className="text-lg font-semibold clara-text-primary">Edit data customer</h3>
                         <p className="mt-2 text-sm leading-7 text-slate-600">
                           Isi seperlunya. Fokus ke nama, telepon, status customer, dan kategori akun supaya pembacaan tim tetap rapi.
                         </p>
@@ -483,9 +425,10 @@ export default function CustomerProfilePage() {
                     </div>
 
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
-                      <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Nama Customer</span>
+                      <label htmlFor="customer-display-name" className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold clara-text-primary">Nama Customer</span>
                         <input
+                          id="customer-display-name"
                           value={profileForm.display_name}
                           onChange={(event) => {
                             setProfileForm((prev) => ({
@@ -493,13 +436,14 @@ export default function CustomerProfilePage() {
                               display_name: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="clara-input"
                           placeholder="Masukkan nama customer"
                         />
                       </label>
-                      <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Telepon</span>
+                      <label htmlFor="customer-phone" className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold clara-text-primary">Telepon</span>
                         <input
+                          id="customer-phone"
                           value={profileForm.phone}
                           onChange={(event) => {
                             setProfileForm((prev) => ({
@@ -507,13 +451,14 @@ export default function CustomerProfilePage() {
                               phone: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="clara-input"
                           placeholder="08xxxx atau +62xxxx"
                         />
                       </label>
-                      <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Email</span>
+                      <label htmlFor="customer-email" className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold clara-text-primary">Email</span>
                         <input
+                          id="customer-email"
                           type="email"
                           value={profileForm.email}
                           onChange={(event) => {
@@ -522,13 +467,14 @@ export default function CustomerProfilePage() {
                               email: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="clara-input"
                           placeholder="customer@email.com"
                         />
                       </label>
-                      <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Status Customer</span>
+                      <label htmlFor="customer-status" className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold clara-text-primary">Status Customer</span>
                         <select
+                          id="customer-status"
                           value={profileForm.status}
                           onChange={(event) => {
                             setProfileForm((prev) => ({
@@ -536,15 +482,16 @@ export default function CustomerProfilePage() {
                               status: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="clara-select"
                         >
                           <option value="active">Aktif</option>
                           <option value="inactive">Tidak aktif</option>
                         </select>
                       </label>
-                      <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Temperature Customer</span>
+                      <label htmlFor="customer-temperature" className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold clara-text-primary">Temperature Customer</span>
                         <select
+                          id="customer-temperature"
                           value={profileForm.temperature}
                           onChange={(event) => {
                             setProfileForm((prev) => ({
@@ -552,7 +499,7 @@ export default function CustomerProfilePage() {
                               temperature: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="clara-select"
                         >
                           <option value="unknown">Belum ditentukan</option>
                           <option value="cold">Cold</option>
@@ -560,9 +507,10 @@ export default function CustomerProfilePage() {
                           <option value="hot">Hot</option>
                         </select>
                       </label>
-                      <label className="space-y-2 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Kategori Akun</span>
+                      <label htmlFor="customer-account-category" className="space-y-2 text-sm text-slate-700">
+                        <span className="font-semibold clara-text-primary">Kategori Akun</span>
                         <select
+                          id="customer-account-category"
                           value={profileForm.account_category}
                           onChange={(event) => {
                             setProfileForm((prev) => ({
@@ -570,7 +518,7 @@ export default function CustomerProfilePage() {
                               account_category: event.target.value,
                             }));
                           }}
-                          className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                          className="clara-select"
                         >
                           <option value="unknown">Belum ditentukan</option>
                           <option value="mini">Mini</option>
@@ -579,9 +527,10 @@ export default function CustomerProfilePage() {
                       </label>
                     </div>
 
-                    <label className="mt-4 block space-y-2 text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">Alamat</span>
+                    <label htmlFor="customer-address" className="mt-4 block space-y-2 text-sm text-slate-700">
+                      <span className="font-semibold clara-text-primary">Alamat</span>
                       <textarea
+                        id="customer-address"
                         value={profileForm.address}
                         onChange={(event) => {
                           setProfileForm((prev) => ({
@@ -590,7 +539,7 @@ export default function CustomerProfilePage() {
                           }));
                         }}
                         rows={4}
-                        className="w-full rounded-[24px] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-950"
+                        className="clara-textarea"
                         placeholder="Isi alamat customer jika memang sudah diketahui"
                       />
                     </label>
@@ -620,7 +569,7 @@ export default function CustomerProfilePage() {
                           });
                           setIsEditingProfile(false);
                         }}
-                        className="inline-flex rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
+                        className="clara-button clara-button-ghost"
                       >
                         Reset Form
                       </button>
@@ -629,8 +578,8 @@ export default function CustomerProfilePage() {
                 ) : null}
               </article>
 
-              <article className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-                <h2 className="text-xl font-semibold text-slate-950">
+              <article className="clara-card-outline p-5 sm:p-6">
+                <h2 className="text-xl font-semibold clara-text-primary">
                   {isLeadershipWorkspace
                     ? "Urutan baca manager"
                     : "Yang Perlu Dicek Dulu"}
@@ -669,24 +618,33 @@ export default function CustomerProfilePage() {
             </section>
 
             {canMergeProfiles && activePanel === "merge" ? (
-              <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <section className="clara-card-outline p-5 sm:p-6">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       Merge Candidates
                     </h2>
                     <p className="mt-2 text-sm leading-7 text-slate-600">
                       Clara menampilkan kandidat profil customer lain yang kemungkinan adalah orang yang sama. Head atau superadmin bisa merge manual kalau identity otomatis masih pecah.
                     </p>
+                    <p className="clara-alert clara-alert-danger mt-3">
+                      Merge memindahkan relasi kandidat ke profil ini. Pastikan kedua profil memang customer yang sama sebelum melanjutkan.
+                    </p>
                   </div>
-                  <textarea
-                    value={mergeNotes}
-                    onChange={(event) => {
-                      setMergeNotes(event.target.value);
-                    }}
-                    placeholder="Catatan merge opsional..."
-                    className="min-h-[88px] w-full rounded-2xl border border-slate-300 bg-white p-3 text-sm text-slate-900 lg:w-80"
-                  />
+                  <div className="w-full lg:w-80">
+                    <label htmlFor="customer-merge-notes" className="clara-label">
+                      Catatan merge (opsional)
+                    </label>
+                    <textarea
+                      id="customer-merge-notes"
+                      value={mergeNotes}
+                      onChange={(event) => {
+                        setMergeNotes(event.target.value);
+                      }}
+                      placeholder="Alasan kedua profil perlu digabung..."
+                      className="clara-textarea mt-2 min-h-[88px]"
+                    />
+                  </div>
                 </div>
 
                 <div className="mt-5 space-y-4">
@@ -698,10 +656,10 @@ export default function CustomerProfilePage() {
                     profile.merge_candidates.map((candidate) => (
                       <article
                         key={candidate.id}
-                        className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5"
+                        className="clara-card-soft p-4"
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold text-slate-950">
+                          <h3 className="text-base font-semibold clara-text-primary">
                             {candidate.display_name}
                           </h3>
                           <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
@@ -739,11 +697,17 @@ export default function CustomerProfilePage() {
                           <div className="mt-4">
                             <button
                               type="button"
-                              disabled={mergingCandidateId === candidate.id}
+                              disabled={mergingCandidateId !== null}
                               onClick={() => {
-                                void handleMerge(candidate.id);
+                                if (
+                                  window.confirm(
+                                    `Gabungkan ${candidate.display_name} ke ${profile.display_name}? Relasi kandidat akan dipindahkan ke profil ini.`,
+                                  )
+                                ) {
+                                  void handleMerge(candidate.id);
+                                }
                               }}
-                              className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                              className="clara-button clara-button-danger disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {mergingCandidateId === candidate.id
                                 ? "Merging..."
@@ -759,10 +723,10 @@ export default function CustomerProfilePage() {
             ) : null}
 
             {activePanel === "leads" ? (
-              <section className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+              <section className="clara-card p-5 sm:p-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <h2 className="text-xl font-semibold text-slate-950">Lead Terkait</h2>
+                    <h2 className="text-xl font-semibold clara-text-primary">Lead Terkait</h2>
                     <p className="mt-2 max-w-3xl text-sm leading-7 text-[#5a421f]">
                       {isLeadershipWorkspace
                         ? "Bagian ini menunjukkan semua lead yang masih dianggap milik customer yang sama. Manager tidak perlu buka semuanya. Mulai dari prioritas teratas, lalu cek apakah owner dan ritme follow-up-nya konsisten."
@@ -771,7 +735,7 @@ export default function CustomerProfilePage() {
                   </div>
                   <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     Prioritas baca:
-                    <span className="ml-2 font-semibold text-slate-950">
+                    <span className="ml-2 font-semibold clara-text-primary">
                       hot &gt; warm &gt; kontak terbaru
                     </span>
                   </div>
@@ -780,13 +744,13 @@ export default function CustomerProfilePage() {
                   {[...profile.related_leads].sort(compareCustomerLeadPriority).map((lead, index) => (
                     <article
                       key={lead.id}
-                      className="rounded-[24px] border border-slate-200 bg-slate-50 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+                      className="clara-card-outline p-4"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-semibold text-white">
                           Prioritas {index + 1}
                         </span>
-                        <h3 className="text-base font-semibold text-slate-950">{lead.display_name}</h3>
+                        <h3 className="text-base font-semibold clara-text-primary">{lead.display_name}</h3>
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
                             lead.lead_temperature
@@ -818,7 +782,7 @@ export default function CustomerProfilePage() {
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Link
                           href={`/dashboard/crm/${lead.id}`}
-                          className="inline-flex rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                          className="clara-button clara-button-ghost px-3 py-2 text-xs"
                         >
                           Buka Lead
                         </Link>
@@ -845,19 +809,17 @@ export default function CustomerProfilePage() {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-        {label}
-      </p>
-      <p className="mt-3 text-lg font-semibold text-slate-950">{value}</p>
+    <div className="clara-card-soft min-w-0 p-4">
+      <p className="text-xs font-semibold clara-text-muted">{label}</p>
+      <p className="mt-2 break-words text-sm font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }
 
 function ActionHint({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
+    <div className="clara-card-soft p-4">
+      <p className="text-sm font-semibold clara-text-primary">{title}</p>
       <p className="mt-2 text-sm leading-7 text-slate-600">{description}</p>
     </div>
   );
@@ -876,10 +838,10 @@ function PanelChip({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+      className={`clara-button ${
         active
-          ? "bg-slate-950 text-white"
-          : "border border-slate-300 bg-white text-slate-700"
+          ? "clara-button-primary"
+          : "clara-button-ghost"
       }`}
     >
       {label}
@@ -889,48 +851,21 @@ function PanelChip({
 
 function CompactInfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+    <div className="clara-card-soft min-w-0 p-4">
+      <p className="text-xs font-semibold clara-text-muted">
         {label}
       </p>
-      <p className="mt-2 text-base font-semibold text-slate-950">{value}</p>
+      <p className="mt-2 break-words text-base font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }
-
-function HeroPill({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: string;
-  accent: "amber" | "slate" | "emerald";
-}) {
-  const toneClass =
-    accent === "amber"
-      ? "border-[#d5a548]/35 bg-[linear-gradient(135deg,rgba(74,47,14,0.72)_0%,rgba(49,31,12,0.92)_100%)] text-[#f0cb73]"
-      : accent === "emerald"
-        ? "border-[#1c8f78]/35 bg-[linear-gradient(135deg,rgba(10,56,50,0.72)_0%,rgba(8,35,32,0.92)_100%)] text-[#3fd0b3]"
-        : "border-[#f0cb73]/22 bg-[linear-gradient(135deg,rgba(38,28,18,0.76)_0%,rgba(24,18,12,0.92)_100%)] text-[#f7e0a8]";
-
-  return (
-    <div className={`rounded-full border px-4 py-2 shadow-sm ${toneClass}`}>
-      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] opacity-80">
-        {label}
-      </span>
-      <span className="ml-2 text-sm font-bold">{value}</span>
-    </div>
-  );
-}
-
 function InlineMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+    <div className="clara-card-soft min-w-0 p-4">
+      <p className="text-xs font-semibold clara-text-muted">
         {label}
       </p>
-      <p className="mt-3 text-xl font-semibold text-slate-950">{value}</p>
+      <p className="mt-2 break-words text-sm font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }
@@ -1104,27 +1039,6 @@ function buildCustomerFocusSummary({
     helper: "Mulai dari data customer ini dulu, lalu cek lead yang kontaknya paling baru untuk menentukan langkah berikutnya.",
   };
 }
-
-function buildCustomerOverview({
-  profile,
-  activeLeadCount,
-  hotLeadCount,
-  warmLeadCount,
-  dominantSourceLabel,
-}: {
-  profile: CustomerProfileSummaryItem | null;
-  activeLeadCount: number;
-  hotLeadCount: number;
-  warmLeadCount: number;
-  dominantSourceLabel: string;
-}) {
-  if (!profile) {
-    return "";
-  }
-
-  return `${profile.display_name} saat ini tercatat punya ${profile.lead_count} lead dan ${profile.conversation_count} conversation. ${activeLeadCount} lead masih aktif dibaca tim. Channel yang terlihat paling dominan: ${dominantSourceLabel}. Sinyal minat saat ini: ${hotLeadCount} hot lead dan ${warmLeadCount} warm lead.`;
-}
-
 function buildCustomerActionSummary({
   topPriorityLead,
   latestLead,

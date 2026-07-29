@@ -3,12 +3,7 @@
 import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
   faArrowDownWideShort,
-  faBullseye,
-  faFilter,
-  faFire,
   faLayerGroup,
-  faLink,
-  faRotateLeft,
   faTrophy,
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
@@ -260,7 +255,6 @@ export default function CrmPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
   const [quickFilter, setQuickFilter] = useState("all");
   const [bucketFilter, setBucketFilter] = useState("all");
@@ -420,37 +414,8 @@ export default function CrmPage() {
     ];
   }, [bucketFilter, bucketedLeads, paginatedVisibleLeads]);
 
-  const bucketSummary = useMemo(() => {
-    return {
-      action: filteredLeads.filter((lead) => getLeadBucket(lead) === "action")
-        .length,
-      waiting: filteredLeads.filter((lead) => getLeadBucket(lead) === "waiting")
-        .length,
-      won: filteredLeads.filter((lead) => getLeadBucket(lead) === "won").length,
-      archived: filteredLeads.filter(
-        (lead) => getLeadBucket(lead) === "archived",
-      ).length,
-    };
-  }, [filteredLeads]);
-
-  useEffect(() => {
-    if (!isFilterModalOpen) {
-      return;
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsFilterModalOpen(false);
-      }
-    }
-
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [isFilterModalOpen]);
-
   const summary = useMemo(() => {
     return {
-      total: leads.length,
       needsAction: leads.filter((lead) => needsActionToday(lead)).length,
       overdue: leads.filter((lead) => isOverdueLead(lead)).length,
       needsSync: leads.filter((lead) => lead.needs_deal_sync).length,
@@ -458,7 +423,6 @@ export default function CrmPage() {
       won: leads.filter((lead) => lead.current_stage === "won").length,
     };
   }, [leads]);
-  const isSalesWorkspace = currentUser?.role === "sales";
   const isManagerWorkspace = isManagerRole(currentUser?.role);
   const isHeadWorkspace = isHeadRole(currentUser?.role);
   const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;
@@ -519,25 +483,6 @@ export default function CrmPage() {
   const previewEmpty = isLeadershipWorkspace
     ? "Pilih satu lead dari panel kiri untuk melihat ringkasan cepat sebelum turun ke detail penuh."
     : "Pilih satu lead dari panel kiri untuk melihat preview cepatnya.";
-
-  const activeBucketLabel =
-    BUCKET_OPTIONS.find((option) => option.value === bucketFilter)?.label ??
-    "Semua bucket";
-  const activeChannelLabel =
-    SOURCE_CHANNEL_OPTIONS.find(
-      (option) => option.value === sourceChannelFilter,
-    )?.label ?? "Semua Channel";
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-
-    if (searchQuery.trim()) count += 1;
-    if (sourceChannelFilter !== "all") count += 1;
-    if (quickFilter !== "all") count += 1;
-    if (bucketFilter !== "all") count += 1;
-    if (sortBy !== "created_at") count += 1;
-
-    return count;
-  }, [bucketFilter, quickFilter, searchQuery, sortBy, sourceChannelFilter]);
 
   const effectiveSelectedLeadId =
     selectedLeadId && paginatedVisibleLeads.some((lead) => lead.id === selectedLeadId)
@@ -625,6 +570,10 @@ export default function CrmPage() {
     }
   }
 
+  const hasUsableLeadData = leads.length > 0;
+  const shouldRenderLeadWorkspace =
+    !isLoading && (!errorMessage || hasUsableLeadData);
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
@@ -679,210 +628,109 @@ export default function CrmPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
-            Loading leads...
+          <div
+            role="status"
+            aria-live="polite"
+            className="clara-empty-state p-8 text-sm"
+          >
+            Memuat daftar lead...
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
+          <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         )}
 
-        {!isLoading && !errorMessage && (
+        {shouldRenderLeadWorkspace && (
           <>
             <section
               data-onboarding-id="sales-crm-hero"
-              className="clara-card rounded-[30px] p-6"
+              className="clara-card p-5 sm:p-6"
             >
               <p className="clara-kicker text-xs">Ringkasan leads</p>
-              <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] text-slate-950">
-                    {heroTitle}
-                  </h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {heroSummary}
-                  </p>
-                  {isLeadershipWorkspace && topPriorityLead ? (
-                    <p className="mt-3 text-sm font-medium text-[#f0cb73]">
-                      Prioritas sekarang: {topPriorityLead.display_name} •{" "}
-                      {STAGE_LABELS[topPriorityLead.current_stage] ??
-                        topPriorityLead.current_stage}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  {isHeadWorkspace ? (
-                    <>
-                      <Link
-                        href="/dashboard/notifications"
-                        className="clara-button clara-button-primary justify-center"
-                      >
-                        Buka Alert Tim
-                      </Link>
-                      <Link
-                        href="/dashboard/approvals"
-                        className="clara-button clara-button-ghost justify-center"
-                      >
-                        Buka Arahan Tim
-                      </Link>
-                    </>
-                  ) : isManagerWorkspace ? (
-                    <>
-                      <Link
-                        href="/dashboard/approvals"
-                        className="clara-button clara-button-primary justify-center"
-                      >
-                        Buka Review Sales
-                      </Link>
-                      <Link
-                        href="/dashboard/manager-insights"
-                        className="clara-button clara-button-ghost justify-center"
-                      >
-                        Lihat Monitor Tim
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <Link
-                        href="/dashboard/sales"
-                        className="clara-button clara-button-ghost justify-center"
-                      >
-                        Buka Chat Masuk
-                      </Link>
-                      <Link
-                        href="/dashboard/follow-up"
-                        className="clara-button clara-button-primary justify-center"
-                      >
-                        Buka Tindak Lanjut
-                      </Link>
-                    </>
-                  )}
-                </div>
-              </div>
+              <h2 className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl">
+                {heroTitle}
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
+                {heroSummary}
+              </p>
+              {isLeadershipWorkspace && topPriorityLead ? (
+                <p className="mt-3 break-words text-sm font-medium clara-text-primary">
+                  Prioritas sekarang: {topPriorityLead.display_name} ·{" "}
+                  {STAGE_LABELS[topPriorityLead.current_stage] ??
+                    topPriorityLead.current_stage}
+                </p>
+              ) : null}
             </section>
 
             <section
               data-onboarding-id="sales-crm-metrics"
-              className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+              className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
             >
               <BoardMetric
                 label={isLeadershipWorkspace ? "Butuh perhatian" : "Perlu tindakan"}
                 value={String(summary.needsAction)}
-                icon={faBullseye}
-                accentClass="from-[#f59e0b]/18 to-transparent text-[#f5c15d]"
               />
               <BoardMetric
                 label="Overdue"
                 value={String(summary.overdue)}
-                icon={faBullseye}
-                accentClass="from-[#fb923c]/18 to-transparent text-[#f4b164]"
               />
               <BoardMetric
                 label="Hot"
                 value={String(summary.hot)}
-                icon={faFire}
-                accentClass="from-[#ef4444]/18 to-transparent text-[#ff9d7a]"
               />
               <BoardMetric
                 label="Perlu sync"
                 value={String(summary.needsSync)}
-                icon={faLink}
-                accentClass="from-[#60a5fa]/18 to-transparent text-[#8fc0ff]"
               />
-              {isLeadershipWorkspace ? (
-                <BoardMetric
-                  label="Lead dimonitor"
-                  value={String(summary.total)}
-                  icon={faUsers}
-                  accentClass="from-[#f0cb73]/18 to-transparent text-[#f0cb73]"
-                />
-              ) : (
-                <BoardMetric
-                  label="Total lead aktif"
-                  value={String(summary.total)}
-                  icon={faUsers}
-                  accentClass="from-[#f0cb73]/18 to-transparent text-[#f0cb73]"
-                />
-              )}
             </section>
 
             <section
               data-onboarding-id="sales-crm-filters"
-              className="clara-card rounded-[30px] p-6"
+              className="clara-card p-4 sm:p-5"
             >
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-2xl">
-                  <p className="clara-kicker text-xs">Filter lead</p>
-                  <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-slate-950">
-                    {isHeadWorkspace
-                      ? "Saring lead tim untuk cepat melihat yang butuh keputusan"
-                      : isManagerWorkspace
-                        ? "Saring lead tim tanpa tenggelam di semua data"
-                        : "Cari lead dan rapikan daftar kerja"}
-                  </h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {isHeadWorkspace
-                      ? "Head cukup pakai filter sederhana untuk menemukan lead yang mulai butuh intervensi, overdue, atau tidak sinkron antar tim."
-                      : isManagerWorkspace
-                        ? "Manager cukup pakai filter sederhana untuk menemukan lead yang butuh keputusan, overdue, atau sinkronisasi."
-                        : "Pakai pencarian dan filter sederhana supaya cepat ketemu lead yang perlu diproses dulu."}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsFilterModalOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-5 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-                  >
-                    <FontAwesomeIcon
-                      icon={faFilter}
-                      className="h-3.5 w-3.5"
-                    />
-                    Filter
-                    {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    className="inline-flex items-center gap-2 rounded-full border border-[#3c2c16] bg-[#22190f] px-5 py-2.5 text-sm font-semibold text-[#e1c27c] transition hover:border-[#f0cb73]/28 hover:bg-[#2a1e12]"
-                  >
-                    <FontAwesomeIcon
-                      icon={faRotateLeft}
-                      className="h-3.5 w-3.5"
-                    />
-                    Reset
-                  </button>
-                </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-semibold clara-text-primary">
+                  Cari dan filter lead
+                </h2>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="clara-button clara-button-ghost"
+                >
+                  Reset
+                </button>
               </div>
 
-              <div className="mt-5 grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
-                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                  <span>Cari lead</span>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_repeat(4,minmax(0,1fr))]">
+                <div>
+                  <label htmlFor="crm-search" className="clara-label">
+                    Cari lead
+                  </label>
                   <input
+                    id="crm-search"
                     value={searchQuery}
                     onChange={(event) => {
                       setSearchQuery(event.target.value);
                       setLeadPage(1);
                     }}
                     placeholder="Cari nama lead atau summary..."
-                    className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
+                    className="clara-input mt-2"
                   />
-                </label>
+                </div>
 
-                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                  <span>Bucket</span>
+                <div>
+                  <label htmlFor="crm-bucket" className="clara-label">Bucket</label>
                   <select
+                    id="crm-bucket"
                     value={bucketFilter}
                     onChange={(event) => {
                       setBucketFilter(event.target.value);
                       setLeadPage(1);
                     }}
-                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                    className="clara-select mt-2"
                   >
                     {BUCKET_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -890,17 +738,18 @@ export default function CrmPage() {
                       </option>
                     ))}
                   </select>
-                </label>
+                </div>
 
-                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                  <span>Quick filter</span>
+                <div>
+                  <label htmlFor="crm-quick-filter" className="clara-label">Prioritas</label>
                   <select
+                    id="crm-quick-filter"
                     value={quickFilter}
                     onChange={(event) => {
                       setQuickFilter(event.target.value);
                       setLeadPage(1);
                     }}
-                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                    className="clara-select mt-2"
                   >
                     {QUICK_FILTER_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -908,17 +757,37 @@ export default function CrmPage() {
                       </option>
                     ))}
                   </select>
-                </label>
+                </div>
 
-                <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                  <span>Urutkan</span>
+                <div>
+                  <label htmlFor="crm-channel" className="clara-label">Channel</label>
                   <select
+                    id="crm-channel"
+                    value={sourceChannelFilter}
+                    onChange={(event) => {
+                      setSourceChannelFilter(event.target.value);
+                      setLeadPage(1);
+                    }}
+                    className="clara-select mt-2"
+                  >
+                    {SOURCE_CHANNEL_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="crm-sort" className="clara-label">Urutkan</label>
+                  <select
+                    id="crm-sort"
                     value={sortBy}
                     onChange={(event) => {
                       setSortBy(event.target.value);
                       setLeadPage(1);
                     }}
-                    className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
+                    className="clara-select mt-2"
                   >
                     {SORT_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -926,204 +795,23 @@ export default function CrmPage() {
                       </option>
                     ))}
                   </select>
-                </label>
+                </div>
               </div>
             </section>
 
-            {isFilterModalOpen ? (
-              <div className="fixed inset-0 z-50 flex items-end justify-center bg-[rgba(8,6,4,0.72)] p-4 backdrop-blur-sm sm:items-center">
-                <button
-                  type="button"
-                  aria-label="Tutup filter"
-                  onClick={() => setIsFilterModalOpen(false)}
-                  className="absolute inset-0"
-                />
-                <section className="relative z-10 w-full max-w-4xl rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.98)_0%,rgba(22,16,12,0.98)_48%,rgba(53,39,17,0.96)_100%)] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.36)]">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                        Filter
-                      </p>
-                      <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#fff0c9]">
-                        Lead controls
-                      </h2>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsFilterModalOpen(false)}
-                      className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
-                    >
-                      Tutup
-                    </button>
-                  </div>
 
-                  <div className="mt-5 space-y-4">
-                    <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr_0.8fr]">
-                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
-                          Cari lead
-                        </span>
-                        <input
-                          value={searchQuery}
-                            onChange={(event) => {
-                              setSearchQuery(event.target.value);
-                              setLeadPage(1);
-                            }}
-                          placeholder="Cari nama, owner, profile, source, atau summary..."
-                          className="w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm text-[#f7e7b7] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.04)] placeholder:text-[#907953]"
-                        />
-                      </label>
-
-                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
-                          Sort
-                        </span>
-                        <select
-                          value={sortBy}
-                          onChange={(event) => {
-                            setSortBy(event.target.value);
-                            setLeadPage(1);
-                          }}
-                          className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
-                        >
-                          {SORT_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
-                          Channel
-                        </span>
-                        <select
-                          value={sourceChannelFilter}
-                            onChange={(event) => {
-                              setSourceChannelFilter(event.target.value);
-                              setLeadPage(1);
-                            }}
-                          className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none shadow-[inset_0_1px_0_rgba(255,232,182,0.05)]"
-                        >
-                          {SOURCE_CHANNEL_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-
-                    <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                      <div className="rounded-[22px] border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(34,25,18,0.82)_0%,rgba(18,13,10,0.88)_100%)] p-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                          Quick Filters
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {QUICK_FILTER_OPTIONS.map((option) => {
-                            const isActive = quickFilter === option.value;
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => {
-                                  setQuickFilter(option.value);
-                                  setLeadPage(1);
-                                }}
-                                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                                  isActive
-                                    ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-                                    : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="rounded-[22px] border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(34,25,18,0.82)_0%,rgba(18,13,10,0.88)_100%)] p-4">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                          Bucket View
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {BUCKET_OPTIONS.map((option) => {
-                            const isActive = bucketFilter === option.value;
-                            const count =
-                              option.value === "all"
-                                ? filteredLeads.length
-                                : bucketSummary[
-                                    option.value as keyof typeof bucketSummary
-                                  ];
-                            return (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => {
-                                  setBucketFilter(option.value);
-                                  setLeadPage(1);
-                                }}
-                                className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                                  isActive
-                                    ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-                                    : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
-                                }`}
-                              >
-                                {option.label}
-                                <span className="ml-1 text-xs opacity-80">
-                                  {count}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex flex-col gap-3 border-t border-[#f0cb73]/12 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-[#d8bc84]">
-                      {activeFilterCount > 0
-                        ? `${activeFilterCount} filter aktif`
-                        : "Belum ada filter aktif"}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={resetFilters}
-                        className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
-                      >
-                        Reset
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setIsFilterModalOpen(false)}
-                        className="rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-5 py-2 text-sm font-semibold text-[#140f08]"
-                      >
-                        Selesai
-                      </button>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            ) : null}
-
-            <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-4 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
-              <div className="flex items-center justify-between gap-3 border-b border-[#f0cb73]/12 px-2 pb-4">
+            <section className="clara-card p-4 sm:p-5">
+              <div className="flex flex-col gap-2 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
-                    Lead List
-                  </p>
-                  <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
+                  <p className="clara-kicker text-xs">Daftar lead</p>
+                  <h2 className="mt-2 text-xl font-bold tracking-tight clara-text-primary">
                     {leadListTitle}
-                  </h3>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#c8ad75]">
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
                     {leadListDescription}
                   </p>
                 </div>
-                <p className="text-sm text-[#c8ad75]">
+                <p className="text-sm clara-text-secondary">
                   {paginatedVisibleLeads.length} / {visibleLeads.length} lead
                   tampil di halaman ini
                 </p>
@@ -1137,7 +825,7 @@ export default function CrmPage() {
                 ) : (
                   <>
                     <div className="flex min-h-0 flex-col gap-4 xl:max-h-[780px]">
-                      <div className="clara-scrollbar min-h-0 flex-1 space-y-3 rounded-[24px] border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(35,25,17,0.82)_0%,rgba(17,13,10,0.86)_100%)] p-3 xl:overflow-y-auto">
+                      <div className="clara-scrollbar min-h-0 flex-1 space-y-3 xl:overflow-y-auto">
                         {renderedBucketSections.map((section, index) => (
                           <Fragment key={section.title}>
                             {renderBucketSection({
@@ -1154,8 +842,8 @@ export default function CrmPage() {
                       </div>
 
                       {totalLeadPages > 1 ? (
-                        <div className="flex items-center justify-between gap-3 rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
-                          <p className="text-sm text-[#d8bc84]">
+                        <div className="clara-card-soft flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <p className="text-sm clara-text-secondary">
                             Halaman {effectiveLeadPage} dari {totalLeadPages}
                           </p>
                           <div className="flex gap-2">
@@ -1167,7 +855,7 @@ export default function CrmPage() {
                                   Math.max(1, current - 1),
                                 )
                               }
-                              className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Sebelumnya
                             </button>
@@ -1179,7 +867,7 @@ export default function CrmPage() {
                                   Math.min(totalLeadPages, current + 1),
                                 )
                               }
-                              className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               Berikutnya
                             </button>
@@ -1196,7 +884,7 @@ export default function CrmPage() {
                               {previewTitle}
                             </p>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
-                              <h3 className="text-xl font-bold tracking-tight text-slate-950">
+                              <h3 className="text-xl font-bold tracking-tight clara-text-primary">
                                 {selectedLead.display_name}
                               </h3>
                               <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
@@ -1405,14 +1093,14 @@ function renderBucketSection({
     <section className="space-y-3">
       <div className="px-1">
         <div className="flex items-center justify-between gap-3">
-          <h4 className="text-sm font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
+          <h3 className="text-sm font-semibold clara-text-primary">
             {title}
-          </h4>
-          <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
+          </h3>
+          <span className="clara-chip">
             {leads.length} lead
           </span>
         </div>
-        <p className="mt-2 text-sm leading-6 text-[#c8ad75]">{description}</p>
+        <p className="mt-2 text-sm leading-6 clara-text-secondary">{description}</p>
       </div>
 
       <div className="space-y-3">
@@ -1459,19 +1147,19 @@ function LeadListRow({
       type="button"
       data-onboarding-id={onboardingTargetId}
       onClick={onSelect}
-      className={`block w-full rounded-[22px] border p-4 text-left transition ${
+      className={`block w-full rounded-2xl border p-4 text-left transition ${
         isSelected
-          ? "border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(60,42,17,0.98)_0%,rgba(27,20,14,0.98)_100%)] shadow-[0_16px_32px_rgba(0,0,0,0.22)]"
-          : "border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] hover:border-[#f0cb73]/28"
+          ? "border-[var(--color-accent)] bg-[var(--color-surface-muted)]"
+          : "border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] hover:border-[var(--color-border-default)]"
       }`}
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-slate-950">
+              <h4 className="min-w-0 break-words text-base font-semibold clara-text-primary">
                 {lead.display_name}
-              </h2>
+              </h4>
               <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
                 {STAGE_LABELS[lead.current_stage] ?? lead.current_stage}
               </span>
@@ -1521,17 +1209,17 @@ function LeadListRow({
             </div>
           </div>
 
-          <div className="rounded-[18px] border border-[#f0cb73]/14 bg-[#1c140d] px-3 py-2 text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b9924b]">
+          <div className="clara-card-soft min-w-32 p-3 text-left sm:text-right">
+            <p className="text-xs font-semibold clara-text-muted">
               Next step
             </p>
-            <p className="mt-1 text-sm font-semibold text-[#fff0c9]">
+            <p className="mt-1 text-sm font-semibold clara-text-primary">
               {nextStepLabel}
             </p>
           </div>
         </div>
 
-        <p className="mt-3 line-clamp-2 text-sm leading-6 text-[#d6bb84]">
+        <p className="mt-3 line-clamp-2 break-words text-sm leading-6 clara-text-secondary">
           {lead.summary ??
             "Belum ada summary lead. Jalankan AI analysis dulu kalau konteksnya masih mentah."}
         </p>
@@ -1709,31 +1397,16 @@ function StageQuickSelect({
 function BoardMetric({
   label,
   value,
-  icon,
-  accentClass,
 }: {
   label: string;
   value: string;
-  icon: IconDefinition;
-  accentClass: string;
 }) {
   return (
-    <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] px-5 py-4 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#b9924b]">
-            {label}
-          </p>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-[#fff0c9]">
-            {value}
-          </p>
-        </div>
-        <span
-          className={`flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br ${accentClass}`}
-        >
-          <FontAwesomeIcon icon={icon} className="h-4 w-4" />
-        </span>
-      </div>
+    <article className="clara-card-soft p-4">
+      <p className="text-sm clara-text-secondary">{label}</p>
+      <p className="mt-1 text-2xl font-bold tracking-tight clara-text-primary">
+        {value}
+      </p>
     </article>
   );
 }

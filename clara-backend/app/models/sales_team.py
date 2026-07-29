@@ -55,3 +55,15 @@ class SalesTeam(Base):
         back_populates="sales_team",
         foreign_keys="User.team_id",
     )
+    performance_actions = relationship(
+        "PerformanceAction",
+        back_populates="team",
+    )
+    sales_performance_snapshots = relationship(
+        "SalesPerformanceSnapshot",
+        back_populates="team",
+    )
+    team_performance_snapshots = relationship(
+        "TeamPerformanceSnapshot",
+        back_populates="team",
+    )

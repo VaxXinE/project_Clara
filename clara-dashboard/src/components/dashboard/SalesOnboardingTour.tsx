@@ -37,51 +37,21 @@ const TOUR_ROUTES: TourRoute[] = [
     steps: [
       {
         id: "sales-shell-sidebar",
-        title: "Menu kerja utama",
+        title: "Mulai dari Chat Masuk",
         description:
-          "Sidebar ini adalah jalur kerja sales. Kamu akan paling sering pindah antara Beranda, Chat Masuk, Leads, Tindak Lanjut, dan Input Chat.",
-      },
-      {
-        id: "sales-home-summary",
-        title: "Ringkasan kerja hari ini",
-        description:
-          "Ini adalah ringkasan paling atas untuk membaca kondisi kerja hari ini. Biasanya cukup lihat bagian ini dulu sebelum memutuskan mau mulai dari chat, follow-up, atau lead.",
-      },
-      {
-        id: "sales-home-metrics",
-        title: "Angka tekanan kerja",
-        description:
-          "Kartu angka ini dipakai untuk membaca tekanan harian secara cepat. Tujuannya bukan analisis detail, tapi supaya kamu langsung tahu apakah kerja hari ini berat di chat, follow-up, atau risiko.",
+          "Gunakan Chat Masuk untuk membuka antrean dan memilih customer yang paling perlu respons.",
       },
       {
         id: "sales-home-next-action",
         title: "Kerja berikutnya",
         description:
-          "Panel ini menunjukkan pekerjaan yang paling layak dibuka berikutnya. Kalau kamu bingung harus mulai dari mana, ikuti blok ini dulu karena isinya memang diprioritaskan untuk sales.",
+          "Ikuti rekomendasi ini saat kamu perlu menentukan satu pekerjaan yang harus dikerjakan sekarang.",
       },
       {
         id: "sales-home-latest-conversation",
-        title: "Percakapan terbaru",
+        title: "Kembali ke konteks terakhir",
         description:
-          "Bagian ini merangkum conversation terakhir yang masih relevan. Gunanya untuk cepat balik ke chat aktif tanpa harus buka inbox dan cari manual lagi.",
-      },
-      {
-        id: "sales-home-quick-nav",
-        title: "Navigasi cepat",
-        description:
-          "Tombol-tombol ini adalah shortcut ke area kerja utama sales. Pakai ini kalau kamu sudah tahu mau kerja di mana dan tidak perlu lewat sidebar dulu.",
-      },
-      {
-        id: "sales-home-focus",
-        title: "Fokus kerja Sales hari ini",
-        description:
-          "Blok ini menjelaskan prioritas praktis untuk hari ini: apakah harus mulai dari chat masuk, tindak lanjut, atau cukup rapikan lead yang masih aktif.",
-      },
-      {
-        id: "sales-home-health",
-        title: "Kondisi kerja",
-        description:
-          "Bagian ini adalah health check cepat untuk kualitas ritme kerja kamu: seberapa banyak chat sudah dibaca AI, berapa yang berisiko, dan seberapa besar coverage AI saat ini.",
+          "Buka percakapan terbaru untuk meninjau kembali konteks sebelum melanjutkan respons.",
       },
     ],
   },
@@ -90,40 +60,22 @@ const TOUR_ROUTES: TourRoute[] = [
     title: "Chat Masuk",
     steps: [
       {
-        id: "sales-shell-actions",
-        title: "Aksi cepat halaman ini",
-        description:
-          "Tombol di kanan atas dipakai untuk lompat cepat ke halaman yang paling sering dipakai bersama inbox ini.",
-      },
-      {
-        id: "sales-inbox-hero",
-        title: "Ringkasan inbox",
-        description:
-          "Bagian atas ini menjelaskan kondisi antrean chat secara singkat. Dari sini sales bisa langsung tahu apakah harus fokus ke chat berisiko, chat belum dianalisis, atau cukup lanjut ke percakapan siap balas.",
-      },
-      {
-        id: "sales-inbox-metrics",
-        title: "Kartu metrik inbox",
-        description:
-          "Tiga kartu ini adalah pembacaan cepat kondisi inbox: berapa yang masih perlu analisis, berapa yang berisiko tinggi, dan berapa yang sudah menunggu customer.",
-      },
-      {
         id: "sales-inbox-filters",
-        title: "Filter antrean chat",
+        title: "Temukan chat",
         description:
-          "Gunakan filter ini untuk menyempitkan chat berdasarkan status, channel, dan prioritas kerja supaya fokusmu tidak pecah.",
+          "Cari customer atau saring status, channel, dan prioritas untuk menemukan chat yang perlu dikerjakan.",
       },
       {
         id: "sales-inbox-queue",
-        title: "Antrean chat aktif",
+        title: "Baca status dan alasan",
         description:
-          "Di sini Clara mengelompokkan chat berdasarkan apa yang perlu kamu lakukan: analisis, draft, balas, atau cukup tunggu customer.",
+          "Antrean dikelompokkan berdasarkan tindakan: analisis, siapkan draft, balas, tunggu customer, atau arsip.",
       },
       {
         id: "sales-inbox-upcoming-actions",
-        title: "Aksi di setiap conversation",
+        title: "Lakukan aksi berikutnya",
         description:
-          "Setiap kartu conversation memberi jalan kerja yang berbeda: analisis AI, buat draft, atau langsung buka percakapan. Fokusnya pilih aksi paling kecil yang membuat chat itu maju.",
+          "Pilih analisis, buat draft, atau buka percakapan sesuai langkah berikutnya yang tertulis.",
       },
     ],
   },
@@ -198,12 +150,6 @@ const TOUR_ROUTES: TourRoute[] = [
           "Kartu ini memberi tahu beban kerja follow-up hari ini, jadi kamu bisa mulai dari item yang paling telat atau paling siap dikirim.",
       },
       {
-        id: "sales-followup-metrics",
-        title: "Kartu angka follow-up",
-        description:
-          "Kartu angka di kanan dipakai untuk melihat tekanan kerja follow-up: yang telat berat, harus hari ini, siap dikirim, dan yang sudah selesai.",
-      },
-      {
         id: "sales-followup-filters",
         title: "Filter pekerjaan follow-up",
         description:
@@ -232,12 +178,6 @@ const TOUR_ROUTES: TourRoute[] = [
         title: "Alur input tercepat",
         description:
           "Kotak ini menjelaskan urutan paling singkat untuk memasukkan chat baru ke Clara tanpa banyak langkah tambahan.",
-      },
-      {
-        id: "sales-upload-safety",
-        title: "Aturan aman sebelum upload",
-        description:
-          "Blok ini menjelaskan hal-hal penting supaya Clara membaca chat dengan benar, terutama nama customer, channel, dan format file yang dipakai.",
       },
       {
         id: "sales-upload-form",
@@ -980,17 +920,21 @@ function readState(userId: string, role: TourRole): TourState {
     }
 
     const parsed = JSON.parse(raw) as Partial<TourState>;
+    const routes = getTourRoutes(role);
+    const routeIndex = clamp(
+      typeof parsed.routeIndex === "number" ? parsed.routeIndex : 0,
+      0,
+      routes.length - 1,
+    );
     return {
       completed: parsed.completed === true,
       dismissed: parsed.dismissed === true,
-      routeIndex:
-        typeof parsed.routeIndex === "number" && parsed.routeIndex >= 0
-          ? parsed.routeIndex
-          : 0,
-      stepIndex:
-        typeof parsed.stepIndex === "number" && parsed.stepIndex >= 0
-          ? parsed.stepIndex
-          : 0,
+      routeIndex,
+      stepIndex: clamp(
+        typeof parsed.stepIndex === "number" ? parsed.stepIndex : 0,
+        0,
+        routes[routeIndex].steps.length - 1,
+      ),
     };
   } catch {
     return {
@@ -1106,6 +1050,42 @@ export function SalesOnboardingTour() {
 
     return activeRoute.steps[tourState.stepIndex] ?? null;
   }, [activeRoute, tourState]);
+  const isTourVisible = Boolean(activeStep);
+
+  useEffect(() => {
+    if (!isTourVisible) {
+      return;
+    }
+
+    const previouslyFocusedElement =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusFrameId = window.requestAnimationFrame(() => {
+      popupRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      setTourState((current) =>
+        current
+          ? {
+              ...current,
+              completed: true,
+              dismissed: true,
+            }
+          : current,
+      );
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.cancelAnimationFrame(focusFrameId);
+      window.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedElement?.focus();
+    };
+  }, [isTourVisible]);
 
   useEffect(() => {
     if (!activeStep) {
@@ -1134,7 +1114,9 @@ export function SalesOnboardingTour() {
 
       if (isOutOfView) {
         target.scrollIntoView({
-          behavior: "smooth",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            ? "auto"
+            : "smooth",
           block: "center",
           inline: "nearest",
         });
@@ -1309,7 +1291,7 @@ export function SalesOnboardingTour() {
 
       {targetRect ? (
         <div
-          className="pointer-events-none fixed z-[71] rounded-[24px] border-[3px] border-[#f6d98c] bg-transparent shadow-[0_0_0_2px_rgba(255,243,207,0.42),0_0_28px_rgba(240,203,115,0.38),0_0_0_9999px_rgba(0,0,0,0.14)] transition-all"
+          className="pointer-events-none fixed z-[71] rounded-[24px] border-[3px] border-[#f6d98c] bg-transparent shadow-[0_0_0_2px_rgba(255,243,207,0.42),0_0_28px_rgba(240,203,115,0.38),0_0_0_9999px_rgba(0,0,0,0.14)] transition-all motion-reduce:transition-none"
           style={{
             left: highlightLeft,
             top: highlightTop,
@@ -1320,8 +1302,10 @@ export function SalesOnboardingTour() {
       ) : null}
 
       <div
+        aria-labelledby="sales-onboarding-title"
         className="fixed z-[72] w-[340px] max-w-[calc(100vw-2rem)] rounded-[24px] border border-[#f6d98c]/40 bg-[linear-gradient(180deg,rgba(43,31,19,0.99)_0%,rgba(20,14,10,0.99)_100%)] p-5 text-[#fff4d6] shadow-[0_28px_64px_rgba(0,0,0,0.58),0_0_0_1px_rgba(246,217,140,0.18)]"
         ref={popupRef}
+        role="dialog"
         style={{
           left: popupLeft,
           top: popupTop,
@@ -1336,14 +1320,17 @@ export function SalesOnboardingTour() {
                   ? "Onboarding Head"
                   : "Onboarding Sales"}
             </p>
-            <h2 className="mt-2 text-xl font-bold leading-7 text-[#fff6de]">
+            <h2
+              id="sales-onboarding-title"
+              className="mt-2 text-xl font-bold leading-7 text-[#fff6de]"
+            >
               {activeStep.title}
             </h2>
           </div>
           <button
             type="button"
             onClick={handleSkip}
-            className="rounded-full border border-[#f6d98c]/28 bg-[rgba(246,217,140,0.08)] px-3 py-1.5 text-xs font-semibold text-[#f6d98c] hover:bg-[rgba(246,217,140,0.14)]"
+            className="rounded-full border border-[#f6d98c]/28 bg-[rgba(246,217,140,0.08)] px-3 py-1.5 text-xs font-semibold text-[#f6d98c] hover:bg-[rgba(246,217,140,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6d98c]"
           >
             Lewati
           </button>
@@ -1371,7 +1358,7 @@ export function SalesOnboardingTour() {
           <button
             type="button"
             onClick={handleNext}
-            className="rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
+            className="rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6d98c] focus-visible:ring-offset-2 focus-visible:ring-offset-[#140f08]"
           >
             {isLastStepOnRoute
               ? isLastRoute
