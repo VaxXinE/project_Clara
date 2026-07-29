@@ -25,8 +25,6 @@ def sign_tawk_payload(payload: dict) -> tuple[str, bytes]:
 
 def test_tawk_webhook_rejects_invalid_signature(client, monkeypatch) -> None:
     monkeypatch.setattr(settings, "tawk_webhook_secret_key", "tawk-secret")
-    monkeypatch.setattr(settings, "tawk_default_organization_slug", "org-alpha")
-    monkeypatch.setattr(settings, "tawk_default_sales_user_email", "marketing.alpha@clara.local")
 
     payload = {
         "event": "chat:transcript_created",
@@ -55,8 +53,6 @@ def test_tawk_transcript_webhook_is_accepted_and_audited(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(settings, "tawk_webhook_secret_key", "tawk-secret")
-    monkeypatch.setattr(settings, "tawk_default_organization_slug", "org-alpha")
-    monkeypatch.setattr(settings, "tawk_default_sales_user_email", "marketing.alpha@clara.local")
 
     payload = {
         "event": "chat:transcript_created",
@@ -74,10 +70,16 @@ def test_tawk_transcript_webhook_is_accepted_and_audited(
             },
             "messages": [
                 {
-                    "sender": {"t": "s", "n": "Customer Support"},
+                    "sender": {"t": "s", "n": "Marketing Alpha"},
                     "type": "msg",
                     "msg": "Hi! How can we help?",
                     "time": "2024-07-03T01:02:37.780Z",
+                },
+                {
+                    "sender": {"t": "s", "n": "marketing.beta@clara.local"},
+                    "type": "msg",
+                    "msg": "Saya bantu lanjut ya.",
+                    "time": "2024-07-03T01:02:40.000Z",
                 },
                 {
                     "sender": {"t": "v"},
@@ -119,9 +121,10 @@ def test_tawk_transcript_webhook_is_accepted_and_audited(
     assert conversation.provider == "official_api"
     assert conversation.provider_key == "tawk"
     assert conversation.source == "tawk_webhook"
-    assert conversation.sales_user_id == seeded_data["marketing_a"].id
+    assert conversation.sales_user_id == seeded_data["marketing_b"].id
     assert conversation.external_thread_id == "tawk:58ca8453b8a7e060cd3b1ecb:70fe3290-99ad-11e9-a30a-51567162179f"
-    assert "Customer Support: Hi! How can we help?" in (conversation.raw_text or "")
+    assert "Marketing Alpha: Hi! How can we help?" in (conversation.raw_text or "")
+    assert "marketing.beta@clara.local: Saya bantu lanjut ya." in (conversation.raw_text or "")
     assert "V1561719148780935: Tell me more" in (conversation.raw_text or "")
 
     messages = list(
@@ -129,7 +132,7 @@ def test_tawk_transcript_webhook_is_accepted_and_audited(
             select(Message).where(Message.conversation_id == conversation.id)
         ).all()
     )
-    assert len(messages) == 2
+    assert len(messages) == 3
     assert all(message.channel == "live_chat" for message in messages)
     assert all(message.provider == "official_api" for message in messages)
     assert {message.sender_type for message in messages} == {"sales", "customer"}
@@ -137,7 +140,7 @@ def test_tawk_transcript_webhook_is_accepted_and_audited(
     lead = db.get(Lead, conversation.lead_id)
     assert lead is not None
     assert lead.display_name == "V1561719148780935"
-    assert lead.assigned_user_id == seeded_data["marketing_a"].id
+    assert lead.assigned_user_id == seeded_data["marketing_b"].id
     assert lead.source == "tawk_webhook"
 
     audit_logs = list(
@@ -150,8 +153,8 @@ def test_tawk_transcript_webhook_is_accepted_and_audited(
     assert audit_logs[0].provider == "tawk.to"
     assert audit_logs[0].channel == "live_chat"
     assert audit_logs[0].metadata_json["chat_id"] == "70fe3290-99ad-11e9-a30a-51567162179f"
-    assert audit_logs[0].metadata_json["processed_messages"] == 2
-    assert audit_logs[0].metadata_json["transcript_message_count"] == 2
+    assert audit_logs[0].metadata_json["processed_messages"] == 3
+    assert audit_logs[0].metadata_json["transcript_message_count"] == 3
 
     duplicate_response = client.post(
         "/webhooks/tawk",
@@ -165,6 +168,77 @@ def test_tawk_transcript_webhook_is_accepted_and_audited(
     assert duplicate_response.status_code == 200, duplicate_response.text
     duplicate_body = duplicate_response.json()
     assert duplicate_body["processed_messages"] == 0
-    assert duplicate_body["duplicate_messages"] == 2
+    assert duplicate_body["duplicate_messages"] == 3
     assert duplicate_body["conversation_ids"] == body["conversation_ids"]
     db.close()
+
+
+def test_tawk_webhook_rejects_unmapped_property(
+    client,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "tawk_webhook_secret_key", "tawk-secret")
+
+    payload = {
+        "event": "chat:transcript_created",
+        "time": "2024-07-03T01:02:37.780Z",
+        "property": {"id": "unmapped-property", "name": "Bobs Burgers"},
+        "chat": {
+            "id": "chat-1",
+            "messages": [
+                {
+                    "sender": {"t": "s", "n": "Marketing Alpha"},
+                    "type": "msg",
+                    "msg": "Halo",
+                    "time": "2024-07-03T01:02:37.780Z",
+                }
+            ],
+        },
+    }
+    signature, raw_body = sign_tawk_payload(payload)
+
+    response = client.post(
+        "/webhooks/tawk",
+        content=raw_body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Tawk-Signature": signature,
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_tawk_webhook_rejects_unmapped_agent(
+    client,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "tawk_webhook_secret_key", "tawk-secret")
+
+    payload = {
+        "event": "chat:transcript_created",
+        "time": "2024-07-03T01:02:37.780Z",
+        "property": {"id": "58ca8453b8a7e060cd3b1ecb", "name": "Bobs Burgers"},
+        "chat": {
+            "id": "chat-1",
+            "messages": [
+                {
+                    "sender": {"t": "s", "n": "Unmapped Agent"},
+                    "type": "msg",
+                    "msg": "Halo",
+                    "time": "2024-07-03T01:02:37.780Z",
+                }
+            ],
+        },
+    }
+    signature, raw_body = sign_tawk_payload(payload)
+
+    response = client.post(
+        "/webhooks/tawk",
+        content=raw_body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Tawk-Signature": signature,
+        },
+    )
+    assert response.status_code == 503, response.text
+    assert "tidak punya user aktif yang match di database" in response.json()["detail"]

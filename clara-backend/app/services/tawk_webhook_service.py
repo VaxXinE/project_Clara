@@ -5,7 +5,7 @@ import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -44,46 +44,86 @@ def _require_tawk_secret() -> str:
     return secret_key
 
 
-def _resolve_tawk_target_organization_slug() -> str:
-    organization_slug = (
-        settings.tawk_default_organization_slug or settings.bootstrap_organization_slug
+def _resolve_latest_sales_message(
+    payload: TawkWebhookEnvelope,
+) -> TawkWebhookTranscriptMessagePayload:
+    if payload.chat is None:
+        raise TawkWebhookError("Payload Tawk tidak punya transcript chat untuk menentukan owner.")
+
+    for message in sorted(payload.chat.messages, key=lambda item: item.time, reverse=True):
+        if _map_sender_type(message) == "sales":
+            return message
+
+    raise TawkWebhookError(
+        f"Transcript Tawk `{payload.chat.id}` belum memiliki balasan agent sales untuk menentukan owner."
     )
-    if not organization_slug:
-        raise TawkWebhookError(
-            "TAWK_DEFAULT_ORGANIZATION_SLUG belum dikonfigurasi."
-        )
-    return organization_slug
 
 
-def _resolve_tawk_target_sales_user_email() -> str:
-    sales_user_email = (
-        settings.tawk_default_sales_user_email or settings.bootstrap_owner_email
+def _resolve_owner_candidates(
+    payload: TawkWebhookEnvelope,
+    latest_sales_message: TawkWebhookTranscriptMessagePayload,
+) -> list[str]:
+    candidates: list[str] = []
+
+    sender_id = (
+        latest_sales_message.sender.id.strip()
+        if latest_sales_message.sender is not None and latest_sales_message.sender.id
+        else ""
     )
-    if not sales_user_email:
+    if sender_id:
+        candidates.append(sender_id.casefold())
+
+    sender_name = _map_sender_name(payload, latest_sales_message).strip()
+    if sender_name:
+        normalized_sender_name = sender_name.casefold()
+        if normalized_sender_name not in candidates:
+            candidates.append(normalized_sender_name)
+
+    if not candidates:
         raise TawkWebhookError(
-            "TAWK_DEFAULT_SALES_USER_EMAIL belum dikonfigurasi."
+            f"Agent Tawk pada transcript `{payload.chat.id}` tidak punya identifier yang bisa dicocokkan ke database."
         )
-    return sales_user_email
+
+    return candidates
 
 
-def _resolve_tawk_context(db: Session) -> ResolvedTawkWebhookContext:
-    organization = db.scalars(
-        select(Organization).where(
-            Organization.slug == _resolve_tawk_target_organization_slug()
-        )
-    ).first()
-    if organization is None:
-        raise TawkWebhookError("Organization default webhook Tawk.to tidak ditemukan.")
+def _resolve_tawk_context(
+    db: Session,
+    *,
+    payload: TawkWebhookEnvelope,
+) -> ResolvedTawkWebhookContext:
+    latest_sales_message = _resolve_latest_sales_message(payload)
+    candidates = _resolve_owner_candidates(payload, latest_sales_message)
 
-    sales_user = db.scalars(
+    matched_users = db.scalars(
         select(User).where(
-            User.email == _resolve_tawk_target_sales_user_email(),
-            User.organization_id == organization.id,
             User.is_active.is_(True),
+            or_(
+                func.lower(User.email).in_(candidates),
+                func.lower(User.name).in_(candidates),
+            ),
         )
-    ).first()
-    if sales_user is None:
-        raise TawkWebhookError("User default webhook Tawk.to tidak ditemukan.")
+    ).all()
+
+    unique_users = {user.id: user for user in matched_users if user.organization_id is not None}
+    if not unique_users:
+        agent_label = _map_sender_name(payload, latest_sales_message)
+        raise TawkWebhookError(
+            f"Agent Tawk `{agent_label}` tidak punya user aktif yang match di database."
+        )
+
+    if len(unique_users) > 1:
+        agent_label = _map_sender_name(payload, latest_sales_message)
+        raise TawkWebhookError(
+            f"Agent Tawk `{agent_label}` match ke lebih dari satu user aktif di database. Rapikan nama/email user agar unik."
+        )
+
+    sales_user = next(iter(unique_users.values()))
+    organization = db.get(Organization, sales_user.organization_id)
+    if organization is None:
+        raise TawkWebhookError(
+            f"Organization untuk user `{sales_user.email}` tidak ditemukan."
+        )
 
     return ResolvedTawkWebhookContext(organization=organization, sales_user=sales_user)
 
@@ -149,6 +189,8 @@ def _find_or_create_conversation(
         )
     ).first()
     if conversation is not None:
+        conversation.organization_id = context.organization.id
+        conversation.sales_user_id = context.sales_user.id
         conversation.title = _resolve_conversation_title(payload)
         conversation.raw_text = transcript_text
         if started_at is not None and (
@@ -332,7 +374,7 @@ def ingest_tawk_webhook(
             received_at=datetime.now(UTC),
         )
 
-    context = _resolve_tawk_context(db)
+    context = _resolve_tawk_context(db, payload=payload)
     sorted_messages = sorted(payload.chat.messages, key=lambda item: item.time)
     started_at = sorted_messages[0].time.astimezone(UTC) if sorted_messages else payload.time.astimezone(UTC)
     last_message_at = sorted_messages[-1].time.astimezone(UTC) if sorted_messages else payload.time.astimezone(UTC)
@@ -356,9 +398,11 @@ def ingest_tawk_webhook(
         conversation=conversation,
         preferred_name=_resolve_conversation_title(payload),
     )
+    if lead.assigned_user_id != conversation.sales_user_id:
+        lead.assigned_user_id = conversation.sales_user_id
     if lead.last_contact_at != conversation.last_message_at:
         lead.last_contact_at = conversation.last_message_at
-        db.add(lead)
+    db.add(lead)
 
     db.add(conversation)
     db.commit()
