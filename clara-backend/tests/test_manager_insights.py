@@ -13,6 +13,7 @@ from app.models.ai_extraction import AIExtraction
 from app.models.lead_discipline_log import LeadDisciplineLog
 from app.models.lead_task import LeadTask
 from app.models.message import Message
+from app.models.ops_notification import OpsNotification
 from app.models.performance_action import PerformanceAction
 from app.models.sales_team import SalesTeam
 from app.models.sales_unit import SalesUnit
@@ -526,6 +527,58 @@ def test_manager_weekly_review_includes_actions_and_critical_alerts(
     assert any(item["scope_type"] == "sales" for item in payload["top_improvers"])
     assert any(item["title"] == "Weekly backlog recovery" for item in payload["unresolved_actions"])
     assert any(item["severity"] == "critical" for item in payload["critical_alerts_open"])
+
+    db = db_session_factory()
+    open_alert_rows = list(
+        db.scalars(
+            select(OpsNotification).where(
+                OpsNotification.organization_id == manager_b.organization_id,
+                OpsNotification.user_id == manager_b.id,
+                OpsNotification.source_type == "operational_alert",
+                OpsNotification.status.in_(("active", "acknowledged")),
+            )
+        ).all()
+    )
+    critical_rows = [row for row in open_alert_rows if row.severity == "critical"]
+    assert len(critical_rows) == payload["critical_alert_open_count"]
+    critical_hot_lead = next(
+        row for row in critical_rows if row.alert_type == "hot_lead_stagnation"
+    )
+    assert critical_hot_lead.metadata_json["avg_response_sla_status"] == "critical"
+    assert critical_hot_lead.metadata_json["needs_reply_count"] >= 1
+    assert critical_hot_lead.metadata_json["overdue_follow_up_count"] >= 1
+    assert any(
+        row.alert_type == "stale_coaching_action" and row.severity == "warning"
+        for row in open_alert_rows
+    )
+    assert any(
+        row.alert_type == "overdue_follow_up_spike" and row.severity == "medium"
+        for row in open_alert_rows
+    )
+    critical_source_keys = {row.source_key for row in critical_rows}
+    db.close()
+
+    second_response = client.get("/dashboard/manager-insights/weekly-review")
+    assert second_response.status_code == 200, second_response.text
+    assert second_response.json()["critical_alert_open_count"] == len(
+        critical_source_keys
+    )
+
+    db = db_session_factory()
+    persisted_critical_source_keys = list(
+        db.scalars(
+            select(OpsNotification.source_key).where(
+                OpsNotification.organization_id == manager_b.organization_id,
+                OpsNotification.user_id == manager_b.id,
+                OpsNotification.source_type == "operational_alert",
+                OpsNotification.severity == "critical",
+                OpsNotification.status.in_(("active", "acknowledged")),
+            )
+        ).all()
+    )
+    db.close()
+    assert set(persisted_critical_source_keys) == critical_source_keys
+    assert len(persisted_critical_source_keys) == len(critical_source_keys)
 
 
 def test_head_weekly_review_csv_exports_team_scope(
