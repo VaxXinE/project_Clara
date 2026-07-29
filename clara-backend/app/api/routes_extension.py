@@ -27,13 +27,10 @@ from app.services.access_control_service import (
 from app.services.audit_service import create_audit_log
 from app.services.ai_extraction_service import AIExtractionError
 from app.services.extension_ingest_service import (
-    confirm_extension_reply_sent,
     confirm_extension_reply_sent_for_channel,
     ExtensionSnapshotError,
-    generate_extension_reply_suggestions,
     generate_extension_reply_suggestions_for_channel,
     sync_extension_snapshot,
-    sync_whatsapp_extension_snapshot,
 )
 from app.services.reply_suggestion_service import ReplySuggestionError
 

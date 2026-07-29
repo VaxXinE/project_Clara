@@ -25,7 +25,6 @@ from app.schemas.ai_extraction_schema import (
     AccountCategoryPrediction,
     BudgetSignal,
 )
-from app.services.ai_extraction_service import format_conversation_for_ai
 from app.services.business_segmentation_service import normalize_account_category
 from app.services.clara_playbook_service import (
     load_clara_response_playbook,
