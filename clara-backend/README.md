@@ -76,6 +76,7 @@ WHATSAPP_META_VERIFY_TOKEN=replace_with_meta_verify_token
 WHATSAPP_META_APP_SECRET=replace_with_meta_app_secret
 WHATSAPP_META_DEFAULT_ORGANIZATION_SLUG=clara-local
 WHATSAPP_META_DEFAULT_SALES_USER_EMAIL=owner@clara.local
+TAWK_WEBHOOK_SECRET_KEY=replace_with_tawk_webhook_secret_key
 
 CONVERSATION_AUTO_ARCHIVE_DAYS=7
 ```

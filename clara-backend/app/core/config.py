@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     whatsapp_meta_app_secret: str | None = None
     whatsapp_meta_default_organization_slug: str | None = None
     whatsapp_meta_default_sales_user_email: str | None = None
+    tawk_webhook_secret_key: str | None = None
     conversation_auto_archive_days: int = 7
     extension_whatsapp_enabled: bool = True
     extension_instagram_enabled: bool = False
