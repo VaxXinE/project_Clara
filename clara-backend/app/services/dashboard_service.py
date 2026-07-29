@@ -89,8 +89,6 @@ from app.schemas.dashboard_schema import (
     MarketingObjectionInsight,
     MarketingPlanningItem,
     OperationalScorecard,
-    PerformanceActionItem,
-    PerformanceActionListResponse,
     WeeklyReviewAlertItem,
     WeeklyReviewEntityItem,
     WeeklyReviewSummaryResponse,
@@ -419,6 +417,18 @@ VALID_OPERATIONAL_ALERT_TRANSITIONS = {
     "active": {"acknowledged", "resolved", "ignored"},
     "acknowledged": {"resolved", "ignored"},
 }
+_OPERATIONAL_ALERT_SEVERITY_RANK = {
+    "warning": 0,
+    "medium": 1,
+    "high": 2,
+    "critical": 3,
+}
+_OPERATIONAL_ALERT_STATUS_PRIORITY = {
+    "resolved": 0,
+    "active": 1,
+    "acknowledged": 2,
+    "ignored": 3,
+}
 
 
 def _is_open_notification_status(status: str) -> bool:
@@ -427,6 +437,41 @@ def _is_open_notification_status(status: str) -> bool:
 
 def _is_operational_alert(notification: OpsNotification) -> bool:
     return notification.source_type == OPERATIONAL_ALERT_SOURCE_TYPE
+
+
+def _deduplicate_operational_alert_seeds(
+    items: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    by_source_key: dict[str, dict[str, object]] = {}
+    for item in items:
+        source_key = str(item["source_key"])
+        current = by_source_key.get(source_key)
+        item_rank = (
+            _OPERATIONAL_ALERT_SEVERITY_RANK.get(str(item["severity"]), -1),
+            json.dumps(item, sort_keys=True, default=str),
+        )
+        current_rank = (
+            _OPERATIONAL_ALERT_SEVERITY_RANK.get(str(current["severity"]), -1),
+            json.dumps(current, sort_keys=True, default=str),
+        ) if current is not None else None
+        if current_rank is None or item_rank > current_rank:
+            by_source_key[source_key] = item
+
+    return [by_source_key[source_key] for source_key in sorted(by_source_key)]
+
+
+def _select_operational_alert_survivor(
+    notifications: list[OpsNotification],
+) -> OpsNotification:
+    # Preserve the strongest user decision, then prefer the oldest stable row.
+    return min(
+        notifications,
+        key=lambda notification: (
+            -_OPERATIONAL_ALERT_STATUS_PRIORITY.get(notification.status, -1),
+            ensure_aware_utc(notification.created_at) or datetime.min.replace(tzinfo=timezone.utc),
+            str(notification.id),
+        ),
+    )
 
 
 def _build_operational_alert_seed(
@@ -561,6 +606,13 @@ def _build_sales_operational_alert_seeds(
             and item.won_deals_count == 0
             and (item.needs_reply_count > 0 or item.overdue_follow_up_count > 0)
         ):
+            # Critical requires all three existing risks: SLA breach, reply backlog,
+            # and overdue follow-up on a hot lead with no won deal.
+            is_compounded_critical_risk = (
+                item.avg_response_sla_status == "critical"
+                and item.needs_reply_count >= 1
+                and item.overdue_follow_up_count >= 1
+            )
             alerts.append(
                 _build_operational_alert_seed(
                     current_user=current_user,
@@ -568,7 +620,13 @@ def _build_sales_operational_alert_seeds(
                     source_reference_id=item.sales_user_id,
                     sales_user_id=item.sales_user_id,
                     team_id=team_id,
-                    severity="high" if item.hot_leads_count >= 2 else "warning",
+                    severity=(
+                        "critical"
+                        if is_compounded_critical_risk
+                        else "high"
+                        if item.hot_leads_count >= 2
+                        else "warning"
+                    ),
                     title=f"Hot lead tertahan: {item.sales_name}",
                     body=(
                         f"{item.sales_name} masih pegang {item.hot_leads_count} hot lead, "
@@ -578,6 +636,9 @@ def _build_sales_operational_alert_seeds(
                     metadata_json={
                         "hot_leads_count": item.hot_leads_count,
                         "won_deals_count": item.won_deals_count,
+                        "avg_response_sla_status": item.avg_response_sla_status,
+                        "needs_reply_count": item.needs_reply_count,
+                        "overdue_follow_up_count": item.overdue_follow_up_count,
                     },
                 )
             )
@@ -825,6 +886,9 @@ def sync_operational_alert_notifications(
             sales_user_team_map=sales_user_team_map,
         )
     )
+    desired_notifications = _deduplicate_operational_alert_seeds(
+        desired_notifications
+    )
 
     existing_statement = select(OpsNotification).where(
         OpsNotification.organization_id == current_user.organization_id,
@@ -841,21 +905,30 @@ def sync_operational_alert_notifications(
 
     now = datetime.now(timezone.utc)
     existing_notifications = list(db.scalars(existing_statement).all())
-    existing_by_key = {
-        notification.source_key: notification
-        for notification in existing_notifications
-    }
+    existing_groups: dict[str, list[OpsNotification]] = {}
+    for notification in existing_notifications:
+        existing_groups.setdefault(notification.source_key, []).append(notification)
+
+    existing_by_key: dict[str, OpsNotification] = {}
+    for source_key, notifications in existing_groups.items():
+        survivor = _select_operational_alert_survivor(notifications)
+        existing_by_key[source_key] = survivor
+        for redundant in notifications:
+            if redundant.id == survivor.id or not _is_open_notification_status(redundant.status):
+                continue
+            redundant.status = "resolved"
+            redundant.resolved_at = now
+            redundant.resolved_by_user_id = current_user.id
+            redundant.resolution_note = (
+                redundant.resolution_note
+                or "Duplicate operational alert reconciled during sync."
+            )
+            db.add(redundant)
+
     desired_keys = {str(item["source_key"]) for item in desired_notifications}
 
-    for notification in existing_notifications:
+    for notification in existing_by_key.values():
         if notification.source_key in desired_keys:
-            continue
-        if notification.status == "ignored":
-            notification.status = "resolved"
-            notification.ignored_at = notification.ignored_at or now
-            notification.resolved_at = now
-            notification.resolved_by_user_id = current_user.id
-            db.add(notification)
             continue
         if _is_open_notification_status(notification.status):
             notification.status = "resolved"
@@ -891,6 +964,7 @@ def sync_operational_alert_notifications(
                 metadata_json=item["metadata_json"],
                 triggered_at=now,
             )
+            existing_by_key[source_key] = notification
         else:
             notification.team_id = item["team_id"]
             notification.sales_user_id = item["sales_user_id"]
