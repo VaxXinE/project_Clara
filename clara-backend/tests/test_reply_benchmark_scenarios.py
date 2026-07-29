@@ -45,6 +45,15 @@ class FakeOpenAI:
         return SimpleNamespace(output_parsed=next_payload, output_text="", output=[])
 
 
+@pytest.fixture(autouse=True)
+def configure_fake_openai_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        reply_suggestion_service.settings,
+        "openai_api_key",
+        "sk-test-reply-benchmark-fake-only",
+    )
+
+
 def _build_payload(text: str) -> dict[str, list[dict[str, str]]]:
     return {
         "suggested_replies": [
