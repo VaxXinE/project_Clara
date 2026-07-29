@@ -582,6 +582,57 @@ export type SalesPerformanceTrend = {
   momentum_label: string;
 };
 
+export type WeeklyPerformanceSnapshotItem = {
+  snapshot_date: string;
+  snapshot_granularity: string;
+  member_count?: number | null;
+  active_leads_count: number;
+  needs_reply_count: number;
+  overdue_follow_up_count: number;
+  hot_leads_count: number;
+  analyzed_conversations_count: number;
+  needs_analysis_count: number;
+  won_deals_count: number;
+  lost_deals_count?: number | null;
+  open_deals_count?: number | null;
+  avg_response_sla_status: string;
+  crm_discipline_status: string;
+  coaching_priority_score: number;
+  coaching_priority_label: string;
+};
+
+export type HistoricalPerformanceSummary = {
+  trend_label: string;
+  delta_needs_reply: number;
+  delta_overdue_follow_up: number;
+  delta_won_deals: number;
+  latest_snapshot_date: string | null;
+  previous_snapshot_date: string | null;
+};
+
+export type OperationalScorecard = {
+  overall_score: number;
+  score_label: string;
+  response_discipline_score: number;
+  follow_up_discipline_score: number;
+  hot_lead_handling_score: number;
+  pipeline_movement_score: number;
+  crm_hygiene_score: number;
+  primary_reason: string;
+  secondary_reason: string | null;
+  recommended_action: string;
+  score_delta_vs_previous: number;
+  score_trend_label: string;
+};
+
+export type ManagerHistoricalSummary = {
+  trend_label: string;
+  delta_total_needs_reply: number;
+  delta_total_overdue_follow_up: number;
+  latest_snapshot_date: string | null;
+  previous_snapshot_date: string | null;
+};
+
 export type SalesCoachingSignal = {
   priority_score: number;
   priority_label: string;
@@ -631,8 +682,110 @@ export type TeamPerformanceItem = {
   avg_response_sla_status: string;
   crm_discipline_status: string;
   trend: SalesPerformanceTrend;
+  scorecard: OperationalScorecard;
   coaching_signal: SalesCoachingSignal;
   top_sales_contributors: TeamTopContributorItem[];
+  weekly_history: WeeklyPerformanceSnapshotItem[];
+  history_summary: HistoricalPerformanceSummary | null;
+};
+
+export type PerformanceActionCreateRequest = {
+  assigned_to_user_id: string;
+  team_id?: string | null;
+  sales_user_id?: string | null;
+  source_type: string;
+  source_reference_id?: string | null;
+  title: string;
+  description: string;
+  action_type: string;
+  priority_label: string;
+  due_at?: string | null;
+};
+
+export type PerformanceActionUpdateRequest = {
+  status: string;
+  resolution_note?: string | null;
+};
+
+export type PerformanceActionItem = {
+  id: string;
+  organization_id: string | null;
+  created_by_user_id: string | null;
+  created_by_user_name: string | null;
+  assigned_to_user_id: string | null;
+  assigned_to_user_name: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  sales_user_id: string | null;
+  sales_name: string | null;
+  source_type: string;
+  source_reference_id: string | null;
+  title: string;
+  description: string;
+  action_type: string;
+  status: string;
+  priority_label: string;
+  due_at: string | null;
+  resolution_note: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PerformanceActionListResponse = {
+  generated_at: string;
+  open_count: number;
+  in_progress_count: number;
+  done_count: number;
+  skipped_count: number;
+  items: PerformanceActionItem[];
+};
+
+export type WeeklyReviewEntityItem = {
+  scope_type: string;
+  sales_user_id: string | null;
+  team_id: string | null;
+  label: string;
+  team_name: string | null;
+  score: number;
+  score_label: string;
+  trend_label: string;
+  score_delta: number;
+  backlog_count: number;
+  overdue_count: number;
+  action_open_count: number;
+  critical_alert_count: number;
+  summary: string;
+  target_href: string | null;
+};
+
+export type WeeklyReviewAlertItem = {
+  notification_id: string;
+  alert_type: string | null;
+  title: string;
+  description: string;
+  severity: string;
+  status: string;
+  team_name: string | null;
+  sales_name: string | null;
+  target_href: string | null;
+  triggered_at: string | null;
+};
+
+export type WeeklyReviewSummaryResponse = {
+  generated_at: string;
+  review_start: string;
+  review_end: string;
+  scope_label: string;
+  healthy_team_count: number;
+  teams_needing_attention_count: number;
+  unresolved_action_count: number;
+  critical_alert_open_count: number;
+  top_improvers: WeeklyReviewEntityItem[];
+  biggest_risks: WeeklyReviewEntityItem[];
+  teams_needing_intervention: WeeklyReviewEntityItem[];
+  unresolved_actions: PerformanceActionItem[];
+  critical_alerts_open: WeeklyReviewAlertItem[];
 };
 
 export type ManagerSalesPerformanceItem = {
@@ -652,7 +805,10 @@ export type ManagerSalesPerformanceItem = {
   avg_response_sla_status: string;
   crm_discipline_status: string;
   trend: SalesPerformanceTrend;
+  scorecard: OperationalScorecard;
   coaching_signal: SalesCoachingSignal;
+  weekly_history: WeeklyPerformanceSnapshotItem[];
+  history_summary: HistoricalPerformanceSummary | null;
 };
 
 export type SalesPerformanceDetailUser = {
@@ -680,7 +836,10 @@ export type SalesPerformanceDetailSummary = {
   avg_response_sla_status: string;
   crm_discipline_status: string;
   trend: SalesPerformanceTrend;
+  scorecard: OperationalScorecard;
   coaching_signal: SalesCoachingSignal;
+  weekly_history: WeeklyPerformanceSnapshotItem[];
+  history_summary: HistoricalPerformanceSummary | null;
 };
 
 export type SalesPerformanceLeadItem = {
@@ -738,11 +897,40 @@ export type ManagerInsightsResponse = {
   coaching_priority: ManagerCoachingPriorityItem[];
   objection_trends: ManagerObjectionTrendItem[];
   boundary_alerts: ManagerBoundaryAlertItem[];
+  historical_summary: ManagerHistoricalSummary | null;
+  weekly_review: WeeklyReviewSummaryResponse | null;
   sales_performance_summary: ManagerSalesPerformanceSummary;
   sales_performance: ManagerSalesPerformanceItem[];
   top_coaching_targets: TopCoachingTargetItem[];
   team_performance_summary: TeamPerformanceSummary;
   team_performance: TeamPerformanceItem[];
+};
+
+export type SalesPerformanceHistoryResponse = {
+  generated_at: string;
+  sales_user: SalesPerformanceDetailUser;
+  history_summary: HistoricalPerformanceSummary;
+  weekly_history: WeeklyPerformanceSnapshotItem[];
+};
+
+export type TeamPerformanceHistoryResponse = {
+  generated_at: string;
+  team_id: string;
+  team_name: string;
+  unit_id: string | null;
+  unit_name: string | null;
+  manager_user_name: string | null;
+  history_summary: HistoricalPerformanceSummary;
+  weekly_history: WeeklyPerformanceSnapshotItem[];
+};
+
+export type PerformanceSnapshotGenerationResponse = {
+  generated_at: string;
+  snapshot_granularity: string;
+  weeks: number;
+  snapshot_dates: string[];
+  sales_snapshot_count: number;
+  team_snapshot_count: number;
 };
 
 export type SalesApprovalQueueItem = {
@@ -840,8 +1028,13 @@ export type OpsNotificationItem = {
   id: string;
   organization_id: string | null;
   user_id: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  sales_user_id: string | null;
   source_type: string;
   source_key: string;
+  source_reference_id: string | null;
+  alert_type: string | null;
   workflow_scope: string;
   owner_role: string;
   target_role: string;
@@ -857,12 +1050,17 @@ export type OpsNotificationItem = {
   delivery_status: string;
   escalation_level: string;
   resolution_note: string | null;
+  metadata_json: Record<string, unknown> | null;
   age_bucket: string;
   acknowledged_by_user_id: string | null;
   acknowledged_at: string | null;
+  resolved_by_user_id: string | null;
   delivered_at: string | null;
   escalated_at: string | null;
   resolved_at: string | null;
+  ignored_by_user_id: string | null;
+  ignored_at: string | null;
+  triggered_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -872,6 +1070,7 @@ export type OpsNotificationResponse = {
   active_count: number;
   acknowledged_count: number;
   resolved_count: number;
+  ignored_count: number;
   escalated_count: number;
   items: OpsNotificationItem[];
 };

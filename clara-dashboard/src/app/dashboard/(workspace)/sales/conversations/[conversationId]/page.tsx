@@ -104,6 +104,15 @@ function getLatestConversationMessage(detail: SalesConversationDetail) {
   )[detail.messages.length - 1] ?? null;
 }
 
+function getLatestCustomerMessage(detail: SalesConversationDetail) {
+  const customerMessages = detail.messages.filter(
+    (message) => message.sender_type === "customer",
+  );
+  return [...customerMessages].sort((left, right) =>
+    left.message_timestamp.localeCompare(right.message_timestamp),
+  )[customerMessages.length - 1] ?? null;
+}
+
 function isSalesConversationMessage(
   message: SalesConversationDetail["messages"][number],
 ): boolean {
@@ -597,13 +606,17 @@ export default function SalesConversationDetailPage() {
     >
       <div className="space-y-6">
         {isLoading && (
-          <div className="clara-empty-state text-sm text-slate-600">
-            Loading conversation...
+          <div
+            role="status"
+            aria-live="polite"
+            className="clara-empty-state text-sm"
+          >
+            Memuat percakapan...
           </div>
         )}
 
         {errorMessage && !isLoading && (
-          <div className="clara-alert clara-alert-danger">
+          <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}. Coba kembali ke{" "}
             <Link
               href={
@@ -714,10 +727,12 @@ function ConversationFreshnessBanner({
     <div className="space-y-3">
       {uploadBanner ? (
         <div
+          role="status"
+          aria-live="polite"
           className={
             uploadBanner.tone === "success"
-              ? "rounded-[24px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
-              : "rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"
+              ? "clara-alert clara-alert-success"
+              : "clara-alert clara-alert-info"
           }
         >
           {uploadBanner.text}
@@ -725,16 +740,16 @@ function ConversationFreshnessBanner({
       ) : null}
 
       {(freshCustomerReply || analysisStale || suggestionStale) ? (
-        <div className="rounded-[28px] border border-[#f0cb73]/20 bg-[linear-gradient(135deg,rgba(43,31,20,0.96)_0%,rgba(24,18,12,0.98)_100%)] p-5 shadow-[0_20px_40px_rgba(0,0,0,0.22)]">
+        <div role="alert" className="clara-alert clara-alert-warning p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="clara-kicker text-[#f0cb73]">
+              <p className="clara-kicker">
                 Chat terus berkembang
               </p>
-              <h2 className="mt-2 text-lg font-bold text-[#fff0c9]">
+              <h2 className="mt-2 text-lg font-bold clara-text-primary">
                 Ada konteks baru setelah tindakan terakhir
               </h2>
-              <div className="mt-3 space-y-2 text-sm leading-6 text-[#d6bb82]">
+              <div className="mt-3 space-y-2 text-sm leading-6 clara-text-secondary">
                 {freshCustomerReply ? (
                   <p>
                     Customer sudah membalas lagi setelah pesan terakhir yang
@@ -760,14 +775,14 @@ function ConversationFreshnessBanner({
             <div className="flex flex-wrap gap-3">
               <Link
                 href={continuationHref}
-                className="inline-flex rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
+                className="clara-button clara-button-primary"
               >
                 Upload Chat Lanjutan
               </Link>
               <button
                 type="button"
                 onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                className="inline-flex rounded-full border border-[#f0cb73]/24 bg-[#f0cb73]/10 px-4 py-2.5 text-sm font-semibold text-[#f3d694] hover:bg-[#f0cb73]/14"
+                className="clara-button clara-button-ghost"
               >
                 Baca dari atas lagi
               </button>
@@ -789,17 +804,18 @@ function ConversationDetailHeader({
   const analysisStale = isAnalysisStale(detail);
   const suggestionStale = isReplySuggestionStale(detail);
   const provider = inferProviderFromSource(detail.source);
+  const latestCustomerMessage = getLatestCustomerMessage(detail);
 
   return (
-    <section className="clara-card rounded-[30px] p-5 sm:p-6">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
-        <div>
-          <p className="clara-kicker">Conversation Signal</p>
-          <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-slate-950">
-            Ringkasan kondisi percakapan saat ini
+    <section className="clara-card p-5 sm:p-6">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+        <div className="min-w-0">
+          <p className="clara-kicker">Konteks percakapan</p>
+          <h2 className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl">
+            Status dan pesan customer terbaru
           </h2>
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            Last message: {formatDateTime(detail.last_message_at)}
+          <p className="mt-2 text-sm leading-6 clara-text-secondary">
+            Aktivitas terakhir {formatDateTime(detail.last_message_at)}
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -879,39 +895,62 @@ function ConversationDetailHeader({
               </span>
             ) : null}
           </div>
+
+          <article className="clara-card-soft mt-5 min-w-0 p-4">
+            <p className="clara-kicker text-[11px]">
+              Pesan customer terbaru
+            </p>
+            {latestCustomerMessage ? (
+              <>
+                <p className="mt-2 break-words whitespace-pre-wrap text-sm leading-6 clara-text-primary [overflow-wrap:anywhere]">
+                  {latestCustomerMessage.message_text}
+                </p>
+                <p className="mt-2 text-xs clara-text-muted">
+                  {latestCustomerMessage.sender_name} ·{" "}
+                  {formatDateTime(latestCustomerMessage.message_timestamp)}
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 text-sm clara-text-secondary">
+                Belum ada pesan customer pada timeline ini.
+              </p>
+            )}
+          </article>
         </div>
 
-        <div className="clara-card-dark rounded-[26px] p-5">
-          <p className="clara-kicker text-[#d4b07b]">Snapshot</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+        <aside className="clara-card-outline p-4" aria-label="Metadata percakapan">
+          <p className="clara-kicker">Identitas</p>
+          <div className="mt-3 grid gap-2">
             <MetaPill
               label="Channel"
               value={formatChannelLabel(detail.source_channel)}
-              dark
             />
             <MetaPill
               label="Provider"
               value={formatProviderLabel(provider)}
-              dark
             />
-            <MetaPill label="Source" value={detail.source_label} dark />
+            <MetaPill label="Source" value={detail.source_label} />
+            <MetaPill label="Status" value={formatStatusLabel(detail.status)} />
             <MetaPill
-              label="Messages"
+              label="Kategori"
+              value={formatAccountCategory(detail.account_category)}
+            />
+            <MetaPill
+              label="Pesan"
               value={String(detail.messages.length)}
-              dark
-            />
-            <MetaPill
-              label="Sent logs"
-              value={String(detail.sent_messages.length)}
-              dark
             />
             <MetaPill
               label="AI status"
-              value={extraction ? "Analyzed" : "Pending"}
-              dark
+              value={
+                analysisStale
+                  ? "Perlu diperbarui"
+                  : extraction
+                    ? "Tersedia"
+                    : "Belum tersedia"
+              }
             />
           </div>
-        </div>
+        </aside>
       </div>
     </section>
   );
@@ -1032,75 +1071,70 @@ function ConversationDetailContent({
     ? detail.messages
     : detail.messages.slice(Math.max(detail.messages.length - 12, 0));
   const chatTimeline = (
-    <div
+    <section
       data-onboarding-id="sales-conversation-timeline"
-      className="clara-card rounded-[30px] p-5 sm:p-6"
+      className="clara-card min-w-0 p-4 sm:p-6"
+      aria-labelledby="conversation-timeline-title"
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="clara-kicker">Chat Timeline</p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[#fff0c9]">
+          <p className="clara-kicker">Timeline</p>
+          <h2
+            id="conversation-timeline-title"
+            className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl"
+          >
             Timeline percakapan
           </h2>
-          <p className="mt-2 text-sm text-[#d6bb84]">
+          <p className="mt-2 text-sm leading-6 clara-text-secondary">
             Fokus ke pesan terbaru dulu. Expand penuh hanya saat butuh membaca
             konteks lama.
           </p>
         </div>
 
-        <div className="rounded-full border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(24,17,12,0.96)_100%)] px-4 py-2 text-sm text-[#d6bb84]">
+        <div className="clara-chip clara-chip-neutral">
           Menampilkan {visibleMessages.length} dari {detail.messages.length}{" "}
           pesan
         </div>
       </div>
 
       <div
-        className="clara-scrollbar mt-5 max-h-[70vh] overflow-y-auto rounded-[28px] border border-[#f0cb73]/12 p-4 pr-2 shadow-[inset_0_1px_0_rgba(255,240,201,0.03)] sm:p-5 sm:pr-3"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(18, 13, 9, 0.84), rgba(18, 13, 9, 0.84)), url('/assets/eb24786e5579a01bdd4bb103695b8286.jpg')",
-          backgroundPosition: "center",
-          backgroundRepeat: "repeat",
-          backgroundSize: "280px auto",
-        }}
+        className="clara-scrollbar mt-5 max-h-[70vh] overflow-y-auto rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-muted)] p-3 sm:p-4"
       >
-        <div className="space-y-3">
+        <ol className="space-y-3" aria-label="Pesan percakapan">
           {!showAllMessages &&
           detail.messages.length > visibleMessages.length ? (
-            <div className="rounded-[22px] border border-dashed border-[#f0cb73]/24 bg-[rgba(32,23,14,0.92)] p-4 text-sm text-[#d6bb84]">
+            <li className="clara-card-outline p-3 text-sm clara-text-secondary">
               {detail.messages.length - visibleMessages.length} pesan lama
               disembunyikan dulu supaya halaman tetap ringkas.
-            </div>
+            </li>
+          ) : null}
+
+          {visibleMessages.length === 0 ? (
+            <li className="clara-empty-state text-sm">
+              Belum ada pesan pada percakapan ini.
+            </li>
           ) : null}
 
           {visibleMessages.map((message) => {
             const isSales = isSalesConversationMessage(message);
 
             return (
-              <div
+              <li
                 key={message.id}
-                className={`flex px-1 ${isSales ? "justify-end" : "justify-start"}`}
+                className={`flex min-w-0 ${isSales ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[90%] sm:max-w-[78%] rounded-[24px] border px-4 py-3 shadow-[0_14px_32px_rgba(0,0,0,0.18)] ${
+                  className={`min-w-0 max-w-[92%] rounded-xl border px-4 py-3 sm:max-w-[78%] ${
                     isSales
-                      ? "rounded-tr-[10px] border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(250,220,134,0.98)_0%,rgba(227,186,92,0.98)_55%,rgba(194,138,43,0.98)_100%)] text-[#2c1907]"
-                      : "rounded-tl-[10px] border-[#5a3a17]/72 bg-[linear-gradient(180deg,rgba(55,35,21,0.98)_0%,rgba(36,23,14,0.98)_100%)] text-[#fff0c9]"
+                      ? "rounded-tr-sm border-[var(--color-border-strong)] bg-[var(--color-warning-surface)]"
+                      : "rounded-tl-sm border-[var(--color-border-default)] bg-[var(--color-surface-base)]"
                   }`}
                 >
-                  {!isSales ? (
-                    <p className="mb-1 text-xs font-semibold text-[#ff7792]">
-                      {message.sender_name}
-                    </p>
-                  ) : null}
+                  <p className="mb-1 text-xs font-semibold clara-text-secondary">
+                    {isSales ? "Sales" : "Customer"} · {message.sender_name}
+                  </p>
                   {message.reply_context_text ? (
-                    <div
-                      className={`mb-3 rounded-[18px] border px-3 py-2 text-xs leading-6 ${
-                        isSales
-                          ? "border-[#7d5316]/24 bg-[rgba(95,62,17,0.12)] text-[#5f3910]"
-                          : "border-[#f0cb73]/16 bg-[rgba(255,240,201,0.06)] text-[#dcbf86]"
-                      }`}
-                    >
+                    <blockquote className="mb-3 min-w-0 rounded-lg border-l-4 border-[var(--color-border-strong)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs leading-5 clara-text-secondary">
                       <p className="mb-1 font-semibold">
                         Membalas{" "}
                         {message.reply_context_sender_type === "sales"
@@ -1110,28 +1144,24 @@ function ConversationDetailContent({
                           ? ` · ${message.reply_context_sender_name}`
                           : ""}
                       </p>
-                      <p className="whitespace-pre-wrap opacity-90">
+                      <p className="break-words whitespace-pre-wrap [overflow-wrap:anywhere]">
                         {message.reply_context_text}
                       </p>
-                    </div>
+                    </blockquote>
                   ) : null}
-                  <p className="whitespace-pre-wrap text-[15px] leading-7">
+                  <p className="break-words whitespace-pre-wrap text-[15px] leading-7 clara-text-primary [overflow-wrap:anywhere]">
                     {message.message_text}
                   </p>
                   <div className="mt-2 flex justify-end">
-                    <p
-                      className={`text-[11px] font-medium ${
-                        isSales ? "text-[#6f4311]" : "text-[#d4b06d]"
-                      }`}
-                    >
+                    <p className="text-xs clara-text-muted">
                       {formatDateTime(message.message_timestamp)}
                     </p>
                   </div>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
       </div>
 
       {detail.messages.length > 12 ? (
@@ -1139,13 +1169,13 @@ function ConversationDetailContent({
           <button
             type="button"
             onClick={() => setShowAllMessages((current) => !current)}
-            className="inline-flex rounded-full border border-[#f0cb73]/18 bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#f0cb73] hover:border-[#f0cb73]/32"
+            className="clara-button clara-button-ghost"
           >
             {showAllMessages ? "Tampilkan ringkas" : "Tampilkan semua pesan"}
           </button>
         </div>
       ) : null}
-    </div>
+    </section>
   );
 
   return (
@@ -1167,7 +1197,7 @@ function ConversationDetailContent({
             >
               <div>
                 <p className="clara-kicker">Area kerja sales</p>
-                <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                <h3 className="mt-2 text-lg font-semibold clara-text-primary">
                   Baca konteks lalu pilih aksi
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1205,7 +1235,7 @@ function ConversationDetailContent({
                       className="rounded-[26px] border border-slate-200 bg-white p-5"
                     >
                       <p className="clara-kicker">Ringkasan Clara</p>
-                      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                         Hasil baca percakapan
                       </h2>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1237,6 +1267,10 @@ function ConversationDetailContent({
                             value={formatStatusLabel(extraction.pipeline_stage)}
                           />
                           <InfoBlock
+                            label="Buying intent"
+                            value={formatStatusLabel(extraction.buying_intent)}
+                          />
+                          <InfoBlock
                             label="Sentimen"
                             value={formatStatusLabel(extraction.sentiment)}
                           />
@@ -1265,6 +1299,10 @@ function ConversationDetailContent({
                             label="Langkah berikutnya"
                             value={extraction.next_best_action}
                           />
+                          <InfoBlock
+                            label="Confidence AI"
+                            value={`${(extraction.confidence_score * 100).toFixed(0)}%`}
+                          />
                         </div>
                       ) : (
                         <div className="clara-card-outline mt-4 rounded-[24px] p-4 text-sm text-slate-600">
@@ -1288,7 +1326,7 @@ function ConversationDetailContent({
                         />
                       ) : (
                         <div className="clara-card-outline rounded-[30px] p-5">
-                          <h2 className="text-lg font-semibold text-slate-950">
+                          <h2 className="text-lg font-semibold clara-text-primary">
                             Belum ada jawaban terbaik
                           </h2>
                           <p className="mt-2 text-sm text-slate-600">
@@ -1303,9 +1341,13 @@ function ConversationDetailContent({
                 {activePanel === "sent_logs" ? (
                   <div className="rounded-[26px] border border-slate-200 bg-white p-5">
                     <p className="clara-kicker">Riwayat kirim</p>
-                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                       Balasan yang sudah ditandai terkirim
                     </h2>
+                    <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                      Riwayat manual dashboard; bukan konfirmasi delivery atau
+                      read receipt dari provider.
+                    </p>
 
                     {detail.sent_messages.length > 0 ? (
                       <div className="mt-4 space-y-3">
@@ -1321,7 +1363,7 @@ function ConversationDetailContent({
                               {formatDateTime(sentMessage.sent_at)} &bull;{" "}
                               {sentMessage.send_mode}
                             </p>
-                            <p className="mt-3 whitespace-pre-wrap leading-6">
+                            <p className="mt-3 break-words whitespace-pre-wrap leading-6 [overflow-wrap:anywhere]">
                               {sentMessage.message_text}
                             </p>
                           </div>
@@ -1342,7 +1384,7 @@ function ConversationDetailContent({
             <section className="clara-card rounded-[30px] p-5">
           <div>
             <p className="clara-kicker">Workspace Panel</p>
-            <h3 className="mt-2 text-lg font-semibold text-slate-950">
+            <h3 className="mt-2 text-lg font-semibold clara-text-primary">
               Pilih area kerja
             </h3>
           </div>
@@ -1384,7 +1426,7 @@ function ConversationDetailContent({
 
                 <div className="rounded-[26px] border border-slate-200 bg-white p-5">
                   <p className="clara-kicker">AI Analysis</p>
-                  <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                  <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                     Hasil pembacaan Clara
                   </h2>
 
@@ -1393,6 +1435,10 @@ function ConversationDetailContent({
                       <InfoBlock
                         label="Pipeline stage"
                         value={formatStatusLabel(extraction.pipeline_stage)}
+                      />
+                      <InfoBlock
+                        label="Buying intent"
+                        value={formatStatusLabel(extraction.buying_intent)}
                       />
                       <InfoBlock
                         label="Sentiment"
@@ -1449,7 +1495,7 @@ function ConversationDetailContent({
                   />
                 ) : (
                   <div className="clara-card-outline rounded-[30px] p-5">
-                    <h2 className="text-lg font-semibold text-slate-950">
+                    <h2 className="text-lg font-semibold clara-text-primary">
                       Belum ada reply suggestion
                     </h2>
                     <p className="mt-2 text-sm text-slate-600">
@@ -1466,7 +1512,7 @@ function ConversationDetailContent({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="clara-kicker">Coaching Review</p>
-                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                       Review case manusia untuk manager dan head
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1488,20 +1534,27 @@ function ConversationDetailContent({
                 </div>
 
                 {reviewSuccessMessage ? (
-                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="clara-alert clara-alert-success mt-4"
+                  >
                     {reviewSuccessMessage}
                   </div>
                 ) : null}
 
                 {reviewErrorMessage ? (
-                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  <div role="alert" className="clara-alert clara-alert-danger mt-4">
                     {reviewErrorMessage}
                   </div>
                 ) : null}
 
                 {reviewSuggestionHint ? (
-                  <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-700">
-                    {reviewSuggestionHint}
+                  <div
+                    role="status"
+                    className="clara-alert clara-alert-info mt-4"
+                  >
+                    Saran AI—belum disimpan: {reviewSuggestionHint}
                   </div>
                 ) : null}
 
@@ -1653,20 +1706,24 @@ function ConversationDetailContent({
                   <div className="mt-6 space-y-4">
                     <div>
                       <p className="clara-kicker">Manager Notes</p>
-                      <h3 className="mt-2 text-lg font-semibold text-slate-950">
+                      <h3 className="mt-2 text-lg font-semibold clara-text-primary">
                         Catatan coaching yang tersimpan
                       </h3>
                     </div>
 
                     {canManage ? (
                       <form onSubmit={onAddReviewNote} className="space-y-3">
+                        <label htmlFor="manager-note" className="clara-label">
+                          Manager note
+                        </label>
                         <textarea
+                          id="manager-note"
                           value={reviewNoteInput}
                           onChange={(event) =>
                             onReviewNoteChange(event.target.value)
                           }
                           rows={3}
-                          className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                          className="clara-textarea"
                           placeholder="Tulis catatan coaching, instruksi rework, atau alasan eskalasi."
                         />
                         <div className="flex justify-end">
@@ -1699,7 +1756,7 @@ function ConversationDetailContent({
                                 {formatReviewCaseLabel(note.note_type)}
                               </span>
                             </div>
-                            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                            <p className="mt-3 break-words whitespace-pre-wrap text-sm leading-6 clara-text-secondary [overflow-wrap:anywhere]">
                               {note.body}
                             </p>
                           </article>
@@ -1720,7 +1777,7 @@ function ConversationDetailContent({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="clara-kicker">Knowledge Update Queue</p>
-                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                       Usulan knowledge dari kasus lapangan
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1750,13 +1807,20 @@ function ConversationDetailContent({
                 ) : (
                   <>
                     {knowledgeProposalSuccessMessage ? (
-                      <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                      <div
+                        role="status"
+                        aria-live="polite"
+                        className="clara-alert clara-alert-success mt-4"
+                      >
                         {knowledgeProposalSuccessMessage}
                       </div>
                     ) : null}
 
                     {knowledgeProposalErrorMessage ? (
-                      <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                      <div
+                        role="alert"
+                        className="clara-alert clara-alert-danger mt-4"
+                      >
                         {knowledgeProposalErrorMessage}
                       </div>
                     ) : null}
@@ -1962,9 +2026,13 @@ function ConversationDetailContent({
             {activePanel === "sent_logs" ? (
               <div className="rounded-[26px] border border-slate-200 bg-white p-5">
                 <p className="clara-kicker">Sent Messages</p>
-                <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
-                  Riwayat balasan terkirim
+                <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
+                  Balasan yang ditandai terkirim
                 </h2>
+                <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                  Riwayat manual dashboard; bukan konfirmasi delivery atau read
+                  receipt dari provider.
+                </p>
 
                 {detail.sent_messages.length > 0 ? (
                   <div className="mt-4 space-y-3">
@@ -1980,7 +2048,7 @@ function ConversationDetailContent({
                           {formatDateTime(sentMessage.sent_at)} &bull;{" "}
                           {sentMessage.send_mode}
                         </p>
-                        <p className="mt-3 whitespace-pre-wrap leading-6">
+                        <p className="mt-3 break-words whitespace-pre-wrap leading-6 [overflow-wrap:anywhere]">
                           {sentMessage.message_text}
                         </p>
                       </div>
@@ -2018,6 +2086,7 @@ function PanelTab({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={isActive}
       className={`w-full rounded-2xl px-3.5 py-2.5 text-center text-sm font-semibold transition ${
         isActive
           ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
@@ -2032,22 +2101,16 @@ function PanelTab({
 function MetaPill({
   label,
   value,
-  dark = false,
 }: {
   label: string;
   value: string;
-  dark?: boolean;
 }) {
   return (
-    <div
-      className={`flex items-center justify-between rounded-2xl px-4 py-3 ${
-        dark ? "bg-white/7 text-slate-100" : "bg-slate-50 text-slate-900"
-      }`}
-    >
-      <span className={dark ? "text-slate-300" : "text-slate-600"}>
-        {label}
+    <div className="flex min-w-0 items-start justify-between gap-3 rounded-lg bg-[var(--color-surface-muted)] px-3 py-2.5">
+      <span className="text-sm clara-text-secondary">{label}</span>
+      <span className="min-w-0 break-words text-right text-sm font-semibold clara-text-primary [overflow-wrap:anywhere]">
+        {value}
       </span>
-      <span className="font-semibold">{value}</span>
     </div>
   );
 }

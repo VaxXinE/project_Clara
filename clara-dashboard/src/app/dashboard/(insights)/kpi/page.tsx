@@ -68,6 +68,8 @@ export default function KpiCommandCenterPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const loadKpiPage = useCallback(async () => {
+    setErrorMessage("");
+
     try {
       const kpiPath =
         sourceChannelFilter === "all"
@@ -83,15 +85,31 @@ export default function KpiCommandCenterPage() {
         return;
       }
 
-      const [kpiResponse, alertsResponse, snapshotsResponse] =
-        await Promise.all([
+      const [kpiResult, alertsResult, snapshotsResult] =
+        await Promise.allSettled([
           apiFetch<KpiCommandCenterResponse>(kpiPath),
           apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts"),
           apiFetch<KpiSnapshotHistoryResponse>("/dashboard/kpi/snapshots"),
         ]);
-      setKpi(kpiResponse);
-      setAlertHistory(alertsResponse);
-      setSnapshotHistory(snapshotsResponse);
+
+      if (kpiResult.status === "fulfilled") {
+        setKpi(kpiResult.value);
+      }
+      if (alertsResult.status === "fulfilled") {
+        setAlertHistory(alertsResult.value);
+      }
+      if (snapshotsResult.status === "fulfilled") {
+        setSnapshotHistory(snapshotsResult.value);
+      }
+      if (
+        kpiResult.status === "rejected" ||
+        alertsResult.status === "rejected" ||
+        snapshotsResult.status === "rejected"
+      ) {
+        setErrorMessage(
+          "Sebagian data KPI gagal dimuat. Data yang berhasil dimuat tetap ditampilkan.",
+        );
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -248,19 +266,23 @@ export default function KpiCommandCenterPage() {
     >
       <div className="space-y-8">
         {isLoading ? (
-          <div className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
+          <div role="status" className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
             Loading KPI command center...
           </div>
         ) : null}
 
         {errorMessage ? (
-          <div className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
+          <div role="alert" className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
             {errorMessage}
           </div>
         ) : null}
 
-        {kpi && !isLoading && !errorMessage ? (
+        {kpi && !isLoading ? (
           <>
+            <p className="text-sm leading-6 text-[#b89a62]">
+              KPI mendukung review manusia dan bukan satu-satunya dasar untuk
+              keputusan terkait anggota tim atau keuangan.
+            </p>
             <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
               <SectionPanel
                 eyebrow="Status Hari Ini"

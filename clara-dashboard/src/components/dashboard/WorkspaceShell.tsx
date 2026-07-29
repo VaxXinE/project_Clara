@@ -22,7 +22,7 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
 import { resetDashboardOnboardingState } from "@/components/dashboard/SalesOnboardingTour";
@@ -83,13 +83,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     },
     {
       href: "/crm",
-      label: isSalesRole
-        ? "Leads"
-        : isHeadMonitorRole
-          ? "Lead Tim"
-        : isManagerMonitorRole
-          ? "Lead Tim"
-          : "Lead Management",
+      label: "Leads",
       icon: faBriefcase,
       description: isSalesRole
         ? "Progres prospect yang sedang ditangani"
@@ -104,7 +98,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   if (isSalesRole || isSuperadminScopedRole) {
     workspaceItems.push({
       href: "/customers",
-      label: isSalesRole ? "Daftar Customer" : "Customer List",
+      label: "Customers",
       icon: faBuildingShield,
       description: isSalesRole ? "Ringkasan customer aktif" : "Data customer",
     });
@@ -116,13 +110,13 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       0,
       {
         href: "/sales",
-        label: isSalesRole ? "Chat Masuk" : "Queue",
+        label: "Chat",
         icon: faComments,
         description: isSalesRole ? "Tempat mulai balas chat" : "Chat masuk Sales",
       },
       {
         href: "/follow-up",
-        label: isSalesRole ? "Tindak Lanjut" : "Action Center",
+        label: "Follow-up",
         icon: faCalendarCheck,
         description: isSalesRole
           ? "Pekerjaan follow-up yang belum selesai"
@@ -137,7 +131,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   if (currentUser && (isHeadScopedRole || isSuperadminScopedRole)) {
     workspaceItems.push({
       href: "/notifications",
-      label: isHeadMonitorRole ? "Alert Tim" : "Alert Center",
+      label: "Alerts",
       icon: faTriangleExclamation,
       description: isHeadScopedRole
         ? "Sinyal follow-up tim yang perlu perhatian"
@@ -161,12 +155,8 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     workspaceItems.push({
       href: "/approvals",
       label: isHeadScopedRole
-        ? isHeadMonitorRole
-          ? "Arahan Tim"
-          : "Follow-up Center"
-        : isManagerMonitorRole
-          ? "Review Sales"
-          : "Chat Review Center",
+        ? "Arahan Tim"
+        : "Review",
       icon: faWandSparkles,
       description: isHeadScopedRole
         ? "Keputusan dan arahan tindak lanjut tim"
@@ -176,13 +166,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     });
     insightItems.push({
       href: "/manager-insights",
-      label: isHeadScopedRole
-        ? isHeadMonitorRole
-          ? "Monitor Tim"
-          : "Head Insights"
-        : isManagerMonitorRole
-          ? "Monitor Tim"
-          : "Manager Insights",
+      label: "Team Monitor",
       icon: faChartLine,
       description: isHeadScopedRole
         ? "Pantau progres, risiko, dan hambatan tim"
@@ -196,7 +180,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     insightItems.push(
       {
         href: "/knowledge",
-        label: "Knowledge Base",
+        label: "Knowledge",
         icon: faBookOpen,
         description: "Jawaban resmi",
       },
@@ -222,7 +206,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     adminItems.push(
       {
         href: "/admin/access",
-        label: "Access Control",
+        label: "Users & Access",
         icon: faUsersGear,
         description: "Role dan akses",
       },
@@ -322,6 +306,11 @@ export function WorkspaceShell({
   const dashboardUser = useDashboardUser();
   const resolvedCurrentUser = currentUser ?? dashboardUser?.currentUser ?? null;
   const navGroups = buildNavGroups(resolvedCurrentUser);
+  const mobileMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileSidebarRef = useRef<HTMLElement>(null);
+  const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuContainerRef = useRef<HTMLDivElement>(null);
+  const accountMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountMenuPathname, setAccountMenuPathname] = useState(pathname);
@@ -333,7 +322,6 @@ export function WorkspaceShell({
     OpsNotificationItem[]
   >([]);
   const normalizedRole = normalizeWorkspaceRole(resolvedCurrentUser?.role);
-  const isHeadScopedRole = normalizedRole === "head";
   const isAccountMenuVisible =
     accountMenuOpen && accountMenuPathname === pathname;
 
@@ -346,18 +334,116 @@ export function WorkspaceShell({
   }, [currentUser, dashboardUser]);
 
   useEffect(() => {
+    const isDesktop = window.matchMedia("(min-width: 1280px)").matches;
+
     if (!mobileNavOpen) {
       document.body.style.removeProperty("overflow");
+      if (isDesktop) {
+        mobileSidebarRef.current?.removeAttribute("inert");
+        mobileSidebarRef.current?.removeAttribute("aria-hidden");
+      } else {
+        mobileSidebarRef.current?.setAttribute("inert", "");
+        mobileSidebarRef.current?.setAttribute("aria-hidden", "true");
+      }
 
       return;
     }
 
+    mobileSidebarRef.current?.removeAttribute("inert");
+    mobileSidebarRef.current?.removeAttribute("aria-hidden");
     document.body.style.overflow = "hidden";
+    mobileCloseButtonRef.current?.focus();
 
     return () => {
       document.body.style.removeProperty("overflow");
     };
   }, [mobileNavOpen]);
+
+  useEffect(() => {
+    const desktopMedia = window.matchMedia("(min-width: 1280px)");
+
+    function handleDesktopChange(event: MediaQueryListEvent) {
+      if (event.matches) {
+        mobileSidebarRef.current?.removeAttribute("inert");
+        mobileSidebarRef.current?.removeAttribute("aria-hidden");
+        setMobileNavOpen(false);
+      } else if (!mobileNavOpen) {
+        mobileSidebarRef.current?.setAttribute("inert", "");
+        mobileSidebarRef.current?.setAttribute("aria-hidden", "true");
+      }
+    }
+
+    desktopMedia.addEventListener("change", handleDesktopChange);
+
+    return () => desktopMedia.removeEventListener("change", handleDesktopChange);
+  }, [mobileNavOpen]);
+
+  useEffect(() => {
+    if (!isAccountMenuVisible) {
+      return;
+    }
+
+    function handleOutsideClick(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        !accountMenuContainerRef.current?.contains(event.target)
+      ) {
+        setAccountMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handleOutsideClick);
+
+    return () => document.removeEventListener("pointerdown", handleOutsideClick);
+  }, [isAccountMenuVisible]);
+
+  useEffect(() => {
+    if (!mobileNavOpen && !isAccountMenuVisible) {
+      return;
+    }
+
+    function handleShellKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        if (isAccountMenuVisible) {
+          setAccountMenuOpen(false);
+          accountMenuTriggerRef.current?.focus();
+          return;
+        }
+
+        setMobileNavOpen(false);
+        mobileMenuTriggerRef.current?.focus();
+        return;
+      }
+
+      if (event.key !== "Tab" || !mobileNavOpen) {
+        return;
+      }
+
+      const focusableElements = mobileSidebarRef.current?.querySelectorAll<
+        HTMLElement
+      >(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusableElements?.length) {
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
+    }
+
+    document.addEventListener("keydown", handleShellKeyDown);
+
+    return () => document.removeEventListener("keydown", handleShellKeyDown);
+  }, [isAccountMenuVisible, mobileNavOpen]);
 
   useEffect(() => {
     if (!resolvedCurrentUser) {
@@ -441,20 +527,25 @@ export function WorkspaceShell({
   }
 
   return (
-    <main className="min-h-screen bg-transparent text-slate-900">
-      <div className="relative min-h-screen xl:grid xl:grid-cols-[292px_minmax(0,1fr)] xl:items-start">
+    <main className="clara-text-primary min-h-screen bg-transparent">
+      <div className="relative min-h-screen xl:grid xl:grid-cols-[260px_minmax(0,1fr)] xl:items-start">
         <div
-          className={`fixed inset-0 z-40 bg-black/66 backdrop-blur-[2px] transition-opacity duration-300 xl:hidden ${
+          className={`fixed inset-0 z-40 bg-black/70 transition-opacity duration-200 xl:hidden ${
             mobileNavOpen
               ? "pointer-events-auto opacity-100"
               : "pointer-events-none opacity-0"
           }`}
           aria-hidden="true"
-          onClick={() => setMobileNavOpen(false)}
+          onClick={() => {
+            setMobileNavOpen(false);
+            mobileMenuTriggerRef.current?.focus();
+          }}
         />
 
         <aside
+          ref={mobileSidebarRef}
           id="clara-mobile-sidebar"
+          aria-label="Navigasi utama"
           data-onboarding-id={
             normalizedRole === "sales"
               ? "sales-shell-sidebar"
@@ -464,54 +555,59 @@ export function WorkspaceShell({
                   ? "head-shell-sidebar"
                 : undefined
           }
-          className={`fixed inset-y-0 left-0 z-50 flex w-[292px] max-w-[86vw] flex-col overflow-hidden border-r border-[#f0cb73]/14 bg-[linear-gradient(180deg,#15100a_0%,#0f0b07_48%,#090705_100%)] text-white shadow-[0_24px_48px_rgba(0,0,0,0.4)] transition-transform duration-300 xl:sticky xl:top-0 xl:z-auto xl:h-screen xl:w-auto xl:max-w-none xl:translate-x-0 xl:shadow-none ${
+          className={`fixed inset-y-0 left-0 z-50 flex w-[272px] max-w-[86vw] flex-col overflow-hidden border-r border-[var(--color-border-subtle)] bg-[var(--color-surface-base)] shadow-[var(--shadow-floating)] transition-transform duration-200 xl:sticky xl:top-0 xl:z-auto xl:h-screen xl:w-auto xl:max-w-none xl:translate-x-0 xl:shadow-none ${
             mobileNavOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top,_rgba(240,203,115,0.22),_transparent_70%)] opacity-90" />
-          <div className="absolute inset-y-0 right-0 hidden w-px bg-[#f0cb73]/10 xl:block" />
-
-          <div className="relative shrink-0 border-b border-[#f0cb73]/12 px-5 py-5 xl:min-h-[86px] xl:px-0 xl:py-0">
-            <div className="mb-4 flex items-center justify-between xl:hidden">
-              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#f0cb73]">
-                Navigation
+          <div className="shrink-0 border-b border-[var(--color-border-subtle)] p-4">
+            <div className="mb-3 flex items-center justify-between xl:hidden">
+              <p className="clara-text-secondary text-sm font-semibold">
+                Navigasi
               </p>
               <button
+                ref={mobileCloseButtonRef}
                 type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#f0cb73]/14 bg-[#f0cb73]/8 text-[#f7e7b7]"
-                onClick={() => setMobileNavOpen(false)}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--color-border-default)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)]"
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  mobileMenuTriggerRef.current?.focus();
+                }}
                 aria-label="Tutup menu"
               >
                 <FontAwesomeIcon icon={faXmark} className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="clara-surface rounded-[26px] border border-[#f0cb73]/14 bg-[linear-gradient(135deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.96)_100%)] shadow-[0_18px_38px_rgba(0,0,0,0.26)] backdrop-blur-xl xl:rounded-none xl:border-0 xl:bg-transparent xl:shadow-none xl:backdrop-blur-none">
-              <div className="flex min-h-[72px] items-center gap-3 px-4 py-3 sm:px-5 sm:py-3.5 xl:min-h-[85px] xl:px-6 xl:py-0">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_12px_24px_rgba(0,0,0,0.22)] xl:h-10 xl:w-10 xl:rounded-xl xl:shadow-none">
-                  <FontAwesomeIcon icon={faArrowTrendUp} className="h-4 w-4" />
-                </div>
-
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-[#fff0c9] xl:text-base">
-                    {SITE_TITLE}
-                  </p>
-                </div>
+            <div className="flex h-10 items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent)] text-[var(--color-accent-foreground)]">
+                <FontAwesomeIcon icon={faArrowTrendUp} className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">
+                  {SITE_TITLE}
+                </p>
+                <p className="clara-text-muted truncate text-xs capitalize">
+                  {resolvedCurrentUser
+                    ? getRoleDisplayLabel(resolvedCurrentUser.role)
+                    : "Workspace"}
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="clara-scrollbar relative min-h-0 flex-1 space-y-8 overflow-y-auto px-4 py-6">
+          <nav
+            className="clara-scrollbar min-h-0 flex-1 space-y-6 overflow-y-auto px-3 py-5"
+            aria-label="Menu workspace"
+          >
             {navGroups.map((group) => (
-              <div key={group.title}>
-                <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
-                  {group.title === "Insights" && isHeadScopedRole
-                    ? "Head Oversight"
-                    : group.title === "Insights"
-                      ? "Oversight"
-                      : group.title}
-                </p>
-                <nav className="mt-3 space-y-2.5">
+              <section key={group.title} aria-labelledby={`nav-${group.title}`}>
+                <h2
+                  id={`nav-${group.title}`}
+                  className="clara-text-muted px-3 text-xs font-semibold uppercase tracking-[0.16em]"
+                >
+                  {group.title}
+                </h2>
+                <div className="mt-2 space-y-1">
                   {group.items.map((item) => {
                     const active = isNavItemActive(pathname, item.href);
 
@@ -520,105 +616,119 @@ export function WorkspaceShell({
                         key={item.href}
                         href={item.href}
                         onClick={() => setMobileNavOpen(false)}
-                        className={`group flex items-center gap-3 rounded-xl px-3 py-3 transition ${
+                        aria-current={active ? "page" : undefined}
+                        className={`group flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium ${
                           active
-                            ? "border border-[#f7dfa2]/20 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_14px_28px_rgba(0,0,0,0.22)]"
-                            : "border border-white/0 text-slate-200 hover:border-[#f0cb73]/12 hover:bg-[#f0cb73]/8 hover:text-white"
+                            ? "border-[var(--color-border-default)] bg-[var(--color-surface-muted)] text-[var(--color-accent)]"
+                            : "border-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)]"
                         }`}
                       >
-                        <span
-                          className={`flex h-11 w-11 items-center justify-center rounded-2xl transition ${
-                            active
-                              ? "bg-[#140f08] text-[#f7dfa2]"
-                              : "border border-[#f0cb73]/12 bg-[#f0cb73]/7 text-slate-200 group-hover:bg-[#f0cb73]/10"
-                          }`}
-                        >
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
                           <FontAwesomeIcon
                             icon={item.icon}
                             className="h-4 w-4"
                           />
                         </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold">
-                            {item.label}
-                          </span>
-                          <span
-                            className={`mt-0.5 block truncate text-xs ${
-                              active
-                                ? "text-[#352614]"
-                                : "text-slate-400"
-                            }`}
-                          >
-                            {item.description}
-                          </span>
-                        </span>
+                        <span className="min-w-0 truncate">{item.label}</span>
                       </Link>
                     );
                   })}
-                </nav>
-              </div>
+                </div>
+              </section>
             ))}
-          </div>
+          </nav>
         </aside>
 
-        <section className="min-w-0 px-5 pb-5 pt-28 sm:px-7 sm:pb-7 sm:pt-32 xl:px-7 xl:pb-7 xl:pt-32">
-          <div className="fixed inset-x-0 top-0 z-30 px-4 pt-3 sm:px-6 sm:pt-4 xl:left-[292px] xl:right-0 xl:px-0 xl:pt-0">
-            <div className="clara-surface flex items-center justify-between rounded-[26px] border border-[#f0cb73]/14 bg-[linear-gradient(135deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.96)_100%)] px-4 py-3 shadow-[0_18px_38px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:px-5 sm:py-3.5 xl:min-h-[86px] xl:rounded-none xl:border-x-0 xl:border-t-0 xl:bg-[linear-gradient(180deg,rgba(21,16,10,0.96)_0%,rgba(16,12,8,0.94)_100%)] xl:px-8 xl:py-0 xl:shadow-[0_10px_24px_rgba(0,0,0,0.18)] xl:backdrop-blur-none">
+        <section className="min-w-0 px-4 pb-5 pt-20 sm:px-6 sm:pb-6 xl:px-8 xl:pb-8">
+          <div className="fixed inset-x-0 top-0 z-30 h-16 border-b border-[var(--color-border-subtle)] bg-[var(--color-surface-base)] xl:left-[260px]">
+            <div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6 xl:px-8">
               <div className="flex min-w-0 items-center gap-3">
                 <button
+                  ref={mobileMenuTriggerRef}
                   type="button"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_12px_24px_rgba(0,0,0,0.22)] xl:hidden"
-                  onClick={() => setMobileNavOpen(true)}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border-default)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-muted)] xl:hidden"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    setMobileNavOpen(true);
+                  }}
                   aria-label="Buka menu"
                   aria-expanded={mobileNavOpen}
                   aria-controls="clara-mobile-sidebar"
                 >
                   <FontAwesomeIcon icon={faBars} className="h-4 w-4" />
                 </button>
+                <p className="clara-text-secondary truncate text-sm font-medium">
+                  {eyebrow}
+                </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div ref={accountMenuContainerRef} className="relative shrink-0">
                   <button
+                    ref={accountMenuTriggerRef}
                     type="button"
                     onClick={() => {
                       setAccountMenuPathname(pathname);
-                      setAccountMenuOpen((current) => !current);
+                      setAccountMenuOpen((current) =>
+                        accountMenuPathname === pathname ? !current : true,
+                      );
                     }}
-                    className="inline-flex h-10 w-10 items-center text-center gap-1.5 rounded-full border border-[#7a5520]/18 bg-[#2b1c0f] px-3 text-xs font-semibold uppercase text-[#f0cb73] shadow-[0_10px_20px_rgba(0,0,0,0.18)] transition hover:bg-[#362312]"
-                    aria-label="Buka menu akun"
+                    className="flex h-11 max-w-[min(15rem,48vw)] items-center gap-2 rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-muted)] px-2.5 text-left hover:border-[var(--color-border-strong)]"
+                    aria-label={
+                      isAccountMenuVisible ? "Tutup menu akun" : "Buka menu akun"
+                    }
                     aria-expanded={isAccountMenuVisible}
+                    aria-controls="account-menu"
                   >
-                    <span className="hidden sm:inline mx-auto">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-accent)] text-xs font-bold uppercase text-[var(--color-accent-foreground)]">
                       {resolvedCurrentUser?.name
                         ? resolvedCurrentUser.name
                             .split(" ")
                             .map((word) => word[0])
                             .join("")
+                            .slice(0, 2)
                             .toUpperCase()
                         : "A"}
+                    </span>
+                    <span className="hidden min-w-0 sm:block">
+                      <span className="block truncate text-sm font-semibold">
+                        {resolvedCurrentUser?.name ?? "Akun Clara"}
+                      </span>
+                      <span className="clara-text-muted block truncate text-xs capitalize">
+                        {resolvedCurrentUser
+                          ? getRoleDisplayLabel(resolvedCurrentUser.role)
+                          : "Pengguna"}
+                      </span>
                     </span>
                   </button>
 
                   {isAccountMenuVisible ? (
-                    <div className="absolute right-0 top-[calc(100%+0.6rem)] z-40 w-[188px] overflow-hidden rounded-[14px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.98)_0%,rgba(18,13,10,0.98)_100%)] text-[#fff0c9] shadow-[0_16px_34px_rgba(0,0,0,0.28)]">
-                      <div className="border-b border-[#f0cb73]/12 px-3.5 py-3">
-                        <p className="text-lg font-semibold leading-5 text-[#fff0c9]">
-                          {resolvedCurrentUser?.name ?? "AdminNM"}
+                    <div
+                      id="account-menu"
+                      aria-label="Menu akun"
+                      className="absolute right-0 top-[calc(100%+0.5rem)] z-40 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-overlay)] shadow-[var(--shadow-floating)]"
+                    >
+                      <div className="border-b border-[var(--color-border-subtle)] px-4 py-3">
+                        <p className="truncate text-sm font-semibold">
+                          {resolvedCurrentUser?.name ?? "Akun Clara"}
                         </p>
-                        <p className="mt-1 text-xs italic text-[#b89a62]">
+                        {resolvedCurrentUser?.email ? (
+                          <p className="clara-text-secondary mt-1 truncate text-xs">
+                            {resolvedCurrentUser.email}
+                          </p>
+                        ) : null}
+                        <p className="clara-text-muted mt-1 truncate text-xs capitalize">
                           {resolvedCurrentUser
                             ? getRoleDisplayLabel(resolvedCurrentUser.role)
-                            : "Admin"}
+                            : "Pengguna"}
                         </p>
                       </div>
 
-                      <div className="px-2.5 py-2">
+                      <div className="p-2">
                         <Link
                           href={getAccountProfileHref()}
-                          className="block rounded-lg px-3 py-2 text-sm font-medium text-[#f0cb73] transition hover:bg-[#f0cb73]/10"
+                          className="block min-h-11 rounded-lg px-3 py-3 text-sm font-medium hover:bg-[var(--color-surface-muted)]"
                         >
-                          Profile
+                          Profil
                         </Link>
                         {normalizedRole === "sales" ||
                         normalizedRole === "manager" ||
@@ -626,7 +736,7 @@ export function WorkspaceShell({
                           <button
                             type="button"
                             onClick={handleRestartOnboarding}
-                            className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#f0cb73] transition hover:bg-[#f0cb73]/10"
+                            className="block min-h-11 w-full rounded-lg px-3 py-3 text-left text-sm font-medium hover:bg-[var(--color-surface-muted)]"
                           >
                             Ulangi onboarding
                           </button>
@@ -635,46 +745,39 @@ export function WorkspaceShell({
                           type="button"
                           onClick={() => void handleLogout()}
                           disabled={isLoggingOut}
-                          className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#e1c27c] transition hover:bg-[#f0cb73]/10 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="block min-h-11 w-full rounded-lg px-3 py-3 text-left text-sm font-medium text-[var(--color-danger)] hover:bg-[var(--color-danger-surface)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {isLoggingOut ? "Signing Out..." : "Sign Out"}
+                          {isLoggingOut ? "Sedang keluar..." : "Keluar"}
                         </button>
                       </div>
                     </div>
                   ) : null}
-                </div>
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <section className="relative overflow-hidden rounded-[28px] border border-[#f0cb73]/16 bg-[linear-gradient(135deg,rgba(29,21,14,0.96)_0%,rgba(18,13,10,0.97)_52%,rgba(12,9,7,0.98)_100%)] p-5 shadow-[0_22px_44px_rgba(0,0,0,0.3)] sm:p-6">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(240,203,115,0.18),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0)_26%,rgba(212,168,82,0.08)_62%,rgba(255,255,255,0.03)_100%)]"
-              />
-              <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+            <header className="clara-page-hero border-b border-[var(--color-border-default)] px-4 pb-5 pt-4 sm:px-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
-                    {eyebrow}
-                  </p>
-                  <h1 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-[#fff0c9] sm:text-3xl">
+                  {backHref && backLabel ? (
+                    <Link
+                      href={backHref}
+                      className="clara-text-secondary mb-3 inline-flex min-h-10 max-w-full items-center rounded-lg px-2 text-sm font-medium hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)]"
+                    >
+                      <span aria-hidden="true" className="mr-2">
+                        ←
+                      </span>
+                      <span className="truncate">{backLabel}</span>
+                    </Link>
+                  ) : null}
+                  <p className="clara-kicker">{eyebrow}</p>
+                  <h1 className="clara-page-title mt-2 break-words">
                     {title}
                   </h1>
-                  <p className="mt-3 max-w-3xl text-sm leading-7 text-[#d6bb84] sm:text-[15px]">
+                  <p className="clara-text-secondary mt-2 max-w-3xl text-sm leading-6 sm:text-[15px]">
                     {description}
                   </p>
-
-                  {backHref && backLabel ? (
-                    <div className="mt-4">
-                      <Link
-                        href={backHref}
-                        className="inline-flex items-center rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-4 py-2 text-sm font-semibold text-[#f3d694] shadow-[0_10px_24px_rgba(0,0,0,0.18)] hover:bg-[#f0cb73]/14 hover:text-[#fff0c9]"
-                      >
-                        {backLabel}
-                      </Link>
-                    </div>
-                  ) : null}
                 </div>
 
                 {actions ? (
@@ -684,44 +787,47 @@ export function WorkspaceShell({
                         ? "sales-shell-actions"
                         : undefined
                     }
-                    className="flex w-full flex-wrap gap-3 lg:w-auto lg:max-w-[520px] lg:flex-none lg:justify-end"
+                    className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto lg:max-w-[520px] lg:flex-none lg:justify-end [&_.clara-button]:max-w-full [&_.clara-button]:px-3 [&_.clara-button]:py-2 [&_.clara-button]:text-sm"
                   >
                     {actions}
                   </div>
                 ) : null}
               </div>
-            </section>
+            </header>
 
             {globalNotifications.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2" aria-label="Notifikasi penting">
                 {globalNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className="rounded-[24px] border border-[#f0cb73]/24 bg-[linear-gradient(135deg,rgba(71,50,17,0.94)_0%,rgba(36,26,12,0.96)_100%)] p-4 shadow-[0_18px_36px_rgba(0,0,0,0.22)]"
+                    role={notification.severity === "high" ? "alert" : "status"}
+                    className="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-warning-surface)] p-3"
                   >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-[#f0cb73] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#140f08]">
-                            Perlu tindakan
+                          <span className="rounded-full bg-[var(--color-warning)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text-inverse)]">
+                            {notification.severity === "high"
+                              ? "Prioritas tinggi"
+                              : "Perlu tindakan"}
                           </span>
-                          <span className="rounded-full bg-[#f0cb73]/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#f3d694]">
+                          <span className="text-xs font-medium text-[var(--color-warning)]">
                             {notification.source_type.replaceAll("_", " ")}
                           </span>
                         </div>
-                        <p className="mt-3 text-base font-semibold text-[#fff0c9]">
+                        <p className="mt-2 text-sm font-semibold">
                           {notification.title}
                         </p>
-                        <p className="mt-1 text-sm leading-6 text-[#d6bb82]">
+                        <p className="clara-text-secondary mt-1 text-sm leading-5">
                           {notification.body}
                         </p>
                       </div>
 
-                      <div className="flex shrink-0 flex-wrap gap-3">
+                      <div className="flex min-w-0 shrink-0 flex-wrap gap-2">
                         {notification.target_href ? (
                           <Link
                             href={notification.target_href}
-                            className="inline-flex items-center rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
+                            className="clara-button clara-button-primary max-w-full px-3 py-2 text-sm"
                           >
                             {normalizedRole === "head"
                               ? "Buka follow-up tim"
@@ -730,9 +836,9 @@ export function WorkspaceShell({
                         ) : null}
                         <Link
                           href="/dashboard/notifications"
-                          className="inline-flex items-center rounded-full border border-[#f0cb73]/24 bg-[#f0cb73]/10 px-4 py-2.5 text-sm font-semibold text-[#f3d694] hover:bg-[#f0cb73]/14"
+                          className="clara-button clara-button-secondary max-w-full px-3 py-2 text-sm"
                         >
-                          Buka notification center
+                          Lihat semua notifikasi
                         </Link>
                         <button
                           type="button"
@@ -740,7 +846,7 @@ export function WorkspaceShell({
                             void handleResolveGlobalNotification(notification.id)
                           }
                           disabled={resolvingNotificationId === notification.id}
-                          className="inline-flex items-center rounded-full border border-[#f0cb73]/18 bg-transparent px-4 py-2.5 text-sm font-semibold text-[#c9b17a] hover:border-[#f0cb73]/30 hover:text-[#f3d694] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="clara-button clara-button-ghost px-3 py-2 text-sm"
                         >
                           {resolvingNotificationId === notification.id
                             ? "Menutup..."

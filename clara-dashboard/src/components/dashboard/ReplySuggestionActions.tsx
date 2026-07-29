@@ -33,6 +33,7 @@ export function ReplySuggestionActions({
 
   const isPending = approvalStatus === "pending";
   const isApproved = approvalStatus === "approved";
+  const isBusy = isSubmitting || isMarkingSent;
 
   async function handleApprove() {
     setErrorMessage("");
@@ -105,28 +106,28 @@ export function ReplySuggestionActions({
 
   if (hasBeenSent) {
     return (
-      <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(24,17,12,0.98)_100%)] p-4 shadow-[0_14px_32px_rgba(0,0,0,0.18)]">
-        <p className="text-sm font-semibold text-[#fff0c9]">
+      <section className="clara-card-outline p-4">
+        <p className="text-sm font-semibold clara-text-primary">
           Jawaban ini sudah ditandai terkirim.
         </p>
-        <p className="mt-1 text-sm leading-6 text-[#d6bb84]">
-          Untuk MVP ini, status terkirim masih simulasi manual. Nanti bisa
-          diganti ke WhatsApp Cloud API.
+        <p className="mt-1 text-sm leading-6 clara-text-secondary">
+          Ini catatan manual dari dashboard, bukan konfirmasi delivery atau
+          read receipt dari provider.
         </p>
         {isStale ? (
-          <p className="mt-3 rounded-[18px] border border-amber-200/50 bg-amber-100/10 px-3 py-2 text-sm text-[#fff0c9]">
+          <p role="alert" className="clara-alert clara-alert-warning mt-3">
             Customer sudah membalas lagi setelah pesan terkirim. Draft lama ini
             sebaiknya tidak dipakai sebagai patokan balasan berikutnya.
           </p>
         ) : null}
-      </div>
+      </section>
     );
   }
 
   if (!isPending && !isApproved) {
     return (
-      <div className="clara-card-soft rounded-[24px] p-4">
-        <p className="text-sm font-medium text-slate-700">
+      <div className="clara-card-soft p-4">
+        <p className="text-sm font-medium clara-text-secondary">
           Suggestion status: {approvalStatus}
         </p>
       </div>
@@ -135,56 +136,61 @@ export function ReplySuggestionActions({
 
   if (isApproved) {
     return (
-      <div className="clara-card space-y-4 rounded-[30px] p-5">
+      <section className="clara-card space-y-4 p-5">
         <div>
           <p className="clara-kicker">Jawaban siap kirim</p>
-          <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+          <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
             Jawaban sudah siap dipakai
           </h3>
-          <p className="mt-2 text-sm text-slate-600">
-            Jawaban ini sudah final. Setelah benar-benar dikirim ke WhatsApp, tandai sebagai terkirim.
+          <p className="mt-2 text-sm leading-6 clara-text-secondary">
+            Approval belum berarti pesan terkirim. Setelah benar-benar dikirim
+            melalui channel asal, catat statusnya secara manual.
           </p>
         </div>
 
         {errorMessage && (
-          <p className="clara-alert clara-alert-danger">{errorMessage}</p>
+          <p role="alert" className="clara-alert clara-alert-danger">
+            {errorMessage}
+          </p>
         )}
 
         <button
           type="button"
           onClick={handleMarkSent}
-          disabled={isMarkingSent}
+          disabled={isBusy}
           className="clara-button clara-button-success"
         >
           {isMarkingSent ? "Menandai..." : "Tandai Sudah Terkirim"}
         </button>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="clara-card space-y-5 rounded-[30px] p-5">
+    <section className="clara-card space-y-5 p-5">
       <div>
         <p className="clara-kicker">Jawaban Clara</p>
-        <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-slate-950">
+        <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
           Pilih jawaban yang paling pas
         </h3>
-        <p className="mt-2 text-sm text-slate-600">
-          Pilih jawaban yang paling cocok, edit kalau perlu, lalu simpan sebagai jawaban final.
+        <p className="mt-2 text-sm leading-6 clara-text-secondary">
+          Pilih draft, edit bila perlu, lalu setujui secara eksplisit. Approval
+          tidak mengirim pesan ke customer.
         </p>
         {isStale ? (
-          <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <div role="alert" className="clara-alert clara-alert-warning mt-4">
             Draft ini dibuat sebelum chat terbaru masuk. Baca pesan terakhir
             customer dulu, lalu pertimbangkan generate ulang sebelum approve.
           </div>
         ) : null}
       </div>
 
-      <div className="space-y-3">
+      <fieldset className="space-y-3">
+        <legend className="clara-label mb-3">Pilihan draft jawaban</legend>
         {suggestedReplies.map((reply, index) => (
           <label
             key={`${reply.tone}-${index}`}
-            className="clara-card-soft block cursor-pointer rounded-[24px] p-4 hover:border-[rgba(141,103,55,0.24)]"
+            className="clara-card-soft block cursor-pointer p-4 hover:border-[rgba(141,103,55,0.24)]"
           >
             <div className="flex items-start gap-3">
               <input
@@ -197,21 +203,21 @@ export function ReplySuggestionActions({
                   setFinalText(reply.text);
                 }}
               />
-              <div>
-                <p className="text-sm font-semibold capitalize text-slate-900">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold capitalize clara-text-primary">
                   {reply.tone}
                 </p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm clara-text-secondary [overflow-wrap:anywhere]">
                   {reply.text}
                 </p>
-                <p className="mt-2 text-xs text-slate-500">
-                  Reasoning: {reply.reasoning}
+                <p className="mt-2 break-words text-xs clara-text-muted [overflow-wrap:anywhere]">
+                  Alasan saran: {reply.reasoning}
                 </p>
               </div>
             </div>
           </label>
         ))}
-      </div>
+      </fieldset>
 
       <div>
         <label
@@ -246,28 +252,30 @@ export function ReplySuggestionActions({
       </div>
 
       {errorMessage && (
-        <p className="clara-alert clara-alert-danger">{errorMessage}</p>
+        <p role="alert" className="clara-alert clara-alert-danger">
+          {errorMessage}
+        </p>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <button
           type="button"
           onClick={handleApprove}
-          disabled={isSubmitting || finalText.trim().length === 0}
+          disabled={isBusy || finalText.trim().length === 0}
           className="clara-button clara-button-primary"
         >
-          Pilih Jawaban Ini
+          Setujui Jawaban Final
         </button>
 
         <button
           type="button"
           onClick={handleReject}
-          disabled={isSubmitting}
+          disabled={isBusy}
           className="clara-button clara-button-ghost"
         >
-          Jangan Pakai
+          Tolak Draft
         </button>
       </div>
-    </div>
+    </section>
   );
 }

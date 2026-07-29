@@ -128,6 +128,58 @@ def get_accessible_sales_user_ids(
     return accessible_user_ids
 
 
+def get_accessible_team_ids(
+    db: Session,
+    *,
+    current_user: User,
+) -> set[UUID] | None:
+    if is_platform_super_admin(current_user):
+        return None
+
+    if is_superadmin_like(current_user.role):
+        return None
+
+    ensure_user_has_organization(current_user)
+
+    if is_head_like(current_user.role):
+        return None
+
+    if is_sales_like(current_user.role):
+        return {current_user.team_id} if current_user.team_id is not None else set()
+
+    if not is_manager_like(current_user.role):
+        return {current_user.team_id} if current_user.team_id is not None else set()
+
+    scoped_team_ids: set[UUID] = set()
+    scoped_unit_ids: set[UUID] = set()
+
+    if current_user.team_id is not None:
+        scoped_team_ids.add(current_user.team_id)
+
+    managed_teams = db.scalars(
+        select(SalesTeam).where(
+            SalesTeam.organization_id == current_user.organization_id,
+            SalesTeam.manager_user_id == current_user.id,
+        )
+    ).all()
+
+    for team in managed_teams:
+        scoped_team_ids.add(team.id)
+        if team.unit_id is not None:
+            scoped_unit_ids.add(team.unit_id)
+
+    if scoped_unit_ids:
+        unit_team_ids = db.scalars(
+            select(SalesTeam.id).where(
+                SalesTeam.organization_id == current_user.organization_id,
+                SalesTeam.unit_id.in_(scoped_unit_ids),
+            )
+        ).all()
+        scoped_team_ids.update(unit_team_ids)
+
+    return scoped_team_ids
+
+
 def apply_sales_user_scope_filter(
     statement: Select,
     *,

@@ -44,6 +44,7 @@ export default function ProductKnowledgePage() {
   const [expandedProposalId, setExpandedProposalId] = useState<string | null>(
     null,
   );
+  const [hasLoadedKnowledgeList, setHasLoadedKnowledgeList] = useState(false);
   const canManageKnowledge = currentUser?.role === "superadmin";
   const canReviewProposals = ["superadmin"].includes(
     currentUser?.role ?? "",
@@ -81,7 +82,7 @@ export default function ProductKnowledgePage() {
       const includeProposalQueue =
         options?.includeProposalQueue ?? canSeeProposalQueue;
 
-      const [data, proposalData] = await Promise.all([
+      const [dataResult, proposalResult] = await Promise.allSettled([
         apiFetch<ProductKnowledgeItem[]>(path),
         includeProposalQueue
           ? apiFetch<KnowledgeUpdateProposalItem[]>(
@@ -89,8 +90,21 @@ export default function ProductKnowledgePage() {
             )
           : Promise.resolve([]),
       ]);
-      setItems(data);
-      setProposals(proposalData);
+      if (dataResult.status === "fulfilled") {
+        setItems(dataResult.value);
+        setHasLoadedKnowledgeList(true);
+      }
+      if (proposalResult.status === "fulfilled") {
+        setProposals(proposalResult.value);
+      }
+      if (
+        dataResult.status === "rejected" ||
+        proposalResult.status === "rejected"
+      ) {
+        setErrorMessage(
+          "Sebagian data knowledge gagal dimuat. Data yang berhasil dimuat tetap ditampilkan.",
+        );
+      }
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -195,11 +209,18 @@ export default function ProductKnowledgePage() {
     }
   }
 
-  async function handleDelete(knowledgeId: string) {
+  async function handleDelete(knowledgeId: string, title: string) {
     if (!canManageKnowledge) {
       setErrorMessage(
         "Hanya superadmin yang boleh menghapus product knowledge.",
       );
+      return;
+    }
+
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Hapus knowledge entry "${title}"? Aksi ini tidak bisa dibatalkan.`)
+    ) {
       return;
     }
 
@@ -282,6 +303,10 @@ export default function ProductKnowledgePage() {
   }
 
   const activeItemsCount = items.filter((item) => item.is_active).length;
+  const hasUsableKnowledgeData =
+    hasLoadedKnowledgeList || items.length > 0 || proposals.length > 0;
+  const shouldRenderKnowledgeWorkspace =
+    !isLoading && (!errorMessage || hasUsableKnowledgeData);
   const selectedKnowledge =
     items.find((item) => item.id === effectiveSelectedKnowledgeId) ??
     items[0] ??
@@ -320,29 +345,43 @@ export default function ProductKnowledgePage() {
       }
     >
       <div className="mx-auto space-y-6">
-        <section className="grid gap-4 md:grid-cols-3">
-          <InfoCard
-            label="Total Entry"
-            value={isLoading ? "..." : String(items.length)}
-            description="Seluruh knowledge yang tersedia untuk dibaca dari workspace."
-          />
-          <InfoCard
-            label="Entry Aktif"
-            value={isLoading ? "..." : String(activeItemsCount)}
-            description="Entry aktif akan dipakai Clara sebagai grounding jawaban."
-          />
-          <InfoCard
-            label="Hak Akses"
-            value={canManageKnowledge ? "Superadmin" : "Read Only"}
-            description="Hanya superadmin yang bisa menambah, mengubah, menghapus, dan publish knowledge resmi."
-          />
-        </section>
+        {errorMessage ? (
+          <div role="alert" className="clara-alert clara-alert-danger">
+            {errorMessage}
+          </div>
+        ) : null}
 
-        {canSeeProposalQueue && (
+        {successMessage ? (
+          <div role="status" className="clara-alert clara-alert-success">
+            {successMessage}
+          </div>
+        ) : null}
+
+        {shouldRenderKnowledgeWorkspace ? (
+          <section className="grid gap-4 md:grid-cols-3">
+            <InfoCard
+              label="Total Entry"
+              value={isLoading ? "..." : String(items.length)}
+              description="Seluruh knowledge yang tersedia untuk dibaca dari workspace."
+            />
+            <InfoCard
+              label="Entry Aktif"
+              value={isLoading ? "..." : String(activeItemsCount)}
+              description="Entry aktif akan dipakai Clara sebagai grounding jawaban."
+            />
+            <InfoCard
+              label="Hak Akses"
+              value={canManageKnowledge ? "Superadmin" : "Read Only"}
+              description="Hanya superadmin yang bisa menambah, mengubah, menghapus, dan publish knowledge resmi."
+            />
+          </section>
+        ) : null}
+
+        {shouldRenderKnowledgeWorkspace && canSeeProposalQueue && (
           <section className="clara-card rounded-[30px] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-slate-950">
+                <h2 className="text-lg font-semibold clara-text-primary">
                   Knowledge Update Queue
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
@@ -370,7 +409,7 @@ export default function ProductKnowledgePage() {
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold text-slate-950">
+                          <h3 className="text-base font-semibold clara-text-primary">
                             {proposal.title}
                           </h3>
                           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -451,20 +490,21 @@ export default function ProductKnowledgePage() {
           </section>
         )}
 
-        <section
-          className={
-            canManageKnowledge
-              ? "grid gap-6 lg:grid-cols-[0.95fr_1.05fr]"
-              : "space-y-4"
-          }
-        >
+        {(isLoading || shouldRenderKnowledgeWorkspace) && (
+          <section
+            className={
+              canManageKnowledge
+                ? "grid gap-6 lg:grid-cols-[0.95fr_1.05fr]"
+                : "space-y-4"
+            }
+          >
           {canManageKnowledge && (
             <form
               onSubmit={handleSubmit}
               className="clara-card space-y-5 rounded-[30px] p-5 h-fit"
             >
               <div>
-                <h2 className="text-lg font-semibold text-slate-950">
+                <h2 className="text-lg font-semibold clara-text-primary">
                   {editingId
                     ? "Edit Knowledge Entry"
                     : "Tambah Knowledge Entry"}
@@ -480,7 +520,7 @@ export default function ProductKnowledgePage() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-slate-900">
+                <label className="text-sm font-semibold clara-text-primary">
                   Title
                 </label>
                 <input
@@ -498,7 +538,7 @@ export default function ProductKnowledgePage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-sm font-semibold text-slate-900">
+                  <label className="text-sm font-semibold clara-text-primary">
                     Category
                   </label>
                   <input
@@ -515,7 +555,7 @@ export default function ProductKnowledgePage() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-semibold text-slate-900">
+                  <label className="text-sm font-semibold clara-text-primary">
                     Source Type
                   </label>
                   <input
@@ -533,7 +573,7 @@ export default function ProductKnowledgePage() {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-slate-900">
+                <label className="text-sm font-semibold clara-text-primary">
                   Content
                 </label>
                 <textarea
@@ -563,16 +603,6 @@ export default function ProductKnowledgePage() {
                 />
                 Entry aktif dan boleh dipakai untuk grounding AI
               </label>
-
-              {errorMessage && (
-                <p className="clara-alert clara-alert-danger">{errorMessage}</p>
-              )}
-
-              {successMessage && (
-                <p className="clara-alert clara-alert-success">
-                  {successMessage}
-                </p>
-              )}
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
@@ -610,7 +640,7 @@ export default function ProductKnowledgePage() {
             <div className="clara-card rounded-[30px] p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="max-w-2xl">
-                  <h2 className="text-lg font-semibold text-slate-950">
+                  <h2 className="text-lg font-semibold clara-text-primary">
                     Current Knowledge Entries
                   </h2>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -705,27 +735,15 @@ export default function ProductKnowledgePage() {
               </form>
             </div>
 
-            {!canManageKnowledge && errorMessage && (
-              <div className="clara-alert clara-alert-danger">
-                {errorMessage}
-              </div>
-            )}
-
-            {!canManageKnowledge && successMessage && (
-              <div className="clara-alert clara-alert-success">
-                {successMessage}
-              </div>
-            )}
-
             {isLoading && (
-              <div className="clara-empty-state text-sm text-slate-600">
+              <div role="status" className="clara-empty-state text-sm text-slate-600">
                 Loading product knowledge...
               </div>
             )}
 
             {!isLoading && items.length === 0 && !errorMessage && (
               <div className="clara-empty-state">
-                <h2 className="text-lg font-semibold text-slate-900">
+                <h2 className="text-lg font-semibold clara-text-primary">
                   Belum ada knowledge entry
                 </h2>
                 <p className="mt-2 text-sm text-slate-600">
@@ -755,7 +773,7 @@ export default function ProductKnowledgePage() {
                         <div className="flex flex-wrap items-center gap-2">
                           <h3
                             className={`text-[1.05rem] font-semibold leading-7 ${
-                              isSelected ? "text-white" : "text-slate-950"
+                              isSelected ? "text-white" : "clara-text-primary"
                             }`}
                           >
                             {item.title}
@@ -832,7 +850,7 @@ export default function ProductKnowledgePage() {
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div className="max-w-3xl">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-xl font-semibold text-slate-950">
+                          <h2 className="text-xl font-semibold clara-text-primary">
                             {selectedKnowledge.title}
                           </h2>
                           <span
@@ -879,7 +897,10 @@ export default function ProductKnowledgePage() {
                           <button
                             type="button"
                             onClick={() =>
-                              void handleDelete(selectedKnowledge.id)
+                              void handleDelete(
+                                selectedKnowledge.id,
+                                selectedKnowledge.title,
+                              )
                             }
                             disabled={deletingId === selectedKnowledge.id}
                             className="clara-button border border-red-200 bg-white/70 text-red-700"
@@ -930,7 +951,8 @@ export default function ProductKnowledgePage() {
               </section>
             )}
           </section>
-        </section>
+          </section>
+        )}
       </div>
     </WorkspaceShell>
   );
@@ -948,7 +970,7 @@ function InfoCard({
   return (
     <article className="clara-card rounded-[24px] p-5">
       <p className="clara-kicker text-xs text-slate-500">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+      <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
         {value}
       </p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
@@ -962,7 +984,7 @@ function QuickStat({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-900">
+      <p className="mt-2 text-sm font-semibold leading-6 clara-text-primary">
         {value}
       </p>
     </div>
@@ -975,7 +997,7 @@ function MetaPill({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold leading-6 text-slate-950">
+      <p className="mt-2 text-sm font-semibold leading-6 clara-text-primary">
         {value}
       </p>
     </div>
@@ -1042,7 +1064,7 @@ function renderKnowledgeContent(content: string) {
 
                   return (
                     <p key={`${blockIndex}-${lineIndex}`}>
-                      <span className="font-semibold text-slate-950">
+                      <span className="font-semibold clara-text-primary">
                         {label}:
                       </span>{" "}
                       {rest.join(":").trim()}
@@ -1054,7 +1076,7 @@ function renderKnowledgeContent(content: string) {
                   return (
                     <p
                       key={`${blockIndex}-${lineIndex}`}
-                      className="text-base font-semibold tracking-tight text-slate-950"
+                      className="text-base font-semibold tracking-tight clara-text-primary"
                     >
                       {line}
                     </p>

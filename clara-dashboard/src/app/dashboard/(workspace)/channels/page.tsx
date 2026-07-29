@@ -75,19 +75,23 @@ export default function ChannelsOverviewPage() {
     >
       <div className="space-y-6">
         {isLoading ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
+          <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-600">
             Loading channel overview...
           </div>
         ) : null}
 
         {errorMessage ? (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
             {errorMessage}
           </div>
         ) : null}
 
-        {overview && !isLoading && !errorMessage ? (
+        {overview && !isLoading ? (
           <>
+            <p className="text-sm text-slate-600">
+              Read-only: status ini hanya memantau kesiapan channel dan tidak
+              mengubah konfigurasi integrasi.
+            </p>
             <section className="grid gap-4 md:grid-cols-3">
               <MetricCard
                 label="Scope"
@@ -113,7 +117,7 @@ export default function ChannelsOverviewPage() {
                   className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]"
                 >
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-xl font-semibold text-slate-950">
+                    <h2 className="text-xl font-semibold clara-text-primary">
                       {item.label}
                     </h2>
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -194,7 +198,7 @@ function MetricCard({
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
         {label}
       </p>
-      <p className="mt-3 text-2xl font-bold text-slate-950">{value}</p>
+      <p className="mt-3 text-2xl font-bold clara-text-primary">{value}</p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{hint}</p>
     </article>
   );
@@ -206,7 +210,7 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
         {label}
       </p>
-      <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
+      <p className="mt-2 text-lg font-semibold clara-text-primary">{value}</p>
     </div>
   );
 }
