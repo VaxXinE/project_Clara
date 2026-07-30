@@ -109,6 +109,17 @@ const isVisible = (element: Element) => {
   return bounds.width > 0 && bounds.height > 0
 }
 
+const isInViewport = (element: Element) => {
+  const bounds = element.getBoundingClientRect()
+  return (
+    isVisible(element) &&
+    bounds.right > 0 &&
+    bounds.bottom > 0 &&
+    bounds.left < window.innerWidth &&
+    bounds.top < window.innerHeight
+  )
+}
+
 const firstVisibleMatch = (
   root: ParentNode,
   selectors: string[]
@@ -303,7 +314,7 @@ const getRealChatCard = (
   let candidate = messageContainer.parentElement
   while (candidate && candidate !== activeChats) {
     if (
-      isVisible(candidate) &&
+      isInViewport(candidate) &&
       !candidate.closest(EXCLUDED_NAVIGATION_SELECTOR) &&
       hasRealChatStructure(candidate)
     ) {
@@ -358,7 +369,8 @@ const findSemanticActivePane = () => {
       document.querySelectorAll<HTMLElement>(selector)
     ).filter(
       (candidate) =>
-        isVisible(candidate) && !candidate.closest(EXCLUDED_NAVIGATION_SELECTOR)
+        isInViewport(candidate) &&
+        !candidate.closest(EXCLUDED_NAVIGATION_SELECTOR)
     )
     const validCandidates = candidates.filter(resolveThreadIdentity)
     if (validCandidates.length === 1) {
