@@ -2620,7 +2620,11 @@ function ClaraSidePanel() {
             return
           }
 
-          if (isTawkDashboardTabUrl(tab?.url)) {
+          if (
+            isTawkDashboardTabUrl(tab?.url) &&
+            (document.visibilityState !== "visible" ||
+              chatDataRef.current?.channel !== "tawk")
+          ) {
             return
           }
 
