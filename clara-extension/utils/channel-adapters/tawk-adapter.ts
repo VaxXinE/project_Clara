@@ -8,8 +8,6 @@ import type { ChannelAdapter } from "./base"
 
 const TAWK_HOSTNAME = "dashboard.tawk.to"
 const MAX_MESSAGES = 80
-const MAX_SCROLL_SWEEPS = 6
-const SCROLL_SETTLE_MS = 80
 const MAX_TEXT_LENGTH = 5000
 const ID_COMPONENT_PATTERN = /^[A-Za-z0-9._-]{1,100}$/
 const INBOX_CHAT_ROUTE_PATTERN =
@@ -40,14 +38,6 @@ const EXCLUDED_NAVIGATION_SELECTOR =
 const SCOPED_ROUTE_SELECTOR = '[to^="/inbox/"][to*="/chats/"]'
 const HEADER_CONTROL_SELECTOR =
   'button, [role="button"], [role="menu"], .tawk-dropdown, .tawk-dropdown-menu'
-
-const MESSAGE_LIST_SELECTORS = [
-  ".tawk-smooth-scroll",
-  '[data-testid="message-list"]',
-  '[data-testid="chat-message-list"]',
-  "[data-message-list]",
-  '[role="log"]'
-]
 
 const MESSAGE_SELECTORS = [
   '[id^="messageId-"].tawk-message-bubble',
@@ -395,48 +385,8 @@ const findMessageElements = (pane: HTMLElement) => {
   return Array.from(unique)
 }
 
-const getScrollContainer = (pane: HTMLElement) => {
-  const candidate = firstVisibleMatch(pane, MESSAGE_LIST_SELECTORS)
-  if (candidate && candidate.scrollHeight > candidate.clientHeight) {
-    return candidate
-  }
-  return pane.scrollHeight > pane.clientHeight ? pane : null
-}
-
-const waitForScrollSettle = () =>
-  new Promise<void>((resolve) => {
-    window.setTimeout(resolve, SCROLL_SETTLE_MS)
-  })
-
-const collectActiveMessageElements = async (pane: HTMLElement) => {
-  const scrollContainer = getScrollContainer(pane)
-  if (!scrollContainer) {
-    return findMessageElements(pane).slice(-MAX_MESSAGES)
-  }
-
-  const originalScrollTop = scrollContainer.scrollTop
-  let previousCount = -1
-  let stableCount = 0
-
-  try {
-    for (let sweep = 0; sweep < MAX_SCROLL_SWEEPS; sweep += 1) {
-      const count = findMessageElements(pane).length
-      stableCount = count === previousCount ? stableCount + 1 : 0
-      if (stableCount >= 1 || scrollContainer.scrollTop === 0) {
-        break
-      }
-      previousCount = count
-      scrollContainer.scrollTop = Math.max(
-        0,
-        scrollContainer.scrollTop - scrollContainer.clientHeight
-      )
-      await waitForScrollSettle()
-    }
-    return findMessageElements(pane).slice(-MAX_MESSAGES)
-  } finally {
-    scrollContainer.scrollTop = originalScrollTop
-  }
-}
+const collectActiveMessageElements = (pane: HTMLElement) =>
+  findMessageElements(pane).slice(-MAX_MESSAGES)
 
 const getMessageDirection = (element: HTMLElement) => {
   if (element.querySelector(".tawk-outgoing-chat")) {
