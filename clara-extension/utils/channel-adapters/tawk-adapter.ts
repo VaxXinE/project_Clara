@@ -318,7 +318,10 @@ const getRealChatCard = (
       !candidate.closest(EXCLUDED_NAVIGATION_SELECTOR) &&
       hasRealChatStructure(candidate)
     ) {
-      return candidate
+      const routeCard = candidate.closest<HTMLElement>(SCOPED_ROUTE_SELECTOR)
+      return routeCard && activeChats.contains(routeCard)
+        ? routeCard
+        : candidate
     }
     candidate = candidate.parentElement
   }
