@@ -313,13 +313,13 @@ const hasRealChatStructure = (element: HTMLElement) =>
   )
 
 const getRealChatCard = (
-  messageContainer: HTMLElement,
+  activeHeader: HTMLElement,
   activeChats: HTMLElement
 ) => {
-  let candidate = messageContainer.parentElement
+  let candidate = activeHeader.parentElement
   while (candidate && candidate !== activeChats) {
     if (
-      isInViewport(candidate) &&
+      isVisible(candidate) &&
       !candidate.closest(EXCLUDED_NAVIGATION_SELECTOR) &&
       hasRealChatStructure(candidate)
     ) {
@@ -333,17 +333,6 @@ const getRealChatCard = (
   return null
 }
 
-const isFocusedChatCard = (card: HTMLElement) =>
-  card.matches(":focus-within") ||
-  card.getAttribute("aria-selected") === "true" ||
-  card.getAttribute("data-active") === "true" ||
-  card.classList.contains("active") ||
-  card.classList.contains("focused") ||
-  card.classList.contains("is-active") ||
-  card.classList.contains("is-focused") ||
-  card.classList.contains("tawk-chat-active") ||
-  card.classList.contains("tawk-chat-focused")
-
 const findRealActivePane = (): HTMLElement | null => {
   const activeChats = document.querySelector<HTMLElement>(
     REAL_ACTIVE_CHATS_SELECTOR
@@ -352,21 +341,11 @@ const findRealActivePane = (): HTMLElement | null => {
     return null
   }
 
-  const cards = Array.from(
-    activeChats.querySelectorAll<HTMLElement>(REAL_MESSAGE_CONTAINER_SELECTOR)
-  )
-    .map((container) => getRealChatCard(container, activeChats))
-    .filter((card): card is HTMLElement => Boolean(card))
-  const uniqueCards = Array.from(new Set(cards))
-  const focusedCards = uniqueCards.filter(isFocusedChatCard)
-  const selectedCard =
-    focusedCards.length === 1
-      ? focusedCards[0]
-      : focusedCards.length === 0 && uniqueCards.length === 1
-        ? uniqueCards[0]
-        : null
+  const activeHeader = Array.from(
+    activeChats.querySelectorAll<HTMLElement>(REAL_CHAT_HEADER_SELECTOR)
+  ).find(isInViewport)
 
-  return selectedCard
+  return activeHeader ? getRealChatCard(activeHeader, activeChats) : null
 }
 
 const findSemanticActivePane = () => {
@@ -610,6 +589,15 @@ const readOpenChat = async (): Promise<WhatsAppReadResponse> => {
 
   const pane = findActivePane()
   if (!pane) {
+    const activeChats = document.querySelector(REAL_ACTIVE_CHATS_SELECTOR)
+    console.warn("[Clara][Tawk] Active pane detection failed.", {
+      activeChatsFound: Boolean(activeChats),
+      chatHeaderCount:
+        activeChats?.querySelectorAll(REAL_CHAT_HEADER_SELECTOR).length || 0,
+      messageContainerCount:
+        activeChats?.querySelectorAll(REAL_MESSAGE_CONTAINER_SELECTOR).length ||
+        0
+    })
     return readError(
       "TAWK_ACTIVE_CHAT_NOT_FOUND",
       "Pane percakapan aktif Tawk.to belum ditemukan."
