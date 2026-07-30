@@ -39,6 +39,11 @@ class WhatsAppExtensionChatSnapshot(BaseModel):
     captured_at: str = Field(alias="capturedAt", min_length=1, max_length=255)
     chat_title: str = Field(alias="chatTitle", min_length=1, max_length=255)
     chat_subtitle: str = Field(alias="chatSubtitle", default="", max_length=255)
+    external_thread_id: str | None = Field(
+        alias="externalThreadId",
+        default=None,
+        max_length=255,
+    )
     messages: list[WhatsAppExtensionMessage] = Field(default_factory=list)
 
 

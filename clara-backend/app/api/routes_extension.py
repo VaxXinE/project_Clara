@@ -36,7 +36,7 @@ from app.services.reply_suggestion_service import ReplySuggestionError
 
 router = APIRouter(prefix="/extension", tags=["extension"])
 
-ALLOWED_EXTENSION_CHANNELS = {"whatsapp", "instagram", "tiktok"}
+ALLOWED_EXTENSION_CHANNELS = {"whatsapp", "instagram", "tiktok", "tawk"}
 
 
 def _build_unsupported_channel_detail(channel: str) -> dict[str, str]:
@@ -51,6 +51,7 @@ def _build_feature_disabled_detail(channel: str) -> dict[str, str]:
         "whatsapp": "WhatsApp",
         "instagram": "Instagram DM",
         "tiktok": "TikTok DM",
+        "tawk": "Tawk.to Live Chat",
     }.get(channel, channel)
     return {
         "code": "FEATURE_DISABLED",
@@ -75,6 +76,7 @@ def _is_extension_channel_enabled(channel: str) -> bool:
         "whatsapp": settings.extension_whatsapp_enabled,
         "instagram": settings.extension_instagram_enabled,
         "tiktok": settings.extension_tiktok_enabled,
+        "tawk": settings.extension_tawk_enabled,
     }[channel]
 
 
@@ -141,6 +143,14 @@ def _send_extension_reply_suggestion(
 ) -> ExtensionSendReplyResponse:
     normalized_channel = _normalize_extension_channel_or_raise(channel)
     _require_enabled_extension_channel(normalized_channel)
+    if normalized_channel == "tawk":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "TAWK_REPLY_ACTION_NOT_AVAILABLE",
+                "message": "Aksi balasan Tawk tersedia pada TAWK-03.",
+            },
+        )
 
     try:
         get_accessible_reply_suggestion_or_raise(
@@ -345,6 +355,10 @@ def get_extension_config(
             },
             "tiktok": {
                 "enabled": settings.extension_tiktok_enabled,
+                "provider": "extension",
+            },
+            "tawk": {
+                "enabled": settings.extension_tawk_enabled,
                 "provider": "extension",
             },
         }
