@@ -111,13 +111,21 @@ const isVisible = (element: Element) => {
 
 const isInViewport = (element: Element) => {
   const bounds = element.getBoundingClientRect()
-  return (
+  if (
     isVisible(element) &&
     bounds.right > 0 &&
     bounds.bottom > 0 &&
     bounds.left < window.innerWidth &&
     bounds.top < window.innerHeight
-  )
+  ) {
+    const centerX =
+      (Math.max(0, bounds.left) + Math.min(window.innerWidth, bounds.right)) / 2
+    const centerY =
+      (Math.max(0, bounds.top) + Math.min(window.innerHeight, bounds.bottom)) / 2
+    const foreground = document.elementFromPoint(centerX, centerY)
+    return Boolean(foreground && element.contains(foreground))
+  }
+  return false
 }
 
 const firstVisibleMatch = (
@@ -297,9 +305,6 @@ const resolveThreadIdentity = (pane: HTMLElement): TawkThreadIdentity | null =>
   resolveScopedDataIdentity(pane) ||
   resolveUrlIdentity()
 
-const resolveRouteIdentity = (pane: HTMLElement) =>
-  getScopedRouteIdentity(pane) || getDocumentRouteIdentity(pane)
-
 const hasRealChatStructure = (element: HTMLElement) =>
   Boolean(
     element.querySelector(REAL_CHAT_HEADER_SELECTOR) &&
@@ -361,9 +366,7 @@ const findRealActivePane = (): HTMLElement | null => {
         ? uniqueCards[0]
         : null
 
-  return selectedCard && resolveRouteIdentity(selectedCard)
-    ? selectedCard
-    : null
+  return selectedCard
 }
 
 const findSemanticActivePane = () => {
