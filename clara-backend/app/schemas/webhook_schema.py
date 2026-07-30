@@ -93,7 +93,7 @@ class TawkWebhookFileAttachmentPayload(BaseModel):
     url: str | None = Field(default=None, max_length=2000)
     name: str | None = Field(default=None, max_length=255)
     mime_type: str | None = Field(default=None, alias="mimeType", max_length=255)
-    size: int | None = None
+    size: int | None = Field(default=None, ge=0)
     extension: str | None = Field(default=None, max_length=50)
 
 
@@ -109,15 +109,21 @@ class TawkWebhookAttachmentPayload(BaseModel):
 class TawkWebhookTranscriptMessagePayload(BaseModel):
     sender: TawkWebhookSenderPayload | None = None
     type: str | None = Field(default=None, max_length=50)
-    msg: str | None = None
+    msg: str | None = Field(default=None, max_length=5000)
     time: datetime
-    attchs: list[TawkWebhookAttachmentPayload] = Field(default_factory=list)
+    attchs: list[TawkWebhookAttachmentPayload] = Field(
+        default_factory=list,
+        max_length=20,
+    )
 
 
 class TawkWebhookChatPayload(BaseModel):
     id: str = Field(min_length=1, max_length=100)
     visitor: TawkWebhookVisitorPayload | None = None
-    messages: list[TawkWebhookTranscriptMessagePayload] = Field(default_factory=list)
+    messages: list[TawkWebhookTranscriptMessagePayload] = Field(
+        default_factory=list,
+        max_length=1000,
+    )
 
 
 class TawkWebhookMessageSenderPayload(BaseModel):
@@ -172,6 +178,7 @@ class TawkWebhookIngestResponse(BaseModel):
     processed_messages: int = 0
     duplicate_messages: int = 0
     ignored_events: int = 0
+    reason_code: str | None = None
     conversation_ids: list[UUID] = Field(default_factory=list)
     transcript_message_count: int = 0
     received_at: datetime

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -85,6 +86,10 @@ class Settings(BaseSettings):
     whatsapp_meta_default_organization_slug: str | None = None
     whatsapp_meta_default_sales_user_email: str | None = None
     tawk_webhook_secret_key: str | None = None
+    tawk_property_organization_map: dict[str, str] = Field(default_factory=dict)
+    tawk_property_default_sales_user_map: dict[str, str] = Field(
+        default_factory=dict
+    )
     conversation_auto_archive_days: int = 7
     extension_whatsapp_enabled: bool = True
     extension_instagram_enabled: bool = False

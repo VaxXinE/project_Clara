@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -21,6 +22,8 @@ from app.schemas.webhook_schema import (
 from app.services.lead_service import ensure_conversation_lead
 
 TAWK_WEBHOOK_SOURCE = "tawk_webhook"
+TAWK_UNMAPPED_PROPERTY = "tawk_property_unmapped"
+TAWK_INVALID_ORGANIZATION_MAPPING = "tawk_organization_mapping_invalid"
 
 
 class TawkWebhookError(RuntimeError):
@@ -29,6 +32,12 @@ class TawkWebhookError(RuntimeError):
 
 class TawkWebhookAuthError(TawkWebhookError):
     pass
+
+
+class TawkWebhookIgnoredError(TawkWebhookError):
+    def __init__(self, reason_code: str) -> None:
+        super().__init__(reason_code)
+        self.reason_code = reason_code
 
 
 @dataclass(frozen=True)
@@ -59,32 +68,99 @@ def _resolve_latest_sales_message(
     )
 
 
-def _resolve_owner_candidates(
-    payload: TawkWebhookEnvelope,
+def _normalize_identifier(value: str | None) -> str:
+    return " ".join((value or "").split()).casefold()
+
+
+def _resolve_mapped_organization(
+    db: Session,
+    *,
+    property_id: str,
+) -> Organization:
+    organization_slug = settings.tawk_property_organization_map.get(property_id)
+    if not organization_slug or not organization_slug.strip():
+        raise TawkWebhookIgnoredError(TAWK_UNMAPPED_PROPERTY)
+
+    organizations = db.scalars(
+        select(Organization).where(Organization.slug == organization_slug.strip())
+    ).all()
+    if len(organizations) != 1:
+        raise TawkWebhookIgnoredError(TAWK_INVALID_ORGANIZATION_MAPPING)
+    return organizations[0]
+
+
+def _resolve_sales_user(
+    db: Session,
+    *,
+    organization: Organization,
+    property_id: str,
     latest_sales_message: TawkWebhookTranscriptMessagePayload,
-) -> list[str]:
-    candidates: list[str] = []
-
-    sender_id = (
-        latest_sales_message.sender.id.strip()
-        if latest_sales_message.sender is not None and latest_sales_message.sender.id
-        else ""
+) -> User:
+    eligible_users = db.scalars(
+        select(User).where(
+            User.organization_id == organization.id,
+            User.is_active.is_(True),
+            User.role == "sales",
+        )
+    ).all()
+    sender_id = _normalize_identifier(
+        latest_sales_message.sender.id
+        if latest_sales_message.sender is not None
+        else None
     )
+    sender_name = _normalize_identifier(
+        latest_sales_message.sender.n
+        if latest_sales_message.sender is not None
+        else None
+    )
+
     if sender_id:
-        candidates.append(sender_id.casefold())
+        id_matches = [
+            user
+            for user in eligible_users
+            if sender_id
+            in {
+                str(user.id).casefold(),
+                _normalize_identifier(user.email),
+            }
+        ]
+        if len(id_matches) == 1:
+            return id_matches[0]
 
-    sender_name = _map_sender_name(payload, latest_sales_message).strip()
     if sender_name:
-        normalized_sender_name = sender_name.casefold()
-        if normalized_sender_name not in candidates:
-            candidates.append(normalized_sender_name)
+        email_matches = [
+            user
+            for user in eligible_users
+            if sender_name == _normalize_identifier(user.email)
+        ]
+        if len(email_matches) == 1:
+            return email_matches[0]
 
-    if not candidates:
+        name_matches = [
+            user
+            for user in eligible_users
+            if sender_name == _normalize_identifier(user.name)
+        ]
+        if len(name_matches) == 1:
+            return name_matches[0]
+
+    default_email = settings.tawk_property_default_sales_user_map.get(property_id)
+    if default_email:
+        normalized_default_email = _normalize_identifier(default_email)
+        default_matches = [
+            user
+            for user in eligible_users
+            if normalized_default_email == _normalize_identifier(user.email)
+        ]
+        if len(default_matches) == 1:
+            return default_matches[0]
         raise TawkWebhookError(
-            f"Agent Tawk pada transcript `{payload.chat.id}` tidak punya identifier yang bisa dicocokkan ke database."
+            "Default Sales user Tawk tidak valid untuk organization yang dipetakan."
         )
 
-    return candidates
+    raise TawkWebhookError(
+        "Agent Tawk tidak punya satu Sales user aktif yang cocok di organization yang dipetakan."
+    )
 
 
 def _resolve_tawk_context(
@@ -92,38 +168,15 @@ def _resolve_tawk_context(
     *,
     payload: TawkWebhookEnvelope,
 ) -> ResolvedTawkWebhookContext:
+    property_id = payload.property.id.strip()
+    organization = _resolve_mapped_organization(db, property_id=property_id)
     latest_sales_message = _resolve_latest_sales_message(payload)
-    candidates = _resolve_owner_candidates(payload, latest_sales_message)
-
-    matched_users = db.scalars(
-        select(User).where(
-            User.is_active.is_(True),
-            or_(
-                func.lower(User.email).in_(candidates),
-                func.lower(User.name).in_(candidates),
-            ),
-        )
-    ).all()
-
-    unique_users = {user.id: user for user in matched_users if user.organization_id is not None}
-    if not unique_users:
-        agent_label = _map_sender_name(payload, latest_sales_message)
-        raise TawkWebhookError(
-            f"Agent Tawk `{agent_label}` tidak punya user aktif yang match di database."
-        )
-
-    if len(unique_users) > 1:
-        agent_label = _map_sender_name(payload, latest_sales_message)
-        raise TawkWebhookError(
-            f"Agent Tawk `{agent_label}` match ke lebih dari satu user aktif di database. Rapikan nama/email user agar unik."
-        )
-
-    sales_user = next(iter(unique_users.values()))
-    organization = db.get(Organization, sales_user.organization_id)
-    if organization is None:
-        raise TawkWebhookError(
-            f"Organization untuk user `{sales_user.email}` tidak ditemukan."
-        )
+    sales_user = _resolve_sales_user(
+        db,
+        organization=organization,
+        property_id=property_id,
+        latest_sales_message=latest_sales_message,
+    )
 
     return ResolvedTawkWebhookContext(organization=organization, sales_user=sales_user)
 
@@ -171,6 +224,12 @@ def _resolve_conversation_title(payload: TawkWebhookEnvelope) -> str:
     return "Tawk Chat"
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _find_or_create_conversation(
     db: Session,
     *,
@@ -194,10 +253,14 @@ def _find_or_create_conversation(
         conversation.title = _resolve_conversation_title(payload)
         conversation.raw_text = transcript_text
         if started_at is not None and (
-            conversation.started_at is None or started_at < conversation.started_at
+            conversation.started_at is None
+            or _as_utc(started_at) < _as_utc(conversation.started_at)
         ):
             conversation.started_at = started_at
-        if last_message_at is not None:
+        if last_message_at is not None and (
+            conversation.last_message_at is None
+            or _as_utc(last_message_at) > _as_utc(conversation.last_message_at)
+        ):
             conversation.last_message_at = last_message_at
         db.add(conversation)
         return conversation
@@ -255,13 +318,23 @@ def _format_attachment_text(message: TawkWebhookTranscriptMessagePayload) -> str
         if file_payload is None:
             continue
         if file_payload.name and file_payload.name.strip():
-            attachment_labels.append(file_payload.name.strip())
-        elif file_payload.url and file_payload.url.strip():
-            attachment_labels.append(file_payload.url.strip())
+            attachment_labels.append(_normalize_display_text(file_payload.name))
+        elif file_payload.mime_type and file_payload.mime_type.strip():
+            attachment_labels.append(_normalize_display_text(file_payload.mime_type))
+        elif file_payload.extension and file_payload.extension.strip():
+            attachment_labels.append(
+                f"file.{_normalize_display_text(file_payload.extension)}"
+            )
+        else:
+            attachment_labels.append("file")
 
     if not attachment_labels:
         return ""
-    return "[Attachment] " + ", ".join(attachment_labels)
+    return "[Attachment] " + ", ".join(sorted(attachment_labels))
+
+
+def _normalize_display_text(value: str) -> str:
+    return " ".join(value.split())
 
 
 def _extract_message_text(message: TawkWebhookTranscriptMessagePayload) -> str:
@@ -269,32 +342,84 @@ def _extract_message_text(message: TawkWebhookTranscriptMessagePayload) -> str:
     attachment_text = _format_attachment_text(message)
 
     if text and attachment_text:
-        return f"{text}\n{attachment_text}"
-    if text:
-        return text
-    if attachment_text:
-        return attachment_text
-    return "[Empty message]"
+        combined_text = f"{text}\n{attachment_text}"
+    elif text:
+        combined_text = text
+    elif attachment_text:
+        combined_text = attachment_text
+    else:
+        combined_text = "[Empty message]"
+    return combined_text[:5000]
+
+
+def _normalized_attachment_metadata(
+    message: TawkWebhookTranscriptMessagePayload,
+) -> str:
+    normalized_attachments: list[dict[str, str | int | None]] = []
+    for attachment in message.attchs:
+        file_payload = attachment.content.file if attachment.content is not None else None
+        if file_payload is None:
+            continue
+        url_digest = (
+            hashlib.sha256(file_payload.url.strip().encode("utf-8")).hexdigest()
+            if file_payload.url and file_payload.url.strip()
+            else None
+        )
+        normalized_attachments.append(
+            {
+                "type": _normalize_identifier(attachment.type),
+                "name": _normalize_identifier(file_payload.name),
+                "mime_type": _normalize_identifier(file_payload.mime_type),
+                "size": file_payload.size,
+                "extension": _normalize_identifier(file_payload.extension),
+                "url_sha256": url_digest,
+            }
+        )
+    return json.dumps(
+        sorted(
+            normalized_attachments,
+            key=lambda item: json.dumps(item, sort_keys=True),
+        ),
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
+def _stable_sender_identifier(
+    payload: TawkWebhookEnvelope,
+    message: TawkWebhookTranscriptMessagePayload,
+) -> str:
+    sender_id = (
+        message.sender.id
+        if message.sender is not None and message.sender.id
+        else _map_sender_name(payload, message)
+    )
+    return _normalize_identifier(sender_id)
 
 
 def _build_message_external_id(
     payload: TawkWebhookEnvelope,
     *,
-    index: int,
     message: TawkWebhookTranscriptMessagePayload,
 ) -> str:
-    chat_id = payload.chat.id if payload.chat is not None else (payload.chat_id or "unknown_chat")
+    property_id = payload.property.id.strip()
+    chat_id = (
+        payload.chat.id
+        if payload.chat is not None
+        else (payload.chat_id or "unknown_chat")
+    )
     digest_source = "|".join(
         [
+            property_id,
             chat_id.strip(),
-            str(index),
-            message.time.isoformat(),
+            message.time.astimezone(UTC).isoformat(),
             _map_sender_type(message),
-            _map_sender_name(payload, message),
-            _extract_message_text(message),
+            _stable_sender_identifier(payload, message),
+            _normalize_display_text(message.msg or ""),
+            _normalized_attachment_metadata(message),
         ]
     )
-    digest = hashlib.sha1(digest_source.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(digest_source.encode("utf-8")).hexdigest()
     return f"tawkmsg:{digest}"
 
 
@@ -324,10 +449,11 @@ def _persist_transcript_messages(
     duplicate_messages = 0
     sorted_messages = sorted(payload.chat.messages, key=lambda item: item.time)
 
-    for index, message in enumerate(sorted_messages):
-        external_message_id = _build_message_external_id(payload, index=index, message=message)
+    for message in sorted_messages:
+        external_message_id = _build_message_external_id(payload, message=message)
         existing_message = db.scalars(
             select(Message).where(
+                Message.conversation_id == conversation.id,
                 Message.provider == "official_api",
                 Message.channel == "live_chat",
                 Message.external_message_id == external_message_id,
@@ -374,7 +500,20 @@ def ingest_tawk_webhook(
             received_at=datetime.now(UTC),
         )
 
-    context = _resolve_tawk_context(db, payload=payload)
+    try:
+        context = _resolve_tawk_context(db, payload=payload)
+    except TawkWebhookIgnoredError as exc:
+        return TawkWebhookIngestResponse(
+            provider="tawk.to",
+            event=payload.event,
+            event_id=event_id,
+            property_id=payload.property.id,
+            chat_id=payload.chat.id,
+            ignored_events=1,
+            reason_code=exc.reason_code,
+            transcript_message_count=transcript_message_count,
+            received_at=datetime.now(UTC),
+        )
     sorted_messages = sorted(payload.chat.messages, key=lambda item: item.time)
     started_at = sorted_messages[0].time.astimezone(UTC) if sorted_messages else payload.time.astimezone(UTC)
     last_message_at = sorted_messages[-1].time.astimezone(UTC) if sorted_messages else payload.time.astimezone(UTC)

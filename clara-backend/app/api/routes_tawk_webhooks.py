@@ -9,7 +9,7 @@ from app.services.audit_service import create_audit_log
 from app.services.tawk_webhook_service import (
     TawkWebhookAuthError,
     TawkWebhookError,
-    ingest_tawk_webhook,
+    ingest_tawk_webhook as ingest_tawk_webhook_payload,
     validate_tawk_signature,
 )
 
@@ -29,7 +29,7 @@ async def ingest_tawk_webhook(
             signature_header=request.headers.get("X-Tawk-Signature"),
         )
         payload = TawkWebhookEnvelope.model_validate(json.loads(raw_body.decode("utf-8")))
-        response = ingest_tawk_webhook(
+        response = ingest_tawk_webhook_payload(
             db,
             payload=payload,
             event_id=request.headers.get("X-Hook-Event-Id"),
@@ -55,14 +55,13 @@ async def ingest_tawk_webhook(
             detail="Payload webhook Tawk.to tidak sesuai format yang didukung.",
         ) from exc
 
-    create_audit_log(
-        db=db,
-        action="webhook.tawk.ingest",
-        resource_type="webhook",
-        resource_id=response.event_id,
-        current_user=None,
-        request=request,
-        metadata={
+    if response.reason_code:
+        audit_metadata = {
+            "property_id": response.property_id,
+            "reason_code": response.reason_code,
+        }
+    else:
+        audit_metadata = {
             "channel": "live_chat",
             "provider": response.provider,
             "event": response.event,
@@ -74,6 +73,15 @@ async def ingest_tawk_webhook(
             "ignored_events": response.ignored_events,
             "conversation_ids": [str(item) for item in response.conversation_ids],
             "transcript_message_count": response.transcript_message_count,
-        },
+        }
+
+    create_audit_log(
+        db=db,
+        action="webhook.tawk.ingest",
+        resource_type="webhook",
+        resource_id=response.event_id,
+        current_user=None,
+        request=request,
+        metadata=audit_metadata,
     )
     return response
