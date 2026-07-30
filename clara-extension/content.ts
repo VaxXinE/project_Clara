@@ -1,13 +1,17 @@
 import type { PlasmoCSConfig } from "plasmo"
 
 import type { LegacyRuntimeMessage } from "~/types/channel"
-import { getActiveAdapter } from "~/utils/channel-adapters/adapter-registry"
+import {
+  getActiveAdapter,
+  getAdapterByChannel
+} from "~/utils/channel-adapters/adapter-registry"
 
 export const config: PlasmoCSConfig = {
   matches: [
     "https://web.whatsapp.com/*",
     "https://www.instagram.com/direct/*",
-    "https://www.tiktok.com/messages*"
+    "https://www.tiktok.com/messages*",
+    "https://dashboard.tawk.to/*"
   ]
 }
 
@@ -53,7 +57,11 @@ const handleRuntimeMessage = (
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response?: unknown) => void
 ) => {
-  const activeAdapter = getActiveAdapter()
+  const activeAdapter =
+    getActiveAdapter() ||
+    (window.location.hostname === "dashboard.tawk.to"
+      ? getAdapterByChannel("tawk")
+      : null)
 
   if (message?.type === "READ_WHATSAPP_CHAT") {
     if (!activeAdapter) {
@@ -71,9 +79,9 @@ const handleRuntimeMessage = (
       .catch((error) => {
         sendResponse({
           error:
-            error instanceof Error ?
-              error.message
-            : "Terjadi kendala saat membaca chat aktif.",
+            error instanceof Error
+              ? error.message
+              : "Terjadi kendala saat membaca chat aktif.",
           ok: false
         })
       })
@@ -97,9 +105,9 @@ const handleRuntimeMessage = (
       .catch((error) => {
         sendResponse({
           error:
-            error instanceof Error ?
-              error.message
-            : "Terjadi kendala saat membaca chat aktif.",
+            error instanceof Error
+              ? error.message
+              : "Terjadi kendala saat membaca chat aktif.",
           ok: false
         })
       })
@@ -218,7 +226,10 @@ document.addEventListener(
       return
     }
 
-    if (event.target !== composeBox && !composeBox.contains(event.target as Node)) {
+    if (
+      event.target !== composeBox &&
+      !composeBox.contains(event.target as Node)
+    ) {
       return
     }
 

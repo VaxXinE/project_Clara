@@ -1,11 +1,14 @@
+import type { Channel } from "~/types/channel"
 import type {
   WhatsAppActionResponse,
   WhatsAppReadResponse
 } from "~/types/whatsapp"
 
-import type { Channel } from "~/types/channel"
-
 export interface ChannelAdapter {
+  capabilities?: {
+    insertReply: boolean
+    sendReply: boolean
+  }
   channel: Channel
   focusCompose?(): WhatsAppActionResponse
   getComposeText?(): string
@@ -13,5 +16,7 @@ export interface ChannelAdapter {
   insertReply(text: string): WhatsAppActionResponse
   isSupportedPage(): boolean
   readOpenChat(): Promise<WhatsAppReadResponse> | WhatsAppReadResponse
-  sendReply(text: string): Promise<WhatsAppActionResponse> | WhatsAppActionResponse
+  sendReply(
+    text: string
+  ): Promise<WhatsAppActionResponse> | WhatsAppActionResponse
 }
