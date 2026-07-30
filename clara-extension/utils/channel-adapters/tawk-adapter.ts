@@ -12,6 +12,8 @@ const MAX_SCROLL_SWEEPS = 6
 const SCROLL_SETTLE_MS = 80
 const MAX_TEXT_LENGTH = 5000
 const ID_COMPONENT_PATTERN = /^[A-Za-z0-9._-]{1,100}$/
+const INBOX_CHAT_ROUTE_PATTERN =
+  /^\/inbox\/([A-Za-z0-9._-]{1,100})\/chats\/([A-Za-z0-9._-]{1,100})\/?$/
 const RESERVED_ID_COMPONENTS = new Set([
   "all",
   "analytics",
@@ -29,7 +31,18 @@ const ACTIVE_PANE_SELECTORS = [
   '[role="main"] [data-conversation-id]'
 ]
 
+const REAL_ACTIVE_CHATS_SELECTOR = "#active-chats"
+const REAL_CHAT_HEADER_SELECTOR = ".tawk-chat-header"
+const REAL_CHAT_BODY_SELECTOR = ".tawk-chat-body"
+const REAL_MESSAGE_CONTAINER_SELECTOR = ".tawk-chat-message-container"
+const EXCLUDED_NAVIGATION_SELECTOR =
+  "#tawk-live-chats-navigation, #tawk-chat-navigation-list"
+const SCOPED_ROUTE_SELECTOR = '[to^="/inbox/"][to*="/chats/"]'
+const HEADER_CONTROL_SELECTOR =
+  'button, [role="button"], [role="menu"], .tawk-dropdown, .tawk-dropdown-menu'
+
 const MESSAGE_LIST_SELECTORS = [
+  ".tawk-smooth-scroll",
   '[data-testid="message-list"]',
   '[data-testid="chat-message-list"]',
   "[data-message-list]",
@@ -37,6 +50,7 @@ const MESSAGE_LIST_SELECTORS = [
 ]
 
 const MESSAGE_SELECTORS = [
+  '[id^="messageId-"].tawk-message-bubble',
   "[data-message-id]",
   '[data-testid="message"]',
   '[data-testid="chat-message"]',
@@ -45,6 +59,7 @@ const MESSAGE_SELECTORS = [
 ]
 
 const MESSAGE_BODY_SELECTORS = [
+  ".tawk-message",
   '[data-testid="message-text"]',
   '[data-testid="chat-message-text"]',
   "[data-message-text]",
@@ -56,6 +71,7 @@ const MESSAGE_BODY_SELECTORS = [
 ]
 
 const TIMESTAMP_SELECTORS = [
+  ".tawk-time",
   '[data-testid="message-time"]',
   "[data-message-time]",
   "time"
@@ -82,11 +98,21 @@ const CHAT_ATTRIBUTE_NAMES = [
 const normalizeText = (
   value: string | null | undefined,
   max = MAX_TEXT_LENGTH
-) => (value || "").replace(/\s+/g, " ").trim().slice(0, max)
+) =>
+  (value || "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max)
 
 const isValidIdComponent = (value: string) =>
   ID_COMPONENT_PATTERN.test(value) &&
   !RESERVED_ID_COMPONENTS.has(value.toLowerCase())
+
+interface TawkThreadIdentity {
+  chatId: string
+  propertyId: string
+}
 
 const isVisible = (element: Element) => {
   const bounds = element.getBoundingClientRect()
@@ -107,6 +133,67 @@ const firstVisibleMatch = (
   return null
 }
 
+const parseInboxChatRoute = (
+  value: string | null
+): TawkThreadIdentity | null => {
+  const match = (value || "").trim().match(INBOX_CHAT_ROUTE_PATTERN)
+  const propertyId = match?.[1] || ""
+  const chatId = match?.[2] || ""
+
+  if (!isValidIdComponent(propertyId) || !isValidIdComponent(chatId)) {
+    return null
+  }
+
+  return { chatId, propertyId }
+}
+
+const getRouteElements = (root: ParentNode) => {
+  const elements = Array.from(
+    root.querySelectorAll<HTMLElement>(SCOPED_ROUTE_SELECTOR)
+  )
+  if (root instanceof HTMLElement && root.matches(SCOPED_ROUTE_SELECTOR)) {
+    elements.unshift(root)
+  }
+  return Array.from(new Set(elements)).filter(isVisible)
+}
+
+const getSingleRouteIdentity = (
+  elements: HTMLElement[]
+): TawkThreadIdentity | null => {
+  const identities = new Map<string, TawkThreadIdentity>()
+  for (const element of elements) {
+    const identity = parseInboxChatRoute(element.getAttribute("to"))
+    if (identity) {
+      identities.set(`${identity.propertyId}:${identity.chatId}`, identity)
+    }
+  }
+  return identities.size === 1 ? Array.from(identities.values())[0] : null
+}
+
+const getScopedRouteIdentity = (pane: HTMLElement) =>
+  getSingleRouteIdentity(getRouteElements(pane))
+
+const getDocumentRouteIdentity = (
+  pane: HTMLElement
+): TawkThreadIdentity | null => {
+  const matchingRoutes = getRouteElements(document).filter((element) =>
+    parseInboxChatRoute(element.getAttribute("to"))
+  )
+  if (matchingRoutes.length !== 1) {
+    return null
+  }
+
+  const routeElement = matchingRoutes[0]
+  const header = pane.querySelector<HTMLElement>(REAL_CHAT_HEADER_SELECTOR)
+  const isStructurallyLinked =
+    pane.contains(routeElement) ||
+    Boolean(header && routeElement.contains(header))
+
+  return isStructurallyLinked
+    ? parseInboxChatRoute(routeElement.getAttribute("to"))
+    : null
+}
+
 const getUrlValue = (names: string[]) => {
   const url = new URL(window.location.href)
   const hashQuery = url.hash.includes("?")
@@ -125,12 +212,11 @@ const getUrlValue = (names: string[]) => {
 const getInboxRouteIdentity = () => {
   const route = `${window.location.pathname}/${window.location.hash.split("?")[0]}`
   const match = route.match(
-    /\/(?:inbox|chat|chats)\/([A-Za-z0-9._-]{1,100})\/([A-Za-z0-9._-]{1,100})(?:\/|$)/
+    /\/inbox\/([A-Za-z0-9._-]{1,100})\/chats\/([A-Za-z0-9._-]{1,100})(?:\/|$)/
   )
-  return {
-    chatId: match?.[2] || "",
-    propertyId: match?.[1] || ""
-  }
+  return parseInboxChatRoute(
+    match ? `/inbox/${match[1]}/chats/${match[2]}` : null
+  )
 }
 
 const getAttributeId = (
@@ -139,7 +225,10 @@ const getAttributeId = (
   attributeNames: string[]
 ) => {
   for (const selector of selectors) {
-    const element = root.querySelector<HTMLElement>(selector)
+    const element =
+      root instanceof HTMLElement && root.matches(selector)
+        ? root
+        : root.querySelector<HTMLElement>(selector)
     if (!element) {
       continue
     }
@@ -153,47 +242,146 @@ const getAttributeId = (
   return ""
 }
 
-const resolvePropertyId = () => {
-  const fromUrl = getUrlValue(["propertyId", "property", "pid"])
-  if (fromUrl) {
-    return fromUrl
-  }
-
-  const fromRoute = getInboxRouteIdentity().propertyId
-  if (fromRoute) {
-    return fromRoute
-  }
-
-  return getAttributeId(document, PROPERTY_ATTRIBUTE_SELECTORS, [
+const resolveScopedDataIdentity = (
+  pane: HTMLElement
+): TawkThreadIdentity | null => {
+  const propertyId = getAttributeId(pane, PROPERTY_ATTRIBUTE_SELECTORS, [
     "data-property-id",
     "data-tawk-property-id"
   ])
-}
-
-const resolveChatId = (pane: HTMLElement) => {
+  let chatId = ""
   for (const attributeName of CHAT_ATTRIBUTE_NAMES) {
     const value = (pane.getAttribute(attributeName) || "").trim()
     if (isValidIdComponent(value)) {
-      return value
+      chatId = value
+      break
     }
   }
 
-  const descendant = getAttributeId(
-    pane,
-    CHAT_ATTRIBUTE_NAMES.map((name) => `[${name}]`),
-    CHAT_ATTRIBUTE_NAMES
-  )
-  if (descendant) {
-    return descendant
+  if (!chatId) {
+    chatId = getAttributeId(
+      pane,
+      CHAT_ATTRIBUTE_NAMES.map((name) => `[${name}]`),
+      CHAT_ATTRIBUTE_NAMES
+    )
   }
 
-  return (
-    getUrlValue(["chatId", "chat", "conversationId"]) ||
-    getInboxRouteIdentity().chatId
-  )
+  return propertyId && chatId ? { chatId, propertyId } : null
 }
 
-const findActivePane = () => firstVisibleMatch(document, ACTIVE_PANE_SELECTORS)
+const resolveUrlIdentity = (): TawkThreadIdentity | null => {
+  const routeIdentity = getInboxRouteIdentity()
+  if (routeIdentity) {
+    return routeIdentity
+  }
+
+  const propertyId = getUrlValue(["propertyId", "property", "pid"])
+  const chatId = getUrlValue(["chatId", "chat", "conversationId"])
+  return propertyId && chatId ? { chatId, propertyId } : null
+}
+
+const resolveKnownPropertyId = (pane: HTMLElement) =>
+  getScopedRouteIdentity(pane)?.propertyId ||
+  getDocumentRouteIdentity(pane)?.propertyId ||
+  getAttributeId(pane, PROPERTY_ATTRIBUTE_SELECTORS, [
+    "data-property-id",
+    "data-tawk-property-id"
+  ]) ||
+  getInboxRouteIdentity()?.propertyId ||
+  getUrlValue(["propertyId", "property", "pid"])
+
+const resolveThreadIdentity = (pane: HTMLElement): TawkThreadIdentity | null =>
+  getScopedRouteIdentity(pane) ||
+  getDocumentRouteIdentity(pane) ||
+  resolveScopedDataIdentity(pane) ||
+  resolveUrlIdentity()
+
+const resolveRouteIdentity = (pane: HTMLElement) =>
+  getScopedRouteIdentity(pane) || getDocumentRouteIdentity(pane)
+
+const hasRealChatStructure = (element: HTMLElement) =>
+  Boolean(
+    element.querySelector(REAL_CHAT_HEADER_SELECTOR) &&
+      element.querySelector(REAL_CHAT_BODY_SELECTOR) &&
+      element.querySelector(REAL_MESSAGE_CONTAINER_SELECTOR)
+  )
+
+const getRealChatCard = (
+  messageContainer: HTMLElement,
+  activeChats: HTMLElement
+) => {
+  let candidate = messageContainer.parentElement
+  while (candidate && candidate !== activeChats) {
+    if (
+      isVisible(candidate) &&
+      !candidate.closest(EXCLUDED_NAVIGATION_SELECTOR) &&
+      hasRealChatStructure(candidate)
+    ) {
+      return candidate
+    }
+    candidate = candidate.parentElement
+  }
+  return null
+}
+
+const isFocusedChatCard = (card: HTMLElement) =>
+  card.matches(":focus-within") ||
+  card.getAttribute("aria-selected") === "true" ||
+  card.getAttribute("data-active") === "true" ||
+  card.classList.contains("active") ||
+  card.classList.contains("focused") ||
+  card.classList.contains("is-active") ||
+  card.classList.contains("is-focused") ||
+  card.classList.contains("tawk-chat-active") ||
+  card.classList.contains("tawk-chat-focused")
+
+const findRealActivePane = (): HTMLElement | null => {
+  const activeChats = document.querySelector<HTMLElement>(
+    REAL_ACTIVE_CHATS_SELECTOR
+  )
+  if (!activeChats || !isVisible(activeChats)) {
+    return null
+  }
+
+  const cards = Array.from(
+    activeChats.querySelectorAll<HTMLElement>(REAL_MESSAGE_CONTAINER_SELECTOR)
+  )
+    .map((container) => getRealChatCard(container, activeChats))
+    .filter((card): card is HTMLElement => Boolean(card))
+  const uniqueCards = Array.from(new Set(cards))
+  const focusedCards = uniqueCards.filter(isFocusedChatCard)
+  const selectedCard =
+    focusedCards.length === 1
+      ? focusedCards[0]
+      : focusedCards.length === 0 && uniqueCards.length === 1
+        ? uniqueCards[0]
+        : null
+
+  return selectedCard && resolveRouteIdentity(selectedCard)
+    ? selectedCard
+    : null
+}
+
+const findSemanticActivePane = () => {
+  for (const selector of ACTIVE_PANE_SELECTORS) {
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>(selector)
+    ).filter(
+      (candidate) =>
+        isVisible(candidate) && !candidate.closest(EXCLUDED_NAVIGATION_SELECTOR)
+    )
+    const validCandidates = candidates.filter(resolveThreadIdentity)
+    if (validCandidates.length === 1) {
+      return validCandidates[0]
+    }
+    if (validCandidates.length > 1) {
+      return null
+    }
+  }
+  return null
+}
+
+const findActivePane = () => findRealActivePane() || findSemanticActivePane()
 
 const findMessageElements = (pane: HTMLElement) => {
   const unique = new Set<HTMLElement>()
@@ -251,6 +439,13 @@ const collectActiveMessageElements = async (pane: HTMLElement) => {
 }
 
 const getMessageDirection = (element: HTMLElement) => {
+  if (element.querySelector(".tawk-outgoing-chat")) {
+    return "outgoing" as const
+  }
+  if (element.querySelector(".tawk-incoming-chat")) {
+    return "incoming" as const
+  }
+
   const marker = [
     element.getAttribute("data-direction"),
     element.getAttribute("data-sender-type"),
@@ -304,7 +499,7 @@ const getAttachmentText = (element: HTMLElement) => {
 
 const getMessageText = (element: HTMLElement) => {
   const body = firstVisibleMatch(element, MESSAGE_BODY_SELECTORS)
-  const text = normalizeText(body?.textContent)
+  const text = normalizeText(body?.innerText || body?.textContent)
   const attachment = getAttachmentText(element)
   return [text, attachment].filter(Boolean).join("\n").slice(0, MAX_TEXT_LENGTH)
 }
@@ -380,17 +575,54 @@ const readMessages = async (
 }
 
 const getChatTitle = (pane: HTMLElement) => {
+  const header = pane.querySelector<HTMLElement>(REAL_CHAT_HEADER_SELECTOR)
   const title = firstVisibleMatch(pane, [
     '[data-testid="chat-title"]',
     '[data-testid="conversation-title"]',
     "[data-chat-title]",
+    ".tawk-chat-header .tawk-chat-title",
+    ".tawk-chat-header .tawk-chat-name",
+    ".tawk-chat-header .tawk-text-truncate",
     'header [role="heading"]',
     "header h1",
     "header h2"
   ])
-  return normalizeText(
-    title?.getAttribute("data-chat-title") || title?.textContent,
+  const semanticTitle = normalizeText(
+    title && !title.closest(HEADER_CONTROL_SELECTOR)
+      ? title.getAttribute("data-chat-title") || title.textContent
+      : "",
     255
+  )
+  if (semanticTitle) {
+    return semanticTitle
+  }
+  if (!header) {
+    return ""
+  }
+
+  const candidates: string[] = []
+  const walker = document.createTreeWalker(header, NodeFilter.SHOW_TEXT)
+  let node = walker.nextNode()
+  while (node) {
+    const parent = node.parentElement
+    const text = normalizeText(node.textContent, 255)
+    if (
+      parent &&
+      text.length > 1 &&
+      isVisible(parent) &&
+      !parent.closest(HEADER_CONTROL_SELECTOR)
+    ) {
+      candidates.push(text)
+    }
+    node = walker.nextNode()
+  }
+
+  const joinedCandidates = normalizeText(candidates.join(" "), 255)
+  return (
+    candidates.find((candidate) => candidate.includes(" - ")) ||
+    (joinedCandidates.includes(" - ") ? joinedCandidates : "") ||
+    candidates.sort((left, right) => right.length - left.length)[0] ||
+    ""
   )
 }
 
@@ -416,19 +648,14 @@ const readOpenChat = async (): Promise<WhatsAppReadResponse> => {
     )
   }
 
-  const propertyId = resolvePropertyId()
-  if (!propertyId) {
+  const identity = resolveThreadIdentity(pane)
+  if (!identity) {
+    const propertyId = resolveKnownPropertyId(pane)
     return readError(
-      "TAWK_PROPERTY_ID_NOT_FOUND",
-      "Property ID Tawk.to belum berhasil dikenali."
-    )
-  }
-
-  const chatId = resolveChatId(pane)
-  if (!chatId) {
-    return readError(
-      "TAWK_CHAT_ID_NOT_FOUND",
-      "Chat ID percakapan aktif Tawk.to belum berhasil dikenali."
+      propertyId ? "TAWK_CHAT_ID_NOT_FOUND" : "TAWK_PROPERTY_ID_NOT_FOUND",
+      propertyId
+        ? "Chat ID percakapan aktif Tawk.to belum berhasil dikenali."
+        : "Property ID Tawk.to belum berhasil dikenali."
     )
   }
 
@@ -440,7 +667,7 @@ const readOpenChat = async (): Promise<WhatsAppReadResponse> => {
     )
   }
 
-  const externalThreadId = `tawk:${propertyId}:${chatId}`
+  const externalThreadId = `tawk:${identity.propertyId}:${identity.chatId}`
   const messages = await readMessages(pane, externalThreadId, chatTitle)
   if (!messages.length) {
     return readError(
@@ -489,7 +716,7 @@ export const tawkAdapter: ChannelAdapter = {
       return false
     }
     const pane = findActivePane()
-    return Boolean(pane && resolvePropertyId() && resolveChatId(pane))
+    return Boolean(pane && resolveThreadIdentity(pane))
   },
   readOpenChat,
   sendReply: replyActionUnavailable
