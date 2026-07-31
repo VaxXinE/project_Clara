@@ -17,7 +17,7 @@ AIPersonaVersionStatus = Literal["draft", "published", "archived"]
 
 
 class AIPersonaDraftCreateRequest(BaseModel):
-    content: str = Field(min_length=1, max_length=20_000)
+    content: str = Field(min_length=1, max_length=50_000)
 
 
 class AIPersonaConfigVersionResponse(BaseModel):

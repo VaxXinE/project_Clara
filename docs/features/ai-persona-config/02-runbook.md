@@ -34,7 +34,7 @@ dihapus.
 
 - Endpoint hanya dapat dibaca dan diubah oleh `superadmin`.
 - Request perubahan dilindungi CSRF.
-- Isi dibatasi 20.000 karakter dan dirender sebagai plain text.
+- Isi dibatasi 50.000 karakter per section dan dirender sebagai plain text.
 - Guardrail permanen di kode tidak dapat dihapus lewat UI.
 - Audit log menyimpan checksum dan metadata versi, bukan isi prompt.
 - Jangan menaruh password, API key, token, atau data customer pada persona.
