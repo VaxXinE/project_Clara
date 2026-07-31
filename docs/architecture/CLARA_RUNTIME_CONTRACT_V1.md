@@ -291,3 +291,22 @@ database.
 
 Detail parity dan safety coverage:
 `docs/architecture/CLARA_PERSONA_PARITY_AND_RETRY_CONTRACT.md`.
+
+## 15. Stage 4 Semantic Validation Contract
+
+`CLARA_VALIDATION_CONTRACT_VERSION = "1.0"` defines typed validator results,
+reply hashes, failed/passed IDs, critical failures, warnings, reason codes,
+authority owners, safe diagnostics, and retry eligibility. Debug metadata
+excludes evaluated reply text.
+
+`CLARA_SEMANTIC_REVALIDATION_MODE`:
+
+- `OFF` is the default and preserves Stage 3 output selection;
+- `OBSERVE` validates retry and JSON-repair output without enforcing a result;
+- unknown values normalize to `OFF`;
+- `ENFORCE` does not exist in Stage 4.
+
+Runtime capabilities default to no access/no authority. Claiming a system
+status or refund authority while the corresponding capability is unavailable
+is reported as a critical observation. Metadata remains log-only because no
+ORM or database migration is introduced.

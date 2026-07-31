@@ -40,6 +40,15 @@ from app.services.clara_reply_retry_service import (
     compose_plain_json_repair_instructions,
     compose_retry_prompt,
 )
+from app.services.clara_reply_validation_service import (
+    CLARA_VALIDATION_CONTRACT_VERSION,
+    ReplyValidationCapabilities,
+    ReplyValidationContext,
+    SemanticRevalidationMode,
+    build_validation_log_metadata,
+    evaluate_reply,
+    normalize_semantic_revalidation_mode,
+)
 from app.services.clara_legacy_behavior_service import (
     AuthoritySystemPrompt,
     build_authority_debug_metadata,
@@ -3770,194 +3779,6 @@ def response_defers_answer_with_question(
     return False
 
 
-def _collect_retry_validator_ids(
-    *,
-    primary_text: str,
-    latency_profile: str,
-    preferred_reply_register: str,
-    must_answer_with_product_options: bool,
-    product_option_summary: str,
-    latest_customer_intent: str,
-    answer_commitment_level: str,
-    latest_customer_message: str,
-    conversation_variant_focus: str | None,
-    customer_has_variant_commitment: bool,
-    known_identity_fields: dict[str, str],
-    customer_has_identity_submission: bool,
-    customer_has_verification_completion: bool,
-    latest_sales_message: str,
-    previous_customer_message: str,
-    should_avoid_repeating_sales_reply: bool,
-    must_give_concrete_steps: bool,
-    must_give_detailed_explanation: bool,
-    discusses_scalping_or_setup: bool,
-) -> tuple[str, ...]:
-    checks = [
-        (
-            "missing_product_options",
-            response_fails_product_option_requirement(
-                primary_text,
-                must_answer_with_product_options,
-                product_option_summary,
-            ),
-        ),
-        (
-            "unsupported_variant",
-            response_mentions_variant_not_in_grounding(
-                primary_text,
-                product_option_summary,
-                must_answer_with_product_options,
-            ),
-        ),
-        (
-            "unnecessary_variant",
-            response_unnecessarily_mentions_product_variants(
-                primary_text,
-                latest_customer_intent,
-                latest_customer_message,
-                must_answer_with_product_options,
-                conversation_variant_focus,
-            ),
-        ),
-        (
-            "missing_legality_authority",
-            response_lacks_legality_authority(primary_text, latest_customer_intent),
-        ),
-        (
-            "vague_legality_deflection",
-            response_uses_vague_legality_deflection(
-                primary_text, latest_customer_intent
-            ),
-        ),
-        (
-            "unsupported_fixed_sensitive_number",
-            response_states_fixed_sensitive_number(
-                primary_text, latest_customer_intent
-            ),
-        ),
-        (
-            "post_signup_regression",
-            response_ignores_post_signup_state(
-                primary_text, latest_customer_message
-            ),
-        ),
-        (
-            "repeated_product_selection",
-            response_reopens_product_selection(
-                primary_text,
-                customer_has_variant_commitment=customer_has_variant_commitment,
-            ),
-        ),
-        (
-            "repeated_identity_request",
-            response_reasks_identity_data(
-                primary_text,
-                latest_identity_fields=known_identity_fields,
-            ),
-        ),
-        (
-            "abstract_data_requirement",
-            response_uses_abstract_data_requirement(
-                primary_text, latest_customer_message
-            ),
-        ),
-        (
-            "vague_process_direction",
-            response_is_vague_after_identity_submission(
-                primary_text,
-                latest_customer_intent=latest_customer_intent,
-                customer_has_variant_commitment=customer_has_variant_commitment,
-                customer_has_identity_submission=customer_has_identity_submission,
-                customer_has_verification_completion=(
-                    customer_has_verification_completion
-                ),
-            ),
-        ),
-        (
-            "repeated_onboarding",
-            response_stays_stuck_in_onboarding_after_milestone(
-                primary_text, latest_customer_intent
-            ),
-        ),
-        (
-            "followup_topic_break",
-            response_breaks_followup_topic(
-                primary_text,
-                latest_customer_message,
-                latest_sales_message,
-            ),
-        ),
-        (
-            "subject_focus_break",
-            response_breaks_subject_focus(
-                primary_text,
-                latest_customer_message,
-                previous_customer_message,
-            ),
-        ),
-        (
-            "missing_latest_intent",
-            response_misses_latest_customer_intent(
-                primary_text, latest_customer_intent
-            ),
-        ),
-        (
-            "unnecessary_question",
-            response_defers_answer_with_question(
-                primary_text, answer_commitment_level
-            ),
-        ),
-        (
-            "source_dump_opening",
-            response_opens_with_source_dump(primary_text, latest_customer_intent),
-        ),
-    ]
-    if latency_profile != "ultra_fast":
-        checks.extend(
-            [
-                (
-                    "repetitive_closing",
-                    response_uses_repetitive_closing_template(primary_text),
-                ),
-                (
-                    "response_similarity",
-                    response_is_too_similar_to_latest_sales_message(
-                        primary_text,
-                        latest_sales_message,
-                        should_avoid_repeating_sales_reply,
-                    ),
-                ),
-            ]
-        )
-    if latency_profile not in {"ultra_fast", "fast"}:
-        checks.extend(
-            [
-                (
-                    "mixed_register",
-                    response_mixes_register(
-                        primary_text, preferred_reply_register
-                    ),
-                ),
-                (
-                    "insufficient_concrete_detail",
-                    response_lacks_concrete_detail(
-                        primary_text,
-                        must_give_concrete_steps,
-                        must_give_detailed_explanation,
-                        discusses_scalping_or_setup,
-                    ),
-                ),
-                (
-                    "generic_opening",
-                    response_starts_too_generic(
-                        primary_text, latest_customer_intent
-                    ),
-                ),
-            ]
-        )
-    return tuple(validator_id for validator_id, failed in checks if failed)
-
-
 def call_openai_for_reply_suggestion(
     conversation_text: str,
     extraction: AIExtraction | AIExtractionCreate,
@@ -4111,13 +3932,21 @@ def call_openai_for_reply_suggestion(
     )
     generation_authority_metadata = {
         "persona_authority_mode": persona_authority_mode.value,
+        "authority_mode": persona_authority_mode.value,
         "runtime_contract_version": CLARA_RUNTIME_CONTRACT_VERSION,
         "retry_contract_version": CLARA_RETRY_CONTRACT_VERSION,
+        "validation_contract_version": CLARA_VALIDATION_CONTRACT_VERSION,
         "prompt_content_hash": runtime_contract_debug["prompt_content_hash"],
         "legacy_behavior_overlay_present": (
             authority_system_prompt.legacy_overlay_present
         ),
     }
+    semantic_revalidation_mode = normalize_semantic_revalidation_mode(
+        settings.clara_semantic_revalidation_mode
+    )
+    generation_authority_metadata["semantic_revalidation_mode"] = (
+        semantic_revalidation_mode.value
+    )
     prompt_duration_ms = _round_duration_ms(prompt_started_at)
 
     max_output_tokens = 700
@@ -4206,275 +4035,7 @@ def call_openai_for_reply_suggestion(
         raise ReplySuggestionError(f"Invalid reply suggestion output: {exc}") from exc
 
     primary_text = reply_payload.suggested_replies[0].text
-    if desired_count == 1 and latency_profile == "ultra_fast":
-        needs_retry = (
-            response_fails_product_option_requirement(
-                primary_text,
-                must_answer_with_product_options,
-                product_option_summary,
-            )
-            or response_mentions_variant_not_in_grounding(
-                primary_text,
-                product_option_summary,
-                must_answer_with_product_options,
-            )
-            or response_unnecessarily_mentions_product_variants(
-                primary_text,
-                latest_customer_intent,
-                latest_customer_message,
-                must_answer_with_product_options,
-                conversation_variant_focus,
-            )
-            or response_lacks_legality_authority(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_uses_vague_legality_deflection(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_states_fixed_sensitive_number(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_ignores_post_signup_state(
-                primary_text,
-                latest_customer_message,
-            )
-            or response_reopens_product_selection(
-                primary_text,
-                customer_has_variant_commitment=customer_has_variant_commitment,
-            )
-            or response_reasks_identity_data(
-                primary_text,
-                latest_identity_fields=known_identity_fields or {},
-            )
-            or response_uses_abstract_data_requirement(
-                primary_text,
-                latest_customer_message,
-            )
-            or response_is_vague_after_identity_submission(
-                primary_text,
-                latest_customer_intent=latest_customer_intent,
-                customer_has_variant_commitment=customer_has_variant_commitment,
-                customer_has_identity_submission=customer_has_identity_submission,
-                customer_has_verification_completion=customer_has_verification_completion,
-            )
-            or response_stays_stuck_in_onboarding_after_milestone(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_breaks_followup_topic(
-                primary_text,
-                latest_customer_message,
-                latest_sales_message,
-            )
-            or response_breaks_subject_focus(
-                primary_text,
-                latest_customer_message,
-                previous_customer_message,
-            )
-            or response_misses_latest_customer_intent(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_defers_answer_with_question(
-                primary_text,
-                answer_commitment_level,
-            )
-            or response_opens_with_source_dump(
-                primary_text,
-                latest_customer_intent,
-            )
-        )
-    elif desired_count == 1 and latency_profile == "fast":
-        needs_retry = (
-            response_fails_product_option_requirement(
-                primary_text,
-                must_answer_with_product_options,
-                product_option_summary,
-            )
-            or response_mentions_variant_not_in_grounding(
-                primary_text,
-                product_option_summary,
-                must_answer_with_product_options,
-            )
-            or response_unnecessarily_mentions_product_variants(
-                primary_text,
-                latest_customer_intent,
-                latest_customer_message,
-                must_answer_with_product_options,
-                conversation_variant_focus,
-            )
-            or response_lacks_legality_authority(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_uses_vague_legality_deflection(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_states_fixed_sensitive_number(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_ignores_post_signup_state(
-                primary_text,
-                latest_customer_message,
-            )
-            or response_reopens_product_selection(
-                primary_text,
-                customer_has_variant_commitment=customer_has_variant_commitment,
-            )
-            or response_reasks_identity_data(
-                primary_text,
-                latest_identity_fields=known_identity_fields or {},
-            )
-            or response_uses_abstract_data_requirement(
-                primary_text,
-                latest_customer_message,
-            )
-            or response_is_vague_after_identity_submission(
-                primary_text,
-                latest_customer_intent=latest_customer_intent,
-                customer_has_variant_commitment=customer_has_variant_commitment,
-                customer_has_identity_submission=customer_has_identity_submission,
-                customer_has_verification_completion=customer_has_verification_completion,
-            )
-            or response_stays_stuck_in_onboarding_after_milestone(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_breaks_followup_topic(
-                primary_text,
-                latest_customer_message,
-                latest_sales_message,
-            )
-            or response_breaks_subject_focus(
-                primary_text,
-                latest_customer_message,
-                previous_customer_message,
-            )
-            or response_uses_repetitive_closing_template(primary_text)
-            or response_is_too_similar_to_latest_sales_message(
-                primary_text,
-                latest_sales_message,
-                should_avoid_repeating_sales_reply,
-            )
-            or response_misses_latest_customer_intent(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_defers_answer_with_question(
-                primary_text,
-                answer_commitment_level,
-            )
-            or response_opens_with_source_dump(
-                primary_text,
-                latest_customer_intent,
-            )
-        )
-    else:
-        needs_retry = (
-            response_mixes_register(primary_text, preferred_reply_register)
-            or response_fails_product_option_requirement(
-                primary_text,
-                must_answer_with_product_options,
-                product_option_summary,
-            )
-            or response_mentions_variant_not_in_grounding(
-                primary_text,
-                product_option_summary,
-                must_answer_with_product_options,
-            )
-            or response_unnecessarily_mentions_product_variants(
-                primary_text,
-                latest_customer_intent,
-                latest_customer_message,
-                must_answer_with_product_options,
-                conversation_variant_focus,
-            )
-            or response_lacks_legality_authority(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_uses_vague_legality_deflection(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_states_fixed_sensitive_number(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_ignores_post_signup_state(
-                primary_text,
-                latest_customer_message,
-            )
-            or response_reopens_product_selection(
-                primary_text,
-                customer_has_variant_commitment=customer_has_variant_commitment,
-            )
-            or response_reasks_identity_data(
-                primary_text,
-                latest_identity_fields=known_identity_fields or {},
-            )
-            or response_uses_abstract_data_requirement(
-                primary_text,
-                latest_customer_message,
-            )
-            or response_is_vague_after_identity_submission(
-                primary_text,
-                latest_customer_intent=latest_customer_intent,
-                customer_has_variant_commitment=customer_has_variant_commitment,
-                customer_has_identity_submission=customer_has_identity_submission,
-                customer_has_verification_completion=customer_has_verification_completion,
-            )
-            or response_stays_stuck_in_onboarding_after_milestone(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_breaks_followup_topic(
-                primary_text,
-                latest_customer_message,
-                latest_sales_message,
-            )
-            or response_breaks_subject_focus(
-                primary_text,
-                latest_customer_message,
-                previous_customer_message,
-            )
-            or response_uses_repetitive_closing_template(primary_text)
-            or response_is_too_similar_to_latest_sales_message(
-                primary_text,
-                latest_sales_message,
-                should_avoid_repeating_sales_reply,
-            )
-            or response_lacks_concrete_detail(
-                primary_text,
-                must_give_concrete_steps,
-                must_give_detailed_explanation,
-                discusses_scalping_or_setup,
-            )
-            or response_misses_latest_customer_intent(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_starts_too_generic(
-                primary_text,
-                latest_customer_intent,
-            )
-            or response_defers_answer_with_question(
-                primary_text,
-                answer_commitment_level,
-            )
-            or response_opens_with_source_dump(
-                primary_text,
-                latest_customer_intent,
-            )
-        )
-
-    validator_ids = _collect_retry_validator_ids(
-        primary_text=primary_text,
+    validation_context = ReplyValidationContext(
         latency_profile=latency_profile,
         preferred_reply_register=preferred_reply_register,
         must_answer_with_product_options=must_answer_with_product_options,
@@ -4486,21 +4047,50 @@ def call_openai_for_reply_suggestion(
         customer_has_variant_commitment=customer_has_variant_commitment,
         known_identity_fields=known_identity_fields or {},
         customer_has_identity_submission=customer_has_identity_submission,
-        customer_has_verification_completion=customer_has_verification_completion,
+        customer_has_verification_completion=(
+            customer_has_verification_completion
+        ),
         latest_sales_message=latest_sales_message,
         previous_customer_message=previous_customer_message,
         should_avoid_repeating_sales_reply=should_avoid_repeating_sales_reply,
         must_give_concrete_steps=must_give_concrete_steps,
         must_give_detailed_explanation=must_give_detailed_explanation,
         discusses_scalping_or_setup=discusses_scalping_or_setup,
+        capabilities=ReplyValidationCapabilities(
+            customer_is_verified=customer_has_verification_completion,
+            account_is_active=latest_customer_intent
+            in {"activation_complete", "trading_ready"},
+            account_is_funded=latest_customer_intent == "trading_ready",
+        ),
+    )
+    primary_validation_report = evaluate_reply(primary_text, validation_context)
+    validator_ids = tuple(
+        result.validator_id
+        for result in primary_validation_report.validator_results
+        if not result.passed and result.retry_eligible
     )
     needs_retry = bool(validator_ids)
-
     if not needs_retry:
+        repair_validation_report = (
+            primary_validation_report
+            if used_plain_json_fallback
+            and semantic_revalidation_mode == SemanticRevalidationMode.OBSERVE
+            else None
+        )
+        validation_metadata = build_validation_log_metadata(
+            mode=semantic_revalidation_mode,
+            primary_report=primary_validation_report,
+            final_text=primary_text,
+            retry_performed=False,
+            json_repair_performed=used_plain_json_fallback,
+            repair_report=repair_validation_report,
+            final_report=primary_validation_report,
+        )
         reply_logger.info(
             "reply_generation_completed",
             extra={
                 **generation_authority_metadata,
+                **validation_metadata,
                 "desired_count": desired_count,
                 "latest_customer_intent": latest_customer_intent,
                 "variant_response_mode": variant_response_mode,
@@ -4577,11 +4167,50 @@ def call_openai_for_reply_suggestion(
         retried_payload = ReplySuggestionCreate.model_validate(
             _normalize_reply_payload(retry_json)
         )
+        retried_text = retried_payload.suggested_replies[0].text
+        retry_validation_report = None
+        if semantic_revalidation_mode == SemanticRevalidationMode.OBSERVE:
+            try:
+                retry_validation_report = evaluate_reply(
+                    retried_text, validation_context
+                )
+            except Exception:
+                reply_logger.exception(
+                    "reply_semantic_revalidation_observation_failed",
+                    extra={
+                        **generation_authority_metadata,
+                        "retry_used": True,
+                    },
+                )
+        repair_validation_report = (
+            retry_validation_report
+            if retry_used_plain_json_fallback and retry_validation_report
+            else (
+                primary_validation_report
+                if used_plain_json_fallback
+                and semantic_revalidation_mode
+                == SemanticRevalidationMode.OBSERVE
+                else None
+            )
+        )
+        validation_metadata = build_validation_log_metadata(
+            mode=semantic_revalidation_mode,
+            primary_report=primary_validation_report,
+            final_text=retried_text,
+            retry_performed=True,
+            retry_report=retry_validation_report,
+            json_repair_performed=(
+                used_plain_json_fallback or retry_used_plain_json_fallback
+            ),
+            repair_report=repair_validation_report,
+            final_report=retry_validation_report,
+        )
         retry_validation_duration_ms = _round_duration_ms(retry_validation_started_at)
         reply_logger.info(
             "reply_generation_completed",
             extra={
                 **generation_authority_metadata,
+                **validation_metadata,
                 "desired_count": desired_count,
                 "latest_customer_intent": latest_customer_intent,
                 "variant_response_mode": variant_response_mode,
@@ -4614,10 +4243,26 @@ def call_openai_for_reply_suggestion(
         )
         return retried_payload
     except Exception:
+        repair_validation_report = (
+            primary_validation_report
+            if used_plain_json_fallback
+            and semantic_revalidation_mode == SemanticRevalidationMode.OBSERVE
+            else None
+        )
+        validation_metadata = build_validation_log_metadata(
+            mode=semantic_revalidation_mode,
+            primary_report=primary_validation_report,
+            final_text=primary_text,
+            retry_performed=True,
+            json_repair_performed=used_plain_json_fallback,
+            repair_report=repair_validation_report,
+            final_report=primary_validation_report,
+        )
         reply_logger.warning(
             "reply_generation_retry_failed_returning_primary",
             extra={
                 **generation_authority_metadata,
+                **validation_metadata,
                 "desired_count": desired_count,
                 "latest_customer_intent": latest_customer_intent,
                 "variant_response_mode": variant_response_mode,

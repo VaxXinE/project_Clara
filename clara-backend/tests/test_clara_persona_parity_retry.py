@@ -88,6 +88,13 @@ def test_validator_registry_is_complete_unique_and_structured() -> None:
         "generic_opening",
         "unnecessary_question",
         "source_dump_opening",
+        "guaranteed_profit_claim",
+        "risk_free_claim",
+        "specific_buy_sell_instruction",
+        "all_in_or_full_margin_instruction",
+        "fake_verification_status_access",
+        "fake_account_or_fund_status_access",
+        "unsupported_refund_or_compensation_promise",
     }
     actual_ids = [rule.validator_id for rule in VALIDATOR_RULES]
 
@@ -194,8 +201,10 @@ def test_safety_coverage_matrix_is_controlled_and_honest() -> None:
         for entry in SAFETY_COVERAGE_MATRIX
         if entry.behavior_id == "no_fake_access_to_verification_status"
     )
-    assert fake_access.backend_validator_ids == ()
-    assert fake_access.persona_available is False
+    assert fake_access.backend_validator_ids == (
+        "fake_verification_status_access",
+    )
+    assert fake_access.persona_available is True
 
 
 def test_reply_service_contains_no_anonymous_legacy_retry_block() -> None:

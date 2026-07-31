@@ -201,3 +201,19 @@ khusus GAP-08, authority leak pada retry prompt sudah ditutup, tetapi retry
 output masih belum menjalani semantic revalidation.
 
 Kontrak: `docs/architecture/CLARA_PERSONA_PARITY_AND_RETRY_CONTRACT.md`.
+
+## J. Stage 4 Implementation Note
+
+Stage 4 replaces the duplicate semantic boolean chains with one typed
+validation orchestrator. The 22 existing validator IDs and latency-profile
+behavior remain. Seven deterministic safety detectors add observation for
+clear guaranteed-profit, risk-free, transaction-instruction, all-in,
+fake-status-access, and unauthorized refund claims.
+
+`CLARA_SEMANTIC_REVALIDATION_MODE` supports only `OFF` and `OBSERVE`, with
+`OFF` as default. `OBSERVE` revalidates retry/JSON-repair output and records
+safe IDs/hashes without changing selection, policy, approval, send, routing,
+or persistence. GAP-08 is observable after retry but not enforced; process
+state remains heuristic and no FSM was added.
+
+Readiness evidence: `docs/quality/CLARA_STAGE_4_READINESS_REPORT.md`.
