@@ -27,6 +27,7 @@ from app.schemas.ai_extraction_schema import (
 )
 from app.services.business_segmentation_service import normalize_account_category
 from app.services.clara_playbook_service import (
+    load_effective_clara_system_instruction_playbook,
     load_clara_response_playbook,
     load_clara_system_instruction_playbook,
 )
@@ -3710,6 +3711,7 @@ def call_openai_for_reply_suggestion(
     previous_customer_message: str = "",
     latency_profile: str = "standard",
     desired_count: int = 3,
+    db: Session | None = None,
 ) -> ReplySuggestionCreate:
     if not settings.openai_api_key:
         raise ReplySuggestionError("OPENAI_API_KEY is not configured.")
@@ -3722,9 +3724,17 @@ def call_openai_for_reply_suggestion(
     )
 
     playbook_started_at = perf_counter()
-    system_playbook = load_clara_system_instruction_playbook(
-        account_category,
-        include_all_variants=include_all_variants,
+    system_playbook = (
+        load_effective_clara_system_instruction_playbook(
+            db,
+            account_category,
+            include_all_variants=include_all_variants,
+        )
+        if db is not None
+        else load_clara_system_instruction_playbook(
+            account_category,
+            include_all_variants=include_all_variants,
+        )
     )
     response_playbook = load_clara_response_playbook(
         account_category,
@@ -4430,6 +4440,7 @@ def create_reply_suggestion(
         latency_profile=latency_profile,
         desired_count=desired_count,
         previous_customer_message=previous_customer_message,
+        db=db,
     )
     generation_duration_ms = _round_duration_ms(generation_started_at)
 

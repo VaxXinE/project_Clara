@@ -35,3 +35,12 @@ class AIPersonaConfigVersionResponse(BaseModel):
     published_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AIPersonaEffectiveSectionResponse(BaseModel):
+    variant: AIPersonaVariant
+    section_key: AIPersonaSectionKey
+    content: str
+    source: Literal["database", "markdown"]
+    version_id: UUID | None
+    version_number: int | None

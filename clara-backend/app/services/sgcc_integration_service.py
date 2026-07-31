@@ -2,6 +2,8 @@ from collections import Counter
 from datetime import datetime, timedelta, timezone
 import re
 
+from sqlalchemy.orm import Session
+
 from app.schemas.ai_extraction_schema import AIExtractionCreate
 from app.schemas.integration_schema import (
     SGCCConversationAnalysisRequest,
@@ -137,6 +139,7 @@ def _build_sgcc_prioritized_knowledge_brief(
 
 def generate_sgcc_reply_suggestions(
     payload: SGCCReplySuggestionRequest,
+    db: Session | None = None,
 ) -> tuple[AIExtractionCreate, PolicyDecision, ReplySuggestionCreate]:
     analysis = payload.analysis or analyze_sgcc_conversation(payload)
     policy_decision = decide_reply_action(analysis)
@@ -214,6 +217,7 @@ def generate_sgcc_reply_suggestions(
         prioritized_knowledge_brief=prioritized_knowledge_brief,
         answer_commitment_level=answer_commitment_level,
         variant_response_mode=variant_response_mode,
+        db=db,
     )
 
     return analysis, policy_decision, suggestions
