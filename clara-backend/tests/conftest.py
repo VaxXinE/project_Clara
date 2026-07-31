@@ -31,6 +31,7 @@ from app.api import (
     routes_dashboard,
     routes_extension,
     routes_product_knowledge,
+    routes_product_facts,
     routes_sales_structure,
 )
 from app.core.config import settings
@@ -59,6 +60,7 @@ from app.models.organization import Organization
 from app.models.ops_notification import OpsNotification
 from app.models.performance_action import PerformanceAction
 from app.models.product_knowledge import ProductKnowledge
+from app.models.product_fact import ProductFact
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sales_performance_snapshot import SalesPerformanceSnapshot
 from app.models.sales_team import SalesTeam
@@ -120,6 +122,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             ChatReviewNote.__table__,
             SentMessage.__table__,
             ProductKnowledge.__table__,
+            ProductFact.__table__,
             KnowledgeUpdateProposal.__table__,
         ],
     )
@@ -129,6 +132,11 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
     monkeypatch.setattr(routes_dashboard, "create_audit_log", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         routes_product_knowledge,
+        "create_audit_log",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        routes_product_facts,
         "create_audit_log",
         lambda *args, **kwargs: None,
     )
@@ -150,6 +158,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
         tables=[
             KnowledgeUpdateProposal.__table__,
             ProductKnowledge.__table__,
+            ProductFact.__table__,
             SentMessage.__table__,
             AuditLog.__table__,
             ChatReviewNote.__table__,

@@ -1450,6 +1450,28 @@ export type ProductKnowledgeListFilters = {
   is_active?: boolean;
 };
 
+export type ProductFactItem = {
+  id: string;
+  organization_id: string | null;
+  fact_key: string;
+  account_category: "mini" | "regular" | "global";
+  product_code: string | null;
+  value_type: "text" | "integer" | "decimal" | "boolean" | "date" | "json";
+  value: unknown;
+  unit: string | null;
+  lifecycle_status: "DRAFT" | "APPROVED" | "ACTIVE" | "EXPIRED" | "REVOKED";
+  effective_from: string | null;
+  effective_until: string | null;
+  last_verified_at: string | null;
+  source_type: string;
+  source_reference: string;
+  freshness_class: "HIGH_VOLATILITY" | "MEDIUM_VOLATILITY" | "LOW_VOLATILITY";
+  freshness_status: "FRESH" | "STALE" | "UNVERIFIED";
+  revision: number;
+  resolution_status: string | null;
+  warnings: string[];
+};
+
 export type CurrentUser = {
   id: string;
   name: string;

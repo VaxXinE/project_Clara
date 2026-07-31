@@ -129,3 +129,11 @@ semantic revalidation defaults during rollback.
 - Process state remains heuristic.
 - Product facts do not yet have freshness/effective-date enforcement.
 - Stage 5 does not enforce automatic sending or production rollout.
+
+## Stage 6 product-fact interaction
+
+Stage 6 closes the freshness/effective-date authority gap through a separate
+registry. It does not change policy action, generation strategy, reviewer
+requirements for reply approval, or send permission. Fact governance reuses
+the configured compliance reviewer-role mapping for lifecycle changes, while
+reply approval/send continues through the Stage 5 gate unchanged.

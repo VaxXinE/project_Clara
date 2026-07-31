@@ -123,3 +123,17 @@ verification-access enforcement, process-state FSM, dan product-fact freshness.
 
 Remaining: implied claims, comprehensive invented-fact detection, output PII,
 complaint-to-closing detection, retry enforcement, FSM, dan fact freshness.
+
+## Stage 6 Product Fact Migration Result
+
+`LBR-H-01` sampai `LBR-H-04` sekarang memiliki target registry versioned.
+Tiga fakta yang persis didukung repository—minimum Mini Rp5.000.000, regulator
+BAPPEBTI, dan status diawasi BAPPEBTI—di-seed tanpa mengubah nilainya. Fakta
+biaya, spread, komisi, margin, swap, rollover, instrumen, lisensi, promotion,
+dan detail proses tetap `UNRESOLVED`/`INVENTORIED` sampai sumber resmi terbaru
+diverifikasi.
+
+Legacy injection dan knowledge tetap tersedia untuk rollback pada mode
+`LEGACY`; mode `SHADOW` tidak mengubah output. Removal hanya boleh dilakukan
+setelah parity dan freshness disetujui. Inventory rinci:
+`docs/architecture/CLARA_PRODUCT_FACT_MIGRATION_MAP.md`.

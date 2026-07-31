@@ -326,3 +326,16 @@ pending suggestion.
 Safe decision metadata uses IDs and hashes only. Observation history remains
 log-only because no migration is added. See
 `docs/architecture/CLARA_POLICY_ENFORCEMENT_CONTRACT.md`.
+
+## 17. Stage 6 Product Fact Contract
+
+`CLARA_PRODUCT_FACT_MODE` supports `LEGACY`, `SHADOW`, and `REGISTRY`, default
+`LEGACY`. The product-fact service owns lifecycle, effective time, freshness,
+scope precedence, conflict detection, safe fallback, prompt rendering, and
+mutable-fact validator values. Full values/provenance are not logged.
+
+The runtime authority order remains: backend security/policy, technical output,
+persona behavior, runtime context, product facts, then supporting knowledge.
+Stage 6 does not change persona (`LEGACY`), semantic (`OFF`), or policy
+(`OBSERVE`) defaults. See
+`docs/architecture/CLARA_PRODUCT_FACT_REGISTRY_CONTRACT.md`.
