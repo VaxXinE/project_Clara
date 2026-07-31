@@ -230,3 +230,15 @@ Complaint classification requires personal/contextual evidence. Safe handoff
 is deterministic and bypasses normal sales generation. No Tawk ownership,
 product fact, persona default, process heuristic, ORM model, or migration is
 changed.
+
+## L. Stage 6 Product Fact Authority Update
+
+Stage 6 introduces versioned `product_facts` and `CLARA_PRODUCT_FACT_MODE` with
+safe default `LEGACY`. `SHADOW` resolves and compares registry facts without
+changing output. `REGISTRY` excludes legacy fact injection/grounding from the
+composed reply path and injects only fresh, effective, conflict-free `ACTIVE`
+facts through `clara_product_fact_service.py`.
+
+Persona playbooks do not store new facts. Backend safety, policy decisions,
+approval/send gates, runtime context, and Tawk remain separate authorities.
+Contract: `docs/architecture/CLARA_PRODUCT_FACT_REGISTRY_CONTRACT.md`.

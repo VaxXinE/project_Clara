@@ -336,12 +336,20 @@ export default function ProductKnowledgePage() {
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
-        <Link
-          href={roleActionHref}
-          className="clara-button clara-button-ghost"
-        >
-          {roleActionLabel}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/dashboard/product-facts"
+            className="clara-button clara-button-ghost"
+          >
+            Product Fact Registry
+          </Link>
+          <Link
+            href={roleActionHref}
+            className="clara-button clara-button-ghost"
+          >
+            {roleActionLabel}
+          </Link>
+        </div>
       }
     >
       <div className="mx-auto space-y-6">

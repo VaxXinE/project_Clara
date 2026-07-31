@@ -22,6 +22,7 @@ from app.models.organization import Organization
 from app.models.ops_notification import OpsNotification
 from app.models.performance_action import PerformanceAction
 from app.models.product_knowledge import ProductKnowledge
+from app.models.product_fact import ProductFact
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sales_team import SalesTeam
 from app.models.sales_performance_snapshot import SalesPerformanceSnapshot
@@ -55,6 +56,7 @@ __all__ = [
     "OpsNotification",
     "PerformanceAction",
     "ProductKnowledge",
+    "ProductFact",
     "ReplySuggestion",
     "SalesPerformanceSnapshot",
     "SalesTeam",

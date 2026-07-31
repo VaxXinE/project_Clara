@@ -60,6 +60,11 @@ from app.services.clara_policy_enforcement_service import (
     normalize_policy_enforcement_mode,
 )
 from app.services.clara_safe_handoff_service import build_safe_handoff
+from app.services.clara_product_fact_service import (
+    ProductFactMode,
+    compose_product_fact_prompt,
+    normalize_product_fact_mode,
+)
 from app.services.clara_legacy_behavior_service import (
     AuthoritySystemPrompt,
     build_authority_debug_metadata,
@@ -356,9 +361,7 @@ def _extract_reply_payload_with_plain_json_fallback(
     except ReplySuggestionError as primary_error:
         repair_instructions = compose_plain_json_repair_instructions(desired_count)
         fallback_prompt = f"{user_prompt}\n\n{repair_instructions}"
-        fallback_prompt_hash = sha256(
-            fallback_prompt.encode("utf-8")
-        ).hexdigest()
+        fallback_prompt_hash = sha256(fallback_prompt.encode("utf-8")).hexdigest()
         fallback_response = _create_openai_reply_response(
             client=client,
             model=reply_model,
@@ -2103,6 +2106,7 @@ def build_required_fact_brief(
     latest_customer_intent: str,
     product_option_summary: str,
     must_answer_with_product_options: bool,
+    product_fact_mode: ProductFactMode = ProductFactMode.LEGACY,
 ) -> str:
     knowledge_lines = _extract_grounded_lines(grounded_knowledge)
     if not knowledge_lines:
@@ -2147,9 +2151,16 @@ def build_required_fact_brief(
             or re.search(r"\b(minimal|minimum|modal|deposit)\b", line, re.IGNORECASE)
         ]
         if capital_lines:
-            facts.append(
-                "- Untuk pertanyaan modal/minimum, modal awal Mini yang boleh disebut adalah Rp5.000.000 jika konteksnya memang Mini."
-            )
+            if product_fact_mode == ProductFactMode.REGISTRY:
+                facts.append(
+                    "- Untuk pertanyaan modal/minimum, gunakan hanya angka yang "
+                    "tercantum dalam PRODUCT_FACT_REGISTRY."
+                )
+            else:
+                facts.append(
+                    "- Untuk pertanyaan modal/minimum, modal awal Mini yang boleh "
+                    "disebut adalah Rp5.000.000 jika konteksnya memang Mini."
+                )
             facts.append(
                 "- Jangan mengarang angka fixed lain untuk Mikro, Regular, fee, spread, komisi, atau detail biaya lain jika tidak muncul jelas di knowledge resmi."
             )
@@ -2266,6 +2277,7 @@ def build_reply_prompt(
     customer_has_verification_completion: bool,
     latency_profile: str = "standard",
     desired_count: int = 3,
+    product_fact_mode: ProductFactMode = ProductFactMode.LEGACY,
 ) -> str:
     reply_task = (
         "Buat tepat 1 balasan WhatsApp terbaik yang paling siap kirim."
@@ -2311,6 +2323,7 @@ def build_reply_prompt(
         latest_customer_intent=latest_customer_intent,
         product_option_summary=product_option_summary,
         must_answer_with_product_options=must_answer_with_product_options,
+        product_fact_mode=product_fact_mode,
     )
 
     if latency_profile == "fast":
@@ -2522,6 +2535,7 @@ def _compose_reply_system_prompt(
     action_mode: str,
     persona_authority_mode: PersonaAuthorityMode,
     available_system_sections: frozenset[str],
+    product_fact_injection: str | None = None,
 ) -> AuthoritySystemPrompt:
     return compose_authority_system_prompt(
         mode=persona_authority_mode,
@@ -2538,11 +2552,13 @@ def _compose_reply_system_prompt(
             customer_has_variant_commitment=customer_has_variant_commitment,
             conversation_variant_focus=conversation_variant_focus,
             customer_has_identity_submission=customer_has_identity_submission,
-            customer_has_verification_completion=(
-                customer_has_verification_completion
-            ),
+            customer_has_verification_completion=(customer_has_verification_completion),
         ),
-        product_fact_injection=build_legacy_product_fact_injection(account_category),
+        product_fact_injection=(
+            product_fact_injection
+            if product_fact_injection is not None
+            else build_legacy_product_fact_injection(account_category)
+        ),
         system_playbook=system_playbook,
         available_system_sections=available_system_sections,
     )
@@ -2564,6 +2580,7 @@ def build_reply_system_prompt(
     action_mode: str = "auto_draft_only",
     persona_authority_mode: PersonaAuthorityMode = PersonaAuthorityMode.LEGACY,
     available_system_sections: frozenset[str] = frozenset(),
+    product_fact_injection: str | None = None,
 ) -> str:
     return _compose_reply_system_prompt(
         system_playbook=system_playbook,
@@ -2580,6 +2597,7 @@ def build_reply_system_prompt(
         action_mode=action_mode,
         persona_authority_mode=persona_authority_mode,
         available_system_sections=available_system_sections,
+        product_fact_injection=product_fact_injection,
     ).content
 
 
@@ -3467,6 +3485,9 @@ def _is_allowed_mini_initial_capital_answer(normalized_text: str) -> bool:
 def response_states_fixed_sensitive_number(
     text: str,
     latest_customer_intent: str,
+    *,
+    allowed_amounts: tuple[int, ...] = (5_000_000,),
+    registry_authoritative: bool = False,
 ) -> bool:
     if latest_customer_intent != "minimum_capital":
         return False
@@ -3475,8 +3496,26 @@ def response_states_fixed_sensitive_number(
     if not normalized:
         return False
 
-    if _is_allowed_mini_initial_capital_answer(normalized):
+    if not registry_authoritative and _is_allowed_mini_initial_capital_answer(
+        normalized
+    ):
         return False
+
+    if registry_authoritative:
+        amounts: list[int] = []
+        for raw in re.findall(
+            r"\b(?:rp|idr)\s?(\d[\d\.\,]*)\b", normalized, re.IGNORECASE
+        ):
+            digits = re.sub(r"\D", "", raw)
+            if digits:
+                amounts.append(int(digits))
+        amounts.extend(
+            int(value) * 1_000_000
+            for value in re.findall(r"\b(\d+)\s*juta\b", normalized, re.IGNORECASE)
+        )
+        return bool(amounts) and any(
+            amount not in allowed_amounts for amount in amounts
+        )
 
     return bool(
         re.search(
@@ -3820,6 +3859,7 @@ def call_openai_for_reply_suggestion(
     latency_profile: str = "standard",
     desired_count: int = 3,
     db: Session | None = None,
+    organization_id: UUID | None = None,
 ) -> ReplySuggestionCreate:
     if not settings.openai_api_key:
         raise ReplySuggestionError("OPENAI_API_KEY is not configured.")
@@ -3846,6 +3886,34 @@ def call_openai_for_reply_suggestion(
         settings.clara_persona_authority_mode
     )
     persona_authority_mode = PersonaAuthorityMode(mode_resolution.canonical_value)
+    product_fact_mode_resolution = normalize_product_fact_mode(
+        settings.clara_product_fact_mode
+    )
+    product_fact_mode = product_fact_mode_resolution.mode
+    requested_fact_keys = {
+        "minimum_capital": ("account.minimum_opening_amount",),
+        "legality": ("company.regulator", "company.regulatory_status"),
+    }.get(
+        latest_customer_intent,
+        (
+            "account.minimum_opening_amount",
+            "company.regulator",
+            "company.regulatory_status",
+        ),
+    )
+    product_fact_composition = compose_product_fact_prompt(
+        db,
+        mode=product_fact_mode,
+        account_category=account_category,
+        organization_id=organization_id,
+        legacy_content=build_legacy_product_fact_injection(account_category),
+        fact_keys=requested_fact_keys,
+    )
+    if product_fact_mode == ProductFactMode.REGISTRY:
+        grounded_knowledge = product_fact_composition.content
+        prioritized_knowledge_brief = product_fact_composition.content
+        product_option_summary = product_fact_composition.content
+        response_playbook = ""
     available_system_sections = frozenset(
         section.section_key
         for section in playbook_composition.system_sections
@@ -3882,11 +3950,10 @@ def call_openai_for_reply_suggestion(
             conversation_variant_focus=conversation_variant_focus,
             customer_has_identity_submission=customer_has_identity_submission,
             known_identity_fields=known_identity_fields,
-            customer_has_verification_completion=(
-                customer_has_verification_completion
-            ),
+            customer_has_verification_completion=(customer_has_verification_completion),
             latency_profile=latency_profile,
             desired_count=desired_count,
+            product_fact_mode=product_fact_mode,
         )
     else:
         prompt = build_authority_runtime_prompt(
@@ -3907,9 +3974,7 @@ def call_openai_for_reply_suggestion(
             conversation_variant_focus=conversation_variant_focus,
             customer_has_identity_submission=customer_has_identity_submission,
             known_identity_fields=known_identity_fields,
-            customer_has_verification_completion=(
-                customer_has_verification_completion
-            ),
+            customer_has_verification_completion=(customer_has_verification_completion),
         )
     authority_system_prompt = _compose_reply_system_prompt(
         system_playbook=system_playbook,
@@ -3926,14 +3991,13 @@ def call_openai_for_reply_suggestion(
         action_mode=action_mode,
         persona_authority_mode=persona_authority_mode,
         available_system_sections=available_system_sections,
+        product_fact_injection=product_fact_composition.content,
     )
     system_prompt = authority_system_prompt.content
     runtime_contract_debug = build_authority_debug_metadata(
         authority_prompt=authority_system_prompt,
         user_prompt=prompt,
-        playbook_metadata=playbook_composition.debug_metadata(
-            persona_authority_mode
-        ),
+        playbook_metadata=playbook_composition.debug_metadata(persona_authority_mode),
         mode_original_value=mode_resolution.original_value,
         mode_was_normalized=mode_resolution.was_normalized,
     )
@@ -3951,6 +4015,7 @@ def call_openai_for_reply_suggestion(
         "legacy_behavior_overlay_present": (
             authority_system_prompt.legacy_overlay_present
         ),
+        **product_fact_composition.debug_metadata(),
     }
     semantic_revalidation_mode = normalize_semantic_revalidation_mode(
         settings.clara_semantic_revalidation_mode
@@ -4058,15 +4123,19 @@ def call_openai_for_reply_suggestion(
         customer_has_variant_commitment=customer_has_variant_commitment,
         known_identity_fields=known_identity_fields or {},
         customer_has_identity_submission=customer_has_identity_submission,
-        customer_has_verification_completion=(
-            customer_has_verification_completion
-        ),
+        customer_has_verification_completion=(customer_has_verification_completion),
         latest_sales_message=latest_sales_message,
         previous_customer_message=previous_customer_message,
         should_avoid_repeating_sales_reply=should_avoid_repeating_sales_reply,
         must_give_concrete_steps=must_give_concrete_steps,
         must_give_detailed_explanation=must_give_detailed_explanation,
         discusses_scalping_or_setup=discusses_scalping_or_setup,
+        product_fact_mode=product_fact_mode.value,
+        allowed_minimum_opening_amounts=tuple(
+            value
+            for key, value in product_fact_composition.validator_fact_values.items()
+            if key == "account.minimum_opening_amount" and isinstance(value, int)
+        ),
         capabilities=ReplyValidationCapabilities(
             customer_is_verified=customer_has_verification_completion,
             account_is_active=latest_customer_intent
@@ -4164,16 +4233,14 @@ def call_openai_for_reply_suggestion(
             retry_json,
             retry_used_plain_json_fallback,
             retry_plain_json_fallback_hash,
-        ) = (
-            _extract_reply_payload_with_plain_json_fallback(
-                client=client,
-                response=retry_response,
-                reply_model=reply_model,
-                system_prompt=system_prompt,
-                user_prompt=retry_prompt,
-                desired_count=desired_count,
-                max_output_tokens=max_output_tokens,
-            )
+        ) = _extract_reply_payload_with_plain_json_fallback(
+            client=client,
+            response=retry_response,
+            reply_model=reply_model,
+            system_prompt=system_prompt,
+            user_prompt=retry_prompt,
+            desired_count=desired_count,
+            max_output_tokens=max_output_tokens,
         )
         retried_payload = ReplySuggestionCreate.model_validate(
             _normalize_reply_payload(retry_json)
@@ -4199,8 +4266,7 @@ def call_openai_for_reply_suggestion(
             else (
                 primary_validation_report
                 if used_plain_json_fallback
-                and semantic_revalidation_mode
-                == SemanticRevalidationMode.OBSERVE
+                and semantic_revalidation_mode == SemanticRevalidationMode.OBSERVE
                 else None
             )
         )
@@ -4245,9 +4311,7 @@ def call_openai_for_reply_suggestion(
                 "used_plain_json_fallback": (
                     used_plain_json_fallback or retry_used_plain_json_fallback
                 ),
-                "retry_plain_json_fallback_hash": (
-                    retry_plain_json_fallback_hash
-                ),
+                "retry_plain_json_fallback_hash": (retry_plain_json_fallback_hash),
                 "suggested_reply_count": len(retried_payload.suggested_replies),
                 "total_duration_ms": _round_duration_ms(total_started_at),
             },
@@ -4464,13 +4528,12 @@ def create_reply_suggestion(
             conversation_variant_focus=conversation_variant_focus,
             customer_has_identity_submission=customer_has_identity_submission,
             known_identity_fields=known_identity_fields,
-            customer_has_verification_completion=(
-                customer_has_verification_completion
-            ),
+            customer_has_verification_completion=(customer_has_verification_completion),
             latency_profile=latency_profile,
             desired_count=desired_count,
             previous_customer_message=previous_customer_message,
             db=db,
+            organization_id=conversation.organization_id,
         )
     generation_duration_ms = _round_duration_ms(generation_started_at)
 
@@ -4479,11 +4542,33 @@ def create_reply_suggestion(
     validation_unavailable = False
     if reply_data is not None and enforcement_mode != PolicyEnforcementMode.OFF:
         try:
+            enforcement_fact_mode = normalize_product_fact_mode(
+                settings.clara_product_fact_mode
+            ).mode
+            enforcement_fact_composition = compose_product_fact_prompt(
+                db,
+                mode=enforcement_fact_mode,
+                account_category=(
+                    conversation.lead.account_category if conversation.lead else None
+                ),
+                organization_id=conversation.organization_id,
+                legacy_content=build_legacy_product_fact_injection(
+                    conversation.lead.account_category if conversation.lead else None
+                ),
+                fact_keys=("account.minimum_opening_amount",),
+            )
             enforcement_validation = evaluate_reply(
                 reply_data.suggested_replies[0].text,
                 ReplyValidationContext(
                     latest_customer_message=latest_customer_message,
                     latest_customer_intent=latest_customer_intent,
+                    product_fact_mode=enforcement_fact_mode.value,
+                    allowed_minimum_opening_amounts=tuple(
+                        value
+                        for key, value in enforcement_fact_composition.validator_fact_values.items()
+                        if key == "account.minimum_opening_amount"
+                        and isinstance(value, int)
+                    ),
                 ),
             )
             critical_validator_ids = enforcement_validation.critical_failure_ids
@@ -4534,8 +4619,7 @@ def create_reply_suggestion(
             for validator_id in enforcement_decision.critical_validator_ids
         )
         applied_policy_reasons.append(
-            "enforcement:decision_hash="
-            f"{enforcement_decision.decision_hash}"
+            f"enforcement:decision_hash={enforcement_decision.decision_hash}"
         )
         if enforcement_decision.safe_handoff_category:
             applied_policy_reasons.append(
@@ -4545,10 +4629,7 @@ def create_reply_suggestion(
         if enforcement_decision.action_mode == ActionMode.BLOCK:
             approval_status = "blocked"
             model_name = "backend-policy-v1"
-        elif (
-            enforcement_decision.action_mode
-            == ActionMode.SAFE_HANDOFF
-        ):
+        elif enforcement_decision.action_mode == ActionMode.SAFE_HANDOFF:
             category = enforcement_decision.safe_handoff_category
             if category is None:
                 raise ReplySuggestionError("Safe handoff category is missing.")
@@ -4614,9 +4695,7 @@ def create_reply_suggestion(
             **enforcement_mode_resolution.debug_metadata(),
             **enforcement_decision.debug_metadata(),
             "applied_action_mode": applied_action_mode,
-            "enforcement_applied": (
-                enforcement_mode == PolicyEnforcementMode.ENFORCE
-            ),
+            "enforcement_applied": (enforcement_mode == PolicyEnforcementMode.ENFORCE),
         },
     )
     db.commit()

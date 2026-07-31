@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     clara_persona_authority_mode: str = "LEGACY"
     clara_semantic_revalidation_mode: str = "OFF"
     clara_policy_enforcement_mode: str = "OBSERVE"
+    clara_product_fact_mode: str = "LEGACY"
+    clara_product_fact_high_volatility_days: int = 7
+    clara_product_fact_medium_volatility_days: int = 30
+    clara_product_fact_low_volatility_days: int = 90
     clara_compliance_reviewer_roles: str = "head,superadmin"
 
     jwt_secret_key: str

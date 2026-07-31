@@ -61,6 +61,8 @@ class ReplyValidationContext:
     must_give_concrete_steps: bool = False
     must_give_detailed_explanation: bool = False
     discusses_scalping_or_setup: bool = False
+    product_fact_mode: str = "LEGACY"
+    allowed_minimum_opening_amounts: tuple[int, ...] = (5_000_000,)
     capabilities: ReplyValidationCapabilities = field(
         default_factory=ReplyValidationCapabilities
     )
@@ -218,8 +220,7 @@ def _has_non_denied_claim(
 
 def _has_access_assertion(text: str, subject_pattern: re.Pattern[str]) -> bool:
     return any(
-        ACCESS_ASSERTION_PATTERN.search(sentence)
-        and subject_pattern.search(sentence)
+        ACCESS_ASSERTION_PATTERN.search(sentence) and subject_pattern.search(sentence)
         for sentence in re.split(r"(?<=[.!?])\s+|\n+", text)
     )
 
@@ -230,6 +231,17 @@ def evaluate_reply(
 ) -> ReplyValidationReport:
     from app.services import reply_suggestion_service as validators
 
+    legacy_sensitive_number_failed = validators.response_states_fixed_sensitive_number(
+        text, context.latest_customer_intent
+    )
+    registry_sensitive_number_failed = (
+        validators.response_states_fixed_sensitive_number(
+            text,
+            context.latest_customer_intent,
+            allowed_amounts=context.allowed_minimum_opening_amounts,
+            registry_authoritative=True,
+        )
+    )
     checks = {
         "mixed_register": (
             context.latency_profile not in {"ultra_fast", "fast"}
@@ -265,18 +277,16 @@ def evaluate_reply(
             )
         ),
         "unsupported_fixed_sensitive_number": (
-            validators.response_states_fixed_sensitive_number(
-                text, context.latest_customer_intent
-            )
+            registry_sensitive_number_failed
+            if context.product_fact_mode == "REGISTRY"
+            else legacy_sensitive_number_failed
         ),
         "post_signup_regression": validators.response_ignores_post_signup_state(
             text, context.latest_customer_message
         ),
         "repeated_product_selection": validators.response_reopens_product_selection(
             text,
-            customer_has_variant_commitment=(
-                context.customer_has_variant_commitment
-            ),
+            customer_has_variant_commitment=(context.customer_has_variant_commitment),
         ),
         "repeated_identity_request": validators.response_reasks_identity_data(
             text,
@@ -385,13 +395,24 @@ def evaluate_reply(
         ),
     }
 
+    diagnostics = {
+        "unsupported_fixed_sensitive_number": {
+            "product_fact_mode": context.product_fact_mode,
+            "legacy_registry_disagreement": (
+                context.product_fact_mode == "SHADOW"
+                and legacy_sensitive_number_failed != registry_sensitive_number_failed
+            ),
+        }
+    }
     results = tuple(
-        _build_validator_result(rule.validator_id, checks[rule.validator_id])
+        _build_validator_result(
+            rule.validator_id,
+            checks[rule.validator_id],
+            diagnostics.get(rule.validator_id),
+        )
         for rule in VALIDATOR_RULES
     )
-    failed_ids = tuple(
-        result.validator_id for result in results if not result.passed
-    )
+    failed_ids = tuple(result.validator_id for result in results if not result.passed)
     passed_ids = tuple(result.validator_id for result in results if result.passed)
     critical_ids = tuple(
         result.validator_id
@@ -418,6 +439,7 @@ def evaluate_reply(
 def _build_validator_result(
     validator_id: str,
     failed: bool,
+    extra_diagnostics: dict[str, bool | str | int] | None = None,
 ) -> ValidatorResult:
     rule = VALIDATOR_RULES_BY_ID[validator_id]
     return ValidatorResult(
@@ -425,12 +447,11 @@ def _build_validator_result(
         passed=not failed,
         severity=rule.severity,
         authority_owner=rule.canonical_authority_owner,
-        reason_code=(
-            "validation_passed" if not failed else rule.correction_target
-        ),
+        reason_code=("validation_passed" if not failed else rule.correction_target),
         diagnostic_metadata={
             "detected": failed,
             "category": rule.category,
+            **(extra_diagnostics or {}),
         },
         retry_eligible=validator_id not in CRITICAL_SAFETY_VALIDATOR_IDS,
         critical=rule.severity == "CRITICAL",
@@ -451,12 +472,8 @@ def build_validation_log_metadata(
     return {
         "validation_contract_version": CLARA_VALIDATION_CONTRACT_VERSION,
         "semantic_revalidation_mode": mode.value,
-        "primary_failed_validator_ids": list(
-            primary_report.failed_validator_ids
-        ),
-        "primary_critical_failure_ids": list(
-            primary_report.critical_failure_ids
-        ),
+        "primary_failed_validator_ids": list(primary_report.failed_validator_ids),
+        "primary_critical_failure_ids": list(primary_report.critical_failure_ids),
         "retry_performed": retry_performed,
         "retry_failed_validator_ids": (
             list(retry_report.failed_validator_ids) if retry_report else []
