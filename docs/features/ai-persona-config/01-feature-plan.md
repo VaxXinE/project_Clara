@@ -50,7 +50,8 @@ Urutan pemuatan instruction:
 1. Baca versi `published` dari database.
 2. Jika tidak ada atau database gagal dibaca, gunakan Markdown existing.
 3. Guardrail permanen dari kode selalu diterapkan.
-4. Publish/rollback menginvalidasi cache runtime.
+4. Konfigurasi database tidak di-cache, sehingga publish/rollback berlaku pada
+   request AI berikutnya.
 
 Fallback Markdown wajib dipertahankan agar kegagalan konfigurasi tidak
 mematikan reply suggestion production.
@@ -78,7 +79,6 @@ Pilih variant
 → pilih section
 → edit draft
 → preview effective prompt
-→ test dengan contoh chat
 → publish
 → rollback jika diperlukan
 ```
@@ -111,3 +111,16 @@ sebelum tahap berikutnya dimulai.
 - Guardrail permanen tidak dapat dinonaktifkan dari UI.
 - Semua perubahan penting tercatat di audit log.
 - Backend dan dashboard test/build lulus.
+
+## Status Implementasi
+
+- [x] Foundation: model, migration, dan constraint.
+- [x] API superadmin: draft, history, publish, rollback, dan audit.
+- [x] Runtime: published config dengan fallback Markdown.
+- [x] UI: editor Mini/Reguler untuk lima section dan history.
+- [x] QA: regression test, production build, dan runbook.
+
+Test chat langsung dari halaman admin sengaja tidak termasuk implementasi awal.
+Editor menampilkan effective prompt sebagai preview plain text. Endpoint test
+chat baru perlu ditambahkan jika ada kebutuhan operasional, rate limit, dan
+budget OpenAI yang disepakati.
