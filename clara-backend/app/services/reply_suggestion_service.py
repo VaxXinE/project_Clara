@@ -10,6 +10,10 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.clara_runtime_contract import (
+    CLARA_RUNTIME_CONTRACT_VERSION,
+    LEGACY_BEHAVIOR_OVERLAY,
+)
 from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
@@ -26,11 +30,7 @@ from app.schemas.ai_extraction_schema import (
     BudgetSignal,
 )
 from app.services.business_segmentation_service import normalize_account_category
-from app.services.clara_playbook_service import (
-    load_effective_clara_system_instruction_playbook,
-    load_clara_response_playbook,
-    load_clara_system_instruction_playbook,
-)
+from app.services.clara_playbook_service import compose_clara_playbooks
 from app.services.official_source_service import get_official_source_entries
 from app.services.policy_engine import decide_reply_action
 from app.services.product_knowledge_service import (
@@ -184,7 +184,7 @@ def _extract_reply_payload_from_response(response: object) -> dict:
     for candidate_text in candidate_texts:
         try:
             return json.loads(_extract_json_candidate(candidate_text))
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             continue
 
     raise ReplySuggestionError("OpenAI returned empty structured output.")
@@ -227,11 +227,17 @@ def _normalize_reply_tone_value(raw_tone: object) -> str:
 
     if any(token in normalized for token in ("empati", "empat", "calm", "tenang")):
         return "empathetic"
-    if any(token in normalized for token in ("formal", "profes", "sopan", "resmi", "netral")):
+    if any(
+        token in normalized
+        for token in ("formal", "profes", "sopan", "resmi", "netral")
+    ):
         return "professional"
     if any(token in normalized for token in ("urgent", "segera", "mendesak", "cepat")):
         return "urgent"
-    if any(token in normalized for token in ("ramah", "casual", "santai", "natural", "friendly")):
+    if any(
+        token in normalized
+        for token in ("ramah", "casual", "santai", "natural", "friendly")
+    ):
         return "friendly"
 
     return "best"
@@ -864,7 +870,9 @@ def infer_customer_subject_focus(message_text: str) -> str | None:
     if not message:
         return None
 
-    if re.search(r"\bmini\b", message) and re.search(r"\bregular\b|\breguler\b", message):
+    if re.search(r"\bmini\b", message) and re.search(
+        r"\bregular\b|\breguler\b", message
+    ):
         return "mini_vs_regular"
     if MULTILATERAL_BILATERAL_PATTERN.search(message):
         return "multilateral_vs_bilateral"
@@ -1182,7 +1190,11 @@ def extract_customer_identity_fields(latest_customer_message: str) -> dict[str, 
         )
 
     if "name" not in fields:
-        lines = [line.strip() for line in latest_customer_message.splitlines() if line.strip()]
+        lines = [
+            line.strip()
+            for line in latest_customer_message.splitlines()
+            if line.strip()
+        ]
         if len(lines) >= 2:
             possible_name = _compact_whitespace(lines[0])
             if (
@@ -1193,7 +1205,9 @@ def extract_customer_identity_fields(latest_customer_message: str) -> dict[str, 
                 fields["name"] = possible_name
 
     if "domicile" not in fields and "domisili" in message.lower():
-        fallback = re.search(r"domisili[\s:,-]+([A-Za-z][A-Za-z\s\.'-]{2,})", message, re.I)
+        fallback = re.search(
+            r"domisili[\s:,-]+([A-Za-z][A-Za-z\s\.'-]{2,})", message, re.I
+        )
         if fallback:
             fields["domicile"] = re.sub(
                 r"^(kota|kabupaten)\s+",
@@ -1234,10 +1248,9 @@ def should_preserve_previous_topic(
         if latest_subject_focus != previous_subject_focus:
             return False
 
-    if (
-        should_message_ask_product_options(customer_message)
-        or MULTILATERAL_BILATERAL_PATTERN.search(customer_message)
-    ):
+    if should_message_ask_product_options(
+        customer_message
+    ) or MULTILATERAL_BILATERAL_PATTERN.search(customer_message):
         return False
 
     if len(customer_message.split()) <= 8:
@@ -1246,7 +1259,9 @@ def should_preserve_previous_topic(
     return bool(FOLLOW_UP_CONTINUATION_PATTERN.search(customer_message))
 
 
-def conversation_has_customer_chosen_product_variant(conversation: Conversation) -> bool:
+def conversation_has_customer_chosen_product_variant(
+    conversation: Conversation,
+) -> bool:
     return any(
         message.sender_type == "customer"
         and customer_has_chosen_product_variant(message.message_text)
@@ -1341,7 +1356,11 @@ def build_reply_strategy_brief(extraction: AIExtraction | AIExtractionCreate) ->
     )
     lines.append(
         "- Topik yang sebaiknya dihindari: "
-        + (", ".join(avoid_topics) if avoid_topics else "tidak ada larangan topik tambahan")
+        + (
+            ", ".join(avoid_topics)
+            if avoid_topics
+            else "tidak ada larangan topik tambahan"
+        )
     )
     lines.append(f"- Next best action: {extraction.next_best_action}")
 
@@ -1424,9 +1443,7 @@ def get_reply_generation_model(
             if configured_ultra_fast_model:
                 return configured_ultra_fast_model
 
-        configured_fast_model = _compact_whitespace(
-            settings.openai_fast_reply_model
-        )
+        configured_fast_model = _compact_whitespace(settings.openai_fast_reply_model)
         if configured_fast_model:
             return configured_fast_model
 
@@ -1506,7 +1523,10 @@ def build_runtime_rule_brief(
             "- Jika customer sudah memilih Mini/Regular, jangan tanya ulang mau pilih yang mana kecuali customer sendiri berubah arah."
         )
 
-    if conversation_variant_focus in {"mini", "reguler"} and not must_answer_with_product_options:
+    if (
+        conversation_variant_focus in {"mini", "reguler"}
+        and not must_answer_with_product_options
+    ):
         rules.append(
             f"- Riwayat percakapan menunjukkan customer sedang fokus ke {conversation_variant_focus}. Jangan bandingkan lagi dengan varian lain kecuali customer meminta perbandingan."
         )
@@ -1522,7 +1542,9 @@ def build_runtime_rule_brief(
 
     if has_identity_submission:
         submitted_bits = ", ".join(
-            key for key in ("name", "phone", "domicile") if key in customer_identity_fields
+            key
+            for key in ("name", "phone", "domicile")
+            if key in customer_identity_fields
         )
         if submitted_bits:
             rules.append(
@@ -1571,7 +1593,11 @@ def build_runtime_rule_brief(
         rules.append(
             "- Fokus ke langkah berikutnya yang operasional. Jangan mundur ke pengenalan produk umum."
         )
-        if has_identity_submission or customer_chose_variant or customer_has_verification_completion:
+        if (
+            has_identity_submission
+            or customer_chose_variant
+            or customer_has_verification_completion
+        ):
             rules.append(
                 "- Karena customer sudah kirim data dan/atau sudah pilih produk, next step harus konkret: misalnya verifikasi data, proses onboarding, atau handoff ke tim senior. Jangan jawab dengan 'saya cek alurnya dulu' atau filler sejenis."
             )
@@ -1657,7 +1683,9 @@ def build_runtime_rule_brief(
     )
 
     if not rules:
-        rules.append("- Fokus jawab pertanyaan terakhir customer dengan informasi paling relevan.")
+        rules.append(
+            "- Fokus jawab pertanyaan terakhir customer dengan informasi paling relevan."
+        )
 
     return "\n".join(rules)
 
@@ -1704,11 +1732,15 @@ def build_extraction_runtime_summary(
     if known_identity_fields:
         lines.append(
             "- latest_identity_fields="
-            + ", ".join(f"{key}={value}" for key, value in known_identity_fields.items())
+            + ", ".join(
+                f"{key}={value}" for key, value in known_identity_fields.items()
+            )
         )
 
     if latest_sales_message:
-        lines.append(f"- latest_sales_message={_truncate_text(latest_sales_message, 180)}")
+        lines.append(
+            f"- latest_sales_message={_truncate_text(latest_sales_message, 180)}"
+        )
 
     return "\n".join(lines)
 
@@ -1773,7 +1805,10 @@ def infer_product_variant_response_mode(
     if normalized_category in {"mini", "reguler"}:
         return f"anchor_{normalized_category}"
 
-    if conversation_variant_focus in {"mini", "reguler"} and latest_customer_intent != "product_options":
+    if (
+        conversation_variant_focus in {"mini", "reguler"}
+        and latest_customer_intent != "product_options"
+    ):
         return f"lean_{conversation_variant_focus}"
 
     if prediction.value in {"mini", "reguler"} and prediction.confidence_score >= 0.78:
@@ -1959,11 +1994,14 @@ def _score_knowledge_entry(
         if latest_customer_intent in {"next_step", "timing", "safety"}:
             score += 16
 
-    if re.search(
-        r"\b(spread|spa|jfx|live quote|karakteristik produk|registrasi|penarikan|withdraw)\b",
-        latest_customer_message,
-        re.IGNORECASE,
-    ) and source_type == "official_source_sg":
+    if (
+        re.search(
+            r"\b(spread|spa|jfx|live quote|karakteristik produk|registrasi|penarikan|withdraw)\b",
+            latest_customer_message,
+            re.IGNORECASE,
+        )
+        and source_type == "official_source_sg"
+    ):
         score += 24
 
     return score
@@ -1982,9 +2020,7 @@ def build_prioritized_knowledge_brief(
         summary = _truncate_text(first_sentence or entry.content, 160)
         variant = _classify_product_variant(entry.category, entry.title, entry.content)
         variant_label = f" [{variant}]" if variant else ""
-        lines.append(
-            f"- {entry.title}{variant_label}: {summary}"
-        )
+        lines.append(f"- {entry.title}{variant_label}: {summary}")
 
     if latest_customer_intent == "product_options":
         lines.append(
@@ -2099,7 +2135,9 @@ def build_required_fact_brief(
             facts.extend(mechanism_lines[:3])
             return "\n".join(facts)
 
-    facts.append("- Gunakan hanya fakta paling relevan dari knowledge base yang sudah diprioritaskan.")
+    facts.append(
+        "- Gunakan hanya fakta paling relevan dari knowledge base yang sudah diprioritaskan."
+    )
     facts.extend(knowledge_lines[:2])
     return "\n".join(facts)
 
@@ -2388,19 +2426,14 @@ def build_reply_system_prompt(
     customer_has_verification_completion: bool,
     desired_count: int,
 ) -> str:
+    # Stage 1 boundary: this hard-coded layer remains the LEGACY_BEHAVIOR_OVERLAY.
     normalized_category = (account_category or "unknown").strip().lower()
     if normalized_category == "mini":
-        variant_focus = (
-            "Fokus utama kamu adalah Mini / Micro account untuk pemula yang ingin mulai pelan-pelan."
-        )
+        variant_focus = "Fokus utama kamu adalah Mini / Micro account untuk pemula yang ingin mulai pelan-pelan."
     elif normalized_category == "reguler":
-        variant_focus = (
-            "Fokus utama kamu adalah account Reguler untuk user yang sudah lebih siap dan butuh ruang lebih besar."
-        )
+        variant_focus = "Fokus utama kamu adalah account Reguler untuk user yang sudah lebih siap dan butuh ruang lebih besar."
     else:
-        variant_focus = (
-            "Fokus utama kamu adalah membantu customer memilih arah yang paling pas tanpa memaksa varian tertentu."
-        )
+        variant_focus = "Fokus utama kamu adalah membantu customer memilih arah yang paling pas tanpa memaksa varian tertentu."
 
     output_target = (
         "Output akhir harus tepat 1 balasan WhatsApp terbaik yang paling siap kirim dalam JSON valid sesuai schema."
@@ -2549,7 +2582,8 @@ def format_conversation_for_reply(
         )
         if reply_context_text:
             reply_context_sender_name = (
-                getattr(message, "reply_context_sender_name", None) or "pesan sebelumnya"
+                getattr(message, "reply_context_sender_name", None)
+                or "pesan sebelumnya"
             )
             reply_context_sender_type = (
                 getattr(message, "reply_context_sender_type", None) or "unknown"
@@ -2657,8 +2691,7 @@ def build_grounded_knowledge_context(
         return fallback, "- Tidak ada fakta prioritas yang cocok."
 
     serialized_entries = tuple(
-        _serialize_knowledge_entry(entry)
-        for entry in combined_entries
+        _serialize_knowledge_entry(entry) for entry in combined_entries
     )
 
     return _build_cached_grounded_knowledge_context(
@@ -2708,12 +2741,18 @@ def build_product_option_summary(grounded_knowledge: str) -> str:
 
         if variant is not None:
             if product_map[variant]["positioning"] is None and first_sentence:
-                product_map[variant]["positioning"] = _truncate_text(first_sentence, 140)
+                product_map[variant]["positioning"] = _truncate_text(
+                    first_sentence, 140
+                )
             if product_map[variant]["minimum"] is None and minimum_hint:
                 product_map[variant]["minimum"] = minimum_hint
 
         instrument = _classify_product_instrument(category, title, content)
-        if instrument is not None and instrument_map[instrument] is None and first_sentence:
+        if (
+            instrument is not None
+            and instrument_map[instrument] is None
+            and first_sentence
+        ):
             instrument_map[instrument] = _truncate_text(first_sentence, 140)
 
     lines: list[str] = []
@@ -2860,8 +2899,7 @@ def should_give_detailed_explanation(conversation: Conversation) -> bool:
 def should_give_concrete_steps(conversation: Conversation) -> bool:
     latest_customer_message = get_latest_customer_message(conversation)
     return bool(
-        latest_customer_message
-        and STEP_REQUEST_PATTERN.search(latest_customer_message)
+        latest_customer_message and STEP_REQUEST_PATTERN.search(latest_customer_message)
     )
 
 
@@ -2991,13 +3029,25 @@ def response_reasks_identity_data(
         return False
 
     asks_name = bool(
-        re.search(r"\b(kirim|mohon kirim|tolong kirim).*(nama(?:\s+lengkap)?)\b", normalized, re.I)
+        re.search(
+            r"\b(kirim|mohon kirim|tolong kirim).*(nama(?:\s+lengkap)?)\b",
+            normalized,
+            re.I,
+        )
     )
     asks_phone = bool(
-        re.search(r"\b(kirim|mohon kirim|tolong kirim).*(nomor hp|no hp|hp aktif|telepon)\b", normalized, re.I)
+        re.search(
+            r"\b(kirim|mohon kirim|tolong kirim).*(nomor hp|no hp|hp aktif|telepon)\b",
+            normalized,
+            re.I,
+        )
     )
     asks_domicile = bool(
-        re.search(r"\b(kirim|mohon kirim|tolong kirim).*(domisili|kota domisili|kota)\b", normalized, re.I)
+        re.search(
+            r"\b(kirim|mohon kirim|tolong kirim).*(domisili|kota domisili|kota)\b",
+            normalized,
+            re.I,
+        )
     )
 
     if "name" in latest_identity_fields and asks_name:
@@ -3110,7 +3160,9 @@ def response_uses_abstract_data_requirement(
     text: str,
     latest_customer_message: str,
 ) -> bool:
-    if not DATA_PREPARATION_REQUEST_PATTERN.search(_compact_whitespace(latest_customer_message)):
+    if not DATA_PREPARATION_REQUEST_PATTERN.search(
+        _compact_whitespace(latest_customer_message)
+    ):
         return False
 
     normalized = _compact_whitespace(text)
@@ -3162,9 +3214,9 @@ def response_breaks_subject_focus(
     latest_customer_message: str,
     previous_customer_message: str = "",
 ) -> bool:
-    subject_focus = infer_customer_subject_focus(latest_customer_message) or infer_customer_subject_focus(
-        previous_customer_message
-    )
+    subject_focus = infer_customer_subject_focus(
+        latest_customer_message
+    ) or infer_customer_subject_focus(previous_customer_message)
     if subject_focus is None:
         return False
 
@@ -3224,9 +3276,7 @@ def response_uses_repetitive_closing_template(text: str) -> bool:
         return False
 
     sentences = [
-        part.strip()
-        for part in re.split(r"(?<=[.!?])\s+", normalized)
-        if part.strip()
+        part.strip() for part in re.split(r"(?<=[.!?])\s+", normalized) if part.strip()
     ]
     if not sentences:
         return False
@@ -3290,7 +3340,9 @@ def response_mentions_variant_not_in_grounding(
     mentions_mini = "mini" in normalized_text
     mentions_regular = "regular" in normalized_text or "reguler" in normalized_text
     summary_has_mini = "mini" in normalized_summary
-    summary_has_regular = "regular" in normalized_summary or "reguler" in normalized_summary
+    summary_has_regular = (
+        "regular" in normalized_summary or "reguler" in normalized_summary
+    )
 
     if mentions_mini and not summary_has_mini:
         return True
@@ -3342,7 +3394,9 @@ def response_unnecessarily_mentions_product_variants(
     if not normalized:
         return False
 
-    if conversation_variant_focus == "mini" and re.search(r"\b(regular|reguler)\b", normalized):
+    if conversation_variant_focus == "mini" and re.search(
+        r"\b(regular|reguler)\b", normalized
+    ):
         return True
     if conversation_variant_focus == "reguler" and re.search(r"\bmini\b", normalized):
         return True
@@ -3358,7 +3412,10 @@ def _is_allowed_mini_initial_capital_answer(normalized_text: str) -> bool:
     if not mentions_mini or mentions_other_account:
         return False
 
-    return any(pattern.search(normalized_text) for pattern in ALLOWED_MINI_INITIAL_CAPITAL_PATTERNS)
+    return any(
+        pattern.search(normalized_text)
+        for pattern in ALLOWED_MINI_INITIAL_CAPITAL_PATTERNS
+    )
 
 
 def response_states_fixed_sensitive_number(
@@ -3388,7 +3445,12 @@ def response_opens_with_source_dump(
     text: str,
     latest_customer_intent: str,
 ) -> bool:
-    if latest_customer_intent not in {"general", "beginner", "mechanism", "minimum_capital"}:
+    if latest_customer_intent not in {
+        "general",
+        "beginner",
+        "mechanism",
+        "minimum_capital",
+    }:
         return False
 
     normalized = _compact_whitespace(text)
@@ -3396,11 +3458,11 @@ def response_opens_with_source_dump(
         return False
 
     sentences = [
-        part.strip()
-        for part in re.split(r"(?<=[.!?])\s+", normalized)
-        if part.strip()
+        part.strip() for part in re.split(r"(?<=[.!?])\s+", normalized) if part.strip()
     ]
-    opening_window = 1 if latest_customer_intent in {"mechanism", "minimum_capital"} else 2
+    opening_window = (
+        1 if latest_customer_intent in {"mechanism", "minimum_capital"} else 2
+    )
     opening = " ".join(sentences[:opening_window]).lower()
     if not opening:
         return False
@@ -3724,24 +3786,20 @@ def call_openai_for_reply_suggestion(
     )
 
     playbook_started_at = perf_counter()
-    system_playbook = (
-        load_effective_clara_system_instruction_playbook(
-            db,
-            account_category,
-            include_all_variants=include_all_variants,
-        )
-        if db is not None
-        else load_clara_system_instruction_playbook(
-            account_category,
-            include_all_variants=include_all_variants,
-        )
-    )
-    response_playbook = load_clara_response_playbook(
+    playbook_composition = compose_clara_playbooks(
+        db,
         account_category,
         include_all_variants=include_all_variants,
         latest_customer_intent=latest_customer_intent,
         latency_profile=latency_profile,
         desired_count=desired_count,
+    )
+    system_playbook = playbook_composition.system_playbook
+    response_playbook = playbook_composition.supporting_playbook
+    runtime_contract_debug = playbook_composition.debug_metadata()
+    reply_logger.debug(
+        "reply_runtime_contract_composed",
+        extra=runtime_contract_debug,
     )
     playbook_duration_ms = _round_duration_ms(playbook_started_at)
 
@@ -3837,14 +3895,16 @@ def call_openai_for_reply_suggestion(
 
     try:
         validation_started_at = perf_counter()
-        parsed_json, used_plain_json_fallback = _extract_reply_payload_with_plain_json_fallback(
-            client=client,
-            response=response,
-            reply_model=reply_model,
-            system_prompt=system_prompt,
-            user_prompt=prompt,
-            desired_count=desired_count,
-            max_output_tokens=max_output_tokens,
+        parsed_json, used_plain_json_fallback = (
+            _extract_reply_payload_with_plain_json_fallback(
+                client=client,
+                response=response,
+                reply_model=reply_model,
+                system_prompt=system_prompt,
+                user_prompt=prompt,
+                desired_count=desired_count,
+                max_output_tokens=max_output_tokens,
+            )
         )
         reply_payload = ReplySuggestionCreate.model_validate(
             _normalize_reply_payload(parsed_json)
@@ -4227,21 +4287,21 @@ def call_openai_for_reply_suggestion(
         )
         retry_openai_duration_ms = _round_duration_ms(retry_openai_started_at)
         retry_validation_started_at = perf_counter()
-        retry_json, retry_used_plain_json_fallback = _extract_reply_payload_with_plain_json_fallback(
-            client=client,
-            response=retry_response,
-            reply_model=reply_model,
-            system_prompt=system_prompt,
-            user_prompt=retry_prompt,
-            desired_count=desired_count,
-            max_output_tokens=max_output_tokens,
+        retry_json, retry_used_plain_json_fallback = (
+            _extract_reply_payload_with_plain_json_fallback(
+                client=client,
+                response=retry_response,
+                reply_model=reply_model,
+                system_prompt=system_prompt,
+                user_prompt=retry_prompt,
+                desired_count=desired_count,
+                max_output_tokens=max_output_tokens,
+            )
         )
         retried_payload = ReplySuggestionCreate.model_validate(
             _normalize_reply_payload(retry_json)
         )
-        retry_validation_duration_ms = _round_duration_ms(
-            retry_validation_started_at
-        )
+        retry_validation_duration_ms = _round_duration_ms(retry_validation_started_at)
         reply_logger.info(
             "reply_generation_completed",
             extra={
@@ -4334,21 +4394,15 @@ def create_reply_suggestion(
     latest_customer_message = get_latest_customer_message(conversation)
     previous_customer_message = get_previous_customer_message(conversation)
     latest_sales_message = get_latest_sales_message(conversation)
-    avoid_product_variant_locking = should_avoid_product_variant_locking(
-        conversation
-    )
-    must_answer_with_product_options = should_answer_with_product_options(
-        conversation
-    )
+    avoid_product_variant_locking = should_avoid_product_variant_locking(conversation)
+    must_answer_with_product_options = should_answer_with_product_options(conversation)
     should_avoid_repeating_sales_reply = should_avoid_repeating_latest_sales_reply(
         conversation
     )
     must_give_concrete_steps = should_give_concrete_steps(conversation)
     must_give_detailed_explanation = should_give_detailed_explanation(conversation)
     discusses_scalping_context = discusses_scalping_or_setup(conversation)
-    preferred_reply_register = get_preferred_reply_register(
-        latest_customer_message
-    )
+    preferred_reply_register = get_preferred_reply_register(latest_customer_message)
     customer_has_variant_commitment = conversation_has_customer_chosen_product_variant(
         conversation
     )
@@ -4416,7 +4470,9 @@ def create_reply_suggestion(
         extraction=extraction,
         action_mode=policy_decision.action_mode,
         grounded_knowledge=grounded_knowledge,
-        account_category=conversation.lead.account_category if conversation.lead else None,
+        account_category=conversation.lead.account_category
+        if conversation.lead
+        else None,
         include_all_variants=include_all_variants,
         latest_customer_message=latest_customer_message,
         latest_sales_message=latest_sales_message,
@@ -4486,6 +4542,8 @@ def create_reply_suggestion(
             "summary_duration_ms": summary_duration_ms,
             "generation_duration_ms": generation_duration_ms,
             "total_duration_ms": _round_duration_ms(total_started_at),
+            "runtime_contract_version": CLARA_RUNTIME_CONTRACT_VERSION,
+            "legacy_behavior_overlay": LEGACY_BEHAVIOR_OVERLAY,
         },
     )
     db.commit()
