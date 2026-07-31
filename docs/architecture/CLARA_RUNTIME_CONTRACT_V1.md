@@ -310,3 +310,19 @@ Runtime capabilities default to no access/no authority. Claiming a system
 status or refund authority while the corresponding capability is unavailable
 is reported as a critical observation. Metadata remains log-only because no
 ORM or database migration is introduced.
+
+## 16. Stage 5 Policy Enforcement Contract
+
+Stage 5 introduces `CLARA_ENFORCEMENT_CONTRACT_VERSION = "1.0"` and the
+`OFF`, `OBSERVE`, and `ENFORCE` rollout modes. Default is `OBSERVE`.
+
+The backend decision owns generation strategy, reviewer requirement, and send
+permission. In `ENFORCE`, critical semantic failures cannot become normal
+drafts, contextual complaints use a deterministic safe handoff, and blocked
+records contain no customer-facing draft. Approval and send services enforce
+the same decision boundary; extension explicit send cannot auto-approve a
+pending suggestion.
+
+Safe decision metadata uses IDs and hashes only. Observation history remains
+log-only because no migration is added. See
+`docs/architecture/CLARA_POLICY_ENFORCEMENT_CONTRACT.md`.

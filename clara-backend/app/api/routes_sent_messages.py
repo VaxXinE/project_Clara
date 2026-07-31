@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.security import require_roles
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.sent_message_schema import (
@@ -15,6 +16,10 @@ from app.services.sent_message_service import (
     SentMessageError,
     list_sent_messages,
     mark_reply_suggestion_as_sent,
+)
+from app.services.clara_policy_enforcement_service import (
+    CLARA_ENFORCEMENT_CONTRACT_VERSION,
+    normalize_policy_enforcement_mode,
 )
 from app.services.access_control_service import AccessDeniedError, get_accessible_reply_suggestion_or_raise, get_accessible_conversation_or_raise
 
@@ -43,6 +48,7 @@ def mark_reply_sent_endpoint(
             db=db,
             reply_suggestion_id=reply_suggestion_id,
             payload=payload,
+            sender_role=current_user.role,
         )
 
         create_audit_log(
@@ -52,6 +58,15 @@ def mark_reply_sent_endpoint(
             resource_id=str(reply_suggestion_id),
             current_user=current_user,
             request=request,
+            metadata={
+                "enforcement_contract_version": (
+                    CLARA_ENFORCEMENT_CONTRACT_VERSION
+                ),
+                "enforcement_mode": normalize_policy_enforcement_mode(
+                    settings.clara_policy_enforcement_mode
+                ).mode.value,
+                "send_actor_role": current_user.role,
+            },
         )
 
         return sent_message

@@ -168,6 +168,7 @@ def _send_extension_reply_suggestion(
             selected_reply_text=payload.selected_reply_text,
             final_reply_text=payload.final_reply_text,
             sent_by_name=payload.sent_by_name,
+            sender_role=current_user.role,
         )
 
         create_audit_log(
@@ -185,6 +186,7 @@ def _send_extension_reply_suggestion(
                 "status": result.status,
                 "auto_approved": result.auto_approved,
                 "already_sent": result.already_sent,
+                "send_actor_role": current_user.role,
             },
         )
 

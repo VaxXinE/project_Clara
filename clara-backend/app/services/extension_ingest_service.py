@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
 from app.models.conversation import Conversation
@@ -26,6 +27,12 @@ from app.schemas.extension_schema import (
 from app.services.ai_extraction_service import analyze_conversation
 from app.services.access_control_service import can_access_conversation_in_scope
 from app.services.lead_service import ensure_conversation_lead
+from app.services.clara_policy_enforcement_service import (
+    ClaraEnforcementError,
+    PolicyEnforcementMode,
+    assert_suggestion_can_be_sent,
+    normalize_policy_enforcement_mode,
+)
 from app.services.reply_suggestion_service import create_reply_suggestion
 from app.services.tawk_webhook_service import (
     TawkWebhookIgnoredError,
@@ -1000,16 +1007,38 @@ def build_extension_reply_suggestions_response(
     suggestion: ReplySuggestion,
     cached: bool,
 ) -> ExtensionReplySuggestionsResponse:
-    suggestion_details = [
-        WhatsAppExtensionReplySuggestionItem(
-            tone=str(item.get("tone", "")),
-            text=str(item.get("text", "")),
-            reasoning=str(item.get("reasoning", "")),
+    enforcement_mode = normalize_policy_enforcement_mode(
+        settings.clara_policy_enforcement_mode
+    ).mode
+    if (
+        enforcement_mode == PolicyEnforcementMode.ENFORCE
+        and suggestion.approval_status != "approved"
+    ):
+        raise ExtensionSnapshotError(
+            "Suggestion requires explicit approval before extension use."
         )
-        for item in suggestion.suggested_replies
-        if isinstance(item, dict)
-        and str(item.get("text", "")).strip()
-    ]
+
+    if enforcement_mode == PolicyEnforcementMode.ENFORCE:
+        if not suggestion.final_reply_text:
+            raise ExtensionSnapshotError("Approved suggestion has no final text.")
+        suggestion_details = [
+            WhatsAppExtensionReplySuggestionItem(
+                tone="best",
+                text=suggestion.final_reply_text,
+                reasoning="Human-approved reply.",
+            )
+        ]
+    else:
+        suggestion_details = [
+            WhatsAppExtensionReplySuggestionItem(
+                tone=str(item.get("tone", "")),
+                text=str(item.get("text", "")),
+                reasoning=str(item.get("reasoning", "")),
+            )
+            for item in suggestion.suggested_replies
+            if isinstance(item, dict)
+            and str(item.get("text", "")).strip()
+        ]
 
     if not suggestion_details:
         raise ExtensionSnapshotError("Reply suggestion output is empty.")
@@ -1132,6 +1161,7 @@ def confirm_extension_reply_sent_for_channel(
     selected_reply_text: str,
     final_reply_text: str,
     sent_by_name: str,
+    sender_role: str | None = None,
 ) -> ExtensionSendReplyResponse:
     channel_context = get_extension_channel_context(channel=channel, provider=provider)
 
@@ -1166,6 +1196,25 @@ def confirm_extension_reply_sent_for_channel(
 
     auto_approved = False
 
+    enforcement_mode = normalize_policy_enforcement_mode(
+        settings.clara_policy_enforcement_mode
+    ).mode
+
+    if (
+        enforcement_mode == PolicyEnforcementMode.ENFORCE
+        and suggestion.approval_status == "pending"
+    ):
+        raise ExtensionSnapshotError(
+            "Suggestion must be explicitly approved before extension send."
+        )
+    if (
+        enforcement_mode == PolicyEnforcementMode.ENFORCE
+        and suggestion.final_reply_text != normalized_final
+    ):
+        raise ExtensionSnapshotError(
+            "Extension reply must match the human-approved final text."
+        )
+
     if suggestion.approval_status == "pending":
         suggestion.selected_reply_text = normalized_selected
         suggestion.final_reply_text = normalized_final
@@ -1192,6 +1241,18 @@ def confirm_extension_reply_sent_for_channel(
 
     if not suggestion.final_reply_text:
         raise ExtensionSnapshotError("Approved reply has no final reply text.")
+
+    try:
+        assert_suggestion_can_be_sent(
+            action_mode=suggestion.action_mode,
+            risk_level=suggestion.risk_level,
+            approval_status=suggestion.approval_status,
+            actor_role=sender_role,
+            final_text=suggestion.final_reply_text,
+            policy_reasons=tuple(suggestion.policy_reasons),
+        )
+    except ClaraEnforcementError as exc:
+        raise ExtensionSnapshotError(str(exc)) from exc
 
     conversation = db.get(Conversation, suggestion.conversation_id)
 

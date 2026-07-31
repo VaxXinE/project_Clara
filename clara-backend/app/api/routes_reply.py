@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.clara_runtime_contract import runtime_contract_audit_metadata
+from app.core.config import settings
 from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.user import User
@@ -19,6 +20,12 @@ from app.services.reply_suggestion_service import (
     create_reply_suggestion,
     list_reply_suggestions,
     reject_reply_suggestion,
+)
+from app.services.clara_policy_enforcement_service import (
+    CLARA_ENFORCEMENT_CONTRACT_VERSION,
+    PolicyEnforcementMode,
+    normalize_policy_enforcement_mode,
+    reviewer_requirement_for_suggestion,
 )
 from app.services.access_control_service import (
     AccessDeniedError,
@@ -50,6 +57,9 @@ def create_reply_suggestion_endpoint(
         )
 
         suggestion = create_reply_suggestion(db=db, conversation_id=conversation_id)
+        enforcement_mode = normalize_policy_enforcement_mode(
+            settings.clara_policy_enforcement_mode
+        ).mode
 
         create_audit_log(
             db=db,
@@ -67,6 +77,19 @@ def create_reply_suggestion_endpoint(
                 "action_mode": suggestion.action_mode,
                 "suggestion_count": len(suggestion.suggested_replies),
                 "policy_reason_count": len(suggestion.policy_reasons),
+                "enforcement_contract_version": (
+                    CLARA_ENFORCEMENT_CONTRACT_VERSION
+                ),
+                "enforcement_mode": enforcement_mode.value,
+                "applied_action_mode": suggestion.action_mode,
+                "reviewer_requirement": reviewer_requirement_for_suggestion(
+                    action_mode=suggestion.action_mode,
+                    risk_level=suggestion.risk_level,
+                    policy_reasons=tuple(suggestion.policy_reasons),
+                ).value,
+                "enforcement_applied": (
+                    enforcement_mode == PolicyEnforcementMode.ENFORCE
+                ),
             },
         )
 
@@ -145,6 +168,15 @@ def approve_reply_suggestion_endpoint(
             db=db,
             reply_suggestion_id=reply_suggestion_id,
             payload=payload,
+            reviewer_role=current_user.role,
+            authenticated_reviewer_name=(
+                current_user.name
+                if normalize_policy_enforcement_mode(
+                    settings.clara_policy_enforcement_mode
+                ).mode
+                == PolicyEnforcementMode.ENFORCE
+                else None
+            ),
         )
 
         create_audit_log(
@@ -154,6 +186,20 @@ def approve_reply_suggestion_endpoint(
             resource_id=str(reply_suggestion_id),
             current_user=current_user,
             request=request,
+            metadata={
+                "enforcement_contract_version": (
+                    CLARA_ENFORCEMENT_CONTRACT_VERSION
+                ),
+                "enforcement_mode": normalize_policy_enforcement_mode(
+                    settings.clara_policy_enforcement_mode
+                ).mode.value,
+                "approval_actor_role": current_user.role,
+                "reviewer_requirement": reviewer_requirement_for_suggestion(
+                    action_mode=suggestion.action_mode,
+                    risk_level=suggestion.risk_level,
+                    policy_reasons=tuple(suggestion.policy_reasons),
+                ).value,
+            },
         )
 
         return suggestion

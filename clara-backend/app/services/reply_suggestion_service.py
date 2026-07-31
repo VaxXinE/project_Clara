@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.clara_runtime_contract import (
     CLARA_RUNTIME_CONTRACT_VERSION,
+    ActionMode,
     LEGACY_BEHAVIOR_OVERLAY,
     PersonaAuthorityMode,
     PromptSectionSource,
@@ -49,6 +50,16 @@ from app.services.clara_reply_validation_service import (
     evaluate_reply,
     normalize_semantic_revalidation_mode,
 )
+from app.services.clara_policy_enforcement_service import (
+    CLARA_ENFORCEMENT_CONTRACT_VERSION,
+    ClaraEnforcementError,
+    GenerationStrategy,
+    PolicyEnforcementMode,
+    assert_suggestion_can_be_approved,
+    decide_enforcement,
+    normalize_policy_enforcement_mode,
+)
+from app.services.clara_safe_handoff_service import build_safe_handoff
 from app.services.clara_legacy_behavior_service import (
     AuthoritySystemPrompt,
     build_authority_debug_metadata,
@@ -4329,6 +4340,9 @@ def create_reply_suggestion(
         )
 
     policy_decision = decide_reply_action(extraction)
+    enforcement_mode_resolution = normalize_policy_enforcement_mode(
+        settings.clara_policy_enforcement_mode
+    )
     persona_authority_mode = PersonaAuthorityMode(
         normalize_persona_authority_mode(
             settings.clara_persona_authority_mode
@@ -4337,6 +4351,11 @@ def create_reply_suggestion(
     context_started_at = perf_counter()
     include_all_variants = should_include_all_product_variants(conversation)
     latest_customer_message = get_latest_customer_message(conversation)
+    preliminary_enforcement_decision = decide_enforcement(
+        legacy_policy_action=policy_decision.action_mode,
+        policy_risk_level=extraction.risk_level,
+        latest_customer_message=latest_customer_message,
+    )
     previous_customer_message = get_previous_customer_message(conversation)
     latest_sales_message = get_latest_sales_message(conversation)
     avoid_product_variant_locking = should_avoid_product_variant_locking(conversation)
@@ -4410,58 +4429,156 @@ def create_reply_suggestion(
     summary_duration_ms = _round_duration_ms(summary_started_at)
 
     generation_started_at = perf_counter()
-    reply_data = call_openai_for_reply_suggestion(
-        conversation_text=conversation_text,
-        extraction=extraction,
-        action_mode=policy_decision.action_mode,
-        grounded_knowledge=grounded_knowledge,
-        account_category=conversation.lead.account_category
-        if conversation.lead
-        else None,
-        include_all_variants=include_all_variants,
-        latest_customer_message=latest_customer_message,
-        latest_sales_message=latest_sales_message,
-        avoid_product_variant_locking=avoid_product_variant_locking,
-        preferred_reply_register=preferred_reply_register,
-        must_answer_with_product_options=must_answer_with_product_options,
-        should_avoid_repeating_sales_reply=should_avoid_repeating_sales_reply,
-        product_option_summary=product_option_summary,
-        must_give_concrete_steps=must_give_concrete_steps,
-        must_give_detailed_explanation=must_give_detailed_explanation,
-        discusses_scalping_or_setup=discusses_scalping_context,
-        latest_customer_intent=latest_customer_intent,
-        prioritized_knowledge_brief=prioritized_knowledge_brief,
-        answer_commitment_level=answer_commitment_level,
-        variant_response_mode=variant_response_mode,
-        customer_has_variant_commitment=customer_has_variant_commitment,
-        conversation_variant_focus=conversation_variant_focus,
-        customer_has_identity_submission=customer_has_identity_submission,
-        known_identity_fields=known_identity_fields,
-        customer_has_verification_completion=customer_has_verification_completion,
-        latency_profile=latency_profile,
-        desired_count=desired_count,
-        previous_customer_message=previous_customer_message,
-        db=db,
+    enforcement_mode = enforcement_mode_resolution.mode
+    skip_normal_generation = (
+        enforcement_mode == PolicyEnforcementMode.ENFORCE
+        and preliminary_enforcement_decision.generation_strategy
+        != GenerationStrategy.NORMAL_GENERATION
     )
+    reply_data = None
+    if not skip_normal_generation:
+        reply_data = call_openai_for_reply_suggestion(
+            conversation_text=conversation_text,
+            extraction=extraction,
+            action_mode=policy_decision.action_mode,
+            grounded_knowledge=grounded_knowledge,
+            account_category=conversation.lead.account_category
+            if conversation.lead
+            else None,
+            include_all_variants=include_all_variants,
+            latest_customer_message=latest_customer_message,
+            latest_sales_message=latest_sales_message,
+            avoid_product_variant_locking=avoid_product_variant_locking,
+            preferred_reply_register=preferred_reply_register,
+            must_answer_with_product_options=must_answer_with_product_options,
+            should_avoid_repeating_sales_reply=should_avoid_repeating_sales_reply,
+            product_option_summary=product_option_summary,
+            must_give_concrete_steps=must_give_concrete_steps,
+            must_give_detailed_explanation=must_give_detailed_explanation,
+            discusses_scalping_or_setup=discusses_scalping_context,
+            latest_customer_intent=latest_customer_intent,
+            prioritized_knowledge_brief=prioritized_knowledge_brief,
+            answer_commitment_level=answer_commitment_level,
+            variant_response_mode=variant_response_mode,
+            customer_has_variant_commitment=customer_has_variant_commitment,
+            conversation_variant_focus=conversation_variant_focus,
+            customer_has_identity_submission=customer_has_identity_submission,
+            known_identity_fields=known_identity_fields,
+            customer_has_verification_completion=(
+                customer_has_verification_completion
+            ),
+            latency_profile=latency_profile,
+            desired_count=desired_count,
+            previous_customer_message=previous_customer_message,
+            db=db,
+        )
     generation_duration_ms = _round_duration_ms(generation_started_at)
+
+    critical_validator_ids: tuple[str, ...] = ()
+    warning_validator_ids: tuple[str, ...] = ()
+    validation_unavailable = False
+    if reply_data is not None and enforcement_mode != PolicyEnforcementMode.OFF:
+        try:
+            enforcement_validation = evaluate_reply(
+                reply_data.suggested_replies[0].text,
+                ReplyValidationContext(
+                    latest_customer_message=latest_customer_message,
+                    latest_customer_intent=latest_customer_intent,
+                ),
+            )
+            critical_validator_ids = enforcement_validation.critical_failure_ids
+            warning_validator_ids = enforcement_validation.warning_ids
+        except Exception:
+            validation_unavailable = True
+            reply_logger.exception(
+                "reply_policy_enforcement_validation_failed",
+                extra={
+                    **enforcement_mode_resolution.debug_metadata(),
+                    "enforcement_contract_version": (
+                        CLARA_ENFORCEMENT_CONTRACT_VERSION
+                    ),
+                },
+            )
+
+    enforcement_decision = decide_enforcement(
+        legacy_policy_action=policy_decision.action_mode,
+        policy_risk_level=extraction.risk_level,
+        latest_customer_message=latest_customer_message,
+        critical_validator_ids=critical_validator_ids,
+        warning_validator_ids=warning_validator_ids,
+        validation_unavailable=validation_unavailable,
+    )
+    if skip_normal_generation:
+        enforcement_decision = preliminary_enforcement_decision
+
+    suggested_replies: list[dict] = []
+    model_name = get_reply_generation_model(
+        desired_count=desired_count,
+        latency_profile=latency_profile,
+    )
+    approval_status = "pending"
+    applied_action_mode = policy_decision.action_mode
+    applied_policy_reasons = list(policy_decision.reasons)
+
+    if enforcement_mode == PolicyEnforcementMode.ENFORCE:
+        applied_action_mode = enforcement_decision.action_mode.value
+        applied_policy_reasons.extend(
+            f"enforcement:{reason}" for reason in enforcement_decision.reason_codes
+        )
+        applied_policy_reasons.append(
+            "enforcement:reviewer_requirement="
+            f"{enforcement_decision.reviewer_requirement.value}"
+        )
+        applied_policy_reasons.extend(
+            f"enforcement:critical_validator={validator_id}"
+            for validator_id in enforcement_decision.critical_validator_ids
+        )
+        applied_policy_reasons.append(
+            "enforcement:decision_hash="
+            f"{enforcement_decision.decision_hash}"
+        )
+        if enforcement_decision.safe_handoff_category:
+            applied_policy_reasons.append(
+                "enforcement:safe_handoff_category="
+                f"{enforcement_decision.safe_handoff_category.value}"
+            )
+        if enforcement_decision.action_mode == ActionMode.BLOCK:
+            approval_status = "blocked"
+            model_name = "backend-policy-v1"
+        elif (
+            enforcement_decision.action_mode
+            == ActionMode.SAFE_HANDOFF
+        ):
+            category = enforcement_decision.safe_handoff_category
+            if category is None:
+                raise ReplySuggestionError("Safe handoff category is missing.")
+            handoff = build_safe_handoff(category)
+            suggested_replies = [
+                {
+                    "tone": "empathetic",
+                    "text": handoff.content,
+                    "reasoning": "Backend-owned safe handoff.",
+                }
+            ]
+            model_name = "backend-safe-handoff-v1"
+
+    if not suggested_replies and approval_status != "blocked" and reply_data:
+        suggested_replies = [
+            reply.model_dump() for reply in reply_data.suggested_replies
+        ]
 
     suggestion = ReplySuggestion(
         conversation_id=conversation.id,
         ai_extraction_id=extraction.id,
         channel=conversation.channel,
         provider=conversation.provider,
-        model_name=get_reply_generation_model(
-            desired_count=desired_count,
-            latency_profile=latency_profile,
-        ),
+        model_name=model_name,
         schema_version="v1",
         risk_level=extraction.risk_level,
-        action_mode=policy_decision.action_mode,
-        approval_status="pending",
-        suggested_replies=[
-            reply.model_dump() for reply in reply_data.suggested_replies
-        ],
-        policy_reasons=policy_decision.reasons,
+        action_mode=applied_action_mode,
+        approval_status=approval_status,
+        suggested_replies=suggested_replies,
+        policy_reasons=applied_policy_reasons,
     )
 
     db.add(suggestion)
@@ -4494,6 +4611,12 @@ def create_reply_suggestion(
                 if persona_authority_mode == PersonaAuthorityMode.LEGACY
                 else None
             ),
+            **enforcement_mode_resolution.debug_metadata(),
+            **enforcement_decision.debug_metadata(),
+            "applied_action_mode": applied_action_mode,
+            "enforcement_applied": (
+                enforcement_mode == PolicyEnforcementMode.ENFORCE
+            ),
         },
     )
     db.commit()
@@ -4519,6 +4642,8 @@ def approve_reply_suggestion(
     db: Session,
     reply_suggestion_id: UUID,
     payload: ApproveReplyRequest,
+    reviewer_role: str | None = None,
+    authenticated_reviewer_name: str | None = None,
 ) -> ReplySuggestion:
     suggestion = db.get(ReplySuggestion, reply_suggestion_id)
 
@@ -4528,13 +4653,25 @@ def approve_reply_suggestion(
     if suggestion.approval_status != "pending":
         raise ReplySuggestionError("Reply suggestion is not pending.")
 
+    try:
+        assert_suggestion_can_be_approved(
+            action_mode=suggestion.action_mode,
+            risk_level=suggestion.risk_level,
+            approval_status=suggestion.approval_status,
+            actor_role=reviewer_role,
+            candidate_text=payload.final_reply_text,
+            policy_reasons=tuple(suggestion.policy_reasons),
+        )
+    except ClaraEnforcementError as exc:
+        raise ReplySuggestionError(str(exc)) from exc
+
     suggestion.selected_reply_text = payload.selected_reply_text
     suggestion.final_reply_text = payload.final_reply_text
     suggestion.approval_status = "approved"
 
     log = ApprovalLog(
         reply_suggestion_id=suggestion.id,
-        reviewer_name=payload.reviewer_name,
+        reviewer_name=authenticated_reviewer_name or payload.reviewer_name,
         action="approved",
         before_text=payload.selected_reply_text,
         after_text=payload.final_reply_text,

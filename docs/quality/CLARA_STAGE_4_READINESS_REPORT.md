@@ -94,3 +94,15 @@ observation metadata, and unresolved product-fact freshness/authority.
 Stage 5 recommendation: run controlled human shadow scoring and establish
 measured thresholds. Do not switch production mode or introduce enforcement
 until those gates are approved.
+
+## Stage 5 implementation note
+
+Stage 5 adds a separate backend enforcement contract with rollout default
+`OBSERVE`. It does not retroactively make the Stage 4 HYBRID or PERSONA quality
+assessment production-ready. `ENFORCE` is implemented but not activated by
+deployment configuration.
+
+The new gate covers deterministic critical outputs, contextual complaint safe
+handoff, reviewer authorization, and extension pending-approval bypass. Known
+Stage 4 gaps remain for nuanced claims, product-fact freshness, process FSM,
+dedicated compliance role, and persisted shadow-decision analytics.
