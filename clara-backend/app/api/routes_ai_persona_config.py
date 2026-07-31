@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.ai_persona_config_schema import (
     AIPersonaConfigVersionResponse,
     AIPersonaDraftCreateRequest,
+    AIPersonaEffectiveSectionResponse,
     AIPersonaSectionKey,
     AIPersonaVariant,
 )
@@ -21,6 +22,7 @@ from app.services.ai_persona_config_service import (
     rollback_persona_version,
 )
 from app.services.audit_service import create_audit_log
+from app.services.clara_playbook_service import load_effective_persona_sections
 
 router = APIRouter(prefix="/ai-persona-config", tags=["ai-persona-config"])
 
@@ -41,6 +43,18 @@ def _audit_metadata(entry: AIPersonaConfigVersion) -> dict:
         "version_number": entry.version_number,
         "content_sha256": entry.content_sha256,
     }
+
+
+@router.get(
+    "/effective",
+    response_model=list[AIPersonaEffectiveSectionResponse],
+)
+def get_effective_persona_endpoint(
+    variant: AIPersonaVariant = Query(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("superadmin")),
+):
+    return load_effective_persona_sections(db, variant)
 
 
 @router.get("", response_model=list[AIPersonaConfigVersionResponse])

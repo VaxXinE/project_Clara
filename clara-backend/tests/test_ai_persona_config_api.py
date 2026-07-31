@@ -41,6 +41,10 @@ def test_persona_config_is_superadmin_only(
 ) -> None:
     login(client, seeded_data["marketing_a"].email, "MarketingPass123!")
     assert client.get("/ai-persona-config").status_code == 403
+    assert (
+        client.get("/ai-persona-config/effective", params={"variant": "mini"}).status_code
+        == 403
+    )
     response = client.post(
         "/ai-persona-config/mini/flow/drafts",
         json={"content": "Updated flow"},
@@ -127,3 +131,35 @@ def test_draft_publish_and_rollback_preserve_history_and_audit(
         "ai_persona_config.publish",
         "ai_persona_config.rollback",
     }.issubset(actions)
+
+
+def test_effective_persona_uses_published_override_and_markdown_fallback(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    login(client, seeded_data["owner"].email, "OwnerPass123!")
+
+    before = client.get(
+        "/ai-persona-config/effective",
+        params={"variant": "mini"},
+    )
+    assert before.status_code == 200, before.text
+    assert len(before.json()) == 5
+    assert {item["source"] for item in before.json()} == {"markdown"}
+
+    draft = create_draft(client, "Persona runtime dari database")
+    publish = client.post(
+        f"/ai-persona-config/versions/{draft['id']}/publish",
+        headers=csrf_headers(client),
+    )
+    assert publish.status_code == 200, publish.text
+
+    after = client.get(
+        "/ai-persona-config/effective",
+        params={"variant": "mini"},
+    )
+    assert after.status_code == 200, after.text
+    sections = {item["section_key"]: item for item in after.json()}
+    assert sections["personality_mode"]["content"] == "Persona runtime dari database"
+    assert sections["personality_mode"]["source"] == "database"
+    assert sections["instruction"]["source"] == "markdown"

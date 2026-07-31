@@ -1,7 +1,16 @@
+from dataclasses import dataclass
 from functools import lru_cache
+import logging
 from pathlib import Path
 
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.models.ai_persona_config_version import AIPersonaConfigVersion
 from app.services.business_segmentation_service import normalize_account_category
+
+playbook_logger = logging.getLogger("clara.playbook")
 
 PLAYBOOK_FILES = (
     "INSTRUCTION.md",
@@ -35,6 +44,25 @@ SYSTEM_PLAYBOOK_FILES = (
     "PERSONALITY_MODE.md",
     "AUTO_ADAPT.md",
 )
+
+SYSTEM_SECTION_KEYS = {
+    "INSTRUCTION.md": "instruction",
+    "GUARDRAIL.md": "guardrail",
+    "FLOW.md": "flow",
+    "PERSONALITY_MODE.md": "personality_mode",
+    "AUTO_ADAPT.md": "auto_adapt",
+}
+
+
+@dataclass(frozen=True)
+class EffectivePersonaSection:
+    content: str
+    section_key: str
+    source: str
+    variant: str
+    version_id: str | None = None
+    version_number: int | None = None
+
 
 SUPPORTING_PLAYBOOK_FILES = tuple(
     filename
@@ -256,6 +284,92 @@ def load_clara_system_instruction_playbook(
         SYSTEM_PLAYBOOK_FILES,
         include_remaining_files=False,
     )
+
+
+def load_effective_persona_sections(
+    db: Session,
+    account_category: str | None = None,
+    *,
+    include_all_variants: bool = False,
+) -> list[EffectivePersonaSection]:
+    knowledge_dirs = get_clara_knowledge_variant_dirs(
+        account_category,
+        include_all_variants=include_all_variants,
+    )
+    variants = [
+        "mini" if directory.name.endswith("_mini") else "reguler"
+        for directory in knowledge_dirs
+    ]
+    try:
+        published_entries = list(
+            db.scalars(
+                select(AIPersonaConfigVersion).where(
+                    AIPersonaConfigVersion.variant.in_(variants),
+                    AIPersonaConfigVersion.status == "published",
+                )
+            ).all()
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        playbook_logger.warning(
+            "ai_persona_config_database_fallback",
+            extra={"variants": variants},
+        )
+        published_entries = []
+
+    published_by_key = {
+        (entry.variant, entry.section_key): entry for entry in published_entries
+    }
+    sections: list[EffectivePersonaSection] = []
+    for knowledge_dir, variant in zip(knowledge_dirs, variants, strict=True):
+        for filename in SYSTEM_PLAYBOOK_FILES:
+            section_key = SYSTEM_SECTION_KEYS[filename]
+            entry = published_by_key.get((variant, section_key))
+            if entry:
+                sections.append(
+                    EffectivePersonaSection(
+                        content=entry.content,
+                        section_key=section_key,
+                        source="database",
+                        variant=variant,
+                        version_id=str(entry.id),
+                        version_number=entry.version_number,
+                    )
+                )
+                continue
+
+            content = read_markdown_file(knowledge_dir / filename)
+            if content:
+                sections.append(
+                    EffectivePersonaSection(
+                        content=content,
+                        section_key=section_key,
+                        source="markdown",
+                        variant=variant,
+                    )
+                )
+    return sections
+
+
+def load_effective_clara_system_instruction_playbook(
+    db: Session,
+    account_category: str | None = None,
+    *,
+    include_all_variants: bool = False,
+) -> str:
+    sections = load_effective_persona_sections(
+        db,
+        account_category,
+        include_all_variants=include_all_variants,
+    )
+    return "\n\n".join(
+        (
+            f"## clara_knowledge_{section.variant}/"
+            f"{next(filename for filename, key in SYSTEM_SECTION_KEYS.items() if key == section.section_key)}\n"
+            f"{section.content}"
+        )
+        for section in sections
+    ).strip()
 
 
 @lru_cache(maxsize=8)

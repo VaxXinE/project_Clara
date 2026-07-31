@@ -120,7 +120,8 @@ def generate_sgcc_reply_suggestions_endpoint(
 
     try:
         analysis, policy_decision, suggestions = generate_sgcc_reply_suggestions(
-            payload
+            payload,
+            db=db,
         )
         create_sgcc_audit_entry(
             db=db,
