@@ -160,10 +160,11 @@ def publish_persona_version(
         section_key=entry.section_key,
         exclude_id=entry.id,
     )
-    entry.status = "published"
-    entry.published_by_user_id = current_user.id
-    entry.published_at = datetime.now(timezone.utc)
     try:
+        db.flush()
+        entry.status = "published"
+        entry.published_by_user_id = current_user.id
+        entry.published_at = datetime.now(timezone.utc)
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -205,8 +206,9 @@ def rollback_persona_version(
         source_version_id=source.id,
         published_at=datetime.now(timezone.utc),
     )
-    db.add(entry)
     try:
+        db.flush()
+        db.add(entry)
         db.commit()
     except IntegrityError as exc:
         db.rollback()

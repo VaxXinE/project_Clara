@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.clara_runtime_contract import (
     CLARA_RUNTIME_CONTRACT_VERSION,
     LEGACY_BEHAVIOR_OVERLAY,
+    PersonaAuthorityMode,
     PromptSectionSource,
     RUNTIME_AUTHORITY_ORDER,
     SYSTEM_PLAYBOOK_SECTION_ORDER,
@@ -108,13 +109,17 @@ class ClaraPlaybookComposition:
     supporting_playbook: str
     system_sections: tuple[EffectiveSystemSection, ...]
     supporting_knowledge_count: int
+    response_example_count: int
 
     def combined_playbook(self) -> str:
         return "\n\n".join(
             part for part in (self.system_playbook, self.supporting_playbook) if part
         )
 
-    def debug_metadata(self) -> dict:
+    def debug_metadata(
+        self,
+        persona_authority_mode: PersonaAuthorityMode = PersonaAuthorityMode.LEGACY,
+    ) -> dict:
         return {
             "runtime_contract_version": CLARA_RUNTIME_CONTRACT_VERSION,
             "authority_order": [layer.value for layer in RUNTIME_AUTHORITY_ORDER],
@@ -123,9 +128,12 @@ class ClaraPlaybookComposition:
                 for section in self.system_sections
                 if section.provenance.effective_source != PromptSectionSource.MISSING
             ],
-            "legacy_overlay_present": True,
+            "legacy_overlay_present": (
+                persona_authority_mode == PersonaAuthorityMode.LEGACY
+            ),
             "legacy_overlay_name": LEGACY_BEHAVIOR_OVERLAY,
             "supporting_knowledge_count": self.supporting_knowledge_count,
+            "response_example_count": self.response_example_count,
             "missing_required_sections": [
                 f"{section.variant}:{section.section_key}"
                 for section in self.system_sections
@@ -137,6 +145,7 @@ class ClaraPlaybookComposition:
 SUPPORTING_PLAYBOOK_FILES = tuple(
     filename for filename in PLAYBOOK_FILES if filename not in SYSTEM_PLAYBOOK_FILES
 )
+RESPONSE_EXAMPLE_FILES = ("07_solid_prime_conversation_examples_training_dataset_kb.md",)
 
 INTENT_PLAYBOOK_FILES: dict[str, tuple[str, ...]] = {
     "product_options": (
@@ -599,6 +608,20 @@ def _count_loaded_supporting_playbooks(
     return count
 
 
+def _count_loaded_response_examples(
+    knowledge_dirs: list[Path],
+    selected_filenames: tuple[str, ...],
+    *,
+    include_remaining_files: bool,
+) -> int:
+    return sum(
+        bool(read_markdown_file(knowledge_dir / filename))
+        for knowledge_dir in knowledge_dirs
+        for filename in RESPONSE_EXAMPLE_FILES
+        if include_remaining_files or filename in selected_filenames
+    )
+
+
 def compose_clara_playbooks(
     db: Session | None,
     account_category: str | None = None,
@@ -641,6 +664,11 @@ def compose_clara_playbooks(
         supporting_playbook=supporting_playbook,
         system_sections=system_sections,
         supporting_knowledge_count=_count_loaded_supporting_playbooks(
+            knowledge_dirs,
+            selected_filenames,
+            include_remaining_files=desired_count != 1,
+        ),
+        response_example_count=_count_loaded_response_examples(
             knowledge_dirs,
             selected_filenames,
             include_remaining_files=desired_count != 1,
