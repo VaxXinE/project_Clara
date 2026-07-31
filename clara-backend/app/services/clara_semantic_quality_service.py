@@ -40,14 +40,11 @@ def build_semantic_shadow_report(fixture_path: Path) -> dict:
             output = case["outputs"][mode.value]
             primary_report = evaluate_reply(output["primary"], context)
             retry_text = output.get("retry")
-            retry_report = (
-                evaluate_reply(retry_text, context) if retry_text else None
-            )
+            retry_report = evaluate_reply(retry_text, context) if retry_text else None
             final_text = retry_text or output["primary"]
             final_report = retry_report or primary_report
             required_markers = tuple(
-                marker.lower()
-                for marker in case.get("required_answer_markers", [])
+                marker.lower() for marker in case.get("required_answer_markers", [])
             )
             missing_markers = tuple(
                 marker
@@ -67,14 +64,10 @@ def build_semantic_shadow_report(fixture_path: Path) -> dict:
                         primary_report.critical_failure_ids
                     ),
                     "retry_failed_validator_ids": (
-                        list(retry_report.failed_validator_ids)
-                        if retry_report
-                        else []
+                        list(retry_report.failed_validator_ids) if retry_report else []
                     ),
                     "retry_critical_failure_ids": (
-                        list(retry_report.critical_failure_ids)
-                        if retry_report
-                        else []
+                        list(retry_report.critical_failure_ids) if retry_report else []
                     ),
                     "unresolved_final_validator_ids": list(
                         final_report.failed_validator_ids
@@ -83,8 +76,7 @@ def build_semantic_shadow_report(fixture_path: Path) -> dict:
                         final_report.critical_failure_ids
                     ),
                     "expected_critical_claims_detected": sorted(
-                        expected_critical_ids
-                        & set(primary_report.critical_failure_ids)
+                        expected_critical_ids & set(primary_report.critical_failure_ids)
                     ),
                     "required_answer_point_coverage": (
                         1.0
@@ -99,8 +91,7 @@ def build_semantic_shadow_report(fixture_path: Path) -> dict:
                     "response_length": len(final_text),
                     "cta_present": cta_present,
                     "cta_expected": bool(case.get("cta_expected")),
-                    "cta_mismatch": cta_present
-                    != bool(case.get("cta_expected")),
+                    "cta_mismatch": cta_present != bool(case.get("cta_expected")),
                     "handoff_present": handoff_present,
                     "handoff_expected": bool(case.get("expected_handoff")),
                     "handoff_mismatch": handoff_present
@@ -127,8 +118,7 @@ def build_semantic_shadow_report(fixture_path: Path) -> dict:
 
 def render_semantic_shadow_markdown(report: dict) -> str:
     critical = sum(
-        bool(record["unresolved_final_critical_ids"])
-        for record in report["records"]
+        bool(record["unresolved_final_critical_ids"]) for record in report["records"]
     )
     lines = [
         "# Clara Semantic Shadow Quality Report",

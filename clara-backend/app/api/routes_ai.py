@@ -24,7 +24,9 @@ router = APIRouter(prefix="/conversations", tags=["ai-extractions"])
 def analyze_conversation_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ):
     try:
         get_accessible_conversation_or_raise(
@@ -46,11 +48,15 @@ def analyze_conversation_endpoint(
         ) from exc
 
 
-@router.get("/{conversation_id}/ai-extractions", response_model=list[AIExtractionResponse])
+@router.get(
+    "/{conversation_id}/ai-extractions", response_model=list[AIExtractionResponse]
+)
 def list_ai_extractions_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ):
     try:
         get_accessible_conversation_or_raise(

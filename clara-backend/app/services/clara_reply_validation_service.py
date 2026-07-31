@@ -254,7 +254,11 @@ def evaluate_reply(
     process_state_rank = PROCESS_STATE_METADATA[canonical_state][0] or 0
     identity_fields = context.known_identity_fields
     if process_state_rank >= 40 and not identity_fields:
-        identity_fields = {"name": "confirmed", "phone": "confirmed", "domicile": "confirmed"}
+        identity_fields = {
+            "name": "confirmed",
+            "phone": "confirmed",
+            "domicile": "confirmed",
+        }
     milestone_intent = context.latest_customer_intent
     if process_state_rank >= 90:
         milestone_intent = "trading_ready"

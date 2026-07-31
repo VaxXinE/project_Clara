@@ -5,6 +5,7 @@ from app.models.audit_log import AuditLog
 from app.models.chat_review_case import ChatReviewCase
 from app.models.chat_review_note import ChatReviewNote
 from app.models.conversation import Conversation
+from app.models.complaint_case import ComplaintCase, ComplaintCaseEvent
 from app.models.customer_profile import CustomerProfile
 from app.models.customer_process_state import CustomerProcessState
 from app.models.customer_process_state_event import CustomerProcessStateEvent
@@ -30,6 +31,7 @@ from app.models.sales_team import SalesTeam
 from app.models.sales_performance_snapshot import SalesPerformanceSnapshot
 from app.models.sales_unit import SalesUnit
 from app.models.sent_message import SentMessage
+from app.models.support_knowledge_article import SupportKnowledgeArticle
 from app.models.team_performance_snapshot import TeamPerformanceSnapshot
 from app.models.user import User
 
@@ -41,6 +43,8 @@ __all__ = [
     "ChatReviewCase",
     "ChatReviewNote",
     "Conversation",
+    "ComplaintCase",
+    "ComplaintCaseEvent",
     "CustomerProfile",
     "CustomerProcessState",
     "CustomerProcessStateEvent",
@@ -66,6 +70,7 @@ __all__ = [
     "SalesTeam",
     "SalesUnit",
     "SentMessage",
+    "SupportKnowledgeArticle",
     "TeamPerformanceSnapshot",
     "User",
 ]

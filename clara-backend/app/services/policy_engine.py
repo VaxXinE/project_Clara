@@ -34,7 +34,9 @@ def decide_reply_action(extraction: AIExtraction) -> PolicyDecision:
         )
 
     if extraction.pipeline_stage in {"closing", "negotiation", "won"}:
-        reasons.append("Stage sensitif terkait closing/negosiasi: butuh approval sales.")
+        reasons.append(
+            "Stage sensitif terkait closing/negosiasi: butuh approval sales."
+        )
         return PolicyDecision(
             action_mode="human_approval_required",
             reasons=reasons,

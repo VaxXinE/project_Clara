@@ -60,13 +60,17 @@ def _get_latest_message(conversation: Conversation) -> Message | None:
 def _get_latest_extraction(conversation: Conversation) -> AIExtraction | None:
     if not conversation.ai_extractions:
         return None
-    return max(conversation.ai_extractions, key=lambda extraction: extraction.created_at)
+    return max(
+        conversation.ai_extractions, key=lambda extraction: extraction.created_at
+    )
 
 
 def _get_latest_reply_suggestion(conversation: Conversation) -> ReplySuggestion | None:
     if not conversation.reply_suggestions:
         return None
-    return max(conversation.reply_suggestions, key=lambda suggestion: suggestion.created_at)
+    return max(
+        conversation.reply_suggestions, key=lambda suggestion: suggestion.created_at
+    )
 
 
 def _get_latest_sent_message(conversation: Conversation) -> SentMessage | None:
@@ -94,7 +98,9 @@ def build_chat_review_case_item(review_case: ChatReviewCase) -> ChatReviewCaseIt
         lead_id=review_case.lead_id,
         submitted_by_user_id=review_case.submitted_by_user_id,
         submitted_by_user_name=(
-            review_case.submitted_by_user.name if review_case.submitted_by_user else None
+            review_case.submitted_by_user.name
+            if review_case.submitted_by_user
+            else None
         ),
         reviewer_user_id=review_case.reviewer_user_id,
         reviewer_user_name=(
@@ -129,7 +135,10 @@ def build_chat_review_case_suggestion(
     review_label = "unik"
     confidence_score = 0.48
 
-    if latest_reply_suggestion is not None and latest_reply_suggestion.risk_level == "high":
+    if (
+        latest_reply_suggestion is not None
+        and latest_reply_suggestion.risk_level == "high"
+    ):
         review_label = "perlu_eskalasi"
         status = "escalated"
         confidence_score = 0.88
@@ -137,7 +146,10 @@ def build_chat_review_case_suggestion(
         review_label = "perlu_eskalasi"
         status = "in_review"
         confidence_score = 0.84
-    elif latest_reply_suggestion is not None and latest_reply_suggestion.approval_status == "rejected":
+    elif (
+        latest_reply_suggestion is not None
+        and latest_reply_suggestion.approval_status == "rejected"
+    ):
         review_label = "gagal"
         status = "needs_rework"
         confidence_score = 0.79
@@ -155,7 +167,8 @@ def build_chat_review_case_suggestion(
             summary_parts.append(latest_extraction.customer_summary.strip())
         if latest_extraction.main_objections:
             focus_parts.append(
-                "Fokus utama coaching: " + ", ".join(latest_extraction.main_objections[:3])
+                "Fokus utama coaching: "
+                + ", ".join(latest_extraction.main_objections[:3])
             )
         if latest_extraction.risk_level == "high":
             focus_parts.append(
@@ -184,27 +197,26 @@ def build_chat_review_case_suggestion(
 
     review_summary = " ".join(part for part in summary_parts if part).strip()
     if not review_summary:
-        review_summary = (
-            "Conversation ini belum punya cukup sinyal AI yang kuat. Manager perlu membaca konteks chat secara manual."
-        )
+        review_summary = "Conversation ini belum punya cukup sinyal AI yang kuat. Manager perlu membaca konteks chat secara manual."
 
     coaching_focus = " ".join(part for part in focus_parts if part).strip()
     if not coaching_focus:
-        coaching_focus = (
-            "Fokus coaching: cek kualitas follow-up, ketepatan membaca keberatan customer, dan kejelasan langkah berikutnya."
-        )
+        coaching_focus = "Fokus coaching: cek kualitas follow-up, ketepatan membaca keberatan customer, dan kejelasan langkah berikutnya."
 
     recommended_action = " ".join(part for part in action_parts if part).strip()
     if not recommended_action:
-        recommended_action = (
-            "Buka timeline percakapan penuh, nilai apakah sales perlu rework, lalu tetapkan arahan tindak lanjut yang spesifik."
-        )
+        recommended_action = "Buka timeline percakapan penuh, nilai apakah sales perlu rework, lalu tetapkan arahan tindak lanjut yang spesifik."
 
     source_summary = (
         "Prefill dibuat dari AI extraction, draft balasan, pesan customer terbaru, dan histori sent message."
         if any(
             item is not None
-            for item in [latest_extraction, latest_reply_suggestion, latest_message, latest_sent_message]
+            for item in [
+                latest_extraction,
+                latest_reply_suggestion,
+                latest_message,
+                latest_sent_message,
+            ]
         )
         else "Prefill dibuat dari state conversation saat ini karena belum ada sinyal AI atau chat terbaru yang cukup kuat."
     )
@@ -355,7 +367,9 @@ def upsert_chat_review_case(
     current_user: User,
 ) -> ChatReviewCaseItem:
     if not is_manager_like(current_user.role):
-        raise ChatReviewError("Hanya manager, head, atau superadmin yang bisa membuat review case.")
+        raise ChatReviewError(
+            "Hanya manager, head, atau superadmin yang bisa membuat review case."
+        )
 
     reviewer_user: User | None = None
     if payload.reviewer_user_id is not None:
@@ -363,9 +377,12 @@ def upsert_chat_review_case(
         if (
             reviewer_user is None
             or reviewer_user.organization_id != conversation.organization_id
-            or normalize_role(reviewer_user.role) not in {"manager", "head", "superadmin"}
+            or normalize_role(reviewer_user.role)
+            not in {"manager", "head", "superadmin"}
         ):
-            raise ChatReviewError("Reviewer tidak valid untuk organization conversation ini.")
+            raise ChatReviewError(
+                "Reviewer tidak valid untuk organization conversation ini."
+            )
 
     review_case = conversation.chat_review_case
     now = datetime.now(timezone.utc)
@@ -384,7 +401,9 @@ def upsert_chat_review_case(
     review_case.review_label = _normalize_label(payload.review_label)
     review_case.review_summary = _normalize_optional_text(payload.review_summary)
     review_case.coaching_focus = _normalize_optional_text(payload.coaching_focus)
-    review_case.recommended_action = _normalize_optional_text(payload.recommended_action)
+    review_case.recommended_action = _normalize_optional_text(
+        payload.recommended_action
+    )
     review_case.workflow_scope = _resolve_workflow_scope(current_user)
     review_case.feedback_status = _resolve_feedback_status(review_case.status)
     review_case.reviewed_at = (
@@ -428,7 +447,9 @@ def add_chat_review_note(
     current_user: User,
 ) -> ChatReviewCaseItem:
     if not is_manager_like(current_user.role):
-        raise ChatReviewError("Hanya manager, head, atau superadmin yang bisa menambah coaching note.")
+        raise ChatReviewError(
+            "Hanya manager, head, atau superadmin yang bisa menambah coaching note."
+        )
 
     statement = (
         select(ChatReviewCase)

@@ -49,7 +49,9 @@ class KnowledgeUpdateProposal(Base):
         index=True,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    category: Mapped[str] = mapped_column(String(100), nullable=False, default="general")
+    category: Mapped[str] = mapped_column(
+        String(100), nullable=False, default="general"
+    )
     proposed_content: Mapped[str] = mapped_column(Text, nullable=False)
     source_type: Mapped[str] = mapped_column(
         String(50),
@@ -87,8 +89,12 @@ class KnowledgeUpdateProposal(Base):
         nullable=False,
     )
 
-    organization = relationship("Organization", back_populates="knowledge_update_proposals")
-    conversation = relationship("Conversation", back_populates="knowledge_update_proposal")
+    organization = relationship(
+        "Organization", back_populates="knowledge_update_proposals"
+    )
+    conversation = relationship(
+        "Conversation", back_populates="knowledge_update_proposal"
+    )
     chat_review_case = relationship(
         "ChatReviewCase",
         back_populates="knowledge_update_proposal",

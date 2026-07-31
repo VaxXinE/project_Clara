@@ -20,9 +20,13 @@ router = APIRouter(prefix="/conversations", tags=["conversations"])
 @router.get("", response_model=list[ConversationListItem])
 def list_conversations(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> list[Conversation]:
-    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
+    if current_user.organization_id is None and not is_superadmin_like(
+        current_user.role
+    ):
         return []
 
     statement = select(Conversation)
@@ -53,19 +57,27 @@ def list_conversations(
 def get_conversation(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> Conversation:
-    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
+    if current_user.organization_id is None and not is_superadmin_like(
+        current_user.role
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found.",
         )
 
-    statement = select(Conversation).where(Conversation.id == conversation_id).options(
-        selectinload(Conversation.messages)
+    statement = (
+        select(Conversation)
+        .where(Conversation.id == conversation_id)
+        .options(selectinload(Conversation.messages))
     )
     if not is_superadmin_like(current_user.role):
-        statement = statement.where(Conversation.organization_id == current_user.organization_id)
+        statement = statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
 
     statement = apply_sales_user_scope_filter(
         statement,

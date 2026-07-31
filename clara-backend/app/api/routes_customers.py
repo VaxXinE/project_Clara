@@ -68,7 +68,9 @@ def list_customer_profiles(
     q: str | None = Query(default=None),
     status_value: str | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> list[CustomerProfileListItem]:
     return [
         CustomerProfileListItem(**item)
@@ -91,7 +93,10 @@ def list_process_state_reconciliation_required(
 ) -> list[ReconciliationRequiredItem]:
     statement = (
         select(CustomerProcessStateEvent, CustomerProfile)
-        .join(CustomerProfile, CustomerProfile.id == CustomerProcessStateEvent.customer_profile_id)
+        .join(
+            CustomerProfile,
+            CustomerProfile.id == CustomerProcessStateEvent.customer_profile_id,
+        )
         .where(
             CustomerProcessStateEvent.decision
             == TransitionDecision.MERGE_RECONCILIATION_REQUIRED.value,
@@ -111,14 +116,16 @@ def list_process_state_reconciliation_required(
         seen_profiles.add(profile.id)
         if not has_unresolved_merge_reconciliation(db, profile.id):
             continue
-        items.append(ReconciliationRequiredItem(
-            customer_profile_id=profile.id,
-            customer_display_name=profile.display_name,
-            current_state=event.applied_state,
-            event_id=event.id,
-            reason_codes=event.reason_codes,
-            created_at=event.created_at,
-        ))
+        items.append(
+            ReconciliationRequiredItem(
+                customer_profile_id=profile.id,
+                customer_display_name=profile.display_name,
+                current_state=event.applied_state,
+                event_id=event.id,
+                reason_codes=event.reason_codes,
+                created_at=event.created_at,
+            )
+        )
     return items
 
 
@@ -126,7 +133,9 @@ def list_process_state_reconciliation_required(
 def get_customer_profile(
     customer_profile_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> CustomerProfileSummaryItem:
     return CustomerProfileSummaryItem(
         **get_customer_profile_for_user(
@@ -144,7 +153,9 @@ def get_customer_profile(
 def get_customer_process_state(
     customer_profile_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> CustomerProcessStateItem:
     profile = get_customer_profile_model_for_user(
         db=db,
@@ -167,7 +178,9 @@ def get_customer_process_state(
 def get_customer_process_state_history(
     customer_profile_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> list[ProcessStateEventItem]:
     get_customer_profile_model_for_user(
         db=db,
@@ -189,7 +202,9 @@ def transition_customer_process_state(
     payload: ProcessStateTransitionRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> ProcessStateTransitionResponse:
     profile = get_customer_profile_model_for_user(
         db=db,
@@ -206,9 +221,13 @@ def transition_customer_process_state(
             actor=current_user,
         )
     except PermissionError as error:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=str(error)
+        ) from error
     except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(error)
+        ) from error
     db.commit()
     state = get_or_create_process_state(db, profile)
     create_audit_log(
@@ -240,7 +259,9 @@ def update_customer_profile(
     payload: CustomerProfileUpdateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> CustomerProfileSummaryItem:
     profile = update_customer_profile_for_user(
         db=db,

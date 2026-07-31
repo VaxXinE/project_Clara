@@ -48,7 +48,9 @@ def _ensure_manageable_organization(
         raise SalesStructureError("Admin has no organization assigned.")
 
     if organization.id != current_user.organization_id:
-        raise SalesStructureError("Head hanya boleh mengelola hierarchy di organization sendiri.")
+        raise SalesStructureError(
+            "Head hanya boleh mengelola hierarchy di organization sendiri."
+        )
 
     return organization
 
@@ -60,7 +62,10 @@ def _ensure_unit_access(unit: SalesUnit | None, *, current_user: User) -> SalesU
     if is_owner_like(current_user.role):
         return unit
 
-    if current_user.organization_id is None or unit.organization_id != current_user.organization_id:
+    if (
+        current_user.organization_id is None
+        or unit.organization_id != current_user.organization_id
+    ):
         raise SalesStructureError("Sales unit not found.")
 
     return unit
@@ -73,7 +78,10 @@ def _ensure_team_access(team: SalesTeam | None, *, current_user: User) -> SalesT
     if is_owner_like(current_user.role):
         return team
 
-    if current_user.organization_id is None or team.organization_id != current_user.organization_id:
+    if (
+        current_user.organization_id is None
+        or team.organization_id != current_user.organization_id
+    ):
         raise SalesStructureError("Sales team not found.")
 
     return team
@@ -92,14 +100,20 @@ def _validate_team_links(
     if unit_id is not None:
         unit = db.get(SalesUnit, unit_id)
         if unit is None or unit.organization_id != organization_id:
-            raise SalesStructureError("Sales unit tidak ditemukan di organization tersebut.")
+            raise SalesStructureError(
+                "Sales unit tidak ditemukan di organization tersebut."
+            )
 
     if manager_user_id is not None:
         manager_user = db.get(User, manager_user_id)
         if manager_user is None or manager_user.organization_id != organization_id:
-            raise SalesStructureError("Manager user tidak ditemukan di organization tersebut.")
+            raise SalesStructureError(
+                "Manager user tidak ditemukan di organization tersebut."
+            )
         if normalize_role(manager_user.role) != "manager":
-            raise SalesStructureError("User yang ditunjuk sebagai manager team harus memiliki role manager.")
+            raise SalesStructureError(
+                "User yang ditunjuk sebagai manager team harus memiliki role manager."
+            )
 
     return unit, manager_user
 
@@ -120,9 +134,7 @@ def _build_sales_unit_response(db: Session, unit: SalesUnit) -> SalesUnitRespons
 
 
 def _build_sales_team_response(db: Session, team: SalesTeam) -> SalesTeamResponse:
-    member_count = db.scalar(
-        select(func.count(User.id)).where(User.team_id == team.id)
-    )
+    member_count = db.scalar(select(func.count(User.id)).where(User.team_id == team.id))
     return SalesTeamResponse(
         id=team.id,
         organization_id=team.organization_id,
@@ -139,13 +151,17 @@ def _build_sales_team_response(db: Session, team: SalesTeam) -> SalesTeamRespons
 
 
 def list_sales_units(db: Session, *, current_user: User) -> list[SalesUnitResponse]:
-    statement = select(SalesUnit).options(selectinload(SalesUnit.organization)).order_by(
-        SalesUnit.created_at.desc()
+    statement = (
+        select(SalesUnit)
+        .options(selectinload(SalesUnit.organization))
+        .order_by(SalesUnit.created_at.desc())
     )
     if not is_owner_like(current_user.role):
         if current_user.organization_id is None:
             return []
-        statement = statement.where(SalesUnit.organization_id == current_user.organization_id)
+        statement = statement.where(
+            SalesUnit.organization_id == current_user.organization_id
+        )
 
     units = db.scalars(statement).all()
     return [_build_sales_unit_response(db, unit) for unit in units]
@@ -172,7 +188,9 @@ def create_sales_unit(
         db.commit()
     except Exception as exc:
         db.rollback()
-        raise SalesStructureError("Sales unit dengan nama atau kode itu sudah ada.") from exc
+        raise SalesStructureError(
+            "Sales unit dengan nama atau kode itu sudah ada."
+        ) from exc
     db.refresh(unit)
     return _build_sales_unit_response(db, unit)
 
@@ -194,7 +212,9 @@ def update_sales_unit(
         db.commit()
     except Exception as exc:
         db.rollback()
-        raise SalesStructureError("Sales unit dengan nama atau kode itu sudah ada.") from exc
+        raise SalesStructureError(
+            "Sales unit dengan nama atau kode itu sudah ada."
+        ) from exc
     db.refresh(unit)
     return _build_sales_unit_response(db, unit)
 
@@ -223,7 +243,9 @@ def list_sales_teams(db: Session, *, current_user: User) -> list[SalesTeamRespon
     if not is_owner_like(current_user.role):
         if current_user.organization_id is None:
             return []
-        statement = statement.where(SalesTeam.organization_id == current_user.organization_id)
+        statement = statement.where(
+            SalesTeam.organization_id == current_user.organization_id
+        )
 
     teams = db.scalars(statement).all()
     return [_build_sales_team_response(db, team) for team in teams]
@@ -258,7 +280,9 @@ def create_sales_team(
         db.commit()
     except Exception as exc:
         db.rollback()
-        raise SalesStructureError("Sales team dengan nama atau kode itu sudah ada.") from exc
+        raise SalesStructureError(
+            "Sales team dengan nama atau kode itu sudah ada."
+        ) from exc
     db.refresh(team)
     return _build_sales_team_response(db, team)
 
@@ -294,7 +318,9 @@ def update_sales_team(
         db.commit()
     except Exception as exc:
         db.rollback()
-        raise SalesStructureError("Sales team dengan nama atau kode itu sudah ada.") from exc
+        raise SalesStructureError(
+            "Sales team dengan nama atau kode itu sudah ada."
+        ) from exc
     db.refresh(team)
     return _build_sales_team_response(db, team)
 

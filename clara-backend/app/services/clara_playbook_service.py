@@ -145,7 +145,9 @@ class ClaraPlaybookComposition:
 SUPPORTING_PLAYBOOK_FILES = tuple(
     filename for filename in PLAYBOOK_FILES if filename not in SYSTEM_PLAYBOOK_FILES
 )
-RESPONSE_EXAMPLE_FILES = ("07_solid_prime_conversation_examples_training_dataset_kb.md",)
+RESPONSE_EXAMPLE_FILES = (
+    "07_solid_prime_conversation_examples_training_dataset_kb.md",
+)
 
 INTENT_PLAYBOOK_FILES: dict[str, tuple[str, ...]] = {
     "product_options": (

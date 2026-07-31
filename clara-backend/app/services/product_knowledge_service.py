@@ -9,7 +9,10 @@ from app.schemas.product_knowledge_schema import (
     ProductKnowledgeCreateRequest,
     ProductKnowledgeUpdateRequest,
 )
-from app.services.access_control_service import AccessDeniedError, ensure_user_has_organization
+from app.services.access_control_service import (
+    AccessDeniedError,
+    ensure_user_has_organization,
+)
 from app.services.business_segmentation_service import normalize_account_category
 from app.services.role_service import is_owner_like
 
@@ -108,13 +111,11 @@ def get_product_knowledge_or_raise(
     if not is_owner_like(current_user.role):
         ensure_user_has_organization(current_user)
 
-    entry = (
-        db.scalars(
-            select(ProductKnowledge)
-            .options(selectinload(ProductKnowledge.created_by_user))
-            .where(ProductKnowledge.id == knowledge_id)
-        ).first()
-    )
+    entry = db.scalars(
+        select(ProductKnowledge)
+        .options(selectinload(ProductKnowledge.created_by_user))
+        .where(ProductKnowledge.id == knowledge_id)
+    ).first()
 
     if entry is None:
         raise ProductKnowledgeError("Product knowledge entry not found.")

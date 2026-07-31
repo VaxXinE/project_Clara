@@ -77,9 +77,7 @@ def create_reply_suggestion_endpoint(
                 "action_mode": suggestion.action_mode,
                 "suggestion_count": len(suggestion.suggested_replies),
                 "policy_reason_count": len(suggestion.policy_reasons),
-                "enforcement_contract_version": (
-                    CLARA_ENFORCEMENT_CONTRACT_VERSION
-                ),
+                "enforcement_contract_version": (CLARA_ENFORCEMENT_CONTRACT_VERSION),
                 "enforcement_mode": enforcement_mode.value,
                 "applied_action_mode": suggestion.action_mode,
                 "reviewer_requirement": reviewer_requirement_for_suggestion(
@@ -187,9 +185,7 @@ def approve_reply_suggestion_endpoint(
             current_user=current_user,
             request=request,
             metadata={
-                "enforcement_contract_version": (
-                    CLARA_ENFORCEMENT_CONTRACT_VERSION
-                ),
+                "enforcement_contract_version": (CLARA_ENFORCEMENT_CONTRACT_VERSION),
                 "enforcement_mode": normalize_policy_enforcement_mode(
                     settings.clara_policy_enforcement_mode
                 ).mode.value,

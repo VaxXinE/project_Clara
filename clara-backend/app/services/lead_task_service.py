@@ -157,7 +157,9 @@ def get_accessible_lead(
             selectinload(Lead.assigned_user),
             selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
             selectinload(Lead.tasks).selectinload(LeadTask.completed_by_user),
-            selectinload(Lead.tasks).selectinload(LeadTask.events).selectinload(LeadTaskEvent.actor_user),
+            selectinload(Lead.tasks)
+            .selectinload(LeadTask.events)
+            .selectinload(LeadTaskEvent.actor_user),
         )
     )
     lead = db.scalars(statement).first()
@@ -168,12 +170,9 @@ def get_accessible_lead(
             detail="Lead not found.",
         )
 
-    if (
-        not is_superadmin_like(current_user.role)
-        and (
-            current_user.organization_id is None
-            or lead.organization_id != current_user.organization_id
-        )
+    if not is_superadmin_like(current_user.role) and (
+        current_user.organization_id is None
+        or lead.organization_id != current_user.organization_id
     ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -184,7 +183,10 @@ def get_accessible_lead(
         db=db,
         current_user=current_user,
     )
-    if accessible_user_ids is not None and lead.assigned_user_id not in accessible_user_ids:
+    if (
+        accessible_user_ids is not None
+        and lead.assigned_user_id not in accessible_user_ids
+    ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lead not found.",
@@ -251,7 +253,9 @@ def create_lead_task_for_user(
             detail="Invalid task type.",
         )
 
-    assigned_user_id = payload.assigned_user_id or lead.assigned_user_id or current_user.id
+    assigned_user_id = (
+        payload.assigned_user_id or lead.assigned_user_id or current_user.id
+    )
     assignee = validate_assignee_for_lead(
         db=db,
         lead=lead,

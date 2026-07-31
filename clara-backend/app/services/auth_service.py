@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
 from app.models.user import User
-from app.schemas.auth_schema import CreateUserRequest, LoginOptionItem, UpdateUserRequest
+from app.schemas.auth_schema import (
+    CreateUserRequest,
+    LoginOptionItem,
+    UpdateUserRequest,
+)
 from app.models.organization import Organization
 from app.models.sales_team import SalesTeam
 from app.services.role_service import normalize_role
@@ -116,6 +120,7 @@ def authenticate_user(db: Session, email: str, password: str) -> User:
 
     return user
 
+
 def create_user(
     db: Session,
     payload: CreateUserRequest,
@@ -125,7 +130,9 @@ def create_user(
     normalized_role = normalize_role(payload.role)
 
     if normalized_role not in ALLOWED_ROLES:
-        raise AuthError(f"Invalid role. Allowed roles: {', '.join(sorted(ALLOWED_ROLES))}")
+        raise AuthError(
+            f"Invalid role. Allowed roles: {', '.join(sorted(ALLOWED_ROLES))}"
+        )
 
     existing_user = get_user_by_email(db=db, email=normalized_email)
 
@@ -141,7 +148,10 @@ def create_user(
         team = db.get(SalesTeam, payload.team_id)
         if team is None:
             raise AuthError("Sales team not found.")
-        if payload.organization_id is not None and team.organization_id != payload.organization_id:
+        if (
+            payload.organization_id is not None
+            and team.organization_id != payload.organization_id
+        ):
             raise AuthError("Sales team does not belong to the selected organization.")
 
     user = User(
@@ -214,7 +224,9 @@ def update_user(
     normalized_role = normalize_role(payload.role) if payload.role is not None else None
 
     if normalized_role is not None and normalized_role not in ALLOWED_ROLES:
-        raise AuthError(f"Invalid role. Allowed roles: {', '.join(sorted(ALLOWED_ROLES))}")
+        raise AuthError(
+            f"Invalid role. Allowed roles: {', '.join(sorted(ALLOWED_ROLES))}"
+        )
 
     if payload.email is not None:
         normalized_email = payload.email.strip().lower()
@@ -239,7 +251,11 @@ def update_user(
         team = db.get(SalesTeam, payload.team_id)
         if team is None:
             raise AuthError("Sales team not found.")
-        organization_id = payload.organization_id if payload.organization_id is not None else user.organization_id
+        organization_id = (
+            payload.organization_id
+            if payload.organization_id is not None
+            else user.organization_id
+        )
         if organization_id is None or team.organization_id != organization_id:
             raise AuthError("Sales team does not belong to the selected organization.")
         user.team_id = payload.team_id

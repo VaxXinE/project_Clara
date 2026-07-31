@@ -99,32 +99,46 @@ SENSITIVE_EVIDENCE = {
 }
 
 QUESTION_PATTERN = re.compile(r"\?|\b(apakah|apa sudah|udah belum|sudah belum)\b", re.I)
-HYPOTHETICAL_PATTERN = re.compile(r"\b(nanti|kalau|jika|seandainya|akan|rencana)\b", re.I)
+HYPOTHETICAL_PATTERN = re.compile(
+    r"\b(nanti|kalau|jika|seandainya|akan|rencana)\b", re.I
+)
 NEGATION_PATTERN = re.compile(r"\b(belum|tidak|nggak|gak|bukan|jangan)\b", re.I)
 STATE_PATTERNS = (
     (
         ProcessState.ACTIVE_SUPPORT,
-        re.compile(r"\b(dukungan aktif|support aktif|bantuan setelah akun aktif)\b", re.I),
+        re.compile(
+            r"\b(dukungan aktif|support aktif|bantuan setelah akun aktif)\b", re.I
+        ),
         "SUPPORT_CONTEXT_CONFIRMED",
     ),
     (
         ProcessState.FUNDED,
-        re.compile(r"\b(dana|deposit)\b.{0,24}\b(sudah masuk|berhasil masuk|terkonfirmasi)\b", re.I),
+        re.compile(
+            r"\b(dana|deposit)\b.{0,24}\b(sudah masuk|berhasil masuk|terkonfirmasi)\b",
+            re.I,
+        ),
         "FUNDING_CONFIRMED",
     ),
     (
         ProcessState.ACCOUNT_ACTIVE,
-        re.compile(r"\bakun\b.{0,20}\b(sudah aktif|berhasil diaktifkan|telah aktif)\b", re.I),
+        re.compile(
+            r"\bakun\b.{0,20}\b(sudah aktif|berhasil diaktifkan|telah aktif)\b", re.I
+        ),
         "ACCOUNT_ACTIVATION_CONFIRMED",
     ),
     (
         ProcessState.ONBOARDING_OR_ACTIVATION,
-        re.compile(r"\b(onboarding|aktivasi)\b.{0,20}\b(dimulai|diproses|berjalan)\b", re.I),
+        re.compile(
+            r"\b(onboarding|aktivasi)\b.{0,20}\b(dimulai|diproses|berjalan)\b", re.I
+        ),
         "SYSTEM_STATUS_CONFIRMATION",
     ),
     (
         ProcessState.VERIFIED,
-        re.compile(r"\b(sudah|telah|berhasil)\b.{0,20}\b(verified|terverifikasi|diverifikasi)\b", re.I),
+        re.compile(
+            r"\b(sudah|telah|berhasil)\b.{0,20}\b(verified|terverifikasi|diverifikasi)\b",
+            re.I,
+        ),
         "VERIFICATION_COMPLETED_CONFIRMED",
     ),
     (
@@ -134,7 +148,10 @@ STATE_PATTERNS = (
     ),
     (
         ProcessState.DATA_SUBMITTED,
-        re.compile(r"\b(data|dokumen)\b.{0,24}\b(sudah dikirim|telah dikirim|sudah saya kirim|diterima)\b", re.I),
+        re.compile(
+            r"\b(data|dokumen)\b.{0,24}\b(sudah dikirim|telah dikirim|sudah saya kirim|diterima)\b",
+            re.I,
+        ),
         "DATA_SUBMISSION_CONFIRMED",
     ),
     (
@@ -178,7 +195,8 @@ class ProcessStateTransitionDecision:
             "decision": self.decision.value,
             "mode": self.mode.value,
             "process_state_contract_version": CLARA_PROCESS_STATE_CONTRACT_VERSION,
-            "regression_blocked": self.decision == TransitionDecision.REJECTED_REGRESSION,
+            "regression_blocked": self.decision
+            == TransitionDecision.REJECTED_REGRESSION,
         }
 
 
@@ -211,7 +229,9 @@ def derive_process_state_observation(
     pipeline_stage: str | None = None,
 ) -> ProcessStateObservation:
     normalized_sender = sender_type.strip().lower()
-    source_type = "CUSTOMER_MESSAGE" if normalized_sender == "customer" else "AGENT_MESSAGE"
+    source_type = (
+        "CUSTOMER_MESSAGE" if normalized_sender == "customer" else "AGENT_MESSAGE"
+    )
     trust = TrustLevel.MEDIUM if normalized_sender == "customer" else TrustLevel.HIGH
     base_evidence = [
         "EXPLICIT_CUSTOMER_STATEMENT"
@@ -232,7 +252,9 @@ def derive_process_state_observation(
             if pattern.search(message_text):
                 confidence = 0.84 if trust == TrustLevel.MEDIUM else 0.94
                 if extraction_confidence is not None:
-                    confidence = min(confidence, max(0.0, min(extraction_confidence, 1.0)))
+                    confidence = min(
+                        confidence, max(0.0, min(extraction_confidence, 1.0))
+                    )
                 return ProcessStateObservation(
                     proposed_state=proposed_state,
                     confidence_score=confidence,
@@ -290,7 +312,10 @@ def decide_process_state_transition(
         elif proposed_rank < current_rank:
             decision = TransitionDecision.REJECTED_REGRESSION
             reasons.append("AUTOMATIC_REGRESSION_FORBIDDEN")
-        elif trust_rank < current_trust_rank and observation.confidence_score < current_confidence:
+        elif (
+            trust_rank < current_trust_rank
+            and observation.confidence_score < current_confidence
+        ):
             decision = TransitionDecision.REJECTED_LOW_CONFIDENCE
             reasons.append("LOWER_TRUST_THAN_CURRENT_STATE")
         elif observation.proposed_state in SENSITIVE_STATES and (
@@ -308,7 +333,9 @@ def decide_process_state_transition(
                 decision = TransitionDecision.REJECTED_LOW_CONFIDENCE
         else:
             step_count = (proposed_rank - current_rank) // 10
-            enough_for_one_step = step_count == 1 and observation.confidence_score >= 0.75
+            enough_for_one_step = (
+                step_count == 1 and observation.confidence_score >= 0.75
+            )
             enough_for_skip = (
                 step_count > 1
                 and observation.confidence_score >= 0.9
@@ -323,7 +350,8 @@ def decide_process_state_transition(
 
     next_version = (
         current_version + 1
-        if decision in {TransitionDecision.APPLIED, TransitionDecision.SAME_STATE_CONFIRMED}
+        if decision
+        in {TransitionDecision.APPLIED, TransitionDecision.SAME_STATE_CONFIRMED}
         else current_version
     )
     decision_input = "|".join(
@@ -481,16 +509,25 @@ def apply_manual_process_state_transition(
     previous_rank = state_rank(previous)
     proposed_rank = state_rank(proposed_state)
     is_regression = proposed_rank < previous_rank
-    if actor.role == "sales" and (is_regression or proposed_rank > state_rank(ProcessState.DATA_SUBMITTED)):
-        raise PermissionError("Sales hanya dapat memajukan state sampai DATA_SUBMITTED.")
+    if actor.role == "sales" and (
+        is_regression or proposed_rank > state_rank(ProcessState.DATA_SUBMITTED)
+    ):
+        raise PermissionError(
+            "Sales hanya dapat memajukan state sampai DATA_SUBMITTED."
+        )
     if actor.role not in {"sales", "manager", "head", "superadmin"}:
         raise PermissionError("Role tidak diizinkan mengubah process state.")
-    if actor.organization_id is None or profile.organization_id != actor.organization_id:
+    if (
+        actor.organization_id is None
+        or profile.organization_id != actor.organization_id
+    ):
         raise PermissionError(
             "Perubahan lintas organization memerlukan aksi administratif terscope."
         )
     if is_regression and actor.role not in {"manager", "head", "superadmin"}:
-        raise PermissionError("Koreksi mundur memerlukan manager atau role lebih tinggi.")
+        raise PermissionError(
+            "Koreksi mundur memerlukan manager atau role lebih tinggi."
+        )
 
     now = datetime.now(timezone.utc)
     next_version = state.version + 1
@@ -518,10 +555,14 @@ def apply_manual_process_state_transition(
     if result.rowcount != 1:
         raise ValueError("State berubah bersamaan; muat ulang lalu coba lagi.")
     transition_type = (
-        TransitionType.MANUAL_CORRECTION if is_regression else TransitionType.MANUAL_FORWARD
+        TransitionType.MANUAL_CORRECTION
+        if is_regression
+        else TransitionType.MANUAL_FORWARD
     )
     decision_value = (
-        TransitionDecision.MANUAL_CORRECTION if is_regression else TransitionDecision.APPLIED
+        TransitionDecision.MANUAL_CORRECTION
+        if is_regression
+        else TransitionDecision.APPLIED
     )
     decision_input = f"{previous.value}|{proposed_state.value}|{decision_value.value}|{next_version}|{reason}"
     decision = ProcessStateTransitionDecision(
@@ -603,9 +644,7 @@ def get_process_state_history(
     )
 
 
-def has_unresolved_merge_reconciliation(
-    db: Session, customer_profile_id: UUID
-) -> bool:
+def has_unresolved_merge_reconciliation(db: Session, customer_profile_id: UUID) -> bool:
     latest = db.scalar(
         select(CustomerProcessStateEvent.decision)
         .where(
@@ -617,7 +656,10 @@ def has_unresolved_merge_reconciliation(
                 )
             ),
         )
-        .order_by(CustomerProcessStateEvent.created_at.desc(), CustomerProcessStateEvent.id.desc())
+        .order_by(
+            CustomerProcessStateEvent.created_at.desc(),
+            CustomerProcessStateEvent.id.desc(),
+        )
         .limit(1)
     )
     return latest == TransitionDecision.MERGE_RECONCILIATION_REQUIRED.value
@@ -651,7 +693,11 @@ def reconcile_customer_process_states(
         else TransitionDecision.MERGE_RECONCILED
     )
     applied = target_state
-    if not conflict and source_state != ProcessState.UNKNOWN and source_trust > target_trust:
+    if (
+        not conflict
+        and source_state != ProcessState.UNKNOWN
+        and source_trust > target_trust
+    ):
         applied = source_state
         target.current_state = source.current_state
         target.state_rank = source.state_rank
@@ -685,7 +731,9 @@ def reconcile_customer_process_states(
             ),
             actor_user_id=actor_user_id,
             reason_codes=[
-                "HIGH_TRUST_STATE_CONFLICT" if conflict else "CLEARER_TRUSTED_STATE_SELECTED"
+                "HIGH_TRUST_STATE_CONFLICT"
+                if conflict
+                else "CLEARER_TRUSTED_STATE_SELECTED"
             ],
         )
     )

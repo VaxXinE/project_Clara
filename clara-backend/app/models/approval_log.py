@@ -18,7 +18,9 @@ class ApprovalLog(Base):
         index=True,
     )
 
-    reviewer_name: Mapped[str] = mapped_column(String(255), nullable=False, default="sales_user")
+    reviewer_name: Mapped[str] = mapped_column(
+        String(255), nullable=False, default="sales_user"
+    )
     action: Mapped[str] = mapped_column(String(50), nullable=False)
 
     before_text: Mapped[str | None] = mapped_column(Text, nullable=True)

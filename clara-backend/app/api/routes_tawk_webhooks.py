@@ -28,7 +28,9 @@ async def ingest_tawk_webhook(
             body=raw_body,
             signature_header=request.headers.get("X-Tawk-Signature"),
         )
-        payload = TawkWebhookEnvelope.model_validate(json.loads(raw_body.decode("utf-8")))
+        payload = TawkWebhookEnvelope.model_validate(
+            json.loads(raw_body.decode("utf-8"))
+        )
         response = ingest_tawk_webhook_payload(
             db,
             payload=payload,

@@ -24,10 +24,14 @@ class SentMessage(Base):
         index=True,
     )
 
-    send_mode: Mapped[str] = mapped_column(String(50), nullable=False, default="manual_simulation")
+    send_mode: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="manual_simulation"
+    )
     message_text: Mapped[str] = mapped_column(Text, nullable=False)
 
-    sent_by_name: Mapped[str] = mapped_column(String(255), nullable=False, default="sales_user")
+    sent_by_name: Mapped[str] = mapped_column(
+        String(255), nullable=False, default="sales_user"
+    )
     external_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     sent_at: Mapped[datetime] = mapped_column(

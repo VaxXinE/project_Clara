@@ -354,3 +354,12 @@ validation only. It does not enter persona playbooks and cannot override
 backend security, product facts, policy, reviewer, approval/send, complaint,
 or Tawk authority. See
 `docs/architecture/CLARA_PROCESS_STATE_FSM_CONTRACT.md`.
+
+## 19. Stage 8 Service Routing Contract
+
+Stage 8 adds `CLARA_SERVICE_ROUTING_MODE` with safe default `LEGACY`.
+`SHADOW` records only deterministic route metadata. `ROUTED` separates CS
+L0/L1 and contextual complaints from sales generation; complaints reuse the
+Stage 5 handoff and create an idempotent case ledger. Missing CS knowledge
+fails to human handoff. Other defaults, facts, process state, policy,
+approval/send, and Tawk behavior remain unchanged.

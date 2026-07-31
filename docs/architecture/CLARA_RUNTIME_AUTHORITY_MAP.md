@@ -258,3 +258,10 @@ context. State never grants account access or overrides policy, product facts,
 approval/send, complaints, security, or Tawk.
 
 Contract: `docs/architecture/CLARA_PROCESS_STATE_FSM_CONTRACT.md`.
+
+## N. Stage 8 Service Routing Authority Update
+
+Stage 8 adds a deterministic service lane below backend security/policy and
+above domain knowledge selection. Opt-in `ROUTED` uses governed CS knowledge
+or the existing complaint handoff plus a case ledger. Persona, facts, process
+state, approval/send, and Tawk remain separate. Default remains `LEGACY`.

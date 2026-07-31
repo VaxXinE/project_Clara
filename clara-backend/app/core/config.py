@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     clara_policy_enforcement_mode: str = "OBSERVE"
     clara_product_fact_mode: str = "LEGACY"
     clara_process_state_mode: str = "LEGACY"
+    clara_service_routing_mode: str = "LEGACY"
     clara_product_fact_high_volatility_days: int = 7
     clara_product_fact_medium_volatility_days: int = 30
     clara_product_fact_low_volatility_days: int = 90
@@ -96,9 +97,7 @@ class Settings(BaseSettings):
     whatsapp_meta_default_sales_user_email: str | None = None
     tawk_webhook_secret_key: str | None = None
     tawk_property_organization_map: dict[str, str] = Field(default_factory=dict)
-    tawk_property_default_sales_user_map: dict[str, str] = Field(
-        default_factory=dict
-    )
+    tawk_property_default_sales_user_map: dict[str, str] = Field(default_factory=dict)
     conversation_auto_archive_days: int = 7
     extension_whatsapp_enabled: bool = True
     extension_instagram_enabled: bool = False

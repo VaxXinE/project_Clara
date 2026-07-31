@@ -76,21 +76,15 @@ class ClaraEnforcementDecision:
             "calculated_action_mode": self.action_mode.value,
             "reason_codes": list(self.reason_codes),
             "policy_risk_level": self.policy_risk_level,
-            "unresolved_critical_validator_ids": list(
-                self.critical_validator_ids
-            ),
+            "unresolved_critical_validator_ids": list(self.critical_validator_ids),
             "reviewer_requirement": self.reviewer_requirement.value,
             "generation_strategy": self.generation_strategy.value,
             "send_permission": self.send_permission.value,
             "safe_handoff_category": (
-                self.safe_handoff_category.value
-                if self.safe_handoff_category
-                else None
+                self.safe_handoff_category.value if self.safe_handoff_category else None
             ),
             "would_block": self.action_mode == ActionMode.BLOCK,
-            "would_safe_handoff": (
-                self.action_mode == ActionMode.SAFE_HANDOFF
-            ),
+            "would_safe_handoff": (self.action_mode == ActionMode.SAFE_HANDOFF),
             "decision_hash": self.decision_hash,
         }
 
@@ -288,7 +282,9 @@ def decide_enforcement(
         )
 
     legal_sensitive = bool(
-        re.search(r"\b(legal|regulator|bappebti|hukum|izin)\b", latest_customer_message, re.I)
+        re.search(
+            r"\b(legal|regulator|bappebti|hukum|izin)\b", latest_customer_message, re.I
+        )
     )
     if policy_risk_level == "high":
         return _decision(
@@ -312,8 +308,7 @@ def decide_enforcement(
         )
     if (
         policy_risk_level == "medium"
-        or legacy_policy_action
-        in {"human_approval_required", "escalate_to_human"}
+        or legacy_policy_action in {"human_approval_required", "escalate_to_human"}
         or warning_validator_ids
     ):
         return _decision(
@@ -405,9 +400,7 @@ def reviewer_requirement_for_suggestion(
             value = reason.removeprefix(marker)
             if value in {item.value for item in ReviewerRequirement}:
                 return ReviewerRequirement(value)
-    normalized_action = ActionMode(
-        normalize_action_mode(action_mode).canonical_value
-    )
+    normalized_action = ActionMode(normalize_action_mode(action_mode).canonical_value)
     if normalized_action == ActionMode.BLOCK:
         return ReviewerRequirement.NO_REVIEW_ALLOWED
     if normalized_action == ActionMode.SAFE_HANDOFF:
