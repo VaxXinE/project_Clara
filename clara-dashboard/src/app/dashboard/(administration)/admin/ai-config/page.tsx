@@ -350,14 +350,14 @@ export default function AiPersonaConfigPage() {
                 id="persona-content"
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
-                maxLength={20_000}
+                maxLength={50_000}
                 rows={24}
                 spellCheck={false}
                 className="clara-input mt-2 min-h-[560px] w-full resize-y font-mono text-sm leading-6"
               />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-slate-500">
-                  {content.length.toLocaleString("id-ID")} / 20.000 karakter
+                  {content.length.toLocaleString("id-ID")} / 50.000 karakter
                 </p>
                 <div className="flex gap-2">
                   <button

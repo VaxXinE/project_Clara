@@ -65,6 +65,26 @@ def test_persona_mutation_requires_csrf(
     assert response.status_code == 403
 
 
+def test_persona_content_accepts_50k_and_rejects_larger_payload(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    login(client, seeded_data["owner"].email, "OwnerPass123!")
+    accepted = client.post(
+        "/ai-persona-config/mini/instruction/drafts",
+        json={"content": "a" * 50_000},
+        headers=csrf_headers(client),
+    )
+    assert accepted.status_code == 201, accepted.text
+
+    rejected = client.post(
+        "/ai-persona-config/mini/instruction/drafts",
+        json={"content": "a" * 50_001},
+        headers=csrf_headers(client),
+    )
+    assert rejected.status_code == 422
+
+
 def test_draft_publish_and_rollback_preserve_history_and_audit(
     client: TestClient,
     db_session_factory: sessionmaker,
