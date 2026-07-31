@@ -35,7 +35,7 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.1.0-chatgpt-context-autodetect-2"
+const EXTENSION_BUILD_LABEL = "v0.1.1-tawk-active-pane-1"
 const CHATGPT_EMBED_URL =
   "https://chatgpt.com/g/g-69cde65d2fa081919907393fcd892e6e-solid-prime-sales"
 const CHATGPT_CONTEXT_MESSAGE_LIMIT = 12
@@ -1649,27 +1649,35 @@ const isInstagramDmTabUrl = (url: string | undefined) =>
 const isTikTokMessagesTabUrl = (url: string | undefined) =>
   Boolean(url?.startsWith("https://www.tiktok.com/messages"))
 
+const isTawkDashboardTabUrl = (url: string | undefined) =>
+  Boolean(url?.startsWith("https://dashboard.tawk.to/"))
+
 const isSupportedLiveSyncTabUrl = (url: string | undefined) =>
   isWhatsAppTabUrl(url) ||
   isInstagramDmTabUrl(url) ||
-  isTikTokMessagesTabUrl(url)
+  isTikTokMessagesTabUrl(url) ||
+  isTawkDashboardTabUrl(url)
 
 const getSupportedLiveSyncTabMessage = () =>
-  "Buka WhatsApp Web, Instagram DM, atau TikTok Messages dulu di tab aktif."
+  "Buka WhatsApp Web, Instagram DM, TikTok Messages, atau Tawk.to Dashboard dulu di tab aktif."
 
 const getContentScriptUnavailableMessage = (url: string | undefined) =>
   isInstagramDmTabUrl(url)
     ? "Content script Clara belum aktif di halaman Instagram ini. Refresh halaman Instagram DM lalu coba lagi."
     : isTikTokMessagesTabUrl(url)
       ? "Content script Clara belum aktif di halaman TikTok Messages ini. Refresh halaman lalu coba lagi."
-      : "Content script Clara belum aktif di halaman ini. Refresh tab lalu coba lagi."
+      : isTawkDashboardTabUrl(url)
+        ? "Content script Clara belum aktif di dashboard Tawk.to ini. Refresh halaman lalu coba lagi."
+        : "Content script Clara belum aktif di halaman ini. Refresh tab lalu coba lagi."
 
 const getChannelLabel = (channel?: string | null) =>
   channel === "instagram"
     ? "Instagram DM"
     : channel === "tiktok"
       ? "TikTok DM"
-      : "WhatsApp Web"
+      : channel === "tawk"
+        ? "Tawk.to Live Chat"
+        : "WhatsApp Web"
 
 const getPromptSafeText = (
   value: string,
@@ -2017,6 +2025,7 @@ const buildSnapshotSignature = (snapshot: WhatsAppChatSnapshot | null) =>
   JSON.stringify({
     channel: snapshot?.channel || "",
     provider: snapshot?.provider || "",
+    externalThreadId: snapshot?.externalThreadId || "",
     chatTitle: snapshot?.chatTitle || "",
     chatSubtitle: snapshot?.chatSubtitle || "",
     lastMessageId: snapshot?.messages[snapshot.messages.length - 1]?.id || "",
@@ -2064,7 +2073,9 @@ const mergeChatSnapshots = (
   if (
     current.channel !== incoming.channel ||
     current.provider !== incoming.provider ||
-    current.chatTitle !== incoming.chatTitle
+    (current.externalThreadId || incoming.externalThreadId
+      ? current.externalThreadId !== incoming.externalThreadId
+      : current.chatTitle !== incoming.chatTitle)
   ) {
     return incoming
   }
@@ -2243,6 +2254,10 @@ function ClaraSidePanel() {
           setChatGptContextFeedback("")
           setChatGptContextError(getSupportedLiveSyncTabMessage())
           chatGptAutoContextKeyRef.current = ""
+          return
+        }
+
+        if (isTawkDashboardTabUrl(activeTabUrl)) {
           return
         }
 
@@ -2576,7 +2591,8 @@ function ClaraSidePanel() {
       !isClaraWorkspace ||
       hasAutoReadAttempted ||
       isLoading ||
-      !isSupportedLiveSyncTabUrl(tabUrl)
+      !isSupportedLiveSyncTabUrl(tabUrl) ||
+      isTawkDashboardTabUrl(tabUrl)
     ) {
       return
     }
@@ -2601,6 +2617,14 @@ function ClaraSidePanel() {
       syncActiveTabUrl()
         .then((tab) => {
           if (!isSupportedLiveSyncTabUrl(tab?.url)) {
+            return
+          }
+
+          if (
+            isTawkDashboardTabUrl(tab?.url) &&
+            (document.visibilityState !== "visible" ||
+              chatDataRef.current?.channel !== "tawk")
+          ) {
             return
           }
 
@@ -2759,6 +2783,10 @@ function ClaraSidePanel() {
         throw new Error(getSupportedLiveSyncTabMessage())
       }
 
+      if (isTawkDashboardTabUrl(tab.url)) {
+        throw new Error("Aksi balasan Tawk.to akan tersedia pada TAWK-03.")
+      }
+
       let response: WhatsAppActionResponse | undefined
 
       try {
@@ -2823,6 +2851,19 @@ function ClaraSidePanel() {
     setEditingSuggestionIndex(index)
     setError("")
     setFeedback("")
+  }
+
+  const handleCopySuggestion = async (suggestion: string) => {
+    try {
+      await navigator.clipboard.writeText(suggestion)
+      setError("")
+      setFeedback(
+        "Draft Tawk.to berhasil disalin. Tempel dan kirim manual setelah diperiksa."
+      )
+    } catch (_error) {
+      setFeedback("")
+      setError("Draft belum berhasil disalin ke clipboard browser.")
+    }
   }
 
   const handleDraftSuggestionChange = (index: number, value: string) => {
@@ -2893,6 +2934,10 @@ function ClaraSidePanel() {
 
       if (!isSupportedLiveSyncTabUrl(tab.url)) {
         throw new Error(getSupportedLiveSyncTabMessage())
+      }
+
+      if (isTawkDashboardTabUrl(tab.url)) {
+        throw new Error("Aksi balasan Tawk.to akan tersedia pada TAWK-03.")
       }
 
       let response: WhatsAppActionResponse | undefined
@@ -3006,15 +3051,18 @@ function ClaraSidePanel() {
   }
 
   const isSupportedTab = isSupportedLiveSyncTabUrl(tabUrl)
+  const isTawkReadOnly = chatData?.channel === "tawk"
   const activeChannelLabel = chatData
     ? getChannelLabel(chatData.channel)
     : isInstagramDmTabUrl(tabUrl)
       ? "Instagram DM"
       : isTikTokMessagesTabUrl(tabUrl)
         ? "TikTok DM"
-        : isWhatsAppTabUrl(tabUrl)
-          ? "WhatsApp Web"
-          : "Belum terdeteksi"
+        : isTawkDashboardTabUrl(tabUrl)
+          ? "Tawk.to Live Chat"
+          : isWhatsAppTabUrl(tabUrl)
+            ? "WhatsApp Web"
+            : "Belum terdeteksi"
   const authStatusLabel =
     authStatus === "authenticated"
       ? "Connected"
@@ -3133,9 +3181,9 @@ function ClaraSidePanel() {
                       Bawa konteks tab aktif ke ChatGPT
                     </div>
                     <p className="clara-pane__copy">
-                      Clara baca chat aktif dari WhatsApp, Instagram DM, atau
-                      TikTok DM lalu menyiapkan prompt yang siap dipaste ke
-                      ChatGPT.
+                      Clara baca chat aktif dari WhatsApp, Instagram DM, TikTok
+                      DM, atau Tawk.to lalu menyiapkan prompt yang siap dipaste
+                      ke ChatGPT.
                     </p>
                   </div>
                 </div>
@@ -3231,9 +3279,10 @@ function ClaraSidePanel() {
                   </>
                 ) : isChatGptContextExpanded ? (
                   <div className="clara-note clara-note--warn" role="status">
-                    Buka chat aktif di WhatsApp Web, Instagram DM, atau TikTok
-                    Messages, lalu klik <strong>Refresh Context</strong>. Clara
-                    hanya membaca percakapan aktif, bukan seluruh inbox.
+                    Buka chat aktif di WhatsApp Web, Instagram DM, TikTok
+                    Messages, atau Tawk.to, lalu klik{" "}
+                    <strong>Refresh Context</strong>. Clara hanya membaca
+                    percakapan aktif, bukan seluruh inbox.
                   </div>
                 ) : null}
               </div>
@@ -3268,8 +3317,9 @@ function ClaraSidePanel() {
 
               {!isSupportedTab && !chatData && (
                 <div className="clara-note clara-note--warn" role="status">
-                  Buka percakapan aktif di WhatsApp Web, Instagram DM, atau
-                  TikTok Messages, lalu jalankan pembacaan chat dari panel ini.
+                  Buka percakapan aktif di WhatsApp Web, Instagram DM, TikTok
+                  Messages, atau Tawk.to, lalu jalankan pembacaan chat dari
+                  panel ini.
                 </div>
               )}
 
@@ -3489,28 +3539,42 @@ function ClaraSidePanel() {
                             type="button">
                             Edit
                           </button>
-                          <button
-                            className="clara-button clara-button--insert"
-                            disabled={isInsertingIndex !== null}
-                            onClick={() =>
-                              handleInsertSuggestion(primarySuggestion, 0)
-                            }
-                            type="button">
-                            {isInsertingIndex === 0
-                              ? "Memasukkan..."
-                              : "Masukkan ke Chat"}
-                          </button>
-                          <button
-                            className="clara-button clara-button--send"
-                            disabled={isInsertingIndex !== null}
-                            onClick={() =>
-                              handleSendSuggestion(primarySuggestion, 0)
-                            }
-                            type="button">
-                            {isInsertingIndex === 0
-                              ? "Mengirim..."
-                              : "Kirim Sekarang"}
-                          </button>
+                          {isTawkReadOnly ? (
+                            <button
+                              className="clara-button clara-button--insert"
+                              disabled={isInsertingIndex !== null}
+                              onClick={() =>
+                                handleCopySuggestion(primarySuggestion)
+                              }
+                              type="button">
+                              Salin Draft
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                className="clara-button clara-button--insert"
+                                disabled={isInsertingIndex !== null}
+                                onClick={() =>
+                                  handleInsertSuggestion(primarySuggestion, 0)
+                                }
+                                type="button">
+                                {isInsertingIndex === 0
+                                  ? "Memasukkan..."
+                                  : "Masukkan ke Chat"}
+                              </button>
+                              <button
+                                className="clara-button clara-button--send"
+                                disabled={isInsertingIndex !== null}
+                                onClick={() =>
+                                  handleSendSuggestion(primarySuggestion, 0)
+                                }
+                                type="button">
+                                {isInsertingIndex === 0
+                                  ? "Mengirim..."
+                                  : "Kirim Sekarang"}
+                              </button>
+                            </>
+                          )}
                         </div>
                       ) : null}
                     </article>

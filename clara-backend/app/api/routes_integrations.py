@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.clara_runtime_contract import runtime_contract_audit_metadata
 from app.core.security import require_sgcc_integration
 from app.db.session import get_db
 from app.schemas.integration_schema import (
@@ -120,7 +121,8 @@ def generate_sgcc_reply_suggestions_endpoint(
 
     try:
         analysis, policy_decision, suggestions = generate_sgcc_reply_suggestions(
-            payload
+            payload,
+            db=db,
         )
         create_sgcc_audit_entry(
             db=db,
@@ -128,6 +130,7 @@ def generate_sgcc_reply_suggestions_endpoint(
             action="integration.sgcc.reply_suggestions",
             resource_id=payload.external_conversation_id,
             metadata={
+                **runtime_contract_audit_metadata(),
                 "source_channel": payload.source_channel,
                 "message_count": len(payload.messages),
                 "account_category": payload.account_category,

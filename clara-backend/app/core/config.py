@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     openai_ultra_fast_reply_max_output_tokens: int = 120
     openai_fast_reply_max_output_tokens: int = 180
     openai_single_reply_max_output_tokens: int = 260
+    clara_persona_authority_mode: str = "LEGACY"
+    clara_semantic_revalidation_mode: str = "OFF"
 
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
@@ -94,6 +96,7 @@ class Settings(BaseSettings):
     extension_whatsapp_enabled: bool = True
     extension_instagram_enabled: bool = False
     extension_tiktok_enabled: bool = False
+    extension_tawk_enabled: bool = False
     extension_distribution_dir: str = "./storage/extension-builds"
 
     model_config = SettingsConfigDict(

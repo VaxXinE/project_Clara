@@ -37,6 +37,7 @@ from app.core.config import settings
 from app.db.session import Base, get_db
 from app.main import create_app
 from app.models.ai_extraction import AIExtraction
+from app.models.ai_persona_config_version import AIPersonaConfigVersion
 from app.models.approval_log import ApprovalLog
 from app.models.audit_log import AuditLog
 from app.models.chat_review_case import ChatReviewCase
@@ -111,6 +112,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             Conversation.__table__,
             Message.__table__,
             AIExtraction.__table__,
+            AIPersonaConfigVersion.__table__,
             ReplySuggestion.__table__,
             ApprovalLog.__table__,
             AuditLog.__table__,
@@ -154,6 +156,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             ChatReviewCase.__table__,
             ApprovalLog.__table__,
             ReplySuggestion.__table__,
+            AIPersonaConfigVersion.__table__,
             AIExtraction.__table__,
             Message.__table__,
             Conversation.__table__,
