@@ -89,3 +89,24 @@ Status: 20 `EXTRACTED`, 6 `TECHNICAL`, 4 `RUNTIME_CONTEXT`, 4 `PRODUCT_FACT`, 1 
 4. Jangan gabungkan pekerjaan ini dengan FSM, policy hard gate, atau Product Fact Registry.
 
 Rules yang belum aman dihapus: legacy user-prompt helpers, product fact injections, runtime heuristic summaries, parser/schema enforcement, dan semantic validators.
+
+## Stage 3 Retry Migration Result
+
+| Retry area | Stage 2 status | Stage 3 result | Remaining authority |
+|---|---|---|---|
+| Anonymous retry behavior block | Python-owned | Removed from reply service | None in PERSONA |
+| Style correction | Anonymous prose | `legacy_retry_style` in LEGACY | PERSONALITY_MODE playbook in HYBRID/PERSONA |
+| Product selection | Anonymous prose | `legacy_retry_product_selection` in LEGACY | FLOW/product facts |
+| Process continuity | Anonymous prose | `legacy_retry_process_continuity` in LEGACY | FLOW/runtime context |
+| Concrete detail | Anonymous prose | `legacy_retry_concrete_detail` in LEGACY | FLOW |
+| Legal grounding | Anonymous prose | `legacy_retry_legality_grounding`; approved HYBRID missing-GUARDRAIL fallback | GUARDRAIL/product facts |
+| JSON repair | Mixed retry path | Technical-only repair contract | TECHNICAL_OUTPUT |
+
+Empat kelompok legacy user-prompt helpers tetap aktif hanya pada production
+`LEGACY` primary path. Pada `PERSONA`, retry tidak mengandung legacy fragments,
+CLOSING alias, COLD/WARM/HOT adaptation prose, JAWAB/FRAME/DIRECTION prose,
+objection strategy, atau sales-closing strategy.
+
+Stage 3 tidak menghapus semantic validators. Gap yang masih terbuka adalah
+semantic revalidation terhadap hasil retry, universal claim validators, fake
+verification-access enforcement, process-state FSM, dan product-fact freshness.

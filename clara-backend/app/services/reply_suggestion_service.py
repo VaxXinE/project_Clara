@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from functools import lru_cache
+from hashlib import sha256
 from time import perf_counter
 from uuid import UUID
 
@@ -34,6 +35,11 @@ from app.schemas.ai_extraction_schema import (
 )
 from app.services.business_segmentation_service import normalize_account_category
 from app.services.clara_playbook_service import compose_clara_playbooks
+from app.services.clara_reply_retry_service import (
+    CLARA_RETRY_CONTRACT_VERSION,
+    compose_plain_json_repair_instructions,
+    compose_retry_prompt,
+)
 from app.services.clara_legacy_behavior_service import (
     AuthoritySystemPrompt,
     build_authority_debug_metadata,
@@ -324,17 +330,15 @@ def _extract_reply_payload_with_plain_json_fallback(
     user_prompt: str,
     desired_count: int,
     max_output_tokens: int,
-) -> tuple[dict, bool]:
+) -> tuple[dict, bool, str | None]:
     try:
-        return _extract_reply_payload_from_response(response), False
+        return _extract_reply_payload_from_response(response), False, None
     except ReplySuggestionError as primary_error:
-        fallback_prompt = (
-            f"{user_prompt}\n\n"
-            "OUTPUT WAJIB DARURAT:\n"
-            "- Keluarkan JSON valid saja, tanpa markdown dan tanpa kalimat pembuka.\n"
-            "- Bentuk JSON harus cocok dengan schema `clara_reply_suggestion`.\n"
-            "- Jika hanya ada 1 jawaban, tetap bungkus di `suggested_replies`.\n"
-        )
+        repair_instructions = compose_plain_json_repair_instructions(desired_count)
+        fallback_prompt = f"{user_prompt}\n\n{repair_instructions}"
+        fallback_prompt_hash = sha256(
+            fallback_prompt.encode("utf-8")
+        ).hexdigest()
         fallback_response = _create_openai_reply_response(
             client=client,
             model=reply_model,
@@ -345,7 +349,11 @@ def _extract_reply_payload_with_plain_json_fallback(
             use_strict_schema=False,
         )
         try:
-            return _extract_reply_payload_from_response(fallback_response), True
+            return (
+                _extract_reply_payload_from_response(fallback_response),
+                True,
+                fallback_prompt_hash,
+            )
         except ReplySuggestionError as fallback_error:
             raise fallback_error from primary_error
 
@@ -3762,6 +3770,194 @@ def response_defers_answer_with_question(
     return False
 
 
+def _collect_retry_validator_ids(
+    *,
+    primary_text: str,
+    latency_profile: str,
+    preferred_reply_register: str,
+    must_answer_with_product_options: bool,
+    product_option_summary: str,
+    latest_customer_intent: str,
+    answer_commitment_level: str,
+    latest_customer_message: str,
+    conversation_variant_focus: str | None,
+    customer_has_variant_commitment: bool,
+    known_identity_fields: dict[str, str],
+    customer_has_identity_submission: bool,
+    customer_has_verification_completion: bool,
+    latest_sales_message: str,
+    previous_customer_message: str,
+    should_avoid_repeating_sales_reply: bool,
+    must_give_concrete_steps: bool,
+    must_give_detailed_explanation: bool,
+    discusses_scalping_or_setup: bool,
+) -> tuple[str, ...]:
+    checks = [
+        (
+            "missing_product_options",
+            response_fails_product_option_requirement(
+                primary_text,
+                must_answer_with_product_options,
+                product_option_summary,
+            ),
+        ),
+        (
+            "unsupported_variant",
+            response_mentions_variant_not_in_grounding(
+                primary_text,
+                product_option_summary,
+                must_answer_with_product_options,
+            ),
+        ),
+        (
+            "unnecessary_variant",
+            response_unnecessarily_mentions_product_variants(
+                primary_text,
+                latest_customer_intent,
+                latest_customer_message,
+                must_answer_with_product_options,
+                conversation_variant_focus,
+            ),
+        ),
+        (
+            "missing_legality_authority",
+            response_lacks_legality_authority(primary_text, latest_customer_intent),
+        ),
+        (
+            "vague_legality_deflection",
+            response_uses_vague_legality_deflection(
+                primary_text, latest_customer_intent
+            ),
+        ),
+        (
+            "unsupported_fixed_sensitive_number",
+            response_states_fixed_sensitive_number(
+                primary_text, latest_customer_intent
+            ),
+        ),
+        (
+            "post_signup_regression",
+            response_ignores_post_signup_state(
+                primary_text, latest_customer_message
+            ),
+        ),
+        (
+            "repeated_product_selection",
+            response_reopens_product_selection(
+                primary_text,
+                customer_has_variant_commitment=customer_has_variant_commitment,
+            ),
+        ),
+        (
+            "repeated_identity_request",
+            response_reasks_identity_data(
+                primary_text,
+                latest_identity_fields=known_identity_fields,
+            ),
+        ),
+        (
+            "abstract_data_requirement",
+            response_uses_abstract_data_requirement(
+                primary_text, latest_customer_message
+            ),
+        ),
+        (
+            "vague_process_direction",
+            response_is_vague_after_identity_submission(
+                primary_text,
+                latest_customer_intent=latest_customer_intent,
+                customer_has_variant_commitment=customer_has_variant_commitment,
+                customer_has_identity_submission=customer_has_identity_submission,
+                customer_has_verification_completion=(
+                    customer_has_verification_completion
+                ),
+            ),
+        ),
+        (
+            "repeated_onboarding",
+            response_stays_stuck_in_onboarding_after_milestone(
+                primary_text, latest_customer_intent
+            ),
+        ),
+        (
+            "followup_topic_break",
+            response_breaks_followup_topic(
+                primary_text,
+                latest_customer_message,
+                latest_sales_message,
+            ),
+        ),
+        (
+            "subject_focus_break",
+            response_breaks_subject_focus(
+                primary_text,
+                latest_customer_message,
+                previous_customer_message,
+            ),
+        ),
+        (
+            "missing_latest_intent",
+            response_misses_latest_customer_intent(
+                primary_text, latest_customer_intent
+            ),
+        ),
+        (
+            "unnecessary_question",
+            response_defers_answer_with_question(
+                primary_text, answer_commitment_level
+            ),
+        ),
+        (
+            "source_dump_opening",
+            response_opens_with_source_dump(primary_text, latest_customer_intent),
+        ),
+    ]
+    if latency_profile != "ultra_fast":
+        checks.extend(
+            [
+                (
+                    "repetitive_closing",
+                    response_uses_repetitive_closing_template(primary_text),
+                ),
+                (
+                    "response_similarity",
+                    response_is_too_similar_to_latest_sales_message(
+                        primary_text,
+                        latest_sales_message,
+                        should_avoid_repeating_sales_reply,
+                    ),
+                ),
+            ]
+        )
+    if latency_profile not in {"ultra_fast", "fast"}:
+        checks.extend(
+            [
+                (
+                    "mixed_register",
+                    response_mixes_register(
+                        primary_text, preferred_reply_register
+                    ),
+                ),
+                (
+                    "insufficient_concrete_detail",
+                    response_lacks_concrete_detail(
+                        primary_text,
+                        must_give_concrete_steps,
+                        must_give_detailed_explanation,
+                        discusses_scalping_or_setup,
+                    ),
+                ),
+                (
+                    "generic_opening",
+                    response_starts_too_generic(
+                        primary_text, latest_customer_intent
+                    ),
+                ),
+            ]
+        )
+    return tuple(validator_id for validator_id, failed in checks if failed)
+
+
 def call_openai_for_reply_suggestion(
     conversation_text: str,
     extraction: AIExtraction | AIExtractionCreate,
@@ -3913,6 +4109,15 @@ def call_openai_for_reply_suggestion(
         "reply_runtime_contract_composed",
         extra=runtime_contract_debug,
     )
+    generation_authority_metadata = {
+        "persona_authority_mode": persona_authority_mode.value,
+        "runtime_contract_version": CLARA_RUNTIME_CONTRACT_VERSION,
+        "retry_contract_version": CLARA_RETRY_CONTRACT_VERSION,
+        "prompt_content_hash": runtime_contract_debug["prompt_content_hash"],
+        "legacy_behavior_overlay_present": (
+            authority_system_prompt.legacy_overlay_present
+        ),
+    }
     prompt_duration_ms = _round_duration_ms(prompt_started_at)
 
     max_output_tokens = 700
@@ -3925,6 +4130,7 @@ def call_openai_for_reply_suggestion(
             max_output_tokens = settings.openai_single_reply_max_output_tokens
 
     used_plain_json_fallback = False
+    plain_json_fallback_hash: str | None = None
     try:
         openai_started_at = perf_counter()
         response = _create_openai_reply_response(
@@ -3941,6 +4147,7 @@ def call_openai_for_reply_suggestion(
         reply_logger.exception(
             "reply_generation_openai_failed",
             extra={
+                **generation_authority_metadata,
                 "desired_count": desired_count,
                 "latest_customer_intent": latest_customer_intent,
                 "variant_response_mode": variant_response_mode,
@@ -3960,7 +4167,7 @@ def call_openai_for_reply_suggestion(
 
     try:
         validation_started_at = perf_counter()
-        parsed_json, used_plain_json_fallback = (
+        parsed_json, used_plain_json_fallback, plain_json_fallback_hash = (
             _extract_reply_payload_with_plain_json_fallback(
                 client=client,
                 response=response,
@@ -3979,6 +4186,7 @@ def call_openai_for_reply_suggestion(
         reply_logger.exception(
             "reply_generation_validation_failed",
             extra={
+                **generation_authority_metadata,
                 "desired_count": desired_count,
                 "latest_customer_intent": latest_customer_intent,
                 "variant_response_mode": variant_response_mode,
@@ -3990,11 +4198,6 @@ def call_openai_for_reply_suggestion(
                 "response_status": getattr(response, "status", None),
                 "response_incomplete_details": getattr(
                     response, "incomplete_details", None
-                ),
-                "response_output_excerpt": (
-                    getattr(response, "output_text", "")[:500]
-                    if isinstance(getattr(response, "output_text", None), str)
-                    else None
                 ),
                 "used_plain_json_fallback": used_plain_json_fallback,
                 "total_duration_ms": _round_duration_ms(total_started_at),
@@ -4270,10 +4473,34 @@ def call_openai_for_reply_suggestion(
             )
         )
 
+    validator_ids = _collect_retry_validator_ids(
+        primary_text=primary_text,
+        latency_profile=latency_profile,
+        preferred_reply_register=preferred_reply_register,
+        must_answer_with_product_options=must_answer_with_product_options,
+        product_option_summary=product_option_summary,
+        latest_customer_intent=latest_customer_intent,
+        answer_commitment_level=answer_commitment_level,
+        latest_customer_message=latest_customer_message,
+        conversation_variant_focus=conversation_variant_focus,
+        customer_has_variant_commitment=customer_has_variant_commitment,
+        known_identity_fields=known_identity_fields or {},
+        customer_has_identity_submission=customer_has_identity_submission,
+        customer_has_verification_completion=customer_has_verification_completion,
+        latest_sales_message=latest_sales_message,
+        previous_customer_message=previous_customer_message,
+        should_avoid_repeating_sales_reply=should_avoid_repeating_sales_reply,
+        must_give_concrete_steps=must_give_concrete_steps,
+        must_give_detailed_explanation=must_give_detailed_explanation,
+        discusses_scalping_or_setup=discusses_scalping_or_setup,
+    )
+    needs_retry = bool(validator_ids)
+
     if not needs_retry:
         reply_logger.info(
             "reply_generation_completed",
             extra={
+                **generation_authority_metadata,
                 "desired_count": desired_count,
                 "latest_customer_intent": latest_customer_intent,
                 "variant_response_mode": variant_response_mode,
@@ -4286,45 +4513,25 @@ def call_openai_for_reply_suggestion(
                 "openai_duration_ms": openai_duration_ms,
                 "validation_duration_ms": validation_duration_ms,
                 "used_plain_json_fallback": used_plain_json_fallback,
+                "plain_json_fallback_hash": plain_json_fallback_hash,
                 "retry_used": False,
+                "retry_prompt_hash": None,
+                "validator_ids": [],
+                "legacy_retry_fragments": [],
                 "suggested_reply_count": len(reply_payload.suggested_replies),
                 "total_duration_ms": _round_duration_ms(total_started_at),
             },
         )
         return reply_payload
 
-    retry_prompt = (
-        f"{prompt}\n\n"
-        "PERBAIKAN WAJIB TAMBAHAN:\n"
-        "- Jawaban sebelumnya belum lolos validasi internal.\n"
-        "- Jangan campur register santai dengan formal.\n"
-        "- Jika customer menanyakan opsi produk, WAJIB sebut Mini dan Regular/Reguler bila tersedia.\n"
-        "- Jangan terlalu mirip dengan balasan sales terakhir.\n"
-        "- Jawab inti pertanyaan customer dulu, baru arahkan langkah lanjut.\n"
-        "- Jika customer meminta detail atau step awal, WAJIB beri isi konkret, bukan template umum.\n"
-        "- Jika konteks membahas scalping/setup, sebut arah market, area entry, dan batas risiko secara aman untuk pemula.\n"
-        "- Jawaban WAJIB nyambung langsung ke intent customer terakhir. Jangan alihkan ke topik lain.\n"
-        "- Kalimat pertama jangan generik. Kalimat pertama harus langsung menjawab topik utama customer.\n"
-        "- Jangan buka dengan pertanyaan balik jika customer sebenarnya sudah cukup jelas. Jawab dulu, baru kalau perlu tutup dengan 1 pertanyaan singkat.\n"
-        "- Ikuti aturan pemilihan varian produk dengan disiplin: hanya condong ke Mini/Regular kalau sinyalnya memang cukup kuat.\n"
-        "- Jika customer sudah memilih produk tertentu, jangan kembali ke jawaban perbandingan umum kecuali diminta.\n"
-        "- Jika customer sudah jelas memilih Mini/Regular, jangan tanya ulang pilihannya.\n"
-        "- Jika riwayat percakapan sudah jelas fokus ke Mini atau ke Regular/Reguler, jangan seret jawaban kembali ke perbandingan dua produk kecuali customer minta dibandingkan.\n"
-        "- Jika customer sudah daftar atau deposit, jangan mundur lagi ke penjelasan modal minimal atau pengenalan produk awal.\n"
-        "- Jika customer sudah mengirim nama, nomor HP, atau domisili, jangan minta ulang field yang sudah jelas tertulis. Konfirmasi lalu lanjut ke step berikutnya.\n"
-        "- Jika customer sudah mengirim identitas dan bertanya step berikutnya, jawab dengan langkah operasional yang nyata seperti verifikasi, onboarding, atau handoff ke tim senior. Jangan pakai filler seperti 'saya cek alurnya dulu'.\n"
-        "- Kurangi template closing berulang. Hanya tutup dengan ajakan lanjut jika memang membantu langkah berikutnya.\n"
-        "- Jika pesan customer pendek dan jelas merupakan follow-up, pertahankan topik dari balasan sales sebelumnya. Jangan lompat topik.\n"
-        "- Jika customer minta opsi produk, Mini dan Regular/Reguler harus sama-sama muncul dan harus dibedakan secara konkret, bukan cuma disebut namanya.\n"
-        "- Jika customer bertanya legalitas, kalimat pertama wajib langsung menyebut otoritas pengawasan yang relevan dari knowledge base.\n"
-        "- Jika customer bertanya legalitas, jangan pakai jawaban kabur seperti 'cek status resmi sesuai produk/akun' bila fakta pengawasan resmi sudah ada di grounding.\n"
-        "- Jangan menyebut varian produk yang tidak muncul di ringkasan opsi produk terstruktur / grounding saat ini.\n"
-        "- Untuk intent legalitas, keamanan, mekanisme, dan next step: JANGAN sebut Mini/Regular kecuali customer memang bertanya soal produk, pilihan akun, atau modal.\n"
-        "- Jika customer sudah daftar atau deposit, jawaban wajib fokus ke langkah lanjutan yang operasional.\n"
-        "- Jika customer sudah aktivasi atau sudah deposit lalu mau mulai transaksi, jangan suruh cek email, screenshot, onboarding ulang, atau instruksi lanjutan yang abstrak.\n"
-        "- Untuk tahap aktivasi selesai atau dana sudah masuk, jawab dengan arah operasional berikutnya secara singkat dan konkret.\n"
-        "- Jangan buka jawaban dengan dump link/source resmi kecuali memang customer sedang minta bukti legalitas atau detail resmi tertentu.\n"
+    retry_composition = compose_retry_prompt(
+        authority_mode=persona_authority_mode,
+        validator_ids=validator_ids,
+        desired_count=desired_count,
+        available_system_sections=available_system_sections,
     )
+    retry_prompt = f"{prompt}\n\n{retry_composition.content}"
+    retry_prompt_hash = sha256(retry_prompt.encode("utf-8")).hexdigest()
 
     try:
         retry_openai_started_at = perf_counter()
@@ -4352,7 +4559,11 @@ def call_openai_for_reply_suggestion(
         )
         retry_openai_duration_ms = _round_duration_ms(retry_openai_started_at)
         retry_validation_started_at = perf_counter()
-        retry_json, retry_used_plain_json_fallback = (
+        (
+            retry_json,
+            retry_used_plain_json_fallback,
+            retry_plain_json_fallback_hash,
+        ) = (
             _extract_reply_payload_with_plain_json_fallback(
                 client=client,
                 response=retry_response,
@@ -4370,6 +4581,7 @@ def call_openai_for_reply_suggestion(
         reply_logger.info(
             "reply_generation_completed",
             extra={
+                **generation_authority_metadata,
                 "desired_count": desired_count,
                 "latest_customer_intent": latest_customer_intent,
                 "variant_response_mode": variant_response_mode,
@@ -4382,9 +4594,20 @@ def call_openai_for_reply_suggestion(
                 "openai_duration_ms": openai_duration_ms,
                 "validation_duration_ms": validation_duration_ms,
                 "retry_used": True,
+                "retry_prompt_hash": retry_prompt_hash,
+                "validator_ids": list(retry_composition.validator_ids),
+                "legacy_retry_fragments": list(
+                    retry_composition.behavioral_fragment_names
+                ),
                 "retry_openai_duration_ms": retry_openai_duration_ms,
                 "retry_validation_duration_ms": retry_validation_duration_ms,
                 "retry_used_plain_json_fallback": retry_used_plain_json_fallback,
+                "used_plain_json_fallback": (
+                    used_plain_json_fallback or retry_used_plain_json_fallback
+                ),
+                "retry_plain_json_fallback_hash": (
+                    retry_plain_json_fallback_hash
+                ),
                 "suggested_reply_count": len(retried_payload.suggested_replies),
                 "total_duration_ms": _round_duration_ms(total_started_at),
             },
@@ -4394,6 +4617,7 @@ def call_openai_for_reply_suggestion(
         reply_logger.warning(
             "reply_generation_retry_failed_returning_primary",
             extra={
+                **generation_authority_metadata,
                 "desired_count": desired_count,
                 "latest_customer_intent": latest_customer_intent,
                 "variant_response_mode": variant_response_mode,
@@ -4406,6 +4630,12 @@ def call_openai_for_reply_suggestion(
                 "openai_duration_ms": openai_duration_ms,
                 "validation_duration_ms": validation_duration_ms,
                 "retry_used": True,
+                "used_plain_json_fallback": used_plain_json_fallback,
+                "retry_prompt_hash": retry_prompt_hash,
+                "validator_ids": list(retry_composition.validator_ids),
+                "legacy_retry_fragments": list(
+                    retry_composition.behavioral_fragment_names
+                ),
                 "suggested_reply_count": len(reply_payload.suggested_replies),
                 "total_duration_ms": _round_duration_ms(total_started_at),
             },
