@@ -155,3 +155,27 @@ Bagian A–F di atas adalah **Stage 0 finding** dan dipertahankan sebagai catata
 Stage 1 belum menyelesaikan enforcement gaps GAP-01 sampai GAP-10. Policy, approval/send, complaint routing, process-state persistence, product facts, validator retry, dan Tawk ownership tetap seperti Stage 0.
 
 Kontrak lengkap: `docs/architecture/CLARA_RUNTIME_CONTRACT_V1.md`.
+
+## H. Stage 2 Implementation Note
+
+Bagian A–F tetap merupakan **Stage 0 finding**. Bagian G merupakan **Stage 1 implementation**. Bagian ini mencatat **Stage 2 implementation**.
+
+Stage 2 menambahkan `PersonaAuthorityMode`:
+
+- `LEGACY` sebagai default aman;
+- `HYBRID` untuk menjadikan five system playbooks sebagai behavioral authority utama;
+- `PERSONA` untuk menghilangkan legacy behavioral fragments dari prompt efektif.
+
+Free-form system overlay Stage 0 dipisahkan menjadi lima typed fragments di `clara_legacy_behavior_service.py`: instruction, guardrail, flow, personality mode, dan auto-adapt. Setiap fragment memiliki stable name, SHA-256 hash, source identifier, migration status, semantic markers, dan removal target.
+
+Boundary Stage 2:
+
+1. technical output schema/parser tetap Python-owned;
+2. policy action hanya diteruskan sebagai metadata dan tidak diubah;
+3. runtime customer context tetap data injection;
+4. product/legal/variant facts tetap di `LEGACY_PRODUCT_FACT_INJECTION` dan knowledge path lama;
+5. supporting knowledge/examples tetap lebih rendah dari five system playbooks;
+6. full prompt dan customer message tidak masuk debug metadata;
+7. endpoint, database schema, approval/send, dan Tawk flow tidak diubah.
+
+Remaining gap: production default tetap `LEGACY`, sehingga legacy user-prompt helpers masih efektif. `HYBRID` dan `PERSONA` adalah opt-in configuration untuk validation sebelum Stage 3.

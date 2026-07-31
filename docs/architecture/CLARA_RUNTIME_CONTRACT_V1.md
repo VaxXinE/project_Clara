@@ -236,3 +236,35 @@ Recommended scope Stage 2:
 7. jangan sekaligus membuat policy hard gate, state FSM, atau product-fact migration.
 
 Stage 2 tidak dimulai oleh dokumen ini.
+
+## 12. Stage 2 Persona Authority Modes
+
+Stage 2 menambahkan `CLARA_PERSONA_AUTHORITY_MODE` melalui settings dengan default `LEGACY`.
+
+### LEGACY
+
+Urutan efektif: technical output contract, runtime context, legacy product-fact injection, lima structured legacy behavior fragments, five system playbooks, supporting knowledge, lalu response examples. Legacy user-prompt path tetap dipakai untuk production compatibility.
+
+### HYBRID
+
+Urutan efektif: technical/safety constraints, policy metadata, five system playbooks, runtime context, product facts, approved compatibility fragment bila canonical section terkait missing, supporting knowledge, lalu response examples.
+
+Full `LEGACY_BEHAVIOR_OVERLAY` tidak ikut. Published/Markdown effective section menang atas compatibility fragment dengan canonical destination yang sama.
+
+### PERSONA
+
+Urutan efektif: technical/safety constraints, policy metadata, five system playbooks, runtime context, product facts, supporting knowledge, lalu examples.
+
+Tidak ada legacy fragment, marker overlay, atau instruksi personality `CLOSING`. Personality canonical menggunakan `ACTION`. Python user prompt pada mode ini hanya membawa technical/policy metadata, runtime data, facts, knowledge, dan conversation context.
+
+## 13. Stage 2 Boundaries and Metadata
+
+Technical shell version `1.0` tetap Python-owned dan mencakup schema compatibility, jumlah draft, bubble/length instruction, Bahasa Indonesia, JSON-only output, serta larangan menampilkan chain-of-thought.
+
+Product facts belum dimigrasikan. Scope perusahaan/produk, variant focus lama, dan legal supervision statement ditandai sebagai `LEGACY_PRODUCT_FACT_INJECTION`. Nilainya tidak diubah dan tidak diduplikasi ke behavioral fragments.
+
+Safe internal metadata mencakup runtime contract version, normalized/original persona authority mode, system provenance, legacy overlay presence, included fragment names, technical shell version, product-fact injection presence, supporting/example counts, dan deterministic prompt SHA-256.
+
+Prompt content dan customer message tidak disimpan dalam metadata. Metadata generation masih in-memory/log-only karena persistence baru membutuhkan migration.
+
+Classification lengkap: `docs/architecture/CLARA_LEGACY_BEHAVIOR_MIGRATION_MAP.md`.

@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     openai_ultra_fast_reply_max_output_tokens: int = 120
     openai_fast_reply_max_output_tokens: int = 180
     openai_single_reply_max_output_tokens: int = 260
+    clara_persona_authority_mode: str = "LEGACY"
 
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"

@@ -67,6 +67,12 @@ class ActionMode(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class PersonaAuthorityMode(StrEnum):
+    LEGACY = "LEGACY"
+    HYBRID = "HYBRID"
+    PERSONA = "PERSONA"
+
+
 class RuntimeAuthorityLayer(StrEnum):
     BACKEND_SAFETY_ENFORCEMENT = "BACKEND_SAFETY_ENFORCEMENT"
     POLICY_DECISION = "POLICY_DECISION"
@@ -224,9 +230,38 @@ def normalize_action_mode(value: str | None) -> NormalizationResult:
     )
 
 
+def normalize_persona_authority_mode(value: str | None) -> NormalizationResult:
+    original = value
+    normalized = value.strip().upper() if isinstance(value, str) else ""
+    try:
+        canonical_value = PersonaAuthorityMode(normalized).value
+        is_unknown = False
+    except ValueError:
+        canonical_value = PersonaAuthorityMode.LEGACY.value
+        is_unknown = True
+
+    return NormalizationResult(
+        canonical_value=canonical_value,
+        original_value=original,
+        was_normalized=original != canonical_value,
+        is_legacy=canonical_value == PersonaAuthorityMode.LEGACY,
+        is_unknown=is_unknown,
+        warning=(
+            f"Unknown persona authority mode {original!r}; falling back to LEGACY."
+            if is_unknown
+            else None
+        ),
+    )
+
+
 def runtime_contract_audit_metadata() -> dict[str, str | bool]:
+    from app.core.config import settings
+
+    mode = normalize_persona_authority_mode(
+        settings.clara_persona_authority_mode
+    ).canonical_value
     return {
         "clara_runtime_contract_version": CLARA_RUNTIME_CONTRACT_VERSION,
-        "legacy_behavior_overlay": True,
+        "legacy_behavior_overlay": mode == PersonaAuthorityMode.LEGACY,
         "legacy_behavior_overlay_name": LEGACY_BEHAVIOR_OVERLAY,
     }
