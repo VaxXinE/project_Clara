@@ -110,3 +110,16 @@ objection strategy, atau sales-closing strategy.
 Stage 3 tidak menghapus semantic validators. Gap yang masih terbuka adalah
 semantic revalidation terhadap hasil retry, universal claim validators, fake
 verification-access enforcement, process-state FSM, dan product-fact freshness.
+
+## Stage 4 Validation Result
+
+- Semua 22 legacy semantic validator IDs dijalankan melalui satu orchestrator.
+- Retry communication authority tetap mengikuti Stage 3.
+- Retry/JSON-repair revalidation tersedia hanya dalam `OBSERVE`.
+- Tujuh critical safety validators bersifat observation-only dan tidak menjadi
+  alasan baru untuk mengubah output production.
+- Legacy product facts, process heuristics, policy, approval/send, complaint
+  routing, dan Tawk tidak dipindahkan atau diubah.
+
+Remaining: implied claims, comprehensive invented-fact detection, output PII,
+complaint-to-closing detection, retry enforcement, FSM, dan fact freshness.

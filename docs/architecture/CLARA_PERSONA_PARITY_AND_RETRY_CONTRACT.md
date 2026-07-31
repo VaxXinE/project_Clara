@@ -128,3 +128,15 @@ semantically revalidated.
 Stage 4 recommendation: controlled semantic revalidation and non-production
 quality review of retry results. Do not combine it with product-fact registry,
 process FSM, mandatory human-review enforcement, or production mode switching.
+
+## 8. Stage 4 Observation Update
+
+The safety matrix now has deterministic observation coverage for clear
+guaranteed-profit, risk-free, personalized buy/sell, all-in/full-margin,
+fake-status-access, and unauthorized refund/compensation claims.
+
+This does not convert prompt authority into an enforcement gate. New critical
+validators are observation-only, retry results are revalidated only in
+`OBSERVE`, and production selection remains unchanged. Detailed limitations
+and canary gates are recorded in
+`docs/quality/CLARA_STAGE_4_READINESS_REPORT.md`.
