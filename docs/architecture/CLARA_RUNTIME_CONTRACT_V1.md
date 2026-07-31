@@ -268,3 +268,26 @@ Safe internal metadata mencakup runtime contract version, normalized/original pe
 Prompt content dan customer message tidak disimpan dalam metadata. Metadata generation masih in-memory/log-only karena persistence baru membutuhkan migration.
 
 Classification lengkap: `docs/architecture/CLARA_LEGACY_BEHAVIOR_MIGRATION_MAP.md`.
+
+## 14. Stage 3 Retry Contract
+
+Stage 3 menambahkan retry contract terpisah version `1.0`.
+
+- Technical retry authority: JSON-only, schema, reply count, parser
+  compatibility, validator IDs, correction target IDs, dan no-Markdown.
+- Behavioral retry authority: named legacy fragments pada `LEGACY`, explicit
+  missing-section fallback pada `HYBRID`, dan five playbooks saja pada
+  `PERSONA`.
+- Plain-JSON repair tidak menambahkan behavior.
+- Retry debug metadata mengekspos hash/IDs/names, bukan content.
+
+Validator registry memetakan setiap detector ke salah satu:
+`BACKEND_SAFETY`, `GUARDRAIL`, `FLOW`, `PERSONALITY_MODE`, `AUTO_ADAPT`,
+`PRODUCT_FACT`, `TECHNICAL_OUTPUT`, atau `RUNTIME_CONTEXT`.
+
+Production default tetap `LEGACY`. Contract ini tidak mengubah product facts,
+policy outcome, approval/send, complaint routing, Tawk, model ORM, atau schema
+database.
+
+Detail parity dan safety coverage:
+`docs/architecture/CLARA_PERSONA_PARITY_AND_RETRY_CONTRACT.md`.

@@ -179,3 +179,25 @@ Boundary Stage 2:
 7. endpoint, database schema, approval/send, dan Tawk flow tidak diubah.
 
 Remaining gap: production default tetap `LEGACY`, sehingga legacy user-prompt helpers masih efektif. `HYBRID` dan `PERSONA` adalah opt-in configuration untuk validation sebelum Stage 3.
+
+## I. Stage 3 Implementation Note
+
+Stage 3 memisahkan retry detection dari retry communication:
+
+- seluruh validator tetap backend-owned sebagai defense-in-depth;
+- retry disusun oleh typed contract version `1.0`;
+- `LEGACY` memakai lima named compatibility fragments;
+- `HYBRID` hanya dapat memakai explicit legality fallback ketika effective
+  `GUARDRAIL` missing;
+- `PERSONA` hanya menerima validator/correction IDs dan canonical section
+  references, tanpa Python-owned behavioral prose;
+- plain-JSON fallback hanya memperbaiki output JSON/schema;
+- logs hanya memuat mode, contract versions, IDs, fragment names, flags, dan
+  hashes.
+
+Offline shadow evaluator memeriksa 20 golden cases dalam tiga mode tanpa LLM
+atau database write. Stage 0 findings dan GAP-01 sampai GAP-10 tetap historis;
+khusus GAP-08, authority leak pada retry prompt sudah ditutup, tetapi retry
+output masih belum menjalani semantic revalidation.
+
+Kontrak: `docs/architecture/CLARA_PERSONA_PARITY_AND_RETRY_CONTRACT.md`.
