@@ -3,7 +3,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.core.clara_runtime_contract import runtime_contract_audit_metadata
 from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.user import User
@@ -38,9 +37,7 @@ def create_reply_suggestion_endpoint(
     conversation_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         get_accessible_conversation_or_raise(
@@ -59,7 +56,6 @@ def create_reply_suggestion_endpoint(
             current_user=current_user,
             request=request,
             metadata={
-                **runtime_contract_audit_metadata(),
                 "conversation_id": str(suggestion.conversation_id),
                 "ai_extraction_id": str(suggestion.ai_extraction_id),
                 "approval_status": suggestion.approval_status,
@@ -80,7 +76,6 @@ def create_reply_suggestion_endpoint(
             current_user=current_user,
             request=request,
             metadata={
-                **runtime_contract_audit_metadata(),
                 "conversation_id": str(conversation_id),
                 "error_type": type(exc).__name__,
                 "error_message": str(exc)[:500],
@@ -104,9 +99,7 @@ def create_reply_suggestion_endpoint(
 def list_reply_suggestions_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         get_accessible_conversation_or_raise(
@@ -122,6 +115,8 @@ def list_reply_suggestions_endpoint(
         ) from exc
 
 
+
+
 @router.post(
     "/reply-suggestions/{reply_suggestion_id}/approve",
     response_model=ReplySuggestionResponse,
@@ -131,9 +126,7 @@ def approve_reply_suggestion_endpoint(
     payload: ApproveReplyRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         get_accessible_reply_suggestion_or_raise(
@@ -178,9 +171,7 @@ def reject_reply_suggestion_endpoint(
     payload: RejectReplyRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         get_accessible_reply_suggestion_or_raise(

@@ -102,9 +102,6 @@ def test_extension_manifest_uses_minimal_social_dm_host_permissions() -> None:
     assert "https://web.whatsapp.com/*" in host_permissions
     assert "https://www.instagram.com/*" in host_permissions
     assert "https://www.tiktok.com/*" in host_permissions
-    assert "https://dashboard.tawk.to/*" in host_permissions
-    assert "https://*.tawk.to/*" not in host_permissions
-    assert "https://tawk.to/*" not in host_permissions
     assert "https://clara.newsmaker.id/*" in host_permissions
 
 
@@ -113,7 +110,6 @@ def test_extension_manifest_uses_minimal_social_dm_host_permissions() -> None:
     [
         "clara-extension/utils/channel-adapters/instagram-adapter.ts",
         "clara-extension/utils/channel-adapters/tiktok-adapter.ts",
-        "clara-extension/utils/channel-adapters/tawk-adapter.ts",
     ],
 )
 def test_social_dm_adapters_do_not_access_platform_storage_or_raw_html(

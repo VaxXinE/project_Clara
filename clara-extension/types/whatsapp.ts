@@ -13,10 +13,9 @@ export interface WhatsAppMessage {
 
 export interface WhatsAppChatSnapshot {
   capturedAt: string
-  channel?: "whatsapp" | "instagram" | "tiktok" | "tawk"
+  channel?: "whatsapp" | "instagram" | "tiktok"
   chatTitle: string
   chatSubtitle: string
-  externalThreadId?: string
   debugInfo?: {
     bounds?: string
     candidateCount?: number
@@ -32,14 +31,12 @@ export interface WhatsAppChatSnapshot {
 }
 
 export interface WhatsAppReadResponse {
-  code?: string
   data?: WhatsAppChatSnapshot
   error?: string
   ok: boolean
 }
 
 export interface WhatsAppActionResponse {
-  code?: string
   error?: string
   ok: boolean
 }
