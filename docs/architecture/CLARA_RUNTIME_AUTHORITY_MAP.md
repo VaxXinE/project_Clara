@@ -135,3 +135,23 @@ Selain file utama di atas, audit memeriksa:
 - automated reply, persona, import, extension, security, dan benchmark tests di `clara-backend/tests/`.
 
 Kesimpulan Stage 0: nama file bukan penentu authority. Runtime precedence hanya dapat dipahami dari compiler prompt dan call path di service.
+
+## G. Stage 1 Implementation Note
+
+Bagian A–F di atas adalah **Stage 0 finding** dan dipertahankan sebagai catatan historis kondisi sebelum kontrak runtime dibuat.
+
+**Stage 1 implementation** pada `feat/clara-stage-1-runtime-contract` menambahkan:
+
+- canonical vocabulary dan normalizer di `clara-backend/app/core/clara_runtime_contract.py`;
+- fixed authority order version `1.0`;
+- fixed system-section order `INSTRUCTION → GUARDRAIL → FLOW → PERSONALITY_MODE → AUTO_ADAPT`;
+- per-section provenance dengan source `DATABASE_PUBLISHED`, `MARKDOWN_FALLBACK`, atau `MISSING`;
+- internal debug metadata tanpa full prompt content;
+- label `LEGACY_BEHAVIOR_OVERLAY` untuk hard-coded Python behavior;
+- explicit compatibility `CLOSING → ACTION`;
+- explicit `DELAY → canonical UNKNOWN` sambil mempertahankan legacy signal;
+- exclusion lima system Markdown files dari supporting-playbook layer.
+
+Stage 1 belum menyelesaikan enforcement gaps GAP-01 sampai GAP-10. Policy, approval/send, complaint routing, process-state persistence, product facts, validator retry, dan Tawk ownership tetap seperti Stage 0.
+
+Kontrak lengkap: `docs/architecture/CLARA_RUNTIME_CONTRACT_V1.md`.
