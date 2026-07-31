@@ -1,5 +1,8 @@
 # Clara Process-State FSM Contract
 
+> Stage 8: complaint/support context cannot transition or infer canonical
+> process state.
+
 Status: Stage 7 implementation
 Contract version: `1.0`
 

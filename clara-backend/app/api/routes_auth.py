@@ -54,9 +54,13 @@ def build_user_response(user: User) -> CurrentUserResponse:
         team_id=user.team_id,
         team_name=user.sales_team.name if user.sales_team else None,
         unit_id=user.sales_team.unit_id if user.sales_team else None,
-        unit_name=user.sales_team.unit.name if user.sales_team and user.sales_team.unit else None,
+        unit_name=user.sales_team.unit.name
+        if user.sales_team and user.sales_team.unit
+        else None,
         created_by_user_id=user.created_by_user_id,
-        created_by_user_name=user.created_by_user.name if user.created_by_user else None,
+        created_by_user_name=user.created_by_user.name
+        if user.created_by_user
+        else None,
     )
 
 

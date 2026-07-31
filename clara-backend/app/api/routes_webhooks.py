@@ -4,7 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.webhook_schema import MetaWebhookEnvelope, WhatsAppWebhookIngestResponse
+from app.schemas.webhook_schema import (
+    MetaWebhookEnvelope,
+    WhatsAppWebhookIngestResponse,
+)
 from app.services.audit_service import create_audit_log
 from app.services.whatsapp_webhook_service import (
     WhatsAppWebhookAuthError,
@@ -56,7 +59,9 @@ async def ingest_meta_whatsapp_webhook(
             body=raw_body,
             signature_header=request.headers.get("X-Hub-Signature-256"),
         )
-        payload = MetaWebhookEnvelope.model_validate(json.loads(raw_body.decode("utf-8")))
+        payload = MetaWebhookEnvelope.model_validate(
+            json.loads(raw_body.decode("utf-8"))
+        )
         response = provider.ingest(db=db, body=payload)
     except json.JSONDecodeError as exc:
         raise HTTPException(

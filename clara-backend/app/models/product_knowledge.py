@@ -22,7 +22,9 @@ class ProductKnowledge(Base):
         index=True,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    category: Mapped[str] = mapped_column(String(100), nullable=False, default="general")
+    category: Mapped[str] = mapped_column(
+        String(100), nullable=False, default="general"
+    )
     content: Mapped[str] = mapped_column(Text, nullable=False)
     source_type: Mapped[str] = mapped_column(
         String(50),

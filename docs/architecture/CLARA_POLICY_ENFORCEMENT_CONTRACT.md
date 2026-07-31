@@ -1,5 +1,9 @@
 # Clara Policy Enforcement Contract
 
+> Stage 8: service routing does not override this contract. Backend security
+> and policy stay higher authority; complaint routing reuses its contextual
+> classifier and deterministic handoff categories.
+
 Status: Stage 5 implementation
 
 Contract version: `CLARA_ENFORCEMENT_CONTRACT_VERSION = "1.0"`

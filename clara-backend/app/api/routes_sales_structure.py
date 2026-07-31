@@ -38,7 +38,9 @@ def list_sales_units_endpoint(
     return list_sales_units(db=db, current_user=current_user)
 
 
-@router.post("/units", response_model=SalesUnitResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/units", response_model=SalesUnitResponse, status_code=status.HTTP_201_CREATED
+)
 def create_sales_unit_endpoint(
     payload: CreateSalesUnitRequest,
     request: Request,
@@ -48,7 +50,9 @@ def create_sales_unit_endpoint(
     try:
         unit = create_sales_unit(db=db, payload=payload, current_user=current_user)
     except SalesStructureError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
     create_audit_log(
         db=db,
@@ -78,7 +82,11 @@ def update_sales_unit_endpoint(
             current_user=current_user,
         )
     except SalesStructureError as exc:
-        status_code = status.HTTP_404_NOT_FOUND if "not found" in str(exc).lower() else status.HTTP_400_BAD_REQUEST
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in str(exc).lower()
+            else status.HTTP_400_BAD_REQUEST
+        )
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
     create_audit_log(
@@ -103,7 +111,11 @@ def delete_sales_unit_endpoint(
     try:
         delete_sales_unit(db=db, unit_id=unit_id, current_user=current_user)
     except SalesStructureError as exc:
-        status_code = status.HTTP_404_NOT_FOUND if "not found" in str(exc).lower() else status.HTTP_400_BAD_REQUEST
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in str(exc).lower()
+            else status.HTTP_400_BAD_REQUEST
+        )
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
     create_audit_log(
@@ -125,7 +137,9 @@ def list_sales_teams_endpoint(
     return list_sales_teams(db=db, current_user=current_user)
 
 
-@router.post("/teams", response_model=SalesTeamResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/teams", response_model=SalesTeamResponse, status_code=status.HTTP_201_CREATED
+)
 def create_sales_team_endpoint(
     payload: CreateSalesTeamRequest,
     request: Request,
@@ -135,7 +149,9 @@ def create_sales_team_endpoint(
     try:
         team = create_sales_team(db=db, payload=payload, current_user=current_user)
     except SalesStructureError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
     create_audit_log(
         db=db,
@@ -165,7 +181,11 @@ def update_sales_team_endpoint(
             current_user=current_user,
         )
     except SalesStructureError as exc:
-        status_code = status.HTTP_404_NOT_FOUND if "not found" in str(exc).lower() else status.HTTP_400_BAD_REQUEST
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in str(exc).lower()
+            else status.HTTP_400_BAD_REQUEST
+        )
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
     create_audit_log(
@@ -190,7 +210,11 @@ def delete_sales_team_endpoint(
     try:
         delete_sales_team(db=db, team_id=team_id, current_user=current_user)
     except SalesStructureError as exc:
-        status_code = status.HTTP_404_NOT_FOUND if "not found" in str(exc).lower() else status.HTTP_400_BAD_REQUEST
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in str(exc).lower()
+            else status.HTTP_400_BAD_REQUEST
+        )
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
     create_audit_log(

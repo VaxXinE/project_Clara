@@ -49,7 +49,7 @@ def fetch_official_source_text(url: str) -> str:
         with urlopen(request, timeout=3) as response:
             charset = response.headers.get_content_charset() or "utf-8"
             raw = response.read().decode(charset, errors="ignore")
-    except (HTTPError, URLError, TimeoutError, ValueError):
+    except HTTPError, URLError, TimeoutError, ValueError:
         return ""
 
     return _strip_html(raw)
@@ -105,8 +105,7 @@ def _build_solid_company_entry() -> OfficialKnowledgeEntry:
         title="Profil resmi PT Solid Gold Berjangka",
         category="official_company_profile",
         content=(
-            f"{profile_sentence} Acuan website resmi perusahaan: "
-            f"{OFFICIAL_SOLID_URL}."
+            f"{profile_sentence} Acuan website resmi perusahaan: {OFFICIAL_SOLID_URL}."
         ),
         source_type="official_source_sg",
     )

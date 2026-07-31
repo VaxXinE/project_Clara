@@ -34,4 +34,3 @@ def is_conversation_auto_archived(
     last_activity_at = get_conversation_activity_timestamp(conversation)
     archive_after = timedelta(days=archive_days)
     return (now_utc - last_activity_at) >= archive_after
-

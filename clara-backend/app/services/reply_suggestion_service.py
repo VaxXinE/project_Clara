@@ -62,6 +62,18 @@ from app.services.clara_policy_enforcement_service import (
     normalize_policy_enforcement_mode,
 )
 from app.services.clara_safe_handoff_service import build_safe_handoff
+from app.services.clara_complaint_service import create_or_touch_complaint_case
+from app.services.clara_service_routing_service import (
+    ServiceRoute,
+    ServiceRoutingMode,
+    normalize_service_routing_mode,
+    route_service_message,
+)
+from app.services.clara_support_knowledge_service import (
+    MISSING_SUPPORT_HANDOFF,
+    STATUS_ACCESS_HANDOFF,
+    resolve_support_article,
+)
 from app.services.clara_product_fact_service import (
     ProductFactMode,
     compose_product_fact_prompt,
@@ -4169,7 +4181,8 @@ def call_openai_for_reply_suggestion(
             or latest_customer_intent in {"activation_complete", "trading_ready"},
             account_is_funded=(
                 canonical_process_state is not None
-                and state_rank(canonical_process_state) >= state_rank(ProcessState.FUNDED)
+                and state_rank(canonical_process_state)
+                >= state_rank(ProcessState.FUNDED)
             )
             or latest_customer_intent == "trading_ready",
         ),
@@ -4459,6 +4472,10 @@ def create_reply_suggestion(
     context_started_at = perf_counter()
     include_all_variants = should_include_all_product_variants(conversation)
     latest_customer_message = get_latest_customer_message(conversation)
+    service_routing_mode = normalize_service_routing_mode(
+        settings.clara_service_routing_mode
+    )
+    service_routing_decision = route_service_message(latest_customer_message)
     preliminary_enforcement_decision = decide_enforcement(
         legacy_policy_action=policy_decision.action_mode,
         policy_risk_level=extraction.risk_level,
@@ -4551,6 +4568,10 @@ def create_reply_suggestion(
         enforcement_mode == PolicyEnforcementMode.ENFORCE
         and preliminary_enforcement_decision.generation_strategy
         != GenerationStrategy.NORMAL_GENERATION
+    ) or (
+        service_routing_mode == ServiceRoutingMode.ROUTED
+        and service_routing_decision.route
+        in {ServiceRoute.COMPLAINT, ServiceRoute.CS_GENERAL}
     )
     reply_data = None
     if not skip_normal_generation:
@@ -4661,6 +4682,60 @@ def create_reply_suggestion(
     applied_action_mode = policy_decision.action_mode
     applied_policy_reasons = list(policy_decision.reasons)
 
+    if service_routing_mode == ServiceRoutingMode.ROUTED:
+        applied_policy_reasons.extend(
+            f"service_routing:{reason}"
+            for reason in service_routing_decision.reason_codes
+        )
+        if service_routing_decision.route == ServiceRoute.COMPLAINT:
+            category = service_routing_decision.complaint_category
+            if category is None:
+                raise ReplySuggestionError("Complaint handoff category is missing.")
+            handoff = build_safe_handoff(category)
+            suggested_replies = [
+                {
+                    "tone": "empathetic",
+                    "text": handoff.content,
+                    "reasoning": "Governed complaint handoff.",
+                }
+            ]
+            model_name = "backend-complaint-handoff-v1"
+            applied_action_mode = ActionMode.SAFE_HANDOFF.value
+            create_or_touch_complaint_case(
+                db,
+                conversation=conversation,
+                category=category,
+                handoff=handoff,
+                policy_decision_hash=preliminary_enforcement_decision.decision_hash,
+            )
+        elif service_routing_decision.route == ServiceRoute.CS_GENERAL:
+            article = resolve_support_article(
+                db,
+                topic=service_routing_decision.support_topic.value,
+                organization_id=conversation.organization_id,
+            )
+            content = (
+                STATUS_ACCESS_HANDOFF
+                if service_routing_decision.support_topic.value == "STATUS_REQUEST"
+                else article.content
+                if article
+                else MISSING_SUPPORT_HANDOFF
+            )
+            suggested_replies = [
+                {
+                    "tone": "helpful",
+                    "text": content,
+                    "reasoning": "Governed customer-support response.",
+                }
+            ]
+            model_name = (
+                "backend-support-knowledge-v1"
+                if article
+                else "backend-support-handoff-v1"
+            )
+            if not article:
+                applied_action_mode = ActionMode.SAFE_HANDOFF.value
+
     if enforcement_mode == PolicyEnforcementMode.ENFORCE:
         applied_action_mode = enforcement_decision.action_mode.value
         applied_policy_reasons.extend(
@@ -4751,6 +4826,8 @@ def create_reply_suggestion(
             **enforcement_mode_resolution.debug_metadata(),
             **enforcement_decision.debug_metadata(),
             "applied_action_mode": applied_action_mode,
+            "service_routing_mode": service_routing_mode.value,
+            **service_routing_decision.debug_metadata(),
             "enforcement_applied": (enforcement_mode == PolicyEnforcementMode.ENFORCE),
         },
     )

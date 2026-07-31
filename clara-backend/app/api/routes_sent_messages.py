@@ -21,7 +21,11 @@ from app.services.clara_policy_enforcement_service import (
     CLARA_ENFORCEMENT_CONTRACT_VERSION,
     normalize_policy_enforcement_mode,
 )
-from app.services.access_control_service import AccessDeniedError, get_accessible_reply_suggestion_or_raise, get_accessible_conversation_or_raise
+from app.services.access_control_service import (
+    AccessDeniedError,
+    get_accessible_reply_suggestion_or_raise,
+    get_accessible_conversation_or_raise,
+)
 
 router = APIRouter(tags=["sent-messages"])
 
@@ -36,7 +40,9 @@ def mark_reply_sent_endpoint(
     payload: MarkReplySentRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ):
     try:
         get_accessible_reply_suggestion_or_raise(
@@ -59,9 +65,7 @@ def mark_reply_sent_endpoint(
             current_user=current_user,
             request=request,
             metadata={
-                "enforcement_contract_version": (
-                    CLARA_ENFORCEMENT_CONTRACT_VERSION
-                ),
+                "enforcement_contract_version": (CLARA_ENFORCEMENT_CONTRACT_VERSION),
                 "enforcement_mode": normalize_policy_enforcement_mode(
                     settings.clara_policy_enforcement_mode
                 ).mode.value,
@@ -89,7 +93,9 @@ def mark_reply_sent_endpoint(
 def list_sent_messages_endpoint(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ):
     try:
         get_accessible_conversation_or_raise(

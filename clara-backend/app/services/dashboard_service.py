@@ -152,7 +152,9 @@ GLOBAL_EXTENSION_BUILD_KEY = "global"
 
 
 def _read_extension_distribution_manifest() -> dict[str, dict[str, object]]:
-    manifest_path = Path(settings.extension_distribution_dir).resolve() / "manifest.json"
+    manifest_path = (
+        Path(settings.extension_distribution_dir).resolve() / "manifest.json"
+    )
     if not manifest_path.exists():
         return {}
 
@@ -246,7 +248,7 @@ def parse_uuid_or_none(value: str | None) -> UUID | None:
 
     try:
         return UUID(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
@@ -303,19 +305,21 @@ def _extract_notification_lead_id(notification: OpsNotification) -> UUID | None:
     if notification.source_type == "sales_worklist" and len(parts) >= 2:
         try:
             return UUID(parts[1])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     if notification.source_type == "deal_metrics_sync" and len(parts) >= 2:
         try:
             return UUID(parts[1])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
-    if notification.target_href and notification.target_href.startswith("/dashboard/crm/"):
+    if notification.target_href and notification.target_href.startswith(
+        "/dashboard/crm/"
+    ):
         try:
             return UUID(notification.target_href.rsplit("/", 1)[-1])
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     return None
@@ -385,7 +389,9 @@ def build_ops_notification_item(
         sales_owner_name=(
             lead.assigned_user.name
             if lead is not None and lead.assigned_user
-            else sales_user.name if sales_user is not None else None
+            else sales_user.name
+            if sales_user is not None
+            else None
         ),
         severity=notification.severity,
         title=notification.title,
@@ -451,9 +457,13 @@ def _deduplicate_operational_alert_seeds(
             json.dumps(item, sort_keys=True, default=str),
         )
         current_rank = (
-            _OPERATIONAL_ALERT_SEVERITY_RANK.get(str(current["severity"]), -1),
-            json.dumps(current, sort_keys=True, default=str),
-        ) if current is not None else None
+            (
+                _OPERATIONAL_ALERT_SEVERITY_RANK.get(str(current["severity"]), -1),
+                json.dumps(current, sort_keys=True, default=str),
+            )
+            if current is not None
+            else None
+        )
         if current_rank is None or item_rank > current_rank:
             by_source_key[source_key] = item
 
@@ -468,7 +478,8 @@ def _select_operational_alert_survivor(
         notifications,
         key=lambda notification: (
             -_OPERATIONAL_ALERT_STATUS_PRIORITY.get(notification.status, -1),
-            ensure_aware_utc(notification.created_at) or datetime.min.replace(tzinfo=timezone.utc),
+            ensure_aware_utc(notification.created_at)
+            or datetime.min.replace(tzinfo=timezone.utc),
             str(notification.id),
         ),
     )
@@ -503,7 +514,9 @@ def _build_operational_alert_seed(
         "source_key": f"ops-alert:{alert_type}:{scope_suffix}",
         "source_reference_id": source_reference_id,
         "alert_type": alert_type,
-        "workflow_scope": "head_follow_up" if is_head_like(current_user.role) else "manager_follow_up",
+        "workflow_scope": "head_follow_up"
+        if is_head_like(current_user.role)
+        else "manager_follow_up",
         "owner_role": "manager" if is_head_like(current_user.role) else "sales",
         "target_role": "head" if is_head_like(current_user.role) else "manager",
         "severity": severity,
@@ -549,7 +562,9 @@ def _build_sales_operational_alert_seeds(
                     target_href=detail_href,
                     metadata_json={
                         "needs_reply_count": item.needs_reply_count,
-                        "delta_needs_reply": history.delta_needs_reply if history else 0,
+                        "delta_needs_reply": history.delta_needs_reply
+                        if history
+                        else 0,
                     },
                 )
             )
@@ -574,12 +589,17 @@ def _build_sales_operational_alert_seeds(
                     target_href=detail_href,
                     metadata_json={
                         "overdue_follow_up_count": item.overdue_follow_up_count,
-                        "delta_overdue_follow_up": history.delta_overdue_follow_up if history else 0,
+                        "delta_overdue_follow_up": history.delta_overdue_follow_up
+                        if history
+                        else 0,
                     },
                 )
             )
 
-        if item.crm_discipline_status == "needs_attention" and item.scorecard.crm_hygiene_score <= 55:
+        if (
+            item.crm_discipline_status == "needs_attention"
+            and item.scorecard.crm_hygiene_score <= 55
+        ):
             alerts.append(
                 _build_operational_alert_seed(
                     current_user=current_user,
@@ -680,7 +700,9 @@ def _build_team_operational_alert_seeds(
                     metadata_json={
                         "team_name": item.team_name,
                         "needs_reply_count": item.needs_reply_count,
-                        "delta_needs_reply": history.delta_needs_reply if history else 0,
+                        "delta_needs_reply": history.delta_needs_reply
+                        if history
+                        else 0,
                     },
                 )
             )
@@ -696,7 +718,9 @@ def _build_team_operational_alert_seeds(
                     source_reference_id=item.team_id,
                     sales_user_id=None,
                     team_id=item.team_id,
-                    severity="critical" if item.overdue_follow_up_count >= 4 else "high",
+                    severity="critical"
+                    if item.overdue_follow_up_count >= 4
+                    else "high",
                     title=f"Follow-up overdue menumpuk di {item.team_name}",
                     body=(
                         f"Ada {item.overdue_follow_up_count} follow-up overdue di team {item.team_name}. "
@@ -706,12 +730,17 @@ def _build_team_operational_alert_seeds(
                     metadata_json={
                         "team_name": item.team_name,
                         "overdue_follow_up_count": item.overdue_follow_up_count,
-                        "delta_overdue_follow_up": history.delta_overdue_follow_up if history else 0,
+                        "delta_overdue_follow_up": history.delta_overdue_follow_up
+                        if history
+                        else 0,
                     },
                 )
             )
 
-        if item.crm_discipline_status == "needs_attention" and item.scorecard.crm_hygiene_score <= 55:
+        if (
+            item.crm_discipline_status == "needs_attention"
+            and item.scorecard.crm_hygiene_score <= 55
+        ):
             alerts.append(
                 _build_operational_alert_seed(
                     current_user=current_user,
@@ -777,13 +806,19 @@ def _build_stale_action_alert_seeds(
         PerformanceAction.created_at <= datetime.now(timezone.utc) - timedelta(days=3),
     )
     accessible_team_ids = get_accessible_team_ids(db=db, current_user=current_user)
-    accessible_sales_user_ids = get_accessible_sales_user_ids(db=db, current_user=current_user)
+    accessible_sales_user_ids = get_accessible_sales_user_ids(
+        db=db, current_user=current_user
+    )
 
     if not is_head_like(current_user.role):
         if accessible_team_ids:
-            statement = statement.where(PerformanceAction.team_id.in_(accessible_team_ids))
+            statement = statement.where(
+                PerformanceAction.team_id.in_(accessible_team_ids)
+            )
         elif accessible_sales_user_ids is not None:
-            statement = statement.where(PerformanceAction.sales_user_id.in_(accessible_sales_user_ids))
+            statement = statement.where(
+                PerformanceAction.sales_user_id.in_(accessible_sales_user_ids)
+            )
 
     actions = list(db.scalars(statement).all())
     if not actions:
@@ -797,12 +832,16 @@ def _build_stale_action_alert_seeds(
             if action.team_id is None:
                 continue
             grouped_count[action.team_id] = grouped_count.get(action.team_id, 0) + 1
-        team_lookup = {
-            team.id: team
-            for team in db.scalars(
-                select(SalesTeam).where(SalesTeam.id.in_(set(grouped_count.keys())))
-            ).all()
-        } if grouped_count else {}
+        team_lookup = (
+            {
+                team.id: team
+                for team in db.scalars(
+                    select(SalesTeam).where(SalesTeam.id.in_(set(grouped_count.keys())))
+                ).all()
+            }
+            if grouped_count
+            else {}
+        )
         for team_id, count in grouped_count.items():
             team = team_lookup.get(team_id)
             alerts.append(
@@ -825,13 +864,19 @@ def _build_stale_action_alert_seeds(
         for action in actions:
             if action.sales_user_id is None:
                 continue
-            grouped_count[action.sales_user_id] = grouped_count.get(action.sales_user_id, 0) + 1
-        sales_lookup = {
-            user.id: user
-            for user in db.scalars(
-                select(User).where(User.id.in_(set(grouped_count.keys())))
-            ).all()
-        } if grouped_count else {}
+            grouped_count[action.sales_user_id] = (
+                grouped_count.get(action.sales_user_id, 0) + 1
+            )
+        sales_lookup = (
+            {
+                user.id: user
+                for user in db.scalars(
+                    select(User).where(User.id.in_(set(grouped_count.keys())))
+                ).all()
+            }
+            if grouped_count
+            else {}
+        )
         for sales_user_id, count in grouped_count.items():
             sales_user = sales_lookup.get(sales_user_id)
             alerts.append(
@@ -886,18 +931,14 @@ def sync_operational_alert_notifications(
             sales_user_team_map=sales_user_team_map,
         )
     )
-    desired_notifications = _deduplicate_operational_alert_seeds(
-        desired_notifications
-    )
+    desired_notifications = _deduplicate_operational_alert_seeds(desired_notifications)
 
     existing_statement = select(OpsNotification).where(
         OpsNotification.organization_id == current_user.organization_id,
         OpsNotification.source_type == OPERATIONAL_ALERT_SOURCE_TYPE,
     )
     if is_head_like(current_user.role):
-        existing_statement = existing_statement.where(
-            OpsNotification.user_id.is_(None)
-        )
+        existing_statement = existing_statement.where(OpsNotification.user_id.is_(None))
     else:
         existing_statement = existing_statement.where(
             OpsNotification.user_id == current_user.id
@@ -914,7 +955,9 @@ def sync_operational_alert_notifications(
         survivor = _select_operational_alert_survivor(notifications)
         existing_by_key[source_key] = survivor
         for redundant in notifications:
-            if redundant.id == survivor.id or not _is_open_notification_status(redundant.status):
+            if redundant.id == survivor.id or not _is_open_notification_status(
+                redundant.status
+            ):
                 continue
             redundant.status = "resolved"
             redundant.resolved_at = now
@@ -1292,24 +1335,24 @@ def build_chat_review_item(
     latest_sent_message: SentMessage | None,
     now: datetime,
 ) -> ChatReviewQueueItem | None:
-    current_sent_state = resolve_current_sent_message(latest_message, latest_sent_message)
+    current_sent_state = resolve_current_sent_message(
+        latest_message, latest_sent_message
+    )
     ui_status = determine_ui_status(
         latest_message,
         latest_extraction,
         latest_suggestion,
         current_sent_state,
     )
-    review_bucket, review_label, recommended_action, review_bonus = derive_chat_review_bucket(
-        ui_status=ui_status,
-        latest_extraction=latest_extraction,
-        latest_suggestion=latest_suggestion,
+    review_bucket, review_label, recommended_action, review_bonus = (
+        derive_chat_review_bucket(
+            ui_status=ui_status,
+            latest_extraction=latest_extraction,
+            latest_suggestion=latest_suggestion,
+        )
     )
 
-    if (
-        review_bucket is None
-        or review_label is None
-        or recommended_action is None
-    ):
+    if review_bucket is None or review_label is None or recommended_action is None:
         return None
 
     queue_since_at = get_review_queue_timestamp(
@@ -1334,7 +1377,9 @@ def build_chat_review_item(
         ),
         conversation_title=conversation.title,
         sales_user_id=conversation.sales_user_id,
-        sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
+        sales_owner_name=conversation.sales_user.name
+        if conversation.sales_user
+        else None,
         source_channel=normalize_source_channel(conversation.source),
         source_label=build_source_label(conversation.source),
         account_category=(
@@ -1363,7 +1408,9 @@ def build_chat_review_item(
         latest_sent_message=build_sent_message_summary(latest_sent_message),
         active_review_case_id=active_review_case.id if active_review_case else None,
         active_review_status=active_review_case.status if active_review_case else None,
-        active_review_label=active_review_case.review_label if active_review_case else None,
+        active_review_label=active_review_case.review_label
+        if active_review_case
+        else None,
         active_review_reviewer_name=(
             active_review_case.reviewer_user.name
             if active_review_case and active_review_case.reviewer_user
@@ -1379,7 +1426,9 @@ def get_sales_inbox(
     source_channel: str | None = None,
     archive_scope: str = "active",
 ) -> list[SalesInboxItem]:
-    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
+    if current_user.organization_id is None and not is_superadmin_like(
+        current_user.role
+    ):
         return []
 
     statement = select(Conversation).options(
@@ -1403,7 +1452,9 @@ def get_sales_inbox(
 
     statement = statement.order_by(desc(Conversation.last_message_at))
 
-    normalized_archive_scope = archive_scope if archive_scope in {"active", "archived", "all"} else "active"
+    normalized_archive_scope = (
+        archive_scope if archive_scope in {"active", "archived", "all"} else "active"
+    )
     conversations = []
     for conversation in db.scalars(statement).all():
         if not matches_source_channel(conversation.source, source_channel):
@@ -1469,7 +1520,9 @@ def get_sales_inbox(
                     latest_suggestion,
                 ),
                 sales_user_id=conversation.sales_user_id,
-                sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
+                sales_owner_name=conversation.sales_user.name
+                if conversation.sales_user
+                else None,
                 is_archived=is_conversation_auto_archived(conversation),
             )
         )
@@ -1571,7 +1624,9 @@ def get_sales_conversation_detail(
         sent_messages=[
             {
                 "id": str(sent_message.id),
-                "reply_suggestion_id": str(sent_message.reply_suggestion_id) if sent_message.reply_suggestion_id else None,
+                "reply_suggestion_id": str(sent_message.reply_suggestion_id)
+                if sent_message.reply_suggestion_id
+                else None,
                 "send_mode": sent_message.send_mode,
                 "message_text": sent_message.message_text,
                 "sent_by_name": sent_message.sent_by_name,
@@ -1659,7 +1714,9 @@ def build_sales_worklist_item(
     if lead_has_closed_outcome(lead):
         return None
 
-    current_sent_state = resolve_current_sent_message(latest_message, latest_sent_message)
+    current_sent_state = resolve_current_sent_message(
+        latest_message, latest_sent_message
+    )
     ui_status = determine_ui_status(
         latest_message,
         latest_extraction,
@@ -1709,7 +1766,9 @@ def build_sales_worklist_item(
         task_type = "needs_analysis"
         task_label = "Butuh analisis ulang"
         reason = "Ada balasan customer baru yang belum dibaca ulang oleh AI."
-        recommended_action = "Jalankan AI analysis lagi agar next action dan draft ikut refresh."
+        recommended_action = (
+            "Jalankan AI analysis lagi agar next action dan draft ikut refresh."
+        )
         priority_score += 15
     elif ui_status == "needs_reply_suggestion":
         task_type = "needs_reply_suggestion"
@@ -1718,7 +1777,12 @@ def build_sales_worklist_item(
         recommended_action = "Generate reply suggestion baru dari detail conversation."
         priority_score += 10
 
-    if task_type is None or task_label is None or reason is None or recommended_action is None:
+    if (
+        task_type is None
+        or task_label is None
+        or reason is None
+        or recommended_action is None
+    ):
         return None
 
     return SalesWorklistItem(
@@ -1769,7 +1833,9 @@ def build_sales_worklist_item_from_task(
     else:
         task_type = task.task_type
         task_label = task.title
-        reason = "Task ini sudah dipersist ke sistem dan menunggu eksekusi manual dari tim."
+        reason = (
+            "Task ini sudah dipersist ke sistem dan menunggu eksekusi manual dari tim."
+        )
         priority_bonus = 15
 
     recommended_action = (
@@ -1786,7 +1852,8 @@ def build_sales_worklist_item_from_task(
         assigned_user_name=task.assigned_user.name if task.assigned_user else None,
         current_stage=lead.current_stage,
         lead_temperature=lead.lead_temperature,
-        priority_score=calculate_priority_score(latest_extraction, None) + priority_bonus,
+        priority_score=calculate_priority_score(latest_extraction, None)
+        + priority_bonus,
         task_type=task_type,
         task_status=task.status,
         task_label=task_label,
@@ -1820,7 +1887,9 @@ def build_discipline_worklist_item(
         task_type = "missing_discipline_log"
         task_label = "Discipline log belum diisi"
         reason = "Belum ada catatan aktivitas harian untuk lead ini."
-        recommended_action = "Isi discipline log setelah follow-up atau update status lead hari ini."
+        recommended_action = (
+            "Isi discipline log setelah follow-up atau update status lead hari ini."
+        )
         priority_score = 30
     else:
         task_type = "stale_discipline_log"
@@ -1853,7 +1922,9 @@ def get_sales_worklist(
     db: Session,
     current_user: User,
 ) -> SalesWorklistResponse:
-    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
+    if current_user.organization_id is None and not is_superadmin_like(
+        current_user.role
+    ):
         return SalesWorklistResponse(
             generated_at=datetime.now(timezone.utc),
             overdue_count=0,
@@ -1883,7 +1954,9 @@ def get_sales_worklist(
         selectinload(Lead.conversations).selectinload(Conversation.sent_messages),
     )
     if not is_superadmin_like(current_user.role):
-        statement = statement.where(Lead.organization_id == current_user.organization_id)
+        statement = statement.where(
+            Lead.organization_id == current_user.organization_id
+        )
 
     statement = apply_sales_user_scope_filter(
         statement,
@@ -1916,9 +1989,15 @@ def get_sales_worklist(
         lead_is_closed = lead_has_closed_outcome(lead)
 
         latest_message = get_latest_message(conversation) if conversation else None
-        latest_extraction = get_latest_extraction(conversation) if conversation else None
-        latest_suggestion = get_latest_reply_suggestion(conversation) if conversation else None
-        latest_sent_message = get_latest_sent_message(conversation) if conversation else None
+        latest_extraction = (
+            get_latest_extraction(conversation) if conversation else None
+        )
+        latest_suggestion = (
+            get_latest_reply_suggestion(conversation) if conversation else None
+        )
+        latest_sent_message = (
+            get_latest_sent_message(conversation) if conversation else None
+        )
 
         open_or_snoozed_tasks = sorted(
             [
@@ -1927,7 +2006,8 @@ def get_sales_worklist(
                 if task.status in {"open", "snoozed"}
                 and not (
                     lead_is_closed
-                    and task.task_type in {"manual_follow_up", "scheduled_follow_up", "approval_follow_up"}
+                    and task.task_type
+                    in {"manual_follow_up", "scheduled_follow_up", "approval_follow_up"}
                 )
             ],
             key=lambda task: (ensure_aware_utc(task.due_at) or now, task.created_at),
@@ -2060,7 +2140,8 @@ def get_sales_worklist(
         stale_discipline_log_count=stale_discipline_log_count,
         completion_rate_today=(
             round(
-                (completed_today_count / (completed_today_count + open_task_count)) * 100,
+                (completed_today_count / (completed_today_count + open_task_count))
+                * 100,
                 1,
             )
             if (completed_today_count + open_task_count) > 0
@@ -2277,7 +2358,9 @@ def _build_operational_scorecard(
     if hot_leads_count <= 0:
         hot_lead_handling_score = 85
     else:
-        hot_lead_penalty = min(hot_leads_count, needs_reply_count + overdue_follow_up_count) * 18
+        hot_lead_penalty = (
+            min(hot_leads_count, needs_reply_count + overdue_follow_up_count) * 18
+        )
         if needs_analysis_count > 0:
             hot_lead_penalty += 10
         hot_lead_handling_score = _clamp_score(100 - hot_lead_penalty)
@@ -2308,7 +2391,9 @@ def _build_operational_scorecard(
     overall_score = round(sum(current_scores) / len(current_scores))
 
     previous_response_penalty = min(previous_needs_reply_count, 4) * 18
-    previous_follow_score = _clamp_score(100 - min(previous_overdue_follow_up_count, 3) * 28)
+    previous_follow_score = _clamp_score(
+        100 - min(previous_overdue_follow_up_count, 3) * 28
+    )
     if previous_hot_leads_count <= 0:
         previous_hot_score = 85
     else:
@@ -2359,7 +2444,9 @@ def _build_operational_scorecard(
             if needs_reply_count > previous_needs_reply_count
             else "Belum semua conversation yang siap dibalas diproses dengan cepat."
         )
-        recommended_action = "Rapikan conversation yang perlu balas dulu sebelum buka lead baru."
+        recommended_action = (
+            "Rapikan conversation yang perlu balas dulu sebelum buka lead baru."
+        )
     elif lowest_component_key == "follow_up":
         primary_reason = "Score turun karena follow-up overdue masih menumpuk."
         secondary_reason = (
@@ -2367,13 +2454,17 @@ def _build_operational_scorecard(
             if overdue_follow_up_count > previous_overdue_follow_up_count
             else "Jadwal follow-up belum kembali ke jalur aman."
         )
-        recommended_action = "Selesaikan follow-up overdue paling lama dan isi next action yang tegas."
+        recommended_action = (
+            "Selesaikan follow-up overdue paling lama dan isi next action yang tegas."
+        )
     elif lowest_component_key == "hot_lead":
         primary_reason = "Score turun karena hot lead belum tertangani cukup cepat."
         secondary_reason = (
             "Masih ada hot lead yang ikut tertahan oleh backlog atau analysis."
         )
-        recommended_action = "Prioritaskan hot lead yang belum dibalas atau belum dianalisis."
+        recommended_action = (
+            "Prioritaskan hot lead yang belum dibalas atau belum dianalisis."
+        )
     elif lowest_component_key == "crm":
         primary_reason = "Score turun karena disiplin CRM masih longgar."
         secondary_reason = (
@@ -2382,15 +2473,15 @@ def _build_operational_scorecard(
         recommended_action = "Rapikan log CRM dan pastikan setiap lead punya langkah follow-up berikutnya."
     else:
         primary_reason = "Score tertahan karena movement pipeline belum cukup sehat."
-        secondary_reason = (
-            "Pipeline belum banyak bergerak ke deal menang walau ritme operasional sudah lumayan."
-        )
+        secondary_reason = "Pipeline belum banyak bergerak ke deal menang walau ritme operasional sudah lumayan."
         recommended_action = "Dorong lead aktif yang paling dekat closing dan pastikan next step-nya jelas."
 
     if overall_score >= 85:
         primary_reason = "Score tinggi karena backlog rendah, follow-up rapi, dan pipeline tetap bergerak."
         secondary_reason = "Kondisi operasional stabil dan mudah dipertahankan bila ritme saat ini dijaga."
-        recommended_action = "Pertahankan ritme ini dan monitor hanya pada hot lead yang baru masuk."
+        recommended_action = (
+            "Pertahankan ritme ini dan monitor hanya pada hot lead yang baru masuk."
+        )
 
     score_delta_vs_previous = overall_score - previous_overall_score
 
@@ -2449,7 +2540,9 @@ def _build_sales_coaching_signal(
             priority_label=(
                 "urgent"
                 if priority_score >= 70
-                else "high" if priority_score >= 40 else "normal"
+                else "high"
+                if priority_score >= 40
+                else "normal"
             ),
             primary_reason=(
                 "Follow-up overdue masih menumpuk"
@@ -2468,7 +2561,9 @@ def _build_sales_coaching_signal(
             priority_label=(
                 "urgent"
                 if priority_score >= 70
-                else "high" if priority_score >= 40 else "normal"
+                else "high"
+                if priority_score >= 40
+                else "normal"
             ),
             primary_reason="Conversation yang perlu dibalas masih menumpuk.",
             recommended_action=(
@@ -2539,7 +2634,10 @@ def _collect_sales_performance_metrics(
         in_range = (
             True
             if start is None or end is None
-            else any(_is_between(candidate, start=start, end=end) for candidate in lead_timestamps)
+            else any(
+                _is_between(candidate, start=start, end=end)
+                for candidate in lead_timestamps
+            )
         )
         if not in_range:
             continue
@@ -2599,7 +2697,10 @@ def _collect_sales_performance_metrics(
         in_range = (
             True
             if start is None or end is None
-            else any(_is_between(candidate, start=start, end=end) for candidate in activity_timestamps)
+            else any(
+                _is_between(candidate, start=start, end=end)
+                for candidate in activity_timestamps
+            )
         )
         if not in_range:
             continue
@@ -2630,7 +2731,11 @@ def _collect_sales_performance_metrics(
                 )
         if ui_status == "needs_analysis":
             needs_analysis_count += 1
-        if ui_status in {"needs_reply_suggestion", "needs_approval", "needs_escalation"}:
+        if ui_status in {
+            "needs_reply_suggestion",
+            "needs_approval",
+            "needs_escalation",
+        }:
             needs_reply_count += 1
 
         latest_activity_candidates.extend(activity_timestamps)
@@ -2771,7 +2876,9 @@ def _build_sales_performance_summary_item(
         needs_reply_count=int(current_metrics["needs_reply_count"]),
         overdue_follow_up_count=int(current_metrics["overdue_follow_up_count"]),
         hot_leads_count=int(current_metrics["hot_leads_count"]),
-        analyzed_conversations_count=int(current_metrics["analyzed_conversations_count"]),
+        analyzed_conversations_count=int(
+            current_metrics["analyzed_conversations_count"]
+        ),
         needs_analysis_count=int(current_metrics["needs_analysis_count"]),
         won_deals_count=int(current_metrics["won_deals_count"]),
         lost_deals_count=int(current_metrics["lost_deals_count"]),
@@ -2813,7 +2920,11 @@ def _build_team_performance_item(
     total_analyzed = sum(item.analyzed_conversations_count for item in sales_items)
     total_won_deals = sum(item.won_deals_count for item in sales_items)
     latest_activity_at = max(
-        (item.latest_activity_at for item in sales_items if item.latest_activity_at is not None),
+        (
+            item.latest_activity_at
+            for item in sales_items
+            if item.latest_activity_at is not None
+        ),
         default=None,
     )
     avg_response_sla_status = _merge_sales_performance_status(
@@ -2913,7 +3024,9 @@ def _build_team_performance_item(
         team_name=team.name if team else "Tanpa team",
         unit_id=team.unit_id if team else None,
         unit_name=team.unit.name if team and team.unit else None,
-        manager_user_name=team.manager_user.name if team and team.manager_user else None,
+        manager_user_name=team.manager_user.name
+        if team and team.manager_user
+        else None,
         member_count=len(sales_items),
         active_leads_count=total_active_leads,
         needs_reply_count=total_needs_reply,
@@ -2980,9 +3093,7 @@ def _build_historical_summary_from_metrics(
     latest_overdue = int(latest_metrics.get("overdue_follow_up_count", 0))
     latest_won = int(latest_metrics.get("won_deals_count", 0))
     latest_analyzed = int(latest_metrics.get("analyzed_conversations_count", 0))
-    latest_discipline = str(
-        latest_metrics.get("crm_discipline_status", "disciplined")
-    )
+    latest_discipline = str(latest_metrics.get("crm_discipline_status", "disciplined"))
 
     previous_needs_reply = int((previous_metrics or {}).get("needs_reply_count", 0))
     previous_overdue = int((previous_metrics or {}).get("overdue_follow_up_count", 0))
@@ -3075,7 +3186,9 @@ def _build_scorecard_from_weekly_history(
         avg_response_sla_status=latest.avg_response_sla_status,
         previous_won_deals_count=previous.won_deals_count if previous else 0,
         previous_needs_reply_count=previous.needs_reply_count if previous else 0,
-        previous_overdue_follow_up_count=previous.overdue_follow_up_count if previous else 0,
+        previous_overdue_follow_up_count=previous.overdue_follow_up_count
+        if previous
+        else 0,
         previous_hot_leads_count=previous.hot_leads_count if previous else 0,
         previous_analyzed_conversations_count=(
             previous.analyzed_conversations_count if previous else 0
@@ -3083,7 +3196,9 @@ def _build_scorecard_from_weekly_history(
         previous_open_deals_count=(
             previous.open_deals_count
             if previous and previous.open_deals_count is not None
-            else previous.active_leads_count if previous else 0
+            else previous.active_leads_count
+            if previous
+            else 0
         ),
         previous_crm_discipline_status=(
             previous.crm_discipline_status if previous else latest.crm_discipline_status
@@ -3097,7 +3212,9 @@ def _load_sales_snapshot_history_map(
     organization_id: UUID,
     sales_user_ids: set[UUID],
     weeks: int,
-) -> dict[UUID, tuple[list[WeeklyPerformanceSnapshotItem], HistoricalPerformanceSummary]]:
+) -> dict[
+    UUID, tuple[list[WeeklyPerformanceSnapshotItem], HistoricalPerformanceSummary]
+]:
     if not sales_user_ids:
         return {}
 
@@ -3128,7 +3245,9 @@ def _load_sales_snapshot_history_map(
         tuple[list[WeeklyPerformanceSnapshotItem], HistoricalPerformanceSummary],
     ] = {}
     for sales_user_id, snapshots in grouped_rows.items():
-        weekly_history = [_sales_snapshot_to_weekly_item(snapshot) for snapshot in snapshots]
+        weekly_history = [
+            _sales_snapshot_to_weekly_item(snapshot) for snapshot in snapshots
+        ]
         latest = snapshots[-1] if snapshots else None
         previous = snapshots[-2] if len(snapshots) > 1 else None
         history_map[sales_user_id] = (
@@ -3156,7 +3275,9 @@ def _load_sales_snapshot_history_map(
                     if previous is not None
                     else None
                 ),
-                latest_snapshot_date=latest.snapshot_date if latest is not None else None,
+                latest_snapshot_date=latest.snapshot_date
+                if latest is not None
+                else None,
                 previous_snapshot_date=(
                     previous.snapshot_date if previous is not None else None
                 ),
@@ -3172,7 +3293,9 @@ def _load_team_snapshot_history_map(
     organization_id: UUID,
     team_ids: set[UUID],
     weeks: int,
-) -> dict[UUID, tuple[list[WeeklyPerformanceSnapshotItem], HistoricalPerformanceSummary]]:
+) -> dict[
+    UUID, tuple[list[WeeklyPerformanceSnapshotItem], HistoricalPerformanceSummary]
+]:
     if not team_ids:
         return {}
 
@@ -3203,7 +3326,9 @@ def _load_team_snapshot_history_map(
         tuple[list[WeeklyPerformanceSnapshotItem], HistoricalPerformanceSummary],
     ] = {}
     for team_id, snapshots in grouped_rows.items():
-        weekly_history = [_team_snapshot_to_weekly_item(snapshot) for snapshot in snapshots]
+        weekly_history = [
+            _team_snapshot_to_weekly_item(snapshot) for snapshot in snapshots
+        ]
         latest = snapshots[-1] if snapshots else None
         previous = snapshots[-2] if len(snapshots) > 1 else None
         history_map[team_id] = (
@@ -3231,7 +3356,9 @@ def _load_team_snapshot_history_map(
                     if previous is not None
                     else None
                 ),
-                latest_snapshot_date=latest.snapshot_date if latest is not None else None,
+                latest_snapshot_date=latest.snapshot_date
+                if latest is not None
+                else None,
                 previous_snapshot_date=(
                     previous.snapshot_date if previous is not None else None
                 ),
@@ -3377,37 +3504,33 @@ def ensure_weekly_performance_snapshots(
             trend = SalesPerformanceTrend(
                 range_label="weekly",
                 previous_range_label="prev_weekly",
-                delta_active_leads=int(current_metrics["active_leads_count"]) - int(
-                    previous_metrics["active_leads_count"]
-                ),
-                delta_needs_reply=int(current_metrics["needs_reply_count"]) - int(
-                    previous_metrics["needs_reply_count"]
-                ),
-                delta_overdue_follow_up=int(
-                    current_metrics["overdue_follow_up_count"]
-                ) - int(previous_metrics["overdue_follow_up_count"]),
-                delta_hot_leads=int(current_metrics["hot_leads_count"]) - int(
-                    previous_metrics["hot_leads_count"]
-                ),
+                delta_active_leads=int(current_metrics["active_leads_count"])
+                - int(previous_metrics["active_leads_count"]),
+                delta_needs_reply=int(current_metrics["needs_reply_count"])
+                - int(previous_metrics["needs_reply_count"]),
+                delta_overdue_follow_up=int(current_metrics["overdue_follow_up_count"])
+                - int(previous_metrics["overdue_follow_up_count"]),
+                delta_hot_leads=int(current_metrics["hot_leads_count"])
+                - int(previous_metrics["hot_leads_count"]),
                 delta_analyzed_conversations=int(
                     current_metrics["analyzed_conversations_count"]
-                ) - int(previous_metrics["analyzed_conversations_count"]),
-                delta_won_deals=int(current_metrics["won_deals_count"]) - int(
-                    previous_metrics["won_deals_count"]
-                ),
+                )
+                - int(previous_metrics["analyzed_conversations_count"]),
+                delta_won_deals=int(current_metrics["won_deals_count"])
+                - int(previous_metrics["won_deals_count"]),
                 momentum_label=_resolve_sales_performance_momentum(
                     delta_overdue_follow_up=int(
                         current_metrics["overdue_follow_up_count"]
-                    ) - int(previous_metrics["overdue_follow_up_count"]),
-                    delta_needs_reply=int(current_metrics["needs_reply_count"]) - int(
-                        previous_metrics["needs_reply_count"]
-                    ),
-                    delta_won_deals=int(current_metrics["won_deals_count"]) - int(
-                        previous_metrics["won_deals_count"]
-                    ),
+                    )
+                    - int(previous_metrics["overdue_follow_up_count"]),
+                    delta_needs_reply=int(current_metrics["needs_reply_count"])
+                    - int(previous_metrics["needs_reply_count"]),
+                    delta_won_deals=int(current_metrics["won_deals_count"])
+                    - int(previous_metrics["won_deals_count"]),
                     delta_analyzed_conversations=int(
                         current_metrics["analyzed_conversations_count"]
-                    ) - int(previous_metrics["analyzed_conversations_count"]),
+                    )
+                    - int(previous_metrics["analyzed_conversations_count"]),
                     current_discipline_status=str(
                         current_metrics["crm_discipline_status"]
                     ),
@@ -3419,9 +3542,7 @@ def ensure_weekly_performance_snapshots(
             coaching_signal = _build_sales_coaching_signal(
                 active_leads_count=int(current_metrics["active_leads_count"]),
                 needs_reply_count=int(current_metrics["needs_reply_count"]),
-                overdue_follow_up_count=int(
-                    current_metrics["overdue_follow_up_count"]
-                ),
+                overdue_follow_up_count=int(current_metrics["overdue_follow_up_count"]),
                 hot_leads_count=int(current_metrics["hot_leads_count"]),
                 needs_analysis_count=int(current_metrics["needs_analysis_count"]),
                 crm_discipline_status=str(current_metrics["crm_discipline_status"]),
@@ -3446,7 +3567,9 @@ def ensure_weekly_performance_snapshots(
 
             snapshot.team_id = sales_user.team_id
             snapshot.unit_id = (
-                sales_user.sales_team.unit_id if sales_user.sales_team is not None else None
+                sales_user.sales_team.unit_id
+                if sales_user.sales_team is not None
+                else None
             )
             snapshot.active_leads_count = int(current_metrics["active_leads_count"])
             snapshot.needs_reply_count = int(current_metrics["needs_reply_count"])
@@ -3464,7 +3587,9 @@ def ensure_weekly_performance_snapshots(
             snapshot.avg_response_sla_status = str(
                 current_metrics["avg_response_sla_status"]
             )
-            snapshot.crm_discipline_status = str(current_metrics["crm_discipline_status"])
+            snapshot.crm_discipline_status = str(
+                current_metrics["crm_discipline_status"]
+            )
             snapshot.coaching_priority_score = coaching_signal.priority_score
             snapshot.coaching_priority_label = coaching_signal.priority_label
             sales_snapshot_count += 1
@@ -3674,7 +3799,9 @@ def ensure_weekly_performance_snapshots(
             snapshot.member_count = current_metrics["member_count"]
             snapshot.active_leads_count = current_metrics["active_leads_count"]
             snapshot.needs_reply_count = current_metrics["needs_reply_count"]
-            snapshot.overdue_follow_up_count = current_metrics["overdue_follow_up_count"]
+            snapshot.overdue_follow_up_count = current_metrics[
+                "overdue_follow_up_count"
+            ]
             snapshot.hot_leads_count = current_metrics["hot_leads_count"]
             snapshot.analyzed_conversations_count = current_metrics[
                 "analyzed_conversations_count"
@@ -3684,7 +3811,9 @@ def ensure_weekly_performance_snapshots(
             snapshot.avg_response_sla_status = str(
                 current_metrics["avg_response_sla_status"]
             )
-            snapshot.crm_discipline_status = str(current_metrics["crm_discipline_status"])
+            snapshot.crm_discipline_status = str(
+                current_metrics["crm_discipline_status"]
+            )
             snapshot.coaching_priority_score = coaching_signal.priority_score
             snapshot.coaching_priority_label = coaching_signal.priority_label
             team_snapshot_count += 1
@@ -3740,7 +3869,9 @@ def _build_manager_historical_summary(
         if len(weekly_history) > 1:
             previous = weekly_history[-2]
             previous_totals["needs_reply_count"] += previous.needs_reply_count
-            previous_totals["overdue_follow_up_count"] += previous.overdue_follow_up_count
+            previous_totals["overdue_follow_up_count"] += (
+                previous.overdue_follow_up_count
+            )
             previous_totals["won_deals_count"] += previous.won_deals_count
             previous_totals["analyzed_conversations_count"] += (
                 previous.analyzed_conversations_count
@@ -3867,28 +3998,46 @@ def _build_weekly_review_summary(
     review_start, review_end = _build_weekly_review_period(now)
     action_payload = list_performance_actions(db=db, current_user=current_user)
     unresolved_actions = [
-        item
-        for item in action_payload.items
-        if item.status in {"open", "in_progress"}
+        item for item in action_payload.items if item.status in {"open", "in_progress"}
     ]
     critical_alert_rows = _list_open_critical_alerts(db=db, current_user=current_user)
 
-    team_lookup = {
-        team.id: team
-        for team in db.scalars(
-            select(SalesTeam).where(
-                SalesTeam.id.in_({item.team_id for item in team_items if item.team_id is not None})
-            )
-        ).all()
-    } if team_items else {}
-    sales_lookup = {
-        user.id: user
-        for user in db.scalars(
-            select(User).where(
-                User.id.in_({item.sales_user_id for item in sales_items if item.sales_user_id is not None})
-            )
-        ).all()
-    } if sales_items else {}
+    team_lookup = (
+        {
+            team.id: team
+            for team in db.scalars(
+                select(SalesTeam).where(
+                    SalesTeam.id.in_(
+                        {
+                            item.team_id
+                            for item in team_items
+                            if item.team_id is not None
+                        }
+                    )
+                )
+            ).all()
+        }
+        if team_items
+        else {}
+    )
+    sales_lookup = (
+        {
+            user.id: user
+            for user in db.scalars(
+                select(User).where(
+                    User.id.in_(
+                        {
+                            item.sales_user_id
+                            for item in sales_items
+                            if item.sales_user_id is not None
+                        }
+                    )
+                )
+            ).all()
+        }
+        if sales_items
+        else {}
+    )
 
     action_count_by_sales: dict[UUID, int] = {}
     action_count_by_team: dict[UUID, int] = {}
@@ -3898,7 +4047,9 @@ def _build_weekly_review_summary(
                 action_count_by_sales.get(item.sales_user_id, 0) + 1
             )
         if item.team_id is not None:
-            action_count_by_team[item.team_id] = action_count_by_team.get(item.team_id, 0) + 1
+            action_count_by_team[item.team_id] = (
+                action_count_by_team.get(item.team_id, 0) + 1
+            )
 
     critical_count_by_sales: dict[UUID, int] = {}
     critical_count_by_team: dict[UUID, int] = {}
@@ -3909,7 +4060,9 @@ def _build_weekly_review_summary(
                 critical_count_by_sales.get(alert.sales_user_id, 0) + 1
             )
         if alert.team_id is not None:
-            critical_count_by_team[alert.team_id] = critical_count_by_team.get(alert.team_id, 0) + 1
+            critical_count_by_team[alert.team_id] = (
+                critical_count_by_team.get(alert.team_id, 0) + 1
+            )
         critical_alert_items.append(
             WeeklyReviewAlertItem(
                 notification_id=alert.id,
@@ -3918,8 +4071,12 @@ def _build_weekly_review_summary(
                 description=alert.body,
                 severity=alert.severity,
                 status=alert.status,
-                team_name=team_lookup.get(alert.team_id).name if alert.team_id in team_lookup else None,
-                sales_name=sales_lookup.get(alert.sales_user_id).name if alert.sales_user_id in sales_lookup else None,
+                team_name=team_lookup.get(alert.team_id).name
+                if alert.team_id in team_lookup
+                else None,
+                sales_name=sales_lookup.get(alert.sales_user_id).name
+                if alert.sales_user_id in sales_lookup
+                else None,
                 target_href=alert.target_href,
                 triggered_at=alert.triggered_at,
             )
@@ -3967,9 +4124,13 @@ def _build_weekly_review_summary(
     top_improvers = [
         _build_weekly_review_entity(
             scope_type="team" if is_head_like(current_user.role) else "sales",
-            label=item.team_name if is_head_like(current_user.role) else item.sales_name,
+            label=item.team_name
+            if is_head_like(current_user.role)
+            else item.sales_name,
             team_name=item.team_name if is_head_like(current_user.role) else None,
-            sales_user_id=None if is_head_like(current_user.role) else item.sales_user_id,
+            sales_user_id=None
+            if is_head_like(current_user.role)
+            else item.sales_user_id,
             team_id=item.team_id if is_head_like(current_user.role) else None,
             score=item.scorecard.overall_score,
             score_label=item.scorecard.score_label,
@@ -3996,9 +4157,13 @@ def _build_weekly_review_summary(
     biggest_risks = [
         _build_weekly_review_entity(
             scope_type="team" if is_head_like(current_user.role) else "sales",
-            label=item.team_name if is_head_like(current_user.role) else item.sales_name,
+            label=item.team_name
+            if is_head_like(current_user.role)
+            else item.sales_name,
             team_name=item.team_name if is_head_like(current_user.role) else None,
-            sales_user_id=None if is_head_like(current_user.role) else item.sales_user_id,
+            sales_user_id=None
+            if is_head_like(current_user.role)
+            else item.sales_user_id,
             team_id=item.team_id if is_head_like(current_user.role) else None,
             score=item.scorecard.overall_score,
             score_label=item.scorecard.score_label,
@@ -4055,7 +4220,8 @@ def _build_weekly_review_summary(
     ]
 
     healthy_team_count = sum(
-        item.scorecard.score_label in {"good", "excellent"} and item.crm_discipline_status == "disciplined"
+        item.scorecard.score_label in {"good", "excellent"}
+        and item.crm_discipline_status == "disciplined"
         for item in team_items
     )
     teams_needing_attention_count = max(len(team_items) - healthy_team_count, 0)
@@ -4131,7 +4297,9 @@ def get_manager_insights(
     now = datetime.now(timezone.utc)
     normalized_range_label, _ = _normalize_sales_performance_range(range_label)
 
-    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
+    if current_user.organization_id is None and not is_superadmin_like(
+        current_user.role
+    ):
         review_start, review_end = _build_weekly_review_period(now)
         return ManagerInsightsResponse(
             generated_at=now,
@@ -4204,7 +4372,9 @@ def get_manager_insights(
         selectinload(Lead.deal),
     )
     if not is_superadmin_like(current_user.role):
-        lead_statement = lead_statement.where(Lead.organization_id == current_user.organization_id)
+        lead_statement = lead_statement.where(
+            Lead.organization_id == current_user.organization_id
+        )
     lead_statement = apply_sales_user_scope_filter(
         lead_statement,
         db=db,
@@ -4245,7 +4415,9 @@ def get_manager_insights(
         for conversation in db.scalars(conversation_statement).all()
         if conversation.lead_id is None or conversation.lead_id in allowed_lead_ids
     ]
-    conversation_by_id = {conversation.id: conversation for conversation in conversations}
+    conversation_by_id = {
+        conversation.id: conversation for conversation in conversations
+    }
 
     team_statement = select(SalesTeam).options(
         selectinload(SalesTeam.unit),
@@ -4253,7 +4425,9 @@ def get_manager_insights(
         selectinload(SalesTeam.members),
     )
     if not is_superadmin_like(current_user.role):
-        team_statement = team_statement.where(SalesTeam.organization_id == current_user.organization_id)
+        team_statement = team_statement.where(
+            SalesTeam.organization_id == current_user.organization_id
+        )
     teams = list(db.scalars(team_statement).all())
 
     if accessible_user_ids is not None:
@@ -4270,7 +4444,9 @@ def get_manager_insights(
             User.organization_id == current_user.organization_id
         )
     if accessible_user_ids is not None:
-        sales_user_statement = sales_user_statement.where(User.id.in_(accessible_user_ids))
+        sales_user_statement = sales_user_statement.where(
+            User.id.in_(accessible_user_ids)
+        )
     sales_users = [
         user
         for user in db.scalars(sales_user_statement).all()
@@ -4293,7 +4469,9 @@ def get_manager_insights(
     for conversation in conversations:
         if conversation.sales_user_id is None:
             continue
-        conversation_user_map.setdefault(conversation.sales_user_id, []).append(conversation)
+        conversation_user_map.setdefault(conversation.sales_user_id, []).append(
+            conversation
+        )
 
     open_review_cases: list[ChatReviewCase] = []
     pending_proposals = 0
@@ -4379,7 +4557,8 @@ def get_manager_insights(
                     [
                         member
                         for member in team.members
-                        if accessible_user_ids is None or member.id in accessible_user_ids
+                        if accessible_user_ids is None
+                        or member.id in accessible_user_ids
                     ]
                 ),
                 members=[
@@ -4396,7 +4575,10 @@ def get_manager_insights(
                             if accessible_user_ids is None
                             or member.id in accessible_user_ids
                         ],
-                        key=lambda member: (member.role != "manager", member.name.lower()),
+                        key=lambda member: (
+                            member.role != "manager",
+                            member.name.lower(),
+                        ),
                     )
                 ],
                 lead_count=lead_count,
@@ -4457,7 +4639,9 @@ def get_manager_insights(
 
     team_rows.sort(
         key=lambda row: (
-            row.missing_or_stale_logs + row.overdue_follow_ups + row.open_coaching_cases,
+            row.missing_or_stale_logs
+            + row.overdue_follow_ups
+            + row.open_coaching_cases,
             row.lead_count,
         ),
         reverse=True,
@@ -4476,7 +4660,9 @@ def get_manager_insights(
         if conversation is None:
             continue
         latest_extraction = get_latest_extraction(conversation)
-        lead_name = conversation.lead.display_name if conversation.lead else conversation.title
+        lead_name = (
+            conversation.lead.display_name if conversation.lead else conversation.title
+        )
         coaching_priority.append(
             ManagerCoachingPriorityItem(
                 review_case_id=review_case.id,
@@ -4484,8 +4670,12 @@ def get_manager_insights(
                 lead_id=conversation.lead_id,
                 lead_name=lead_name,
                 conversation_title=conversation.title,
-                sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
-                reviewer_user_name=review_case.reviewer_user.name if review_case.reviewer_user else None,
+                sales_owner_name=conversation.sales_user.name
+                if conversation.sales_user
+                else None,
+                reviewer_user_name=review_case.reviewer_user.name
+                if review_case.reviewer_user
+                else None,
                 review_status=review_case.status,
                 review_label=review_case.review_label,
                 risk_level=latest_extraction.risk_level if latest_extraction else None,
@@ -4540,7 +4730,9 @@ def get_manager_insights(
         for item in sales_performance[:3]
     ]
     team_map = {team.id: team for team in teams}
-    sales_user_team_map = {sales_user.id: sales_user.team_id for sales_user in sales_users}
+    sales_user_team_map = {
+        sales_user.id: sales_user.team_id for sales_user in sales_users
+    }
     team_performance_groups: dict[UUID | None, list[ManagerSalesPerformanceItem]] = {}
     for item in sales_performance:
         team_performance_groups.setdefault(
@@ -4601,7 +4793,9 @@ def get_manager_insights(
         team_history_map = _load_team_snapshot_history_map(
             db=db,
             organization_id=current_user.organization_id,
-            team_ids={item.team_id for item in team_performance if item.team_id is not None},
+            team_ids={
+                item.team_id for item in team_performance if item.team_id is not None
+            },
             weeks=4,
         )
         for item in team_performance:
@@ -4650,7 +4844,9 @@ def get_manager_insights(
     )
 
     visible_member_count = (
-        len(accessible_user_ids) if accessible_user_ids is not None else sum(len(team.members) for team in teams)
+        len(accessible_user_ids)
+        if accessible_user_ids is not None
+        else sum(len(team.members) for team in teams)
     )
 
     return ManagerInsightsResponse(
@@ -4679,7 +4875,9 @@ def get_manager_insights(
         weekly_review=weekly_review,
         sales_performance_summary=ManagerSalesPerformanceSummary(
             sales_count=len(sales_performance),
-            total_active_leads=sum(item.active_leads_count for item in sales_performance),
+            total_active_leads=sum(
+                item.active_leads_count for item in sales_performance
+            ),
             total_needs_reply=sum(item.needs_reply_count for item in sales_performance),
             total_overdue_follow_up=sum(
                 item.overdue_follow_up_count for item in sales_performance
@@ -4801,17 +4999,19 @@ def get_sales_performance_detail(
                 discipline_status=_resolve_sales_performance_discipline_status(
                     stale_log_count=(
                         0
-                        if (
-                            latest_log := get_latest_discipline_log_for_lead(lead)
-                        ) is not None
+                        if (latest_log := get_latest_discipline_log_for_lead(lead))
+                        is not None
                         and latest_log.log_date == now.date()
                         else 1
                     ),
                     overdue_follow_up_count=(
                         1
                         if (
-                            next_follow_up_at := ensure_aware_utc(lead.next_follow_up_at)
-                        ) is not None
+                            next_follow_up_at := ensure_aware_utc(
+                                lead.next_follow_up_at
+                            )
+                        )
+                        is not None
                         and next_follow_up_at <= now
                         else 0
                     ),
@@ -4861,16 +5061,22 @@ def get_sales_performance_detail(
         risk_level = (
             latest_extraction.risk_level
             if latest_extraction is not None
-            else (latest_suggestion.risk_level if latest_suggestion is not None else None)
+            else (
+                latest_suggestion.risk_level if latest_suggestion is not None else None
+            )
         )
 
-        if ui_status not in {
-            "needs_analysis",
-            "needs_reply_suggestion",
-            "needs_approval",
-            "needs_escalation",
-            "approved_ready_to_send",
-        } and risk_level != "high":
+        if (
+            ui_status
+            not in {
+                "needs_analysis",
+                "needs_reply_suggestion",
+                "needs_approval",
+                "needs_escalation",
+                "approved_ready_to_send",
+            }
+            and risk_level != "high"
+        ):
             continue
 
         conversation_items.append(
@@ -4913,7 +5119,11 @@ def get_sales_performance_detail(
         )
         next_follow_up_at = ensure_aware_utc(lead.next_follow_up_at)
         top_task = overdue_tasks[0] if overdue_tasks else None
-        due_at = ensure_aware_utc(top_task.due_at) if top_task is not None else next_follow_up_at
+        due_at = (
+            ensure_aware_utc(top_task.due_at)
+            if top_task is not None
+            else next_follow_up_at
+        )
 
         if due_at is None or due_at > now:
             continue
@@ -4927,7 +5137,9 @@ def get_sales_performance_detail(
         follow_up_items_by_lead[lead.id] = SalesPerformanceFollowUpItem(
             lead_id=lead.id,
             lead_name=lead.display_name,
-            task_type=top_task.task_type if top_task is not None else "overdue_follow_up",
+            task_type=top_task.task_type
+            if top_task is not None
+            else "overdue_follow_up",
             due_at=due_at,
             priority_label=priority_label,
             target_href=f"/dashboard/crm/{lead.id}",
@@ -4990,7 +5202,11 @@ def get_sales_performance_detail(
             trend=summary_item.trend,
             scorecard=(
                 historical_scorecard
-                if (historical_scorecard := _build_scorecard_from_weekly_history(weekly_history))
+                if (
+                    historical_scorecard := _build_scorecard_from_weekly_history(
+                        weekly_history
+                    )
+                )
                 is not None
                 else summary_item.scorecard
             ),
@@ -5147,7 +5363,9 @@ def get_sales_approval_queue(
 ) -> SalesApprovalQueueResponse:
     now = datetime.now(timezone.utc)
 
-    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
+    if current_user.organization_id is None and not is_superadmin_like(
+        current_user.role
+    ):
         return SalesApprovalQueueResponse(
             generated_at=now,
             pending_count=0,
@@ -5163,8 +5381,12 @@ def get_sales_approval_queue(
         selectinload(Conversation.reply_suggestions),
     )
     if not is_superadmin_like(current_user.role):
-        statement = statement.where(Conversation.organization_id == current_user.organization_id)
-    statement = statement.order_by(desc(Conversation.last_message_at), desc(Conversation.created_at))
+        statement = statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
+    statement = statement.order_by(
+        desc(Conversation.last_message_at), desc(Conversation.created_at)
+    )
 
     statement = apply_sales_user_scope_filter(
         statement,
@@ -5201,7 +5423,10 @@ def get_sales_approval_queue(
             continue
         if action_mode and latest_suggestion.action_mode != action_mode:
             continue
-        if age_bucket and get_age_bucket(latest_suggestion.created_at, now) != age_bucket:
+        if (
+            age_bucket
+            and get_age_bucket(latest_suggestion.created_at, now) != age_bucket
+        ):
             continue
 
         items.append(
@@ -5260,7 +5485,9 @@ def get_sales_chat_review_center(
 ) -> ChatReviewCenterResponse:
     now = datetime.now(timezone.utc)
 
-    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
+    if current_user.organization_id is None and not is_superadmin_like(
+        current_user.role
+    ):
         return ChatReviewCenterResponse(
             generated_at=now,
             total_items=0,
@@ -5285,8 +5512,12 @@ def get_sales_chat_review_center(
         ),
     )
     if not is_superadmin_like(current_user.role):
-        statement = statement.where(Conversation.organization_id == current_user.organization_id)
-    statement = statement.order_by(desc(Conversation.last_message_at), desc(Conversation.created_at))
+        statement = statement.where(
+            Conversation.organization_id == current_user.organization_id
+        )
+    statement = statement.order_by(
+        desc(Conversation.last_message_at), desc(Conversation.created_at)
+    )
 
     statement = apply_sales_user_scope_filter(
         statement,
@@ -5306,7 +5537,9 @@ def get_sales_chat_review_center(
     stale_count = 0
 
     for conversation in conversations:
-        if source_channel and not matches_source_channel(conversation.source, source_channel):
+        if source_channel and not matches_source_channel(
+            conversation.source, source_channel
+        ):
             continue
 
         latest_message = get_latest_message(conversation)
@@ -5484,7 +5717,11 @@ def sync_ops_notifications(
             )
 
     for item in approval_queue.items[:20]:
-        severity = "high" if item.risk_level == "high" or item.action_mode == "escalate_to_human" else "medium"
+        severity = (
+            "high"
+            if item.risk_level == "high" or item.action_mode == "escalate_to_human"
+            else "medium"
+        )
         desired_notifications.append(
             {
                 "source_type": "approval_queue",
@@ -5573,7 +5810,9 @@ def sync_ops_notifications(
 
     for notification in existing_notifications:
         key = (notification.source_type, notification.source_key)
-        if key not in desired_keys and _is_open_notification_status(notification.status):
+        if key not in desired_keys and _is_open_notification_status(
+            notification.status
+        ):
             notification.status = "resolved"
             notification.resolved_at = now
             notification.resolved_by_user_id = current_user.id
@@ -5712,9 +5951,13 @@ def _get_accessible_ops_notification(
         ):
             raise ValueError("Notification not found.")
         if notification.user_id is None:
-            if not (is_head_like(current_user.role) or is_superadmin_like(current_user.role)):
+            if not (
+                is_head_like(current_user.role) or is_superadmin_like(current_user.role)
+            ):
                 raise ValueError("Notification not found.")
-        elif notification.user_id != current_user.id and not is_superadmin_like(current_user.role):
+        elif notification.user_id != current_user.id and not is_superadmin_like(
+            current_user.role
+        ):
             raise ValueError("Notification not found.")
         return notification
 
@@ -5745,28 +5988,37 @@ def list_ops_notifications(
             .where(Lead.id.in_(lead_ids))
             .options(selectinload(Lead.assigned_user))
         )
-        lead_lookup = {
-            lead.id: lead
-            for lead in db.scalars(lead_statement).all()
-        }
+        lead_lookup = {lead.id: lead for lead in db.scalars(lead_statement).all()}
     sales_user_ids = {
         notification.sales_user_id
         for notification in notifications
         if notification.sales_user_id is not None
     }
-    sales_user_lookup = {
-        user.id: user
-        for user in db.scalars(select(User).where(User.id.in_(sales_user_ids))).all()
-    } if sales_user_ids else {}
+    sales_user_lookup = (
+        {
+            user.id: user
+            for user in db.scalars(
+                select(User).where(User.id.in_(sales_user_ids))
+            ).all()
+        }
+        if sales_user_ids
+        else {}
+    )
     team_ids = {
         notification.team_id
         for notification in notifications
         if notification.team_id is not None
     }
-    team_lookup = {
-        team.id: team
-        for team in db.scalars(select(SalesTeam).where(SalesTeam.id.in_(team_ids))).all()
-    } if team_ids else {}
+    team_lookup = (
+        {
+            team.id: team
+            for team in db.scalars(
+                select(SalesTeam).where(SalesTeam.id.in_(team_ids))
+            ).all()
+        }
+        if team_ids
+        else {}
+    )
 
     return OpsNotificationResponse(
         generated_at=datetime.now(timezone.utc),
@@ -5776,7 +6028,9 @@ def list_ops_notifications(
         ),
         resolved_count=sum(1 for item in notifications if item.status == "resolved"),
         ignored_count=sum(1 for item in notifications if item.status == "ignored"),
-        escalated_count=sum(1 for item in notifications if item.escalation_level != "none"),
+        escalated_count=sum(
+            1 for item in notifications if item.escalation_level != "none"
+        ),
         items=[
             build_ops_notification_item(
                 item,
@@ -5822,13 +6076,20 @@ def resolve_ops_notification(
         notification_id=notification_id,
         current_user=current_user,
     )
-    if _is_operational_alert(notification) and notification.status not in {"active", "acknowledged"}:
+    if _is_operational_alert(notification) and notification.status not in {
+        "active",
+        "acknowledged",
+    }:
         raise ValueError("Notification can no longer be resolved.")
 
     notification.status = "resolved"
     notification.resolved_at = datetime.now(timezone.utc)
     notification.resolved_by_user_id = current_user.id
-    notification.resolution_note = payload.resolution_note.strip() if payload and payload.resolution_note and payload.resolution_note.strip() else None
+    notification.resolution_note = (
+        payload.resolution_note.strip()
+        if payload and payload.resolution_note and payload.resolution_note.strip()
+        else None
+    )
     db.add(notification)
     db.commit()
     db.refresh(notification)
@@ -5870,7 +6131,9 @@ def ignore_ops_notification(
         current_user=current_user,
     )
     if _is_operational_alert(notification):
-        allowed_targets = VALID_OPERATIONAL_ALERT_TRANSITIONS.get(notification.status, set())
+        allowed_targets = VALID_OPERATIONAL_ALERT_TRANSITIONS.get(
+            notification.status, set()
+        )
         if "ignored" not in allowed_targets:
             raise ValueError("Notification can no longer be ignored.")
 
@@ -6043,8 +6306,7 @@ def get_marketing_insights_preview(
         organization_ids=organization_ids if can_view_global else None,
     )
     execution_items = [
-        build_marketing_execution_item(item)
-        for item in execution_item_models
+        build_marketing_execution_item(item) for item in execution_item_models
     ]
 
     return MarketingInsightsPreview(
@@ -6118,7 +6380,9 @@ def build_marketing_execution_item(
         id=item.id,
         organization_id=item.organization_id,
         created_by_user_id=item.created_by_user_id,
-        created_by_user_name=item.created_by_user.name if item.created_by_user else None,
+        created_by_user_name=item.created_by_user.name
+        if item.created_by_user
+        else None,
         assigned_user_id=item.assigned_user_id,
         assigned_user_name=item.assigned_user.name if item.assigned_user else None,
         item_type=item.item_type,
@@ -6279,7 +6543,9 @@ def update_marketing_execution_item(
             item.status = "assigned"
 
     if "campaign_name" in payload.model_fields_set:
-        item.campaign_name = payload.campaign_name.strip() if payload.campaign_name else None
+        item.campaign_name = (
+            payload.campaign_name.strip() if payload.campaign_name else None
+        )
 
     if payload.notes is not None:
         item.notes = payload.notes.strip() or None
@@ -6559,7 +6825,9 @@ def get_ops_database_overview(
             id=user.id,
             organization_id=user.organization_id,
             created_by_user_id=user.created_by_user_id,
-            created_by_user_name=user.created_by_user.name if user.created_by_user else None,
+            created_by_user_name=user.created_by_user.name
+            if user.created_by_user
+            else None,
             name=user.name,
             email=user.email,
             role=user.role,
@@ -6577,7 +6845,9 @@ def get_ops_database_overview(
                 conversation.organization.name if conversation.organization else None
             ),
             sales_user_id=conversation.sales_user_id,
-            sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
+            sales_owner_name=conversation.sales_user.name
+            if conversation.sales_user
+            else None,
             title=conversation.title,
             source=conversation.source,
             status=conversation.status,
@@ -6611,7 +6881,9 @@ def get_ops_database_overview(
         OpsProductKnowledgeRow(
             id=knowledge.id,
             organization_id=knowledge.organization_id,
-            organization_name=knowledge.organization.name if knowledge.organization else None,
+            organization_name=knowledge.organization.name
+            if knowledge.organization
+            else None,
             title=knowledge.title,
             category=knowledge.category,
             source_type=knowledge.source_type,
@@ -6823,7 +7095,10 @@ def build_executive_recommendations(
             )
         )
 
-    if marketing_execution_summary.total_items > 0 and marketing_execution_summary.attributed_won_value == 0:
+    if (
+        marketing_execution_summary.total_items > 0
+        and marketing_execution_summary.attributed_won_value == 0
+    ):
         recommendations.append(
             ExecutiveRecommendationItem(
                 title="Tutup loop hasil marketing ke angka bisnis",
@@ -6963,11 +7238,15 @@ def get_channel_overview(
 
     if not can_view_global:
         if scoped_organization_id is None:
-            return ChannelOverviewResponse(generated_at=now, scope_type=scope_type, items=[])
+            return ChannelOverviewResponse(
+                generated_at=now, scope_type=scope_type, items=[]
+            )
         conversation_statement = conversation_statement.where(
             Conversation.organization_id == scoped_organization_id
         )
-        lead_statement = lead_statement.where(Lead.organization_id == scoped_organization_id)
+        lead_statement = lead_statement.where(
+            Lead.organization_id == scoped_organization_id
+        )
 
     conversations = db.scalars(conversation_statement).all()
     leads = db.scalars(lead_statement).all()
@@ -6981,11 +7260,14 @@ def get_channel_overview(
             if normalize_source_channel(conversation.source) == channel_key
         ]
         channel_leads = [
-            lead for lead in leads if normalize_source_channel(lead.source) == channel_key
+            lead
+            for lead in leads
+            if normalize_source_channel(lead.source) == channel_key
         ]
         latest_activity_at = max(
             (
-                ensure_aware_utc(conversation.last_message_at) or conversation.created_at
+                ensure_aware_utc(conversation.last_message_at)
+                or conversation.created_at
                 for conversation in channel_conversations
             ),
             default=None,
@@ -7019,7 +7301,9 @@ def build_kpi_command_center_data(
     source_channel: str | None = None,
     account_category: str | None = None,
 ) -> dict:
-    can_view_global, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
+    can_view_global, scope_type, scoped_organization_id = resolve_kpi_scope(
+        current_user
+    )
     now = datetime.now(timezone.utc)
 
     organizations_statement = select(Organization)
@@ -7090,7 +7374,9 @@ def build_kpi_command_center_data(
             Lead.organization_id == scoped_organization_id
         )
     elif organization_ids:
-        leads_statement = leads_statement.where(Lead.organization_id.in_(organization_ids))
+        leads_statement = leads_statement.where(
+            Lead.organization_id.in_(organization_ids)
+        )
     leads = [
         lead
         for lead in db.scalars(leads_statement).all()
@@ -7124,13 +7410,17 @@ def build_kpi_command_center_data(
     sales_rows: list[SalesPerformanceRow] = []
     organization_rows: list[OrganizationPerformanceRow] = []
 
-    organization_name_by_id = {organization.id: organization.name for organization in organizations}
+    organization_name_by_id = {
+        organization.id: organization.name for organization in organizations
+    }
 
     for user in users:
         assigned_leads = [lead for lead in leads if lead.assigned_user_id == user.id]
         assigned_deals = [lead.deal for lead in assigned_leads if lead.deal is not None]
         owned_conversations = [
-            conversation for conversation in conversations if conversation.sales_user_id == user.id
+            conversation
+            for conversation in conversations
+            if conversation.sales_user_id == user.id
         ]
 
         user_analyzed = 0
@@ -7162,8 +7452,12 @@ def build_kpi_command_center_data(
                 organization_id=user.organization_id,
                 organization_name=organization_name_by_id.get(user.organization_id),
                 assigned_leads=len(assigned_leads),
-                hot_leads=sum(1 for lead in assigned_leads if lead.lead_temperature == "hot"),
-                closing_leads=sum(1 for lead in assigned_leads if lead.current_stage == "closing"),
+                hot_leads=sum(
+                    1 for lead in assigned_leads if lead.lead_temperature == "hot"
+                ),
+                closing_leads=sum(
+                    1 for lead in assigned_leads if lead.current_stage == "closing"
+                ),
                 conversations_owned=len(owned_conversations),
                 analyzed_conversations=user_analyzed,
                 approved_drafts=user_approved,
@@ -7171,16 +7465,25 @@ def build_kpi_command_center_data(
                 overdue_follow_ups=sum(
                     1
                     for lead in assigned_leads
-                    if (follow_up := ensure_aware_utc(lead.next_follow_up_at)) is not None
+                    if (follow_up := ensure_aware_utc(lead.next_follow_up_at))
+                    is not None
                     and follow_up <= now
                 ),
                 won_leads=sum(1 for deal in assigned_deals if deal.status == "won"),
                 pipeline_value=round(
-                    sum(float(deal.expected_value) for deal in assigned_deals if deal.status == "open"),
+                    sum(
+                        float(deal.expected_value)
+                        for deal in assigned_deals
+                        if deal.status == "open"
+                    ),
                     2,
                 ),
                 won_value=round(
-                    sum(float(deal.expected_value) for deal in assigned_deals if deal.status == "won"),
+                    sum(
+                        float(deal.expected_value)
+                        for deal in assigned_deals
+                        if deal.status == "won"
+                    ),
                     2,
                 ),
                 deposit_amount=round(
@@ -7210,7 +7513,10 @@ def build_kpi_command_center_data(
 
             if latest_extraction is not None:
                 org_analyzed += 1
-            if latest_suggestion is not None and latest_suggestion.approval_status == "approved":
+            if (
+                latest_suggestion is not None
+                and latest_suggestion.approval_status == "approved"
+            ):
                 org_approved += 1
             if latest_sent_message is not None:
                 org_sent += 1
@@ -7220,8 +7526,12 @@ def build_kpi_command_center_data(
                 organization_id=organization.id,
                 organization_name=organization.name,
                 total_leads=len(org_leads),
-                hot_leads=sum(1 for lead in org_leads if lead.lead_temperature == "hot"),
-                closing_leads=sum(1 for lead in org_leads if lead.current_stage == "closing"),
+                hot_leads=sum(
+                    1 for lead in org_leads if lead.lead_temperature == "hot"
+                ),
+                closing_leads=sum(
+                    1 for lead in org_leads if lead.current_stage == "closing"
+                ),
                 conversations=len(org_conversations),
                 analyzed_conversations=org_analyzed,
                 reply_sent_rate=safe_ratio(org_sent, len(org_conversations)),
@@ -7229,16 +7539,25 @@ def build_kpi_command_center_data(
                 overdue_follow_ups=sum(
                     1
                     for lead in org_leads
-                    if (follow_up := ensure_aware_utc(lead.next_follow_up_at)) is not None
+                    if (follow_up := ensure_aware_utc(lead.next_follow_up_at))
+                    is not None
                     and follow_up <= now
                 ),
                 won_leads=sum(1 for deal in org_deals if deal.status == "won"),
                 pipeline_value=round(
-                    sum(float(deal.expected_value) for deal in org_deals if deal.status == "open"),
+                    sum(
+                        float(deal.expected_value)
+                        for deal in org_deals
+                        if deal.status == "open"
+                    ),
                     2,
                 ),
                 won_value=round(
-                    sum(float(deal.expected_value) for deal in org_deals if deal.status == "won"),
+                    sum(
+                        float(deal.expected_value)
+                        for deal in org_deals
+                        if deal.status == "won"
+                    ),
                     2,
                 ),
                 deposit_amount=round(
@@ -7271,9 +7590,7 @@ def build_kpi_command_center_data(
         reverse=True,
     )
 
-    source_keys = {
-        normalize_source_key(lead.source) for lead in leads
-    } | {
+    source_keys = {normalize_source_key(lead.source) for lead in leads} | {
         normalize_source_key(conversation.source) for conversation in conversations
     }
     marketing_execution_statement = select(MarketingExecutionItemModel)
@@ -7314,8 +7631,12 @@ def build_kpi_command_center_data(
                 lead_count=len(source_leads),
                 conversation_count=len(source_conversations),
                 analyzed_conversations=source_analyzed_count,
-                hot_leads=sum(1 for lead in source_leads if lead.lead_temperature == "hot"),
-                reply_sent_rate=safe_ratio(source_sent_count, len(source_conversations)),
+                hot_leads=sum(
+                    1 for lead in source_leads if lead.lead_temperature == "hot"
+                ),
+                reply_sent_rate=safe_ratio(
+                    source_sent_count, len(source_conversations)
+                ),
                 pipeline_value=round(
                     sum(
                         float(lead.deal.expected_value)
@@ -7380,11 +7701,19 @@ def build_kpi_command_center_data(
             2,
         ),
         deposit_amount=round(
-            sum(float(lead.deal.deposit_amount) for lead in leads if lead.deal is not None),
+            sum(
+                float(lead.deal.deposit_amount)
+                for lead in leads
+                if lead.deal is not None
+            ),
             2,
         ),
         win_rate=safe_ratio(
-            sum(1 for lead in leads if lead.deal is not None and lead.deal.status == "won"),
+            sum(
+                1
+                for lead in leads
+                if lead.deal is not None and lead.deal.status == "won"
+            ),
             sum(
                 1
                 for lead in leads
@@ -7482,7 +7811,10 @@ def sync_persistent_kpi_alerts(
         db.add(existing)
 
     for existing in existing_records:
-        if existing.alert_key not in current_keys and existing.status in {"active", "acknowledged"}:
+        if existing.alert_key not in current_keys and existing.status in {
+            "active",
+            "acknowledged",
+        }:
             existing.status = "resolved"
             existing.resolved_at = now
             db.add(existing)
@@ -7495,7 +7827,9 @@ def sync_persistent_kpi_alerts(
             KpiAlertRecord.scope_type == scope_type,
             KpiAlertRecord.organization_id == organization_id,
         )
-        .order_by(desc(KpiAlertRecord.last_detected_at), desc(KpiAlertRecord.created_at))
+        .order_by(
+            desc(KpiAlertRecord.last_detected_at), desc(KpiAlertRecord.created_at)
+        )
     )
     return [
         build_persisted_alert_item(item)
@@ -7529,10 +7863,14 @@ def list_kpi_snapshots(
     current_user: User,
 ) -> KpiSnapshotHistoryResponse:
     _, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
-    statement = select(KpiCommandSnapshot).where(
-        KpiCommandSnapshot.scope_type == scope_type,
-        KpiCommandSnapshot.organization_id == scoped_organization_id,
-    ).order_by(desc(KpiCommandSnapshot.created_at))
+    statement = (
+        select(KpiCommandSnapshot)
+        .where(
+            KpiCommandSnapshot.scope_type == scope_type,
+            KpiCommandSnapshot.organization_id == scoped_organization_id,
+        )
+        .order_by(desc(KpiCommandSnapshot.created_at))
+    )
     items = [build_kpi_snapshot_item(item) for item in db.scalars(statement).all()]
     return KpiSnapshotHistoryResponse(
         generated_at=datetime.now(timezone.utc),
@@ -7545,10 +7883,16 @@ def list_kpi_alert_records(
     current_user: User,
 ) -> KpiAlertHistoryResponse:
     _, scope_type, scoped_organization_id = resolve_kpi_scope(current_user)
-    statement = select(KpiAlertRecord).where(
-        KpiAlertRecord.scope_type == scope_type,
-        KpiAlertRecord.organization_id == scoped_organization_id,
-    ).order_by(desc(KpiAlertRecord.last_detected_at), desc(KpiAlertRecord.created_at))
+    statement = (
+        select(KpiAlertRecord)
+        .where(
+            KpiAlertRecord.scope_type == scope_type,
+            KpiAlertRecord.organization_id == scoped_organization_id,
+        )
+        .order_by(
+            desc(KpiAlertRecord.last_detected_at), desc(KpiAlertRecord.created_at)
+        )
+    )
     items = [build_persisted_alert_item(item) for item in db.scalars(statement).all()]
     return KpiAlertHistoryResponse(
         generated_at=datetime.now(timezone.utc),
@@ -7570,7 +7914,10 @@ def acknowledge_kpi_alert(
     if alert is None:
         raise ValueError("Alert not found.")
 
-    if alert.scope_type != scope_type or alert.organization_id != scoped_organization_id:
+    if (
+        alert.scope_type != scope_type
+        or alert.organization_id != scoped_organization_id
+    ):
         raise ValueError("Alert not found.")
 
     alert.status = "acknowledged"
@@ -7594,7 +7941,10 @@ def resolve_kpi_alert(
     if alert is None:
         raise ValueError("Alert not found.")
 
-    if alert.scope_type != scope_type or alert.organization_id != scoped_organization_id:
+    if (
+        alert.scope_type != scope_type
+        or alert.organization_id != scoped_organization_id
+    ):
         raise ValueError("Alert not found.")
 
     alert.status = "resolved"
@@ -7619,7 +7969,10 @@ def reopen_kpi_alert(
     if alert is None:
         raise ValueError("Alert not found.")
 
-    if alert.scope_type != scope_type or alert.organization_id != scoped_organization_id:
+    if (
+        alert.scope_type != scope_type
+        or alert.organization_id != scoped_organization_id
+    ):
         raise ValueError("Alert not found.")
 
     alert.status = "active"
@@ -7687,7 +8040,9 @@ def get_kpi_command_center(
         source_channel=source_channel,
         account_category=account_category,
     )
-    persisted_alerts = list_kpi_alert_records(db=db, current_user=current_user).items[:8]
+    persisted_alerts = list_kpi_alert_records(db=db, current_user=current_user).items[
+        :8
+    ]
 
     return KpiCommandCenterResponse(
         scope_type=data["scope_type"],
@@ -7940,7 +8295,9 @@ def build_monthly_content_plan(
     sentiment_counter: Counter[str],
     buying_intent_counter: Counter[str],
 ) -> list[MarketingPlanningItem]:
-    primary_objection = top_objections[0].topic if top_objections else "trust dan klarifikasi awal"
+    primary_objection = (
+        top_objections[0].topic if top_objections else "trust dan klarifikasi awal"
+    )
     secondary_objection = (
         top_objections[1].topic if len(top_objections) > 1 else "bukti hasil dan proses"
     )

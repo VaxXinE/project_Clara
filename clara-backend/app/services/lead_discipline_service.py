@@ -52,13 +52,17 @@ def _get_latest_message(conversation: Conversation | None) -> Message | None:
 def _get_latest_extraction(conversation: Conversation | None) -> AIExtraction | None:
     if conversation is None or not conversation.ai_extractions:
         return None
-    return max(conversation.ai_extractions, key=lambda extraction: extraction.created_at)
+    return max(
+        conversation.ai_extractions, key=lambda extraction: extraction.created_at
+    )
 
 
 def _get_latest_sent_message(conversation: Conversation | None) -> SentMessage | None:
     if conversation is None or not conversation.sent_messages:
         return None
-    return max(conversation.sent_messages, key=lambda sent_message: sent_message.sent_at)
+    return max(
+        conversation.sent_messages, key=lambda sent_message: sent_message.sent_at
+    )
 
 
 def _suggest_activity_type(
@@ -134,15 +138,15 @@ def build_discipline_log_suggestion(lead: Lead) -> LeadDisciplineSuggestionRespo
     if latest_extraction is not None:
         notes_parts.append(latest_extraction.customer_summary.strip())
         if latest_extraction.next_best_action.strip():
-            notes_parts.append(f"Aksi berikutnya: {latest_extraction.next_best_action.strip()}")
+            notes_parts.append(
+                f"Aksi berikutnya: {latest_extraction.next_best_action.strip()}"
+            )
     if latest_message is not None and latest_message.message_text.strip():
         notes_parts.append(f"Chat terbaru: {latest_message.message_text.strip()}")
 
     notes = " ".join(part for part in notes_parts if part).strip()
     if not notes:
-        notes = (
-            "Belum ada saran AI yang cukup kuat. Sales perlu menuliskan hasil follow-up manual."
-        )
+        notes = "Belum ada saran AI yang cukup kuat. Sales perlu menuliskan hasil follow-up manual."
 
     source_summary = (
         "Prefill dibuat dari AI extraction, chat terakhir, dan follow-up state lead."
@@ -275,7 +279,10 @@ def create_discipline_log(
     )
     db.add(log)
 
-    if payload.next_follow_up_at is not None and payload.next_follow_up_at != lead.next_follow_up_at:
+    if (
+        payload.next_follow_up_at is not None
+        and payload.next_follow_up_at != lead.next_follow_up_at
+    ):
         create_lead_activity_event(
             db=db,
             lead=lead,
@@ -283,7 +290,9 @@ def create_discipline_log(
             title="Jadwal follow-up diperbarui dari discipline log",
             description="Sales memperbarui target follow-up berikutnya saat mengisi log harian.",
             actor_user_id=current_user.id,
-            from_value=lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
+            from_value=lead.next_follow_up_at.isoformat()
+            if lead.next_follow_up_at
+            else None,
             to_value=payload.next_follow_up_at.isoformat(),
         )
         lead.next_follow_up_at = payload.next_follow_up_at
@@ -345,7 +354,9 @@ def update_discipline_log(
     current_user: User,
 ) -> LeadDisciplineLogItem:
     log = get_discipline_log_or_raise(db=db, lead=lead, log_id=log_id)
-    before_summary = f"{log.log_date.isoformat()} | {log.activity_type} | {log.result_status}"
+    before_summary = (
+        f"{log.log_date.isoformat()} | {log.activity_type} | {log.result_status}"
+    )
 
     if payload.log_date is not None:
         log.log_date = payload.log_date
@@ -374,13 +385,19 @@ def update_discipline_log(
                 title="Jadwal follow-up diperbarui dari discipline log",
                 description="Sales memperbarui target follow-up berikutnya saat mengedit log harian.",
                 actor_user_id=current_user.id,
-                from_value=lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
-                to_value=payload.next_follow_up_at.isoformat() if payload.next_follow_up_at else None,
+                from_value=lead.next_follow_up_at.isoformat()
+                if lead.next_follow_up_at
+                else None,
+                to_value=payload.next_follow_up_at.isoformat()
+                if payload.next_follow_up_at
+                else None,
             )
             lead.next_follow_up_at = payload.next_follow_up_at
         log.next_follow_up_at = payload.next_follow_up_at
 
-    after_summary = f"{log.log_date.isoformat()} | {log.activity_type} | {log.result_status}"
+    after_summary = (
+        f"{log.log_date.isoformat()} | {log.activity_type} | {log.result_status}"
+    )
     create_lead_activity_event(
         db=db,
         lead=lead,

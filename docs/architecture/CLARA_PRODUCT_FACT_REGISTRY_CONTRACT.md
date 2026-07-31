@@ -1,5 +1,8 @@
 # Clara Product Fact Registry Contract
 
+> Stage 8: support knowledge is a separate store and cannot override or
+> supply mutable product facts governed by this registry.
+
 Status: Stage 6 implementation, contract version `1.0`.
 
 ## Authority boundary

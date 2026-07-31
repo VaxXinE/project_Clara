@@ -54,7 +54,9 @@ def list_leads(
     source_channel: str | None = Query(default=None),
     account_category: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> list[LeadListItem]:
     return get_leads_for_user(
         db=db,
@@ -68,7 +70,9 @@ def list_leads(
 def get_lead(
     lead_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadDetail:
     return get_lead_for_user(db=db, lead_id=lead_id, current_user=current_user)
 
@@ -78,7 +82,9 @@ def update_lead(
     lead_id: UUID,
     payload: LeadUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadDetail:
     return update_lead_for_user(
         db=db,
@@ -92,7 +98,9 @@ def update_lead(
 def get_lead_timeline(
     lead_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> list[LeadActivityEventItem]:
     return get_lead_timeline_for_user(
         db=db,
@@ -105,7 +113,9 @@ def get_lead_timeline(
 def get_lead_deal(
     lead_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadDealItem | None:
     return get_lead_deal_for_user(
         db=db,
@@ -119,7 +129,9 @@ def upsert_lead_deal(
     lead_id: UUID,
     payload: LeadDealUpsertRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadDealItem:
     return upsert_lead_deal_for_user(
         db=db,
@@ -133,7 +145,9 @@ def upsert_lead_deal(
 def list_lead_tasks(
     lead_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> list[LeadTaskItem]:
     return get_lead_tasks_for_user(
         db=db,
@@ -147,7 +161,9 @@ def create_lead_task(
     lead_id: UUID,
     payload: LeadTaskCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadTaskItem:
     return create_lead_task_for_user(
         db=db,
@@ -163,7 +179,9 @@ def update_lead_task(
     task_id: UUID,
     payload: LeadTaskUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadTaskItem:
     return update_lead_task_for_user(
         db=db,
@@ -179,7 +197,9 @@ def list_lead_task_events(
     lead_id: UUID,
     task_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> list[LeadTaskEventItem]:
     return get_lead_task_events_for_user(
         db=db,
@@ -194,7 +214,9 @@ def execute_queue_action(
     lead_id: UUID,
     payload: LeadQueueActionRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadTaskItem:
     return execute_queue_action_for_user(
         db=db,
@@ -208,28 +230,39 @@ def execute_queue_action(
 def list_discipline_logs(
     lead_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> list[LeadDisciplineLogItem]:
     lead = get_lead_model_for_user(db=db, lead_id=lead_id, current_user=current_user)
     return list_lead_discipline_logs_for_user(db=db, lead=lead)
 
 
-@router.get("/{lead_id}/discipline-log-suggestion", response_model=LeadDisciplineSuggestionResponse)
+@router.get(
+    "/{lead_id}/discipline-log-suggestion",
+    response_model=LeadDisciplineSuggestionResponse,
+)
 def get_discipline_log_suggestion(
     lead_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadDisciplineSuggestionResponse:
     lead = get_lead_model_for_user(db=db, lead_id=lead_id, current_user=current_user)
     return build_discipline_log_suggestion(lead)
 
 
-@router.post("/{lead_id}/discipline-logs", response_model=LeadDisciplineLogItem, status_code=201)
+@router.post(
+    "/{lead_id}/discipline-logs", response_model=LeadDisciplineLogItem, status_code=201
+)
 def create_discipline_log_endpoint(
     lead_id: UUID,
     payload: LeadDisciplineLogCreateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadDisciplineLogItem:
     lead = get_lead_model_for_user(db=db, lead_id=lead_id, current_user=current_user)
     return create_discipline_log(
@@ -240,13 +273,17 @@ def create_discipline_log_endpoint(
     )
 
 
-@router.patch("/{lead_id}/discipline-logs/{log_id}", response_model=LeadDisciplineLogItem)
+@router.patch(
+    "/{lead_id}/discipline-logs/{log_id}", response_model=LeadDisciplineLogItem
+)
 def update_discipline_log_endpoint(
     lead_id: UUID,
     log_id: UUID,
     payload: LeadDisciplineLogUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
 ) -> LeadDisciplineLogItem:
     lead = get_lead_model_for_user(db=db, lead_id=lead_id, current_user=current_user)
     return update_discipline_log(
