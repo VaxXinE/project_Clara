@@ -137,3 +137,11 @@ registry. It does not change policy action, generation strategy, reviewer
 requirements for reply approval, or send permission. Fact governance reuses
 the configured compliance reviewer-role mapping for lifecycle changes, while
 reply approval/send continues through the Stage 5 gate unchanged.
+
+## Stage 7 process-state interaction
+
+Process state supplies factual continuity context only. FUNDED does not permit
+personalized trading advice, VERIFIED does not bypass a reviewer, ACCOUNT_ACTIVE
+does not bypass complaints, and ACTIVE_SUPPORT does not grant fabricated system
+access. Existing policy action, generation strategy, reviewer requirement,
+approval, and send gates are unchanged. Default process-state mode is LEGACY.

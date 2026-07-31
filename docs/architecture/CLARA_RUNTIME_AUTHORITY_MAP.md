@@ -242,3 +242,19 @@ facts through `clara_product_fact_service.py`.
 Persona playbooks do not store new facts. Backend safety, policy decisions,
 approval/send gates, runtime context, and Tawk remain separate authorities.
 Contract: `docs/architecture/CLARA_PRODUCT_FACT_REGISTRY_CONTRACT.md`.
+
+## M. Stage 7 Process-State Authority Update
+
+Stage 7 adds persistent `CustomerProcessState` authority at canonical
+`CustomerProfile` scope. `AIExtraction.pipeline_stage`,
+`Conversation.current_stage`, `Lead.current_stage`, and customer temperature
+remain separate legacy sales signals and are not mapped automatically.
+
+`CLARA_PROCESS_STATE_MODE` defaults to `LEGACY`. `SHADOW` persists safe
+observations without changing current state or customer behavior. `FSM`
+applies evidence-governed forward transitions, rejects regression, reconciles
+profile merges, and injects only structured canonical state into runtime
+context. State never grants account access or overrides policy, product facts,
+approval/send, complaints, security, or Tawk.
+
+Contract: `docs/architecture/CLARA_PROCESS_STATE_FSM_CONTRACT.md`.

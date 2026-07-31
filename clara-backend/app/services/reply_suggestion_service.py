@@ -16,6 +16,7 @@ from app.core.clara_runtime_contract import (
     ActionMode,
     LEGACY_BEHAVIOR_OVERLAY,
     PersonaAuthorityMode,
+    ProcessState,
     PromptSectionSource,
     normalize_persona_authority_mode,
 )
@@ -23,6 +24,7 @@ from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
 from app.models.conversation import Conversation
+from app.models.customer_process_state import CustomerProcessState
 from app.models.reply_suggestion import ReplySuggestion
 from app.schemas.reply_suggestion_schema import (
     ApproveReplyRequest,
@@ -64,6 +66,11 @@ from app.services.clara_product_fact_service import (
     ProductFactMode,
     compose_product_fact_prompt,
     normalize_product_fact_mode,
+)
+from app.services.clara_process_state_service import (
+    ProcessStateMode,
+    normalize_process_state_mode,
+    state_rank,
 )
 from app.services.clara_legacy_behavior_service import (
     AuthoritySystemPrompt,
@@ -1746,6 +1753,7 @@ def build_extraction_runtime_summary(
     customer_has_identity_submission: bool = False,
     known_identity_fields: dict[str, str] | None = None,
     customer_has_verification_completion: bool = False,
+    canonical_process_state: str | None = None,
 ) -> str:
     main_objections = ", ".join(extraction.main_objections) or "-"
     budget_signal = get_budget_signal(extraction)
@@ -1769,6 +1777,8 @@ def build_extraction_runtime_summary(
         f"- policy_action_mode={action_mode}",
         f"- latest_customer_message={latest_customer_message or '-'}",
     ]
+    if canonical_process_state:
+        lines.append(f"- canonical_process_state={canonical_process_state}")
 
     if known_identity_fields:
         lines.append(
@@ -2483,6 +2493,7 @@ def build_authority_runtime_prompt(
     customer_has_identity_submission: bool,
     known_identity_fields: dict[str, str] | None,
     customer_has_verification_completion: bool,
+    canonical_process_state: str | None = None,
 ) -> str:
     runtime_summary = build_extraction_runtime_summary(
         extraction,
@@ -2498,6 +2509,7 @@ def build_authority_runtime_prompt(
         customer_has_identity_submission=customer_has_identity_submission,
         known_identity_fields=known_identity_fields,
         customer_has_verification_completion=customer_has_verification_completion,
+        canonical_process_state=canonical_process_state,
     )
     return f"""
 POLICY_METADATA
@@ -2536,6 +2548,7 @@ def _compose_reply_system_prompt(
     persona_authority_mode: PersonaAuthorityMode,
     available_system_sections: frozenset[str],
     product_fact_injection: str | None = None,
+    canonical_process_state: str | None = None,
 ) -> AuthoritySystemPrompt:
     return compose_authority_system_prompt(
         mode=persona_authority_mode,
@@ -2553,6 +2566,7 @@ def _compose_reply_system_prompt(
             conversation_variant_focus=conversation_variant_focus,
             customer_has_identity_submission=customer_has_identity_submission,
             customer_has_verification_completion=(customer_has_verification_completion),
+            canonical_process_state=canonical_process_state,
         ),
         product_fact_injection=(
             product_fact_injection
@@ -2581,6 +2595,7 @@ def build_reply_system_prompt(
     persona_authority_mode: PersonaAuthorityMode = PersonaAuthorityMode.LEGACY,
     available_system_sections: frozenset[str] = frozenset(),
     product_fact_injection: str | None = None,
+    canonical_process_state: str | None = None,
 ) -> str:
     return _compose_reply_system_prompt(
         system_playbook=system_playbook,
@@ -2598,6 +2613,7 @@ def build_reply_system_prompt(
         persona_authority_mode=persona_authority_mode,
         available_system_sections=available_system_sections,
         product_fact_injection=product_fact_injection,
+        canonical_process_state=canonical_process_state,
     ).content
 
 
@@ -3860,6 +3876,8 @@ def call_openai_for_reply_suggestion(
     desired_count: int = 3,
     db: Session | None = None,
     organization_id: UUID | None = None,
+    canonical_process_state: str | None = None,
+    process_state_mode: ProcessStateMode = ProcessStateMode.LEGACY,
 ) -> ReplySuggestionCreate:
     if not settings.openai_api_key:
         raise ReplySuggestionError("OPENAI_API_KEY is not configured.")
@@ -3975,6 +3993,7 @@ def call_openai_for_reply_suggestion(
             customer_has_identity_submission=customer_has_identity_submission,
             known_identity_fields=known_identity_fields,
             customer_has_verification_completion=(customer_has_verification_completion),
+            canonical_process_state=canonical_process_state,
         )
     authority_system_prompt = _compose_reply_system_prompt(
         system_playbook=system_playbook,
@@ -3992,6 +4011,7 @@ def call_openai_for_reply_suggestion(
         persona_authority_mode=persona_authority_mode,
         available_system_sections=available_system_sections,
         product_fact_injection=product_fact_composition.content,
+        canonical_process_state=canonical_process_state,
     )
     system_prompt = authority_system_prompt.content
     runtime_contract_debug = build_authority_debug_metadata(
@@ -4016,6 +4036,8 @@ def call_openai_for_reply_suggestion(
             authority_system_prompt.legacy_overlay_present
         ),
         **product_fact_composition.debug_metadata(),
+        "process_state_mode": process_state_mode.value,
+        "current_process_state": canonical_process_state or ProcessState.UNKNOWN.value,
     }
     semantic_revalidation_mode = normalize_semantic_revalidation_mode(
         settings.clara_semantic_revalidation_mode
@@ -4131,6 +4153,7 @@ def call_openai_for_reply_suggestion(
         must_give_detailed_explanation=must_give_detailed_explanation,
         discusses_scalping_or_setup=discusses_scalping_or_setup,
         product_fact_mode=product_fact_mode.value,
+        canonical_process_state=canonical_process_state,
         allowed_minimum_opening_amounts=tuple(
             value
             for key, value in product_fact_composition.validator_fact_values.items()
@@ -4138,9 +4161,17 @@ def call_openai_for_reply_suggestion(
         ),
         capabilities=ReplyValidationCapabilities(
             customer_is_verified=customer_has_verification_completion,
-            account_is_active=latest_customer_intent
-            in {"activation_complete", "trading_ready"},
-            account_is_funded=latest_customer_intent == "trading_ready",
+            account_is_active=(
+                canonical_process_state is not None
+                and state_rank(canonical_process_state)
+                >= state_rank(ProcessState.ACCOUNT_ACTIVE)
+            )
+            or latest_customer_intent in {"activation_complete", "trading_ready"},
+            account_is_funded=(
+                canonical_process_state is not None
+                and state_rank(canonical_process_state) >= state_rank(ProcessState.FUNDED)
+            )
+            or latest_customer_intent == "trading_ready",
         ),
     )
     primary_validation_report = evaluate_reply(primary_text, validation_context)
@@ -4412,6 +4443,19 @@ def create_reply_suggestion(
             settings.clara_persona_authority_mode
         ).canonical_value
     )
+    process_state_mode = normalize_process_state_mode(settings.clara_process_state_mode)
+    canonical_process_state: str | None = None
+    if process_state_mode == ProcessStateMode.FSM:
+        canonical_process_state = ProcessState.UNKNOWN.value
+        if conversation.lead and conversation.lead.customer_profile_id:
+            persisted_state = db.scalar(
+                select(CustomerProcessState).where(
+                    CustomerProcessState.customer_profile_id
+                    == conversation.lead.customer_profile_id
+                )
+            )
+            if persisted_state is not None:
+                canonical_process_state = persisted_state.current_state
     context_started_at = perf_counter()
     include_all_variants = should_include_all_product_variants(conversation)
     latest_customer_message = get_latest_customer_message(conversation)
@@ -4442,6 +4486,15 @@ def create_reply_suggestion(
     customer_has_verification_completion = (
         conversation_has_customer_verification_complete(conversation)
     )
+    if canonical_process_state:
+        process_rank = state_rank(canonical_process_state)
+        customer_has_identity_submission = customer_has_identity_submission or (
+            process_rank >= state_rank(ProcessState.DATA_SUBMITTED)
+        )
+        customer_has_verification_completion = (
+            customer_has_verification_completion
+            or process_rank >= state_rank(ProcessState.VERIFIED)
+        )
     latest_customer_intent = resolve_latest_customer_intent(
         latest_customer_message,
         latest_sales_message,
@@ -4534,6 +4587,8 @@ def create_reply_suggestion(
             previous_customer_message=previous_customer_message,
             db=db,
             organization_id=conversation.organization_id,
+            canonical_process_state=canonical_process_state,
+            process_state_mode=process_state_mode,
         )
     generation_duration_ms = _round_duration_ms(generation_started_at)
 
@@ -4563,6 +4618,7 @@ def create_reply_suggestion(
                     latest_customer_message=latest_customer_message,
                     latest_customer_intent=latest_customer_intent,
                     product_fact_mode=enforcement_fact_mode.value,
+                    canonical_process_state=canonical_process_state,
                     allowed_minimum_opening_amounts=tuple(
                         value
                         for key, value in enforcement_fact_composition.validator_fact_values.items()

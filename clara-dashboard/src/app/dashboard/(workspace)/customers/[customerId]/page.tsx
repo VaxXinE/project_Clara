@@ -13,7 +13,24 @@ import type {
   CustomerProfileMergeRequest,
   CustomerProfileSummaryItem,
   CustomerProfileUpdateRequest,
+  CustomerProcessStateItem,
+  ProcessStateEventItem,
+  ProcessStateTransitionResponse,
 } from "@/types/dashboard";
+
+const PROCESS_STATES = [
+  "UNKNOWN",
+  "NEW_INQUIRY",
+  "EXPLORATION",
+  "READY_TO_PROCEED",
+  "DATA_SUBMITTED",
+  "VERIFICATION_IN_PROGRESS",
+  "VERIFIED",
+  "ONBOARDING_OR_ACTIVATION",
+  "ACCOUNT_ACTIVE",
+  "FUNDED",
+  "ACTIVE_SUPPORT",
+] as const;
 
 export default function CustomerProfilePage() {
   const params = useParams<{ customerId: string }>();
@@ -21,6 +38,11 @@ export default function CustomerProfilePage() {
 
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [profile, setProfile] = useState<CustomerProfileSummaryItem | null>(null);
+  const [processState, setProcessState] = useState<CustomerProcessStateItem | null>(null);
+  const [processHistory, setProcessHistory] = useState<ProcessStateEventItem[]>([]);
+  const [proposedProcessState, setProposedProcessState] = useState("UNKNOWN");
+  const [processReasonCode, setProcessReasonCode] = useState("MANUAL_CONFIRMATION");
+  const [isSavingProcessState, setIsSavingProcessState] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -47,12 +69,17 @@ export default function CustomerProfilePage() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const [me, data] = await Promise.all([
+        const [me, data, currentProcessState, processEvents] = await Promise.all([
           apiFetch<CurrentUser>("/auth/me"),
           apiFetch<CustomerProfileSummaryItem>(`/customers/${customerId}`),
+          apiFetch<CustomerProcessStateItem>(`/customers/${customerId}/process-state`),
+          apiFetch<ProcessStateEventItem[]>(`/customers/${customerId}/process-state/history`),
         ]);
         setCurrentUser(me);
         setProfile(data);
+        setProcessState(currentProcessState);
+        setProcessHistory(processEvents);
+        setProposedProcessState(currentProcessState.current_state);
         setProfileForm({
           display_name: data.display_name,
           phone: data.phone ?? "",
@@ -150,6 +177,38 @@ export default function CustomerProfilePage() {
     }
   }
 
+  async function handleProcessStateTransition() {
+    if (!processState || !profile) {
+      return;
+    }
+    setIsSavingProcessState(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      const result = await apiFetch<ProcessStateTransitionResponse>(
+        `/customers/${profile.id}/process-state/transitions`,
+        {
+          method: "POST",
+          body: {
+            proposed_state: proposedProcessState,
+            expected_version: processState.version,
+            reason_code: processReasonCode.trim().toUpperCase(),
+          },
+        }
+      );
+      const history = await apiFetch<ProcessStateEventItem[]>(
+        `/customers/${profile.id}/process-state/history`
+      );
+      setProcessState(result.current);
+      setProcessHistory(history);
+      setSuccessMessage(`Process state tersimpan: ${formatProcessState(result.current.current_state)}.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Gagal mengubah process state.");
+    } finally {
+      setIsSavingProcessState(false);
+    }
+  }
+
   const relatedLeads = profile?.related_leads ?? [];
   const hotLeadCount = relatedLeads.filter((lead) => lead.lead_temperature === "hot").length;
   const activeLeadCount = relatedLeads.filter(
@@ -179,6 +238,12 @@ export default function CustomerProfilePage() {
     profile,
   });
   const canMergeProfiles = ["head", "superadmin"].includes(currentUser?.role ?? "");
+  const canSubmitProcessState =
+    currentUser?.role !== "sales" ||
+    (processState !== null &&
+      PROCESS_STATES.indexOf(
+        processState.current_state as (typeof PROCESS_STATES)[number]
+      ) <= PROCESS_STATES.indexOf("DATA_SUBMITTED"));
   const mergeCandidateCount = profile?.merge_candidates.length ?? 0;
   const profileFocus = buildCustomerFocusSummary({
     profile,
@@ -328,6 +393,111 @@ export default function CustomerProfilePage() {
               <Metric label="Kontak terakhir" value={formatDateTime(profile.last_contact_at)} />
               <Metric label="PIC" value={profile.assigned_user_name ?? "Belum ada"} />
             </section>
+
+            {processState ? (
+              <section className="clara-card p-5 sm:p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="clara-kicker text-xs">Process state canonical</p>
+                    <h2 className="mt-2 text-xl font-semibold clara-text-primary">
+                      {formatProcessState(processState.current_state)}
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                      Ini progres faktual customer lintas channel. Pipeline lead dan temperature tetap field terpisah.
+                    </p>
+                  </div>
+                  {processState.reconciliation_required ? (
+                    <div role="alert" className="clara-alert clara-alert-danger">
+                      Konflik state hasil merge perlu direview manager/head.
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                  <Metric label="Process state" value={formatProcessState(processState.current_state)} />
+                  <Metric label="Pipeline lead" value={topPriorityLead?.current_stage ?? "Belum ada"} />
+                  <Metric label="Interest" value={formatTemperatureLabel(profile.temperature)} />
+                  <Metric label="Trust sumber" value={processState.source_trust_level} />
+                  <Metric label="Confidence" value={`${Math.round(processState.confidence_score * 100)}%`} />
+                  <Metric label="Konfirmasi" value={formatDateTime(processState.last_confirmed_at)} />
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+                  <div className="clara-card-soft p-4">
+                    <h3 className="font-semibold clara-text-primary">Konfirmasi atau koreksi</h3>
+                    {canSubmitProcessState ? (
+                      <>
+                    <label htmlFor="process-state-value" className="mt-4 block space-y-2 text-sm">
+                      <span className="font-semibold clara-text-primary">State tujuan</span>
+                      <select
+                        id="process-state-value"
+                        className="clara-select"
+                        value={proposedProcessState}
+                        onChange={(event) => setProposedProcessState(event.target.value)}
+                      >
+                        {PROCESS_STATES.filter(
+                          (state) =>
+                            currentUser?.role !== "sales" ||
+                            (PROCESS_STATES.indexOf(state) >=
+                              PROCESS_STATES.indexOf(
+                                processState.current_state as (typeof PROCESS_STATES)[number]
+                              ) &&
+                              PROCESS_STATES.indexOf(state) <= PROCESS_STATES.indexOf("DATA_SUBMITTED"))
+                        ).map((state) => (
+                          <option key={state} value={state}>{formatProcessState(state)}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label htmlFor="process-state-reason" className="mt-4 block space-y-2 text-sm">
+                      <span className="font-semibold clara-text-primary">Reason code</span>
+                      <input
+                        id="process-state-reason"
+                        className="clara-input"
+                        value={processReasonCode}
+                        onChange={(event) => setProcessReasonCode(event.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))}
+                        maxLength={100}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="clara-button clara-button-primary mt-4"
+                      disabled={isSavingProcessState || !processReasonCode.trim()}
+                      onClick={() => void handleProcessStateTransition()}
+                    >
+                      {isSavingProcessState ? "Menyimpan..." : "Simpan Process State"}
+                    </button>
+                      </>
+                    ) : (
+                      <p className="mt-4 text-sm leading-6 text-slate-600">
+                        State di atas DATA_SUBMITTED hanya dapat dikonfirmasi atau dikoreksi oleh manager, head, atau superadmin.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="clara-card-soft p-4">
+                    <h3 className="font-semibold clara-text-primary">Riwayat keputusan</h3>
+                    <div className="mt-4 max-h-80 space-y-3 overflow-y-auto">
+                      {processHistory.length ? processHistory.map((event) => (
+                        <div key={event.id} className="rounded-2xl border border-slate-200 bg-white p-3 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold clara-text-primary">{event.decision}</span>
+                            <span className="text-xs text-slate-500">{formatDateTime(event.created_at)}</span>
+                          </div>
+                          <p className="mt-2 text-slate-600">
+                            {formatProcessState(event.previous_state)} → {formatProcessState(event.proposed_state)}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {event.source_type} • {event.source_trust_level} • {event.reason_codes.join(", ") || "-"}
+                          </p>
+                        </div>
+                      )) : (
+                        <p className="text-sm text-slate-500">Belum ada observasi atau transisi.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : null}
 
             <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
               <article
@@ -912,6 +1082,14 @@ function formatStageLabel(value: string) {
   };
 
   return labels[value] ?? value.replaceAll("_", " ");
+}
+
+function formatProcessState(value: string) {
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function formatTemperatureLabel(value: string) {
