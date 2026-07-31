@@ -1,5 +1,5 @@
-import type { Channel } from "~/types/channel"
 import type { ClaraExtensionSessionUser } from "~/types/whatsapp"
+import type { Channel } from "~/types/channel"
 
 const DEFAULT_PROXY_URL = "http://127.0.0.1:9898/reply-suggestions"
 const DEFAULT_CHAT_SNAPSHOT_PROXY_URL = "http://127.0.0.1:9898/chat-snapshots"
@@ -62,9 +62,7 @@ export const getConfiguredProxyUrl = () =>
 
 export const getConfiguredClaraApiBaseUrl = () =>
   (() => {
-    const configured = (
-      process.env.PLASMO_PUBLIC_CLARA_API_BASE_URL || ""
-    ).trim()
+    const configured = (process.env.PLASMO_PUBLIC_CLARA_API_BASE_URL || "").trim()
 
     if (configured) {
       if (isProductionBuild() && isLoopbackUrl(configured)) {
@@ -86,9 +84,7 @@ export const getConfiguredClaraApiToken = () =>
 
 export const getConfiguredClaraDashboardUrl = () =>
   (() => {
-    const configured = (
-      process.env.PLASMO_PUBLIC_CLARA_DASHBOARD_URL || ""
-    ).trim()
+    const configured = (process.env.PLASMO_PUBLIC_CLARA_DASHBOARD_URL || "").trim()
 
     if (configured) {
       if (isProductionBuild() && isLoopbackUrl(configured)) {
@@ -160,7 +156,6 @@ const normalizeExtensionChannel = (channel?: string | null): Channel => {
 
   if (
     normalized === "instagram" ||
-    normalized === "tawk" ||
     normalized === "tiktok" ||
     normalized === "whatsapp"
   ) {

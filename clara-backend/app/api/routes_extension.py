@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.clara_runtime_contract import runtime_contract_audit_metadata
 from app.core.security import require_roles
 from app.db.session import get_db
 from app.models.user import User
@@ -37,7 +36,7 @@ from app.services.reply_suggestion_service import ReplySuggestionError
 
 router = APIRouter(prefix="/extension", tags=["extension"])
 
-ALLOWED_EXTENSION_CHANNELS = {"whatsapp", "instagram", "tiktok", "tawk"}
+ALLOWED_EXTENSION_CHANNELS = {"whatsapp", "instagram", "tiktok"}
 
 
 def _build_unsupported_channel_detail(channel: str) -> dict[str, str]:
@@ -52,7 +51,6 @@ def _build_feature_disabled_detail(channel: str) -> dict[str, str]:
         "whatsapp": "WhatsApp",
         "instagram": "Instagram DM",
         "tiktok": "TikTok DM",
-        "tawk": "Tawk.to Live Chat",
     }.get(channel, channel)
     return {
         "code": "FEATURE_DISABLED",
@@ -77,7 +75,6 @@ def _is_extension_channel_enabled(channel: str) -> bool:
         "whatsapp": settings.extension_whatsapp_enabled,
         "instagram": settings.extension_instagram_enabled,
         "tiktok": settings.extension_tiktok_enabled,
-        "tawk": settings.extension_tawk_enabled,
     }[channel]
 
 
@@ -144,14 +141,6 @@ def _send_extension_reply_suggestion(
 ) -> ExtensionSendReplyResponse:
     normalized_channel = _normalize_extension_channel_or_raise(channel)
     _require_enabled_extension_channel(normalized_channel)
-    if normalized_channel == "tawk":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "TAWK_REPLY_ACTION_NOT_AVAILABLE",
-                "message": "Aksi balasan Tawk tersedia pada TAWK-03.",
-            },
-        )
 
     try:
         get_accessible_reply_suggestion_or_raise(
@@ -269,7 +258,6 @@ def _generate_extension_reply_suggestions(
             current_user=current_user,
             request=request,
             metadata={
-                **runtime_contract_audit_metadata(),
                 "channel": normalized_channel,
                 "provider": "extension",
                 "conversation_id": str(result.conversation_id),
@@ -290,7 +278,6 @@ def _generate_extension_reply_suggestions(
             current_user=current_user,
             request=request,
             metadata={
-                **runtime_contract_audit_metadata(),
                 "channel": normalized_channel,
                 "provider": "extension",
                 "error_type": type(exc).__name__,
@@ -310,7 +297,6 @@ def _generate_extension_reply_suggestions(
             current_user=current_user,
             request=request,
             metadata={
-                **runtime_contract_audit_metadata(),
                 "channel": normalized_channel,
                 "provider": "extension",
                 "error_type": type(exc).__name__,
@@ -330,7 +316,6 @@ def _generate_extension_reply_suggestions(
             current_user=current_user,
             request=request,
             metadata={
-                **runtime_contract_audit_metadata(),
                 "channel": normalized_channel,
                 "provider": "extension",
                 "error_type": type(exc).__name__,
@@ -345,9 +330,7 @@ def _generate_extension_reply_suggestions(
 
 @router.get("/config", response_model=ExtensionConfigResponse)
 def get_extension_config(
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     del current_user
     return ExtensionConfigResponse(
@@ -364,10 +347,6 @@ def get_extension_config(
                 "enabled": settings.extension_tiktok_enabled,
                 "provider": "extension",
             },
-            "tawk": {
-                "enabled": settings.extension_tawk_enabled,
-                "provider": "extension",
-            },
         }
     )
 
@@ -382,9 +361,7 @@ def sync_extension_snapshot_endpoint(
     payload: ExtensionSnapshotSyncRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return _sync_extension_snapshot(
         channel=channel,
@@ -406,9 +383,7 @@ def send_extension_reply_suggestion_endpoint(
     payload: ExtensionSendReplyRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return _send_extension_reply_suggestion(
         channel=channel,
@@ -430,9 +405,7 @@ def generate_extension_reply_suggestions_endpoint(
     payload: ExtensionSnapshotSyncRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return _generate_extension_reply_suggestions(
         channel=channel,
@@ -452,15 +425,11 @@ def sync_whatsapp_snapshot_endpoint(
     payload: WhatsAppExtensionSnapshotSyncRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return _sync_extension_snapshot(
         channel="whatsapp",
-        payload=ExtensionSnapshotSyncRequest.model_validate(
-            payload.model_dump(by_alias=True)
-        ),
+        payload=ExtensionSnapshotSyncRequest.model_validate(payload.model_dump(by_alias=True)),
         request=request,
         db=db,
         current_user=current_user,
@@ -477,16 +446,12 @@ def send_whatsapp_reply_suggestion_endpoint(
     payload: WhatsAppExtensionSendReplyRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return _send_extension_reply_suggestion(
         channel="whatsapp",
         reply_suggestion_id=reply_suggestion_id,
-        payload=ExtensionSendReplyRequest.model_validate(
-            payload.model_dump(by_alias=True)
-        ),
+        payload=ExtensionSendReplyRequest.model_validate(payload.model_dump(by_alias=True)),
         request=request,
         db=db,
         current_user=current_user,
@@ -502,15 +467,11 @@ def generate_whatsapp_reply_suggestions_endpoint(
     payload: WhatsAppExtensionSnapshotSyncRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return _generate_extension_reply_suggestions(
         channel="whatsapp",
-        payload=ExtensionSnapshotSyncRequest.model_validate(
-            payload.model_dump(by_alias=True)
-        ),
+        payload=ExtensionSnapshotSyncRequest.model_validate(payload.model_dump(by_alias=True)),
         request=request,
         db=db,
         current_user=current_user,

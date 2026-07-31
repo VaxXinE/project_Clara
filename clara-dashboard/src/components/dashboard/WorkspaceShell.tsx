@@ -14,7 +14,6 @@ import {
   faCloudArrowUp,
   faComments,
   faGaugeHigh,
-  faRobot,
   faTriangleExclamation,
   faUsersGear,
   faWandSparkles,
@@ -216,12 +215,6 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
         label: "Audit Logs",
         icon: faBuildingShield,
         description: "Jejak audit dan status sistem",
-      },
-      {
-        href: "/admin/ai-config",
-        label: "AI Persona",
-        icon: faRobot,
-        description: "Prompt dan perilaku Clara",
       },
     );
   }

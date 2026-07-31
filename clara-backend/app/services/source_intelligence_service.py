@@ -93,7 +93,6 @@ def build_source_label(source: str | None) -> str:
         "telegram_manual": "Telegram Manual",
         "instagram_extension": "Instagram Extension",
         "tiktok_extension": "TikTok Extension",
-        "tawk_extension": "Tawk Extension",
         "instagram_dm": "Instagram DM",
         "instagram_comment": "Instagram Comment",
         "tawk_webhook": "Tawk Webhook",

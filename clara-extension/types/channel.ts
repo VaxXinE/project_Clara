@@ -1,10 +1,10 @@
+export type Channel = "whatsapp" | "instagram" | "tiktok"
+
 import type {
   WhatsAppActionResponse,
   WhatsAppChatSnapshot,
   WhatsAppMessage
 } from "~/types/whatsapp"
-
-export type Channel = "whatsapp" | "instagram" | "tiktok" | "tawk"
 
 export type LegacyRuntimeMessageType =
   | "READ_WHATSAPP_CHAT"

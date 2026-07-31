@@ -72,7 +72,7 @@ def _normalize_identifier(value: str | None) -> str:
     return " ".join((value or "").split()).casefold()
 
 
-def resolve_tawk_property_organization(
+def _resolve_mapped_organization(
     db: Session,
     *,
     property_id: str,
@@ -169,7 +169,7 @@ def _resolve_tawk_context(
     payload: TawkWebhookEnvelope,
 ) -> ResolvedTawkWebhookContext:
     property_id = payload.property.id.strip()
-    organization = resolve_tawk_property_organization(db, property_id=property_id)
+    organization = _resolve_mapped_organization(db, property_id=property_id)
     latest_sales_message = _resolve_latest_sales_message(payload)
     sales_user = _resolve_sales_user(
         db,
