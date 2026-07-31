@@ -14,6 +14,10 @@ from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
 from app.schemas.sent_message_schema import MarkReplySentRequest
 from app.services.lead_activity_service import create_lead_activity_event
+from app.services.clara_policy_enforcement_service import (
+    ClaraEnforcementError,
+    assert_suggestion_can_be_sent,
+)
 
 
 class SentMessageError(RuntimeError):
@@ -166,6 +170,7 @@ def mark_reply_suggestion_as_sent(
     db: Session,
     reply_suggestion_id: UUID,
     payload: MarkReplySentRequest,
+    sender_role: str | None = None,
 ) -> SentMessage:
     suggestion = db.get(ReplySuggestion, reply_suggestion_id)
 
@@ -177,6 +182,18 @@ def mark_reply_suggestion_as_sent(
 
     if not suggestion.final_reply_text:
         raise SentMessageError("Approved reply has no final reply text.")
+
+    try:
+        assert_suggestion_can_be_sent(
+            action_mode=suggestion.action_mode,
+            risk_level=suggestion.risk_level,
+            approval_status=suggestion.approval_status,
+            actor_role=sender_role,
+            final_text=suggestion.final_reply_text,
+            policy_reasons=tuple(suggestion.policy_reasons),
+        )
+    except ClaraEnforcementError as exc:
+        raise SentMessageError(str(exc)) from exc
 
     existing_sent_message = db.scalars(
         select(SentMessage).where(

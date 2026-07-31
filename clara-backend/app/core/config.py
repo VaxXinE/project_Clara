@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     openai_single_reply_max_output_tokens: int = 260
     clara_persona_authority_mode: str = "LEGACY"
     clara_semantic_revalidation_mode: str = "OFF"
+    clara_policy_enforcement_mode: str = "OBSERVE"
+    clara_compliance_reviewer_roles: str = "head,superadmin"
 
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"

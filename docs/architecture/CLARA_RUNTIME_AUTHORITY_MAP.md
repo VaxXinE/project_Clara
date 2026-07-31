@@ -217,3 +217,16 @@ or persistence. GAP-08 is observable after retry but not enforced; process
 state remains heuristic and no FSM was added.
 
 Readiness evidence: `docs/quality/CLARA_STAGE_4_READINESS_REPORT.md`.
+
+## K. Stage 5 Enforcement Update
+
+Stage 5 adds backend policy precedence after access control and semantic
+validation. `OBSERVE` is the rollout default and does not alter output or
+approval behavior. `ENFORCE` applies `NORMAL`, `HUMAN_REVIEW`, `SAFE_HANDOFF`,
+or `BLOCK`, disables extension auto-approval for pending suggestions, and
+checks reviewer roles in the shared backend gate.
+
+Complaint classification requires personal/contextual evidence. Safe handoff
+is deterministic and bypasses normal sales generation. No Tawk ownership,
+product fact, persona default, process heuristic, ORM model, or migration is
+changed.
