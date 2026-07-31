@@ -164,7 +164,13 @@ def build_runtime_context_block(
     conversation_variant_focus: str | None,
     customer_has_identity_submission: bool,
     customer_has_verification_completion: bool,
+    canonical_process_state: str | None = None,
 ) -> str:
+    process_state_line = (
+        f"- canonical_process_state={canonical_process_state}"
+        if canonical_process_state
+        else ""
+    )
     return f"""
 RUNTIME_CONTEXT
 - latest_customer_intent={latest_customer_intent}
@@ -175,6 +181,7 @@ RUNTIME_CONTEXT
 - conversation_variant_focus={conversation_variant_focus or "unknown"}
 - customer_has_identity_submission={str(customer_has_identity_submission).lower()}
 - customer_has_verification_completion={str(customer_has_verification_completion).lower()}
+{process_state_line}
 """.strip()
 
 

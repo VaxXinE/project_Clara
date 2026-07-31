@@ -45,6 +45,8 @@ from app.models.chat_review_case import ChatReviewCase
 from app.models.chat_review_note import ChatReviewNote
 from app.models.conversation import Conversation
 from app.models.customer_profile import CustomerProfile
+from app.models.customer_process_state import CustomerProcessState
+from app.models.customer_process_state_event import CustomerProcessStateEvent
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.knowledge_update_proposal import KnowledgeUpdateProposal
@@ -98,6 +100,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             SalesTeam.__table__,
             User.__table__,
             CustomerProfile.__table__,
+            CustomerProcessState.__table__,
+            CustomerProcessStateEvent.__table__,
             KpiCommandSnapshot.__table__,
             KpiAlertRecord.__table__,
             Lead.__table__,
@@ -179,6 +183,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             TeamPerformanceSnapshot.__table__,
             SalesPerformanceSnapshot.__table__,
             Lead.__table__,
+            CustomerProcessStateEvent.__table__,
+            CustomerProcessState.__table__,
             CustomerProfile.__table__,
             KpiAlertRecord.__table__,
             KpiCommandSnapshot.__table__,

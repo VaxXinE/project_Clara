@@ -3,6 +3,11 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from hashlib import sha256
 
+from app.core.clara_runtime_contract import (
+    PROCESS_STATE_METADATA,
+    ProcessState,
+    normalize_process_state,
+)
 from app.services.clara_reply_retry_service import (
     VALIDATOR_RULES,
     VALIDATOR_RULES_BY_ID,
@@ -62,6 +67,7 @@ class ReplyValidationContext:
     must_give_detailed_explanation: bool = False
     discusses_scalping_or_setup: bool = False
     product_fact_mode: str = "LEGACY"
+    canonical_process_state: str | None = None
     allowed_minimum_opening_amounts: tuple[int, ...] = (5_000_000,)
     capabilities: ReplyValidationCapabilities = field(
         default_factory=ReplyValidationCapabilities
@@ -242,6 +248,24 @@ def evaluate_reply(
             registry_authoritative=True,
         )
     )
+    canonical_state = ProcessState(
+        normalize_process_state(context.canonical_process_state).canonical_value
+    )
+    process_state_rank = PROCESS_STATE_METADATA[canonical_state][0] or 0
+    identity_fields = context.known_identity_fields
+    if process_state_rank >= 40 and not identity_fields:
+        identity_fields = {"name": "confirmed", "phone": "confirmed", "domicile": "confirmed"}
+    milestone_intent = context.latest_customer_intent
+    if process_state_rank >= 90:
+        milestone_intent = "trading_ready"
+    elif process_state_rank >= 80:
+        milestone_intent = "activation_complete"
+    post_signup_message = (
+        "customer sudah daftar"
+        if process_state_rank >= 40
+        else context.latest_customer_message
+    )
+
     checks = {
         "mixed_register": (
             context.latency_profile not in {"ultra_fast", "fast"}
@@ -282,7 +306,7 @@ def evaluate_reply(
             else legacy_sensitive_number_failed
         ),
         "post_signup_regression": validators.response_ignores_post_signup_state(
-            text, context.latest_customer_message
+            text, post_signup_message
         ),
         "repeated_product_selection": validators.response_reopens_product_selection(
             text,
@@ -290,7 +314,7 @@ def evaluate_reply(
         ),
         "repeated_identity_request": validators.response_reasks_identity_data(
             text,
-            latest_identity_fields=context.known_identity_fields,
+            latest_identity_fields=identity_fields,
         ),
         "abstract_data_requirement": validators.response_uses_abstract_data_requirement(
             text, context.latest_customer_message
@@ -312,7 +336,7 @@ def evaluate_reply(
         ),
         "repeated_onboarding": (
             validators.response_stays_stuck_in_onboarding_after_milestone(
-                text, context.latest_customer_intent
+                text, milestone_intent
             )
         ),
         "followup_topic_break": validators.response_breaks_followup_topic(

@@ -12,6 +12,12 @@ from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
 from app.schemas.ai_extraction_schema import AIExtractionCreate
 from app.services.customer_profile_service import apply_ai_autofill_to_customer_profile
+from app.services.clara_process_state_service import (
+    ProcessStateMode,
+    derive_process_state_observation,
+    normalize_process_state_mode,
+    record_process_state_observation,
+)
 from app.services.lead_service import sync_lead_from_conversation
 
 
@@ -399,6 +405,29 @@ def analyze_conversation(
         lead=lead,
         autofill=extraction_data.customer_profile_autofill,
     )
+    process_state_mode = normalize_process_state_mode(settings.clara_process_state_mode)
+    if process_state_mode in {ProcessStateMode.SHADOW, ProcessStateMode.FSM}:
+        db.flush([extraction])
+        latest_message = max(
+            conversation.messages,
+            key=lambda message: message.message_timestamp,
+        )
+        if lead.customer_profile is not None:
+            observation = derive_process_state_observation(
+                message_text=latest_message.message_text,
+                sender_type=latest_message.sender_type,
+                source_reference_type="message",
+                source_reference_id=latest_message.id,
+                extraction_confidence=extraction_data.confidence_score,
+                pipeline_stage=extraction_data.pipeline_stage,
+            )
+            record_process_state_observation(
+                db,
+                profile=lead.customer_profile,
+                observation=observation,
+                mode=process_state_mode,
+                correlation_id=str(extraction.id),
+            )
     db.commit()
     db.refresh(extraction)
 

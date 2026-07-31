@@ -6,6 +6,8 @@ from app.models.chat_review_case import ChatReviewCase
 from app.models.chat_review_note import ChatReviewNote
 from app.models.conversation import Conversation
 from app.models.customer_profile import CustomerProfile
+from app.models.customer_process_state import CustomerProcessState
+from app.models.customer_process_state_event import CustomerProcessStateEvent
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.knowledge_update_proposal import KnowledgeUpdateProposal
@@ -40,6 +42,8 @@ __all__ = [
     "ChatReviewNote",
     "Conversation",
     "CustomerProfile",
+    "CustomerProcessState",
+    "CustomerProcessStateEvent",
     "KpiAlertRecord",
     "KpiCommandSnapshot",
     "KnowledgeUpdateProposal",

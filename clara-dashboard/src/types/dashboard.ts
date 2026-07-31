@@ -393,6 +393,43 @@ export type CustomerProfileMergeRequest = {
   merge_notes?: string | null;
 };
 
+export type CustomerProcessStateItem = {
+  customer_profile_id: string;
+  current_state: string;
+  state_rank: number;
+  confidence_score: number;
+  source_type: string;
+  source_trust_level: string;
+  version: number;
+  manual_lock: boolean;
+  last_confirmed_at: string | null;
+  last_transition_at: string | null;
+  reconciliation_required: boolean;
+};
+
+export type ProcessStateEventItem = {
+  id: string;
+  previous_state: string;
+  proposed_state: string;
+  applied_state: string;
+  decision: string;
+  transition_type: string;
+  source_type: string;
+  evidence_codes: string[];
+  confidence_score: number;
+  source_trust_level: string;
+  actor_user_id: string | null;
+  reason_codes: string[];
+  created_at: string;
+};
+
+export type ProcessStateTransitionResponse = {
+  current: CustomerProcessStateItem;
+  decision: string;
+  reason_codes: string[];
+  decision_hash: string;
+};
+
 export type LeadDetail = LeadListItem & {
   conversation_ids: string[];
   customer_profile: CustomerProfileSummaryItem | null;

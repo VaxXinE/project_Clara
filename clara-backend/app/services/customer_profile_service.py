@@ -16,6 +16,10 @@ from app.schemas.ai_extraction_schema import CustomerProfileAutofill
 from app.services.access_control_service import get_accessible_sales_user_ids
 from app.services.business_segmentation_service import normalize_account_category
 from app.services.lead_activity_service import create_lead_activity_event
+from app.services.clara_process_state_service import (
+    get_or_create_process_state,
+    reconcile_customer_process_states,
+)
 from app.services.role_service import is_superadmin_like
 from app.services.source_intelligence_service import build_source_label, normalize_source_channel
 
@@ -463,6 +467,7 @@ def ensure_customer_profile_for_lead(
     lead.customer_profile_id = existing_profile.id
     db.add(lead)
     db.flush([lead])
+    get_or_create_process_state(db, existing_profile)
     sync_customer_profile_temperature(db=db, profile=existing_profile)
     return existing_profile
 
@@ -991,6 +996,13 @@ def merge_customer_profiles(
     source_profile.merged_into_profile_id = target_profile.id
     source_profile.merge_notes = merge_notes.strip() if merge_notes and merge_notes.strip() else "Merged manually"
     source_profile.match_strategy = "merged_manual"
+
+    reconcile_customer_process_states(
+        db,
+        source_profile=source_profile,
+        target_profile=target_profile,
+        actor_user_id=current_user.id,
+    )
 
     for lead in source_leads:
         lead.customer_profile_id = target_profile.id

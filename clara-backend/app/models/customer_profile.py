@@ -63,3 +63,9 @@ class CustomerProfile(Base):
         remote_side=[id],
         backref="merged_profiles",
     )
+    process_state = relationship(
+        "CustomerProcessState",
+        back_populates="customer_profile",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )

@@ -339,3 +339,18 @@ persona behavior, runtime context, product facts, then supporting knowledge.
 Stage 6 does not change persona (`LEGACY`), semantic (`OFF`), or policy
 (`OBSERVE`) defaults. See
 `docs/architecture/CLARA_PRODUCT_FACT_REGISTRY_CONTRACT.md`.
+
+## 18. Stage 7 Process-State Contract
+
+`CLARA_PROCESS_STATE_MODE` supports `LEGACY`, `SHADOW`, and `FSM`, default
+`LEGACY`. The Stage 1 `ProcessState` vocabulary is now persisted once per
+canonical customer profile with append-only decision history and optimistic
+versioning. UNKNOWN is not inferred from, nor replaced by, pipeline stage or
+temperature.
+
+LEGACY and SHADOW preserve prompt/validator output. FSM adds
+`canonical_process_state` to structured runtime context and continuity
+validation only. It does not enter persona playbooks and cannot override
+backend security, product facts, policy, reviewer, approval/send, complaint,
+or Tawk authority. See
+`docs/architecture/CLARA_PROCESS_STATE_FSM_CONTRACT.md`.

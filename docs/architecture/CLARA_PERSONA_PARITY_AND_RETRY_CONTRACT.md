@@ -140,3 +140,15 @@ validators are observation-only, retry results are revalidated only in
 `OBSERVE`, and production selection remains unchanged. Detailed limitations
 and canary gates are recorded in
 `docs/quality/CLARA_STAGE_4_READINESS_REPORT.md`.
+
+## 9. Stage 7 Process-State Interaction
+
+The former “No persisted FSM” continuity gap is addressed by a separate
+customer-level state contract. In FSM mode, retry validator IDs still describe
+detected output failures while factual progress comes from structured runtime
+state. Process state is not persona prose and adds no legacy behavioral retry
+fragment. LEGACY and SHADOW prompt parity remains unchanged.
+
+Sensitive-state correctness is still limited by available authoritative data
+sources; Stage 7 does not claim external access to verification, activation,
+or funding systems.
