@@ -64,6 +64,7 @@ from app.services.clara_policy_enforcement_service import (
 from app.services.clara_safe_handoff_service import build_safe_handoff
 from app.services.clara_complaint_service import create_or_touch_complaint_case
 from app.services.clara_service_routing_service import (
+    ServiceGenerationStrategy,
     ServiceRoute,
     ServiceRoutingMode,
     normalize_service_routing_mode,
@@ -4570,8 +4571,14 @@ def create_reply_suggestion(
         != GenerationStrategy.NORMAL_GENERATION
     ) or (
         service_routing_mode == ServiceRoutingMode.ROUTED
-        and service_routing_decision.route
-        in {ServiceRoute.COMPLAINT, ServiceRoute.CS_GENERAL}
+        and service_routing_decision.generation_strategy
+        in {
+            ServiceGenerationStrategy.SUPPORT_KNOWLEDGE_DRAFT,
+            ServiceGenerationStrategy.SUPPORT_SAFE_HANDOFF,
+            ServiceGenerationStrategy.COMPLAINT_SAFE_HANDOFF,
+            ServiceGenerationStrategy.OFF_TOPIC_BOUNDARY,
+            ServiceGenerationStrategy.NO_CUSTOMER_DRAFT,
+        }
     )
     reply_data = None
     if not skip_normal_generation:
@@ -4687,7 +4694,11 @@ def create_reply_suggestion(
             f"service_routing:{reason}"
             for reason in service_routing_decision.reason_codes
         )
-        if service_routing_decision.route == ServiceRoute.COMPLAINT:
+        if service_routing_decision.generation_strategy == ServiceGenerationStrategy.NO_CUSTOMER_DRAFT:
+            approval_status = "blocked"
+            applied_action_mode = ActionMode.BLOCK.value
+            model_name = "backend-service-boundary-v1"
+        elif service_routing_decision.route == ServiceRoute.COMPLAINT:
             category = service_routing_decision.complaint_category
             if category is None:
                 raise ReplySuggestionError("Complaint handoff category is missing.")
@@ -4704,6 +4715,7 @@ def create_reply_suggestion(
             create_or_touch_complaint_case(
                 db,
                 conversation=conversation,
+                message=latest_customer_message,
                 category=category,
                 handoff=handoff,
                 policy_decision_hash=preliminary_enforcement_decision.decision_hash,
@@ -4735,6 +4747,15 @@ def create_reply_suggestion(
             )
             if not article:
                 applied_action_mode = ActionMode.SAFE_HANDOFF.value
+        elif service_routing_decision.route == ServiceRoute.OFF_TOPIC:
+            suggested_replies = [
+                {
+                    "tone": "neutral",
+                    "text": "Saya dapat membantu pertanyaan terkait layanan dan informasi resmi perusahaan. Silakan sampaikan kebutuhan yang berkaitan dengan itu, ya.",
+                    "reasoning": "Deterministic service boundary.",
+                }
+            ]
+            model_name = "backend-off-topic-boundary-v1"
 
     if enforcement_mode == PolicyEnforcementMode.ENFORCE:
         applied_action_mode = enforcement_decision.action_mode.value
@@ -4760,6 +4781,7 @@ def create_reply_suggestion(
         if enforcement_decision.action_mode == ActionMode.BLOCK:
             approval_status = "blocked"
             model_name = "backend-policy-v1"
+            suggested_replies = []
         elif enforcement_decision.action_mode == ActionMode.SAFE_HANDOFF:
             category = enforcement_decision.safe_handoff_category
             if category is None:

@@ -32,18 +32,14 @@ class CustomerProcessStateEvent(Base):
     source_type: Mapped[str] = mapped_column(String(50), nullable=False)
     source_reference_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     source_reference_id: Mapped[UUID | None] = mapped_column(nullable=True)
-    evidence_codes: Mapped[list[str]] = mapped_column(
-        JSON, nullable=False, default=list
-    )
+    evidence_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False)
     source_trust_level: Mapped[str] = mapped_column(String(20), nullable=False)
     actor_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     reason_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
-    correlation_id: Mapped[str | None] = mapped_column(
-        String(100), nullable=True, index=True
-    )
+    correlation_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

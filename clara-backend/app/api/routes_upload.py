@@ -3,16 +3,7 @@ from datetime import timezone
 import re
 from uuid import UUID
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    File,
-    Form,
-    HTTPException,
-    Request,
-    UploadFile,
-    status,
-)
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -58,8 +49,12 @@ router = APIRouter(prefix="/upload", tags=["upload"])
 
 
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
-CONTACT_PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\-\s().]{6,}\d)")
-CONTACT_EMAIL_PATTERN = re.compile(r"\b[^@\s]+@[^@\s]+\.[^@\s]+\b")
+CONTACT_PHONE_PATTERN = re.compile(
+    r"(?:\+?\d[\d\-\s().]{6,}\d)"
+)
+CONTACT_EMAIL_PATTERN = re.compile(
+    r"\b[^@\s]+@[^@\s]+\.[^@\s]+\b"
+)
 
 
 class UploadRawChatRequest(BaseModel):
@@ -246,9 +241,9 @@ def build_message_fingerprint(message: object) -> tuple[str, str, str, str]:
         line.rstrip()
         for line in str(getattr(message, "message_text", "")).strip().splitlines()
     ).strip()
-    message_timestamp = (
-        getattr(message, "message_timestamp").astimezone(timezone.utc).isoformat()
-    )
+    message_timestamp = getattr(message, "message_timestamp").astimezone(
+        timezone.utc
+    ).isoformat()
     return (sender_name, sender_type, message_text, message_timestamp)
 
 
@@ -389,9 +384,7 @@ def sync_continued_conversation_effects(
     has_new_customer_message = any(
         message.sender_type == "customer" for message in new_messages
     )
-    has_new_sales_message = any(
-        message.sender_type == "sales" for message in new_messages
-    )
+    has_new_sales_message = any(message.sender_type == "sales" for message in new_messages)
 
     if has_new_customer_message:
         create_lead_activity_event(
@@ -499,7 +492,10 @@ def create_or_update_conversation_from_messages(
             latest_timestamp = parsed_messages[-1].message_timestamp
             started_at = ensure_aware_utc(existing_conversation.started_at)
             last_message_at = ensure_aware_utc(existing_conversation.last_message_at)
-            if started_at is None or ensure_aware_utc(first_timestamp) < started_at:
+            if (
+                started_at is None
+                or ensure_aware_utc(first_timestamp) < started_at
+            ):
                 existing_conversation.started_at = first_timestamp
             if (
                 last_message_at is None
@@ -542,9 +538,7 @@ def create_or_update_conversation_from_messages(
         )
 
         if new_messages and previous_status != existing_conversation.status:
-            preferred_customer_name = (
-                infer_customer_name_from_messages(new_messages) or title
-            )
+            preferred_customer_name = infer_customer_name_from_messages(new_messages) or title
             lead = ensure_conversation_lead(
                 db=db,
                 conversation=existing_conversation,
@@ -604,9 +598,7 @@ def create_or_update_conversation_from_messages(
         )
     db.flush()
 
-    preferred_customer_name = (
-        infer_customer_name_from_messages(parsed_messages) or title
-    )
+    preferred_customer_name = infer_customer_name_from_messages(parsed_messages) or title
     lead = ensure_conversation_lead(
         db=db,
         conversation=conversation,
@@ -619,9 +611,7 @@ def create_or_update_conversation_from_messages(
 
 @router.get("/channels", response_model=list[ChannelDefinitionItem])
 def list_upload_channels(
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> list[ChannelDefinitionItem]:
     validate_upload_access(current_user)
     return [ChannelDefinitionItem(**item) for item in list_channel_definitions()]
@@ -630,9 +620,7 @@ def list_upload_channels(
 @router.post("/detect-channel", response_model=ChannelDetectResponse)
 def detect_upload_channel(
     payload: ChannelDetectRequest,
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> ChannelDetectResponse:
     validate_upload_access(current_user)
     raw_text = payload.raw_text.strip()
@@ -656,9 +644,7 @@ async def upload_whatsapp_txt(
     title: str | None = Form(default=None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -698,16 +684,14 @@ async def upload_whatsapp_txt(
         source="whatsapp_txt",
     )
 
-    conversation, upload_status, appended_message_count = (
-        create_or_update_conversation_from_messages(
-            db=db,
-            current_user=current_user,
-            title=normalized_title,
-            source="whatsapp_txt",
-            raw_filename=file.filename,
-            raw_text=raw_text,
-            parsed_messages=parsed_messages,
-        )
+    conversation, upload_status, appended_message_count = create_or_update_conversation_from_messages(
+        db=db,
+        current_user=current_user,
+        title=normalized_title,
+        source="whatsapp_txt",
+        raw_filename=file.filename,
+        raw_text=raw_text,
+        parsed_messages=parsed_messages,
     )
     create_audit_log(
         db=db,
@@ -740,9 +724,7 @@ async def upload_telegram_txt(
     title: str | None = Form(default=None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -782,16 +764,14 @@ async def upload_telegram_txt(
         source="telegram_txt",
     )
 
-    conversation, upload_status, appended_message_count = (
-        create_or_update_conversation_from_messages(
-            db=db,
-            current_user=current_user,
-            title=normalized_title,
-            source="telegram_txt",
-            raw_filename=file.filename,
-            raw_text=raw_text,
-            parsed_messages=parsed_messages,
-        )
+    conversation, upload_status, appended_message_count = create_or_update_conversation_from_messages(
+        db=db,
+        current_user=current_user,
+        title=normalized_title,
+        source="telegram_txt",
+        raw_filename=file.filename,
+        raw_text=raw_text,
+        parsed_messages=parsed_messages,
     )
     create_audit_log(
         db=db,
@@ -823,9 +803,7 @@ async def upload_whatsapp_raw_text(
     payload: UploadRawChatRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -852,16 +830,14 @@ async def upload_whatsapp_raw_text(
         source="whatsapp_txt",
     )
 
-    conversation, upload_status, appended_message_count = (
-        create_or_update_conversation_from_messages(
-            db=db,
-            current_user=current_user,
-            title=normalized_title,
-            source="whatsapp_txt",
-            raw_filename=None,
-            raw_text=raw_text,
-            parsed_messages=parsed_messages,
-        )
+    conversation, upload_status, appended_message_count = create_or_update_conversation_from_messages(
+        db=db,
+        current_user=current_user,
+        title=normalized_title,
+        source="whatsapp_txt",
+        raw_filename=None,
+        raw_text=raw_text,
+        parsed_messages=parsed_messages,
     )
     create_audit_log(
         db=db,
@@ -893,9 +869,7 @@ async def upload_telegram_raw_text(
     payload: UploadRawChatRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ) -> dict[str, UUID | int | str]:
     validate_upload_access(current_user)
 
@@ -922,16 +896,14 @@ async def upload_telegram_raw_text(
         source="telegram_txt",
     )
 
-    conversation, upload_status, appended_message_count = (
-        create_or_update_conversation_from_messages(
-            db=db,
-            current_user=current_user,
-            title=normalized_title,
-            source="telegram_txt",
-            raw_filename=None,
-            raw_text=raw_text,
-            parsed_messages=parsed_messages,
-        )
+    conversation, upload_status, appended_message_count = create_or_update_conversation_from_messages(
+        db=db,
+        current_user=current_user,
+        title=normalized_title,
+        source="telegram_txt",
+        raw_filename=None,
+        raw_text=raw_text,
+        parsed_messages=parsed_messages,
     )
     create_audit_log(
         db=db,

@@ -28,7 +28,9 @@ def create_organization(
             "Slug must use lowercase letters, numbers, and hyphens only."
         )
 
-    existing = db.scalars(select(Organization).where(Organization.slug == slug)).first()
+    existing = db.scalars(
+        select(Organization).where(Organization.slug == slug)
+    ).first()
 
     if existing is not None:
         raise OrganizationError("Organization slug already exists.")
@@ -47,7 +49,9 @@ def create_organization(
 
 def list_organizations(db: Session) -> list[Organization]:
     return list(
-        db.scalars(select(Organization).order_by(Organization.created_at.desc())).all()
+        db.scalars(
+            select(Organization).order_by(Organization.created_at.desc())
+        ).all()
     )
 
 

@@ -51,9 +51,7 @@ class OpsNotification(Base):
     source_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     source_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     source_reference_id: Mapped[UUID | None] = mapped_column(nullable=True, index=True)
-    alert_type: Mapped[str | None] = mapped_column(
-        String(50), nullable=True, index=True
-    )
+    alert_type: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     workflow_scope: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
@@ -75,15 +73,9 @@ class OpsNotification(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     target_href: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
-    delivery_channel: Mapped[str] = mapped_column(
-        String(30), nullable=False, default="in_app"
-    )
-    delivery_status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="pending"
-    )
-    escalation_level: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="none"
-    )
+    delivery_channel: Mapped[str] = mapped_column(String(30), nullable=False, default="in_app")
+    delivery_status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    escalation_level: Mapped[str] = mapped_column(String(20), nullable=False, default="none")
     resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 

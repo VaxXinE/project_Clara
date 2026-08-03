@@ -25,7 +25,9 @@ SHADOW_VALIDATOR_IDS = (
     "unsupported_fixed_sensitive_number",
     "post_signup_regression",
 )
-REQUIRED_SYSTEM_SECTIONS = frozenset(section.value for section in SystemPlaybookSection)
+REQUIRED_SYSTEM_SECTIONS = frozenset(
+    section.value for section in SystemPlaybookSection
+)
 
 
 def load_golden_cases(path: Path) -> list[dict]:
@@ -77,10 +79,14 @@ def build_shadow_report(
                     desired_count=1,
                 ),
                 runtime_context=build_runtime_context_block(
-                    latest_customer_intent=case.get("expected_intent", "unknown"),
+                    latest_customer_intent=case.get(
+                        "expected_intent", "unknown"
+                    ),
                     preferred_reply_register="natural",
                     answer_commitment_level="direct_answer_first",
-                    variant_response_mode=case.get("account_category", "unknown"),
+                    variant_response_mode=case.get(
+                        "account_category", "unknown"
+                    ),
                     customer_has_variant_commitment=False,
                     conversation_variant_focus=None,
                     customer_has_identity_submission=False,
@@ -112,11 +118,15 @@ def build_shadow_report(
                 "legacy_fragments_present": [
                     fragment.name for fragment in authority.included_fragments
                 ],
-                "legacy_retry_fragments_present": list(retry.behavioral_fragment_names),
+                "legacy_retry_fragments_present": list(
+                    retry.behavioral_fragment_names
+                ),
                 "product_fact_injection_present": (
                     LEGACY_PRODUCT_FACT_INJECTION in authority.content
                 ),
-                "product_fact_hash": sha256(product_facts.encode("utf-8")).hexdigest(),
+                "product_fact_hash": sha256(
+                    product_facts.encode("utf-8")
+                ).hexdigest(),
                 "technical_shell_present": (
                     "TECHNICAL_OUTPUT_CONTRACT" in authority.content
                 ),
@@ -126,7 +136,9 @@ def build_shadow_report(
                     and "SUPPORTING_KNOWLEDGE_AND_RESPONSE_EXAMPLES"
                     not in authority.content
                 ),
-                "retry_contract_present": ("RETRY_TECHNICAL_CONTRACT" in retry.content),
+                "retry_contract_present": (
+                    "RETRY_TECHNICAL_CONTRACT" in retry.content
+                ),
                 "forbidden_authority_leakage": forbidden_leaks,
                 "prompt_hash": debug["prompt_content_hash"],
                 "retry_prompt_hash": retry.content_hash,

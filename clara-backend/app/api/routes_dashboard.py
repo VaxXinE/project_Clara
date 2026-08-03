@@ -4,17 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    File,
-    Form,
-    HTTPException,
-    Query,
-    Request,
-    UploadFile,
-    status,
-)
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 from app.core.security import require_roles
@@ -190,9 +180,7 @@ def get_extension_build_or_raise() -> dict[str, object]:
 @router.get("/channels", response_model=ChannelOverviewResponse)
 def channel_overview(
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_channel_overview(db=db, current_user=current_user)
 
@@ -202,9 +190,7 @@ def sales_inbox(
     source_channel: str | None = Query(default=None),
     archive_scope: str = Query(default="active"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_sales_inbox(
         db=db,
@@ -217,9 +203,7 @@ def sales_inbox(
 @router.get("/sales/worklist", response_model=SalesWorklistResponse)
 def sales_worklist(
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_sales_worklist(db=db, current_user=current_user)
 
@@ -239,9 +223,7 @@ def manager_insights(
     )
 
 
-@router.get(
-    "/manager-insights/weekly-review", response_model=WeeklyReviewSummaryResponse
-)
+@router.get("/manager-insights/weekly-review", response_model=WeeklyReviewSummaryResponse)
 def manager_weekly_review(
     account_category: str | None = Query(default=None),
     format: str = Query(default="json"),
@@ -282,9 +264,7 @@ def manager_weekly_review(
 )
 def dashboard_performance_actions(
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return list_performance_actions(db=db, current_user=current_user)
 
@@ -455,9 +435,7 @@ def sales_approval_queue(
     action_mode: str | None = Query(default=None),
     age_bucket: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_sales_approval_queue(
         db=db,
@@ -475,9 +453,7 @@ def sales_chat_review_center(
     age_bucket: str | None = Query(default=None),
     source_channel: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return get_sales_chat_review_center(
         db=db,
@@ -631,9 +607,7 @@ def add_chat_review_note_endpoint(
 @router.get("/notifications", response_model=OpsNotificationResponse)
 def list_ops_notifications_endpoint(
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return list_ops_notifications(db=db, current_user=current_user)
 
@@ -646,9 +620,7 @@ def acknowledge_ops_notification_endpoint(
     notification_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         notification = acknowledge_ops_notification(
@@ -669,10 +641,7 @@ def acknowledge_ops_notification_endpoint(
         resource_id=str(notification.id),
         current_user=current_user,
         request=request,
-        metadata={
-            "status": notification.status,
-            "source_type": notification.source_type,
-        },
+        metadata={"status": notification.status, "source_type": notification.source_type},
     )
     return notification
 
@@ -686,9 +655,7 @@ def resolve_ops_notification_endpoint(
     payload: OpsNotificationResolveRequest | None,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         notification = resolve_ops_notification(
@@ -710,10 +677,7 @@ def resolve_ops_notification_endpoint(
         resource_id=str(notification.id),
         current_user=current_user,
         request=request,
-        metadata={
-            "status": notification.status,
-            "escalation_level": notification.escalation_level,
-        },
+        metadata={"status": notification.status, "escalation_level": notification.escalation_level},
     )
     return notification
 
@@ -749,10 +713,7 @@ def ignore_ops_notification_endpoint(
         resource_id=str(notification.id),
         current_user=current_user,
         request=request,
-        metadata={
-            "status": notification.status,
-            "source_type": notification.source_type,
-        },
+        metadata={"status": notification.status, "source_type": notification.source_type},
     )
     return notification
 
@@ -765,9 +726,7 @@ def reopen_ops_notification_endpoint(
     notification_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         notification = reopen_ops_notification(
@@ -834,9 +793,7 @@ def escalate_ops_notification_endpoint(
 def sales_conversation_detail(
     conversation_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     detail = get_sales_conversation_detail(
         db=db,
@@ -994,9 +951,7 @@ def list_kpi_alerts_endpoint(
     return list_kpi_alert_records(db=db, current_user=current_user)
 
 
-@router.patch(
-    "/kpi/alerts/{alert_id}/acknowledge", response_model=PersistedKpiAlertRecord
-)
+@router.patch("/kpi/alerts/{alert_id}/acknowledge", response_model=PersistedKpiAlertRecord)
 def acknowledge_kpi_alert_endpoint(
     alert_id: UUID,
     request: Request,
@@ -1151,9 +1106,7 @@ def admin_ops_overview(
 
 @router.get("/extension-builds")
 def list_extension_builds(
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     return build_extension_build_item(current_user)
 
@@ -1194,9 +1147,7 @@ async def upload_extension_build(
             detail="Ukuran file extension terlalu besar. Maksimum 50MB.",
         )
 
-    safe_version = (
-        EXTENSION_FILENAME_SANITIZER.sub("-", normalized_version).strip("-") or "build"
-    )
+    safe_version = EXTENSION_FILENAME_SANITIZER.sub("-", normalized_version).strip("-") or "build"
     extension_dir = get_extension_distribution_dir()
     extension_dir.mkdir(parents=True, exist_ok=True)
     stored_file_name = f"clara-extension-{safe_version}{suffix}"
@@ -1239,14 +1190,10 @@ async def upload_extension_build(
 def download_extension_build(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     metadata = get_extension_build_or_raise()
-    file_path = get_extension_distribution_dir() / str(
-        metadata.get("stored_file_name") or ""
-    )
+    file_path = get_extension_distribution_dir() / str(metadata.get("stored_file_name") or "")
 
     if not file_path.exists():
         raise HTTPException(

@@ -169,16 +169,12 @@ class SGCCKpiEnrichmentRequest(BaseModel):
     source_channel: str | None = Field(default=None, max_length=50)
     summary: KpiSummaryCard
     marketing_execution_summary: MarketingExecutionSummary
-    sales_performance: list[SalesPerformanceRow] = Field(
-        default_factory=list, max_length=100
-    )
+    sales_performance: list[SalesPerformanceRow] = Field(default_factory=list, max_length=100)
     organization_performance: list[OrganizationPerformanceRow] = Field(
         default_factory=list,
         max_length=100,
     )
-    source_performance: list[SourcePerformanceRow] = Field(
-        default_factory=list, max_length=100
-    )
+    source_performance: list[SourcePerformanceRow] = Field(default_factory=list, max_length=100)
 
 
 class SGCCKpiEnrichmentResponse(BaseModel):

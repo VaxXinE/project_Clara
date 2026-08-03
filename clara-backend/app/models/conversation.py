@@ -30,9 +30,7 @@ class Conversation(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     channel: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     provider: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
-    provider_key: Mapped[str | None] = mapped_column(
-        String(50), nullable=True, index=True
-    )
+    provider_key: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     external_thread_id: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,

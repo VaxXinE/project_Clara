@@ -30,16 +30,10 @@ class LeadDeal(Base):
 
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="open")
     currency: Mapped[str] = mapped_column(String(10), nullable=False, default="IDR")
-    expected_value: Mapped[float] = mapped_column(
-        Numeric(18, 2), nullable=False, default=0
-    )
-    deposit_amount: Mapped[float] = mapped_column(
-        Numeric(18, 2), nullable=False, default=0
-    )
+    expected_value: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0)
+    deposit_amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0)
     expected_close_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    closed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

@@ -364,7 +364,9 @@ LEGACY_RETRY_FRAGMENTS = (
         ),
     ),
 )
-HYBRID_APPROVED_RETRY_FRAGMENTS = frozenset({"legacy_retry_legality_grounding"})
+HYBRID_APPROVED_RETRY_FRAGMENTS = frozenset(
+    {"legacy_retry_legality_grounding"}
+)
 
 
 @dataclass(frozen=True)

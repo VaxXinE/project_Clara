@@ -14,6 +14,8 @@ class SupportArticleCreate(BaseModel):
     source: str = Field(max_length=50)
     source_reference: str = Field(max_length=500)
     risk_class: str = Field(default="LOW", pattern="^(LOW|MEDIUM|HIGH)$")
+    effective_from: datetime | None = None
+    effective_until: datetime | None = None
 
 
 class SupportArticleResponse(BaseModel):
@@ -67,3 +69,41 @@ class ComplaintTransitionRequest(BaseModel):
 class ComplaintAssignRequest(BaseModel):
     expected_version: int = Field(gt=0)
     assigned_user_id: UUID
+    reason_codes: list[str] = Field(min_length=1, max_length=10)
+
+
+class ComplaintSeverityRequest(BaseModel):
+    expected_version: int = Field(gt=0)
+    severity: str = Field(pattern="^(LOW|MEDIUM|HIGH|CRITICAL)$")
+    reason_codes: list[str] = Field(min_length=1, max_length=10)
+
+
+class ComplaintSafeIntakeRequest(BaseModel):
+    expected_version: int = Field(gt=0)
+    approximate_time: str | None = Field(
+        default=None, pattern="^(TODAY|YESTERDAY|THIS_WEEK|OLDER|UNKNOWN)$"
+    )
+    affected_feature_or_process: str | None = Field(
+        default=None,
+        pattern="^(LOGIN|VERIFICATION|ACTIVATION|FUNDING|WITHDRAWAL|TRANSACTION|PLATFORM|OTHER|UNKNOWN)$",
+    )
+    money_involved: bool | None = None
+    account_access_concern: bool | None = None
+    requested_outcome: str | None = Field(
+        default=None,
+        pattern="^(HUMAN_HANDLING|INVESTIGATION|REFUND_REVIEW|COMPENSATION_REVIEW|OTHER|UNKNOWN)$",
+    )
+    reason_codes: list[str] = Field(min_length=1, max_length=10)
+
+
+class ComplaintEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    complaint_case_id: UUID
+    previous_status: str | None
+    new_status: str
+    event_type: str
+    reason_codes: list[str]
+    actor_user_id: UUID | None
+    safe_metadata: dict
+    created_at: datetime

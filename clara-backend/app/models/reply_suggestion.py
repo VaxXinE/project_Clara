@@ -28,22 +28,14 @@ class ReplySuggestion(Base):
     provider: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
 
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    schema_version: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="v1"
-    )
+    schema_version: Mapped[str] = mapped_column(String(50), nullable=False, default="v1")
 
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False)
     action_mode: Mapped[str] = mapped_column(String(50), nullable=False)
-    approval_status: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="pending"
-    )
+    approval_status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
 
-    suggested_replies: Mapped[list[dict]] = mapped_column(
-        JSONB, nullable=False, default=list
-    )
-    policy_reasons: Mapped[list[str]] = mapped_column(
-        JSONB, nullable=False, default=list
-    )
+    suggested_replies: Mapped[list[dict]] = mapped_column(JSONB, nullable=False, default=list)
+    policy_reasons: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
 
     selected_reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     final_reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)

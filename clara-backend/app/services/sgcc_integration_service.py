@@ -149,7 +149,9 @@ def generate_sgcc_reply_suggestions(
     latest_customer_message = _get_latest_message_text(payload, "customer")
     latest_sales_message = _get_latest_message_text(payload, "sales")
     latest_customer_intent = infer_latest_customer_intent(latest_customer_message)
-    preferred_reply_register = get_preferred_reply_register(latest_customer_message)
+    preferred_reply_register = get_preferred_reply_register(
+        latest_customer_message
+    )
     must_answer_with_product_options = should_message_ask_product_options(
         latest_customer_message
     )
@@ -221,9 +223,7 @@ def generate_sgcc_reply_suggestions(
     return analysis, policy_decision, suggestions
 
 
-def _normalized_counter_items(
-    counter: Counter[str], limit: int = 10
-) -> list[SGCCObjectionInsightItem]:
+def _normalized_counter_items(counter: Counter[str], limit: int = 10) -> list[SGCCObjectionInsightItem]:
     return [
         SGCCObjectionInsightItem(topic=topic, count=count)
         for topic, count in counter.most_common(limit)
@@ -375,9 +375,7 @@ def build_sgcc_follow_up_recommendation(
     if normalized_follow_up_at is not None and normalized_follow_up_at <= now:
         task_type = "overdue_follow_up"
         urgency_level = "critical"
-        reason = (
-            "Jadwal follow-up sudah lewat dan prospek ini berisiko kehilangan momentum."
-        )
+        reason = "Jadwal follow-up sudah lewat dan prospek ini berisiko kehilangan momentum."
         priority_score += 40
     elif (
         analysis.lead_temperature == "hot"
@@ -391,9 +389,7 @@ def build_sgcc_follow_up_recommendation(
     elif policy_decision.action_mode == "escalate_to_human":
         task_type = "supervisor_review"
         urgency_level = "high"
-        reason = (
-            "Percakapan high risk dan butuh eskalasi ke supervisor atau PIC senior."
-        )
+        reason = "Percakapan high risk dan butuh eskalasi ke supervisor atau PIC senior."
         priority_score += 25
         recommended_action = (
             "Eskalasi kasus ini ke supervisor, review legal/risk concern, lalu "
@@ -516,13 +512,7 @@ def _calculate_identity_match(
 
 def build_sgcc_customer_identity_match(
     payload: SGCCCustomerIdentityMatchRequest,
-) -> tuple[
-    SGCCIdentityMatchCandidateItem,
-    SGCCIdentityMatchCandidateItem | None,
-    list[SGCCIdentityMatchCandidateItem],
-    bool,
-    str,
-]:
+) -> tuple[SGCCIdentityMatchCandidateItem, SGCCIdentityMatchCandidateItem | None, list[SGCCIdentityMatchCandidateItem], bool, str]:
     primary_item = _build_identity_match_item(payload.primary_profile)
     candidates: list[SGCCIdentityMatchCandidateItem] = []
 
@@ -555,13 +545,9 @@ def build_sgcc_customer_identity_match(
 
     candidates.sort(key=lambda item: item.match_score, reverse=True)
     recommended_match = candidates[0] if candidates else None
-    should_merge = (
-        recommended_match is not None
-        and recommended_match.match_score
-        >= max(
-            payload.match_threshold,
-            0.7,
-        )
+    should_merge = recommended_match is not None and recommended_match.match_score >= max(
+        payload.match_threshold,
+        0.7,
     )
     merge_reason = (
         f"Candidate teratas memiliki match_score {recommended_match.match_score:.2f} dan cukup kuat untuk digabung."

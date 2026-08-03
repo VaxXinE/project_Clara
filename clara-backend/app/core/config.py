@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     clara_product_fact_mode: str = "LEGACY"
     clara_process_state_mode: str = "LEGACY"
     clara_service_routing_mode: str = "LEGACY"
+    clara_complaint_incident_window_days: int = 30
     clara_product_fact_high_volatility_days: int = 7
     clara_product_fact_medium_volatility_days: int = 30
     clara_product_fact_low_volatility_days: int = 90
