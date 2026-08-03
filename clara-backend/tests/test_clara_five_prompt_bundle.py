@@ -20,6 +20,7 @@ from app.services.ai_persona_bundle_service import (
 )
 from app.services.clara_playbook_service import load_effective_system_sections
 from app.services.clara_playbook_service import compose_clara_playbooks
+from app.services import clara_evaluation_service
 from app.services.ai_persona_config_service import (
     AIPersonaConfigError,
     publish_persona_version,
@@ -34,6 +35,16 @@ def login(client, email: str, password: str) -> None:
 
 def csrf_headers(client) -> dict[str, str]:
     return {"X-CSRF-Token": client.cookies.get("clara_csrf_token")}
+
+
+@pytest.fixture(autouse=True)
+def stage7_publication_compatibility(monkeypatch):
+    """Stage 7 tests predate the mandatory Stage 8 certification gate."""
+    monkeypatch.setattr(
+        clara_evaluation_service,
+        "assert_bundle_certified_for_publication",
+        lambda _db, _bundle: object(),
+    )
 
 
 def _complete_bundle(db, user, suffix: str = "v1"):
@@ -300,7 +311,9 @@ def test_whole_bundle_rollback_creates_new_versions(db_session_factory, seeded_d
     assert restored.status == "published"
     assert restored.source_bundle_id == first.id
     assert second.status == "archived"
-    assert {item.persona_config_version.source_version_id for item in restored.sections}
+    assert {
+        item.persona_config_version_id for item in restored.sections
+    } == {item.persona_config_version_id for item in first.sections}
     db.close()
 
 

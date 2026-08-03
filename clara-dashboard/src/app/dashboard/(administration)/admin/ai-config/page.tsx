@@ -93,6 +93,55 @@ type EffectiveBundleState = {
   legacy_overlay_present: boolean;
 };
 
+type EvaluationRun = {
+  id: string;
+  persona_bundle_id: string;
+  persona_bundle_hash: string;
+  dataset_version: string;
+  dataset_hash: string;
+  evaluator_version: string;
+  configuration_profile: string;
+  status: string;
+  automated_verdict: string | null;
+  passed_case_count: number;
+  failed_case_count: number;
+  critical_failure_count: number;
+  human_review_status: string;
+  human_review_count: number;
+  certification_status: string;
+  report_hash: string | null;
+  superseded_at: string | null;
+};
+
+type EvaluationCase = {
+  case_id: string;
+  category: string;
+  authority_mode: string;
+  automated_verdict: string;
+  findings: { reason_codes?: string[] };
+  review_count: number;
+};
+
+type BundleCertification = {
+  certified: boolean;
+  bundle_hash_match: boolean;
+  run: EvaluationRun | null;
+  message: string;
+};
+
+const REVIEW_DIMENSIONS = [
+  "factual_correctness",
+  "directness",
+  "relevance",
+  "trust",
+  "risk_transparency",
+  "process_continuity",
+  "tone_fit",
+  "cta_appropriateness",
+  "operational_usefulness",
+  "compliance_safety",
+] as const;
+
 const SECTIONS: { key: PersonaSectionKey; label: string; description: string }[] = [
   {
     key: "guardrail",
@@ -143,6 +192,14 @@ export default function AiPersonaConfigPage() {
   const [previewedBundleId, setPreviewedBundleId] = useState<string | null>(null);
   const [effectiveBundleState, setEffectiveBundleState] =
     useState<EffectiveBundleState | null>(null);
+  const [evaluationRun, setEvaluationRun] = useState<EvaluationRun | null>(null);
+  const [evaluationCases, setEvaluationCases] = useState<EvaluationCase[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState("");
+  const [reviewScores, setReviewScores] = useState<Record<string, number>>(
+    Object.fromEntries(REVIEW_DIMENSIONS.map((key) => [key, 5])),
+  );
+  const [certification, setCertification] =
+    useState<BundleCertification | null>(null);
 
   const currentBundle = bundles.find((bundle) => bundle.status === "published");
   const candidateBundle = bundles.find(
@@ -164,7 +221,7 @@ export default function AiPersonaConfigPage() {
     setErrorMessage("");
     try {
       const params = new URLSearchParams({ variant: nextVariant });
-      const [effective, history, bundleHistory, bundleState] = await Promise.all([
+      const [effective, history, bundleHistory, bundleState, evaluationHistory] = await Promise.all([
         apiFetch<EffectiveSection[]>(
           `/ai-persona-config/effective?${params.toString()}`,
         ),
@@ -181,11 +238,40 @@ export default function AiPersonaConfigPage() {
               `/ai-persona-config/bundles/effective/current?${params.toString()}`,
             )
           : Promise.resolve(null),
+        nextVariant === "mini"
+          ? apiFetch<EvaluationRun[]>("/clara-evaluations")
+          : Promise.resolve([]),
       ]);
       setEffectiveSections(effective);
       setVersions(history);
       setBundles(bundleHistory);
       setEffectiveBundleState(bundleState);
+      const candidate = bundleHistory.find(
+        (bundle) => bundle.status === "draft" || bundle.status === "validated",
+      );
+      const latestRun = candidate
+        ? evaluationHistory.find((run) => run.persona_bundle_id === candidate.id) ?? null
+        : null;
+      setEvaluationRun(latestRun);
+      if (candidate) {
+        const certificationState = await apiFetch<BundleCertification>(
+          `/clara-evaluations/bundles/${candidate.id}/certification`,
+        );
+        setCertification(certificationState);
+      } else {
+        setCertification(null);
+      }
+      if (latestRun) {
+        const cases = await apiFetch<EvaluationCase[]>(
+          `/clara-evaluations/${latestRun.id}/cases`,
+        );
+        const personaCases = cases.filter((item) => item.authority_mode === "PERSONA");
+        setEvaluationCases(personaCases);
+        setSelectedCaseId((current) => current || personaCases[0]?.case_id || "");
+      } else {
+        setEvaluationCases([]);
+        setSelectedCaseId("");
+      }
       const draftSection = bundleHistory
         .find(
           (bundle) => bundle.status === "draft" || bundle.status === "validated",
@@ -358,7 +444,12 @@ export default function AiPersonaConfigPage() {
   }
 
   async function publishCandidate() {
-    if (!candidateBundle || !bundleValidation?.complete) return;
+    if (
+      !candidateBundle ||
+      !bundleValidation?.complete ||
+      !certification?.certified ||
+      !certification.bundle_hash_match
+    ) return;
     const versions = candidateBundle.sections
       .map((item) => `${item.section_key} v${item.version_number}`)
       .join("\n");
@@ -407,6 +498,127 @@ export default function AiPersonaConfigPage() {
       setErrorMessage(error instanceof Error ? error.message : "Preview gagal.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function createEvaluationRun() {
+    if (!candidateBundle || candidateBundle.status !== "validated") return;
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await apiFetch<EvaluationRun>("/clara-evaluations", {
+        method: "POST",
+        body: {
+          persona_bundle_id: candidateBundle.id,
+          configuration_profile: "GOVERNED_OFFLINE_SIMULATION",
+        },
+      });
+      setSuccessMessage("Run Golden V2 dibuat. Jalankan fixture deterministic berikutnya.");
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Gagal membuat evaluation run.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function runFixtureEvaluation() {
+    if (!evaluationRun || evaluationRun.status !== "DRAFT") return;
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await apiFetch<EvaluationRun>(`/clara-evaluations/${evaluationRun.id}/evaluate`, {
+        method: "POST",
+        body: { fixture_mode: true },
+      });
+      setSuccessMessage("Evaluasi fixture selesai. Lanjutkan human review sebelum sertifikasi.");
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Evaluasi gagal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function submitHumanReview() {
+    if (!evaluationRun || !selectedCaseId) return;
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await apiFetch(`/clara-evaluations/${evaluationRun.id}/cases/${selectedCaseId}/reviews`, {
+        method: "POST",
+        body: {
+          scores: reviewScores,
+          hard_fail: false,
+          reason_codes: ["SUPERADMIN_REVIEWED"],
+        },
+      });
+      setSuccessMessage(`Human review ${selectedCaseId} tersimpan.`);
+      const nextCase = evaluationCases.find(
+        (item) => item.case_id !== selectedCaseId && item.review_count === 0,
+      );
+      if (nextCase) setSelectedCaseId(nextCase.case_id);
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Human review gagal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function decideCertification(decision: "CERTIFY" | "REJECT") {
+    if (!evaluationRun) return;
+    if (!window.confirm(`${decision} evaluation run ini? Sertifikasi tidak mengaktifkan production.`)) return;
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await apiFetch<EvaluationRun>(`/clara-evaluations/${evaluationRun.id}/certification`, {
+        method: "POST",
+        body: { decision },
+      });
+      setSuccessMessage(`Evaluation run ${decision.toLowerCase()}.`);
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Keputusan sertifikasi gagal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function reconcileSelectedCase() {
+    if (!evaluationRun || !selectedCaseId) return;
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await apiFetch(`/clara-evaluations/${evaluationRun.id}/cases/${selectedCaseId}/reconcile`, {
+        method: "POST",
+        body: { reconciled_scores: reviewScores },
+      });
+      setSuccessMessage(`Konflik review ${selectedCaseId} direkonsiliasi.`);
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Rekonsiliasi gagal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function downloadSafeReport() {
+    if (!evaluationRun) return;
+    try {
+      const report = await apiFetch<Record<string, unknown>>(
+        `/clara-evaluations/${evaluationRun.id}/report`,
+      );
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `clara-golden-v2-${evaluationRun.id}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Report gagal diunduh.");
     }
   }
 
@@ -611,7 +823,9 @@ export default function AiPersonaConfigPage() {
                       disabled={
                         isSubmitting ||
                         !bundleValidation?.complete ||
-                        previewedBundleId !== candidateBundle.id
+                        previewedBundleId !== candidateBundle.id ||
+                        !certification?.certified ||
+                        !certification.bundle_hash_match
                       }
                       onClick={() => void publishCandidate()}
                     >
@@ -666,6 +880,167 @@ export default function AiPersonaConfigPage() {
                       : "Tidak ada"}
                   </p>
                 </div>
+              </div>
+            )}
+
+            {candidateBundle && (
+              <div className="mt-4 rounded-xl border border-slate-200 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Golden V2 Evaluation & Certification
+                    </p>
+                    <p className="mt-1 text-sm font-semibold clara-text-primary">
+                      {evaluationRun
+                        ? `${evaluationRun.status} · automated ${evaluationRun.automated_verdict ?? "pending"}`
+                        : "Belum ada evaluation run untuk kandidat ini"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Dataset {evaluationRun?.dataset_version ?? "2.0"} · Evaluator {evaluationRun?.evaluator_version ?? "2.0"}
+                    </p>
+                    <p className="mt-1 break-all text-xs text-slate-500">
+                      Dataset hash: {evaluationRun?.dataset_hash ?? "dibuat saat evaluation run"}
+                    </p>
+                    <p className="mt-1 text-xs font-semibold text-amber-700">
+                      Certification is not production activation.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {!evaluationRun && (
+                      <button
+                        type="button"
+                        className="clara-button clara-button-ghost"
+                        disabled={isSubmitting || candidateBundle.status !== "validated"}
+                        onClick={() => void createEvaluationRun()}
+                      >
+                        Create run
+                      </button>
+                    )}
+                    {evaluationRun?.status === "DRAFT" && (
+                      <button
+                        type="button"
+                        className="clara-button clara-button-ghost"
+                        disabled={isSubmitting}
+                        onClick={() => void runFixtureEvaluation()}
+                      >
+                        Run offline fixture
+                      </button>
+                    )}
+                    {evaluationRun && (
+                      <button
+                        type="button"
+                        className="clara-button clara-button-ghost"
+                        onClick={() => void downloadSafeReport()}
+                      >
+                        Download safe report
+                      </button>
+                    )}
+                    {evaluationRun?.status === "HUMAN_REVIEW_PENDING" && (
+                      <>
+                        <button
+                          type="button"
+                          className="clara-button clara-button-primary"
+                          disabled={isSubmitting}
+                          onClick={() => void decideCertification("CERTIFY")}
+                        >
+                          Certify
+                        </button>
+                        <button
+                          type="button"
+                          className="clara-button clara-button-ghost"
+                          disabled={isSubmitting}
+                          onClick={() => void decideCertification("REJECT")}
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {evaluationRun && (
+                  <div className="mt-3 grid gap-3 text-sm md:grid-cols-4">
+                    <div>PASS: {evaluationRun.passed_case_count}</div>
+                    <div>FAIL: {evaluationRun.failed_case_count}</div>
+                    <div>Critical: {evaluationRun.critical_failure_count}</div>
+                    <div>Human review: {evaluationRun.human_review_status}</div>
+                    <div>Reviews: {evaluationRun.human_review_count}</div>
+                    <div>Certification: {evaluationRun.certification_status}</div>
+                    <div>Hash match: {certification?.bundle_hash_match ? "yes" : "no"}</div>
+                    <div>Superseded: {evaluationRun.superseded_at ? "yes" : "no"}</div>
+                  </div>
+                )}
+
+                {evaluationCases.length > 0 && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Category completion: {[...new Set(evaluationCases.map((item) => item.category))]
+                      .map((category) => `${category} ${evaluationCases.filter((item) => item.category === category).length}/5`)
+                      .join(" · ")}
+                  </p>
+                )}
+
+                {evaluationRun?.status === "HUMAN_REVIEW_PENDING" && evaluationCases.length > 0 && (
+                  <div className="mt-4 border-t border-slate-200 pt-4">
+                    <label className="text-sm font-semibold clara-text-primary" htmlFor="evaluation-case">
+                      PERSONA case untuk human review
+                    </label>
+                    <select
+                      id="evaluation-case"
+                      className="mt-2 w-full rounded-lg border border-slate-300 p-2 text-sm"
+                      value={selectedCaseId}
+                      onChange={(event) => setSelectedCaseId(event.target.value)}
+                    >
+                      {evaluationCases.map((item) => (
+                        <option key={item.case_id} value={item.case_id}>
+                          {item.case_id} · {item.category} · {item.automated_verdict} · {item.review_count} review
+                        </option>
+                      ))}
+                    </select>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                      {REVIEW_DIMENSIONS.map((dimension) => (
+                        <label key={dimension} className="text-xs text-slate-600">
+                          {dimension.replaceAll("_", " ")}
+                          <input
+                            type="number"
+                            min={1}
+                            max={5}
+                            required
+                            className="mt-1 w-full rounded-lg border border-slate-300 p-2"
+                            value={reviewScores[dimension]}
+                            onChange={(event) =>
+                              setReviewScores((current) => ({
+                                ...current,
+                                [dimension]: Number(event.target.value),
+                              }))
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="clara-button clara-button-ghost mt-3"
+                      disabled={isSubmitting}
+                      onClick={() => void submitHumanReview()}
+                    >
+                      Submit human review
+                    </button>
+                    <button
+                      type="button"
+                      className="clara-button clara-button-ghost mt-3 ml-2"
+                      disabled={isSubmitting}
+                      onClick={() => void reconcileSelectedCase()}
+                    >
+                      Reconcile conflict
+                    </button>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Safe findings: {evaluationCases.find((item) => item.case_id === selectedCaseId)?.findings.reason_codes?.join(", ") || "none"}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      COMPLAINT dan ADVERSARIAL_COMPLIANCE wajib direview dua superadmin berbeda; konflik harus direkonsiliasi reviewer ketiga.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </section>
