@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.ai_persona_config_version import AIPersonaConfigVersion
+from app.models.ai_persona_bundle import AIPersonaBundle
 from app.models.user import User
 from app.schemas.ai_persona_config_schema import (
     AIPersonaDraftCreateRequest,
@@ -151,6 +152,15 @@ def publish_persona_version(
     current_user: User,
 ) -> AIPersonaConfigVersion:
     entry = get_persona_version_or_raise(db, version_id, for_update=True)
+    if entry.variant == "mini" and db.scalar(
+        select(AIPersonaBundle.id).where(
+            AIPersonaBundle.variant == "mini",
+            AIPersonaBundle.status == "published",
+        )
+    ):
+        raise AIPersonaConfigError(
+            "Mini has an active published bundle; publish a complete bundle instead."
+        )
     if entry.status == "published":
         return entry
 
@@ -182,6 +192,15 @@ def rollback_persona_version(
     current_user: User,
 ) -> AIPersonaConfigVersion:
     source = get_persona_version_or_raise(db, version_id, for_update=True)
+    if source.variant == "mini" and db.scalar(
+        select(AIPersonaBundle.id).where(
+            AIPersonaBundle.variant == "mini",
+            AIPersonaBundle.status == "published",
+        )
+    ):
+        raise AIPersonaConfigError(
+            "Mini has an active published bundle; roll back the complete bundle instead."
+        )
     if source.status == "published":
         return source
 

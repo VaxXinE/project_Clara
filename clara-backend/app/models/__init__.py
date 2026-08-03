@@ -1,5 +1,6 @@
 from app.models.ai_extraction import AIExtraction
 from app.models.ai_persona_config_version import AIPersonaConfigVersion
+from app.models.ai_persona_bundle import AIPersonaBundle, AIPersonaBundleSection
 from app.models.approval_log import ApprovalLog
 from app.models.audit_log import AuditLog
 from app.models.chat_review_case import ChatReviewCase
@@ -42,6 +43,8 @@ from app.models.user import User
 __all__ = [
     "AIExtraction",
     "AIPersonaConfigVersion",
+    "AIPersonaBundle",
+    "AIPersonaBundleSection",
     "ApprovalLog",
     "AuditLog",
     "ChatReviewCase",
