@@ -10,6 +10,7 @@ class ExtensionChannelConfigItem(BaseModel):
 
 class ExtensionConfigResponse(BaseModel):
     channels: dict[str, ExtensionChannelConfigItem]
+    delivery_mode: str = "LEGACY"
 
 
 class WhatsAppExtensionMessage(BaseModel):
@@ -61,6 +62,9 @@ class WhatsAppExtensionSnapshotSyncResponse(BaseModel):
     conversation_id: UUID | None = None
     message_count: int = 0
     source: str = "whatsapp_extension"
+    snapshot_fingerprint: str | None = None
+    latest_message_fingerprint: str | None = None
+    active_chat_fingerprint: str | None = None
 
 
 class WhatsAppExtensionReplySuggestionItem(BaseModel):
@@ -86,6 +90,10 @@ class WhatsAppExtensionReplySuggestionsResponse(BaseModel):
     action_mode: str | None = None
     next_best_action: str | None = None
     customer_summary: str | None = None
+    snapshot_fingerprint: str | None = None
+    latest_message_fingerprint: str | None = None
+    active_chat_fingerprint: str | None = None
+    suggestion_version: int = 1
 
 
 class WhatsAppExtensionSendReplyRequest(BaseModel):
@@ -135,3 +143,97 @@ class ExtensionSendReplyRequest(WhatsAppExtensionSendReplyRequest):
 
 class ExtensionSendReplyResponse(WhatsAppExtensionSendReplyResponse):
     pass
+
+
+class ExtensionDeliveryAuthorizationRequest(BaseModel):
+    final_reply_text: str = Field(alias="finalReplyText", min_length=1, max_length=2000)
+    snapshot_fingerprint: str = Field(alias="snapshotFingerprint", pattern=r"^[a-f0-9]{64}$")
+    latest_message_fingerprint: str = Field(
+        alias="latestMessageFingerprint", pattern=r"^[a-f0-9]{64}$"
+    )
+    active_chat_fingerprint: str = Field(
+        alias="activeChatFingerprint", pattern=r"^[a-f0-9]{64}$"
+    )
+    suggestion_version: int = Field(alias="suggestionVersion", ge=1)
+    idempotency_key: str = Field(
+        alias="idempotencyKey",
+        min_length=8,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+    explicit_human_action: bool = Field(alias="explicitHumanAction")
+
+
+class ExtensionDeliveryDecisionResponse(BaseModel):
+    mode: str
+    delivery_permission: str
+    reason_codes: list[str]
+    organization_id: UUID
+    conversation_id: UUID
+    suggestion_id: UUID
+    suggestion_version: int
+    approval_status: str
+    policy_action: str
+    reviewer_requirement: str
+    snapshot_fingerprint: str
+    latest_message_fingerprint: str
+    active_chat_fingerprint: str
+    final_text_hash: str
+    previous_delivery_status: str | None = None
+    authorization_required: bool
+    authorization_id: UUID | None = None
+    authorization_token: str | None = None
+    authorization_expires_at: str | None = None
+    decision_hash: str
+    delivery_contract_version: str
+
+
+class ExtensionDeliveryClaimRequest(BaseModel):
+    authorization_token: str = Field(alias="authorizationToken", min_length=32, max_length=255)
+    conversation_id: UUID = Field(alias="conversationId")
+    suggestion_id: UUID = Field(alias="suggestionId")
+    snapshot_fingerprint: str = Field(alias="snapshotFingerprint", pattern=r"^[a-f0-9]{64}$")
+    latest_message_fingerprint: str = Field(
+        alias="latestMessageFingerprint", pattern=r"^[a-f0-9]{64}$"
+    )
+    active_chat_fingerprint: str = Field(
+        alias="activeChatFingerprint", pattern=r"^[a-f0-9]{64}$"
+    )
+    final_text_hash: str = Field(alias="finalTextHash", pattern=r"^[a-f0-9]{64}$")
+
+
+class ExtensionDeliveryClaimResponse(BaseModel):
+    status: str
+    reason_codes: list[str]
+    authorization_id: UUID
+    decision_hash: str
+    delivery_contract_version: str
+
+
+class ExtensionDeliveryResultRequest(BaseModel):
+    authorization_token: str = Field(alias="authorizationToken", min_length=32, max_length=255)
+    result: str = Field(pattern=r"^(SENT|FAILED|UNKNOWN)$")
+    browser_event_id: str = Field(alias="browserEventId", min_length=8, max_length=128)
+    adapter_result_code: str = Field(
+        alias="adapterResultCode",
+        default="UNSPECIFIED",
+        max_length=80,
+        pattern=r"^[A-Z0-9_]+$",
+    )
+    active_chat_fingerprint: str = Field(
+        alias="activeChatFingerprint", pattern=r"^[a-f0-9]{64}$"
+    )
+    latest_message_fingerprint: str = Field(
+        alias="latestMessageFingerprint", pattern=r"^[a-f0-9]{64}$"
+    )
+    final_text_hash: str = Field(alias="finalTextHash", pattern=r"^[a-f0-9]{64}$")
+
+
+class ExtensionDeliveryResultResponse(BaseModel):
+    status: str
+    authorization_id: UUID
+    sent_message_id: UUID | None = None
+    reconciliation_required: bool = False
+    duplicate_prevented: bool = False
+    reason_codes: list[str]
+    delivery_contract_version: str

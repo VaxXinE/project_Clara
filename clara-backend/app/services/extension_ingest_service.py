@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import hashlib
+import json
 import re
 from uuid import UUID
 
@@ -161,6 +162,64 @@ def build_snapshot_signature(
             *message_lines,
         ]
     ).strip()
+
+
+def build_extension_delivery_identity(
+    *,
+    channel: str,
+    snapshot: WhatsAppExtensionChatSnapshot,
+) -> tuple[str, str, str]:
+    def digest(payload: dict) -> str:
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+
+    def normalized_text(value: str) -> str:
+        return " ".join(value.split())
+
+    active_chat_key = (
+        (snapshot.external_thread_id or "").strip()
+        or normalized_text(snapshot.chat_title).lower()
+    )
+    active_chat_fingerprint = digest(
+        {"channel": channel, "threadKey": active_chat_key}
+    )
+    snapshot_fingerprint = digest(
+        {
+            "channel": channel,
+            "activeChatKey": active_chat_key,
+            "messages": [
+                {
+                    "direction": message.direction,
+                    "text": normalized_text(message.text),
+                }
+                for message in snapshot.messages
+            ],
+        }
+    )
+    latest_inbound = next(
+        (
+            message
+            for message in reversed(snapshot.messages)
+            if message.direction == "incoming"
+        ),
+        None,
+    )
+    latest_message_fingerprint = digest(
+        {
+            "direction": "incoming",
+            "text": normalized_text(latest_inbound.text) if latest_inbound else "",
+        }
+    )
+    return (
+        snapshot_fingerprint,
+        latest_message_fingerprint,
+        active_chat_fingerprint,
+    )
 
 
 def parse_captured_at(captured_at: str) -> datetime:
@@ -852,6 +911,14 @@ def sync_extension_snapshot(
         )
 
     normalized_messages = normalize_snapshot_messages(snapshot)
+    (
+        snapshot_fingerprint,
+        latest_message_fingerprint,
+        active_chat_fingerprint,
+    ) = build_extension_delivery_identity(
+        channel=channel_context.channel,
+        snapshot=snapshot,
+    )
     transcript = build_snapshot_signature(
         chat_title=snapshot.chat_title,
         chat_subtitle=snapshot.chat_subtitle,
@@ -886,6 +953,9 @@ def sync_extension_snapshot(
             conversation_id=conversation.id,
             message_count=len(normalized_messages),
             source=channel_context.source,
+            snapshot_fingerprint=snapshot_fingerprint,
+            latest_message_fingerprint=latest_message_fingerprint,
+            active_chat_fingerprint=active_chat_fingerprint,
         )
 
     if conversation is None:
@@ -982,6 +1052,9 @@ def sync_extension_snapshot(
         conversation_id=conversation.id,
         message_count=len(normalized_messages),
         source=channel_context.source,
+        snapshot_fingerprint=snapshot_fingerprint,
+        latest_message_fingerprint=latest_message_fingerprint,
+        active_chat_fingerprint=active_chat_fingerprint,
     )
 
 
@@ -1057,6 +1130,10 @@ def build_extension_reply_suggestions_response(
         next_best_action=extraction.next_best_action,
         customer_summary=extraction.customer_summary,
         source=snapshot_result.source,
+        snapshot_fingerprint=snapshot_result.snapshot_fingerprint,
+        latest_message_fingerprint=snapshot_result.latest_message_fingerprint,
+        active_chat_fingerprint=snapshot_result.active_chat_fingerprint,
+        suggestion_version=suggestion.version,
     )
 
 
@@ -1105,6 +1182,17 @@ def generate_extension_reply_suggestions_for_channel(
             suggestion=latest_suggestion,
         )
     ):
+        latest_suggestion.extension_snapshot_fingerprint = (
+            snapshot_result.snapshot_fingerprint
+        )
+        latest_suggestion.extension_latest_message_fingerprint = (
+            snapshot_result.latest_message_fingerprint
+        )
+        latest_suggestion.extension_active_chat_fingerprint = (
+            snapshot_result.active_chat_fingerprint
+        )
+        db.add(latest_suggestion)
+        db.commit()
         return build_extension_reply_suggestions_response(
             snapshot_result=snapshot_result,
             extraction=latest_extraction,
@@ -1128,6 +1216,16 @@ def generate_extension_reply_suggestions_for_channel(
         conversation_id=snapshot_result.conversation_id,
         desired_count=1,
     )
+    suggestion.extension_snapshot_fingerprint = snapshot_result.snapshot_fingerprint
+    suggestion.extension_latest_message_fingerprint = (
+        snapshot_result.latest_message_fingerprint
+    )
+    suggestion.extension_active_chat_fingerprint = (
+        snapshot_result.active_chat_fingerprint
+    )
+    db.add(suggestion)
+    db.commit()
+    db.refresh(suggestion)
 
     return build_extension_reply_suggestions_response(
         snapshot_result=snapshot_result,

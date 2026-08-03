@@ -12,8 +12,14 @@ export type LegacyRuntimeMessageType =
   | "SEND_WHATSAPP_REPLY"
 
 export interface LegacyRuntimeMessage {
+  activeChatFingerprint?: string
+  authorizationClaimReference?: string
+  finalTextHash?: string
+  latestMessageFingerprint?: string
+  snapshotFingerprint?: string
   text?: string
   type?: LegacyRuntimeMessageType | string
+  userTriggered?: boolean
 }
 
 export type MessageDirection = "incoming" | "outgoing"
@@ -31,4 +37,14 @@ export interface ChannelChatSnapshot extends WhatsAppChatSnapshot {
 
 export interface ChannelActionResponse extends WhatsAppActionResponse {
   code?: string
+}
+
+export interface ExtensionBrowserSendResult extends ChannelActionResponse {
+  activeChatFingerprint?: string
+  adapterResultCode?: string
+  browserEventId?: string
+  channel?: Channel
+  finalTextHash?: string
+  latestMessageFingerprint?: string
+  status?: "SENT" | "FAILED" | "UNKNOWN"
 }

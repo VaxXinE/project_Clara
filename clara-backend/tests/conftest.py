@@ -48,6 +48,10 @@ from app.models.complaint_case import ComplaintCase, ComplaintCaseEvent
 from app.models.customer_profile import CustomerProfile
 from app.models.customer_process_state import CustomerProcessState
 from app.models.customer_process_state_event import CustomerProcessStateEvent
+from app.models.extension_delivery import (
+    ExtensionDeliveryAuthorization,
+    ExtensionDeliveryEvent,
+)
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.knowledge_update_proposal import KnowledgeUpdateProposal
@@ -125,6 +129,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             AIExtraction.__table__,
             AIPersonaConfigVersion.__table__,
             ReplySuggestion.__table__,
+            ExtensionDeliveryAuthorization.__table__,
+            ExtensionDeliveryEvent.__table__,
             ApprovalLog.__table__,
             AuditLog.__table__,
             ChatReviewCase.__table__,
@@ -173,6 +179,8 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             ChatReviewNote.__table__,
             ChatReviewCase.__table__,
             ApprovalLog.__table__,
+            ExtensionDeliveryEvent.__table__,
+            ExtensionDeliveryAuthorization.__table__,
             ReplySuggestion.__table__,
             AIPersonaConfigVersion.__table__,
             AIExtraction.__table__,

@@ -9,6 +9,10 @@ from app.models.complaint_case import ComplaintCase, ComplaintCaseEvent
 from app.models.customer_profile import CustomerProfile
 from app.models.customer_process_state import CustomerProcessState
 from app.models.customer_process_state_event import CustomerProcessStateEvent
+from app.models.extension_delivery import (
+    ExtensionDeliveryAuthorization,
+    ExtensionDeliveryEvent,
+)
 from app.models.kpi_alert_record import KpiAlertRecord
 from app.models.kpi_command_snapshot import KpiCommandSnapshot
 from app.models.knowledge_update_proposal import KnowledgeUpdateProposal
@@ -48,6 +52,8 @@ __all__ = [
     "CustomerProfile",
     "CustomerProcessState",
     "CustomerProcessStateEvent",
+    "ExtensionDeliveryAuthorization",
+    "ExtensionDeliveryEvent",
     "KpiAlertRecord",
     "KpiCommandSnapshot",
     "KnowledgeUpdateProposal",

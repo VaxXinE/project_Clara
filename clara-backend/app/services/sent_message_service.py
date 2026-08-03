@@ -171,6 +171,7 @@ def mark_reply_suggestion_as_sent(
     reply_suggestion_id: UUID,
     payload: MarkReplySentRequest,
     sender_role: str | None = None,
+    send_mode: str = "manual_simulation",
 ) -> SentMessage:
     suggestion = db.get(ReplySuggestion, reply_suggestion_id)
 
@@ -212,7 +213,7 @@ def mark_reply_suggestion_as_sent(
     sent_message = SentMessage(
         conversation_id=suggestion.conversation_id,
         reply_suggestion_id=suggestion.id,
-        send_mode="manual_simulation",
+        send_mode=send_mode,
         message_text=suggestion.final_reply_text,
         sent_by_name=payload.sent_by_name,
         external_message_id=None,

@@ -13,6 +13,9 @@ import {
   getChatSnapshotProxyUrl,
   getClaraAuthHeaders,
   getClaraDashboardLoginUrl,
+  getClaraDeliveryAuthorizationUrl,
+  getClaraDeliveryClaimUrl,
+  getClaraDeliveryResultUrl,
   getClaraReplySuggestionsUrl,
   getClaraSendReplyUrl,
   getClaraSessionOrigins,
@@ -24,6 +27,11 @@ import {
   getSnapshotSyncCandidates,
   isDevFallbackAllowed
 } from "~/utils/proxy"
+import {
+  buildDeliveryIdentity,
+  canStartGovernedSend,
+  sha256Hex
+} from "~/utils/delivery-governance"
 import { readWhatsAppFromPage } from "~/utils/whatsapp-page"
 
 import chatWallpaper from "./assets/eb24786e5579a01bdd4bb103695b8286.jpg"
@@ -35,7 +43,7 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.1.1-tawk-active-pane-1"
+const EXTENSION_BUILD_LABEL = "v0.1.2-governed-manual-delivery-1"
 const CHATGPT_EMBED_URL =
   "https://chatgpt.com/g/g-69cde65d2fa081919907393fcd892e6e-solid-prime-sales"
 const CHATGPT_CONTEXT_MESSAGE_LIMIT = 12
@@ -1438,6 +1446,27 @@ const sendReplyFromPanel = async (
   const normalizeMessageText = (value: string) =>
     value.replace(/\s+/g, " ").trim().toLowerCase()
 
+  const getMessageDirection = (container: HTMLElement) =>
+    container.classList.contains("message-out") ||
+    Boolean(container.closest(".message-out"))
+      ? "outgoing"
+      : "incoming"
+
+  const getMessageText = (container: HTMLElement) =>
+    container
+      .querySelector<HTMLElement>(
+        '[data-testid="msg-text"], [data-testid="selectable-text"], .copyable-text'
+      )
+      ?.innerText.replace(/\s+/g, " ")
+      .trim() || ""
+
+  const getSendButtonTarget = () =>
+    document.querySelector<HTMLElement>(
+      '[data-testid="compose-btn-send"], button[aria-label="Send"], button[aria-label="Kirim"]'
+    )
+
+  const clickElement = (node: HTMLElement) => node.click()
+
   const getMessageContainers = () =>
     Array.from(
       new Set(
@@ -1621,12 +1650,28 @@ const normalizeSuggestionPayload = (payload: any): WhatsAppSuggestionResult => {
         : typeof payload?.reply_suggestion_id === "string"
           ? payload.reply_suggestion_id
           : undefined,
+    activeChatFingerprint:
+      typeof payload?.active_chat_fingerprint === "string"
+        ? payload.active_chat_fingerprint
+        : undefined,
+    latestMessageFingerprint:
+      typeof payload?.latest_message_fingerprint === "string"
+        ? payload.latest_message_fingerprint
+        : undefined,
     riskLevel:
       typeof payload?.riskLevel === "string"
         ? payload.riskLevel
         : typeof payload?.risk_level === "string"
           ? payload.risk_level
           : undefined,
+    snapshotFingerprint:
+      typeof payload?.snapshot_fingerprint === "string"
+        ? payload.snapshot_fingerprint
+        : undefined,
+    suggestionVersion:
+      typeof payload?.suggestion_version === "number"
+        ? payload.suggestion_version
+        : 1,
     suggestions: suggestions.slice(0, 1)
   }
 }
@@ -2139,6 +2184,13 @@ function ClaraSidePanel() {
     number | null
   >(null)
   const [replySuggestionId, setReplySuggestionId] = useState("")
+  const [deliveryContext, setDeliveryContext] = useState<{
+    activeChatFingerprint: string
+    conversationId: string
+    latestMessageFingerprint: string
+    snapshotFingerprint: string
+    suggestionVersion: number
+  } | null>(null)
   const [tabUrl, setTabUrl] = useState("")
   const [chatGptContextData, setChatGptContextData] =
     useState<WhatsAppChatSnapshot | null>(null)
@@ -2156,6 +2208,7 @@ function ClaraSidePanel() {
   const authStatusRef = useRef(authStatus)
   const authUserRef = useRef<ClaraExtensionSessionUser | null>(authUser)
   const editSuggestionButtonRef = useRef<HTMLButtonElement | null>(null)
+  const sendInFlightRef = useRef(false)
 
   const isClaraWorkspace = activeWorkspace === "clara"
   const isAuthenticated = authStatus === "authenticated"
@@ -2509,6 +2562,7 @@ function ClaraSidePanel() {
     setHasEditedSuggestion(false)
     setEditingSuggestionIndex(null)
     setReplySuggestionId("")
+    setDeliveryContext(null)
 
     try {
       const data = await readChatFromActiveTab()
@@ -2687,6 +2741,22 @@ function ClaraSidePanel() {
       setHasEditedSuggestion(false)
       setEditingSuggestionIndex(null)
       setReplySuggestionId(suggestionResult.replySuggestionId || "")
+      setDeliveryContext(
+        suggestionResult.activeChatFingerprint &&
+          suggestionResult.conversationId &&
+          suggestionResult.latestMessageFingerprint &&
+          suggestionResult.snapshotFingerprint
+          ? {
+              activeChatFingerprint:
+                suggestionResult.activeChatFingerprint,
+              conversationId: suggestionResult.conversationId,
+              latestMessageFingerprint:
+                suggestionResult.latestMessageFingerprint,
+              snapshotFingerprint: suggestionResult.snapshotFingerprint,
+              suggestionVersion: suggestionResult.suggestionVersion || 1
+            }
+          : null
+      )
       setFeedback(
         suggestionResult.cached
           ? "Jawaban terbaik tetap sama karena isi chat belum berubah."
@@ -2703,6 +2773,7 @@ function ClaraSidePanel() {
       setHasEditedSuggestion(false)
       setEditingSuggestionIndex(null)
       setReplySuggestionId("")
+      setDeliveryContext(null)
       setError(message)
     } finally {
       setIsSuggesting(false)
@@ -2912,7 +2983,14 @@ function ClaraSidePanel() {
   }
 
   const handleSendSuggestion = async (suggestion: string, index: number) => {
-    if (isInsertingIndex !== null) {
+    if (
+      isInsertingIndex !== null ||
+      !canStartGovernedSend({
+        explicitHumanAction: true,
+        finalTextVisible: Boolean(suggestion.trim()),
+        sendInFlight: sendInFlightRef.current
+      })
+    ) {
       return
     }
 
@@ -2920,6 +2998,7 @@ function ClaraSidePanel() {
       return
     }
 
+    sendInFlightRef.current = true
     let wasSent = false
     setIsInsertingIndex(index)
     setError("")
@@ -2940,97 +3019,203 @@ function ClaraSidePanel() {
         throw new Error("Aksi balasan Tawk.to akan tersedia pada TAWK-03.")
       }
 
-      let response: WhatsAppActionResponse | undefined
+      if (!replySuggestionId) {
+        throw new Error("Reply suggestion id tidak tersedia. Generate ulang draft.")
+      }
 
-      try {
-        response = (await chrome.tabs.sendMessage(tab.id, {
-          text: suggestion,
-          type: "SEND_WHATSAPP_REPLY"
-        })) as WhatsAppActionResponse
-      } catch (messageError) {
-        const message =
-          messageError instanceof Error
-            ? messageError.message
-            : String(messageError)
-
-        if (!message.includes("Receiving end does not exist")) {
-          throw messageError
+      const authHeaders = await getClaraAuthHeaders()
+      const postJson = async (url: string, body: object) => {
+        const response = await fetch(url, {
+          body: JSON.stringify(body),
+          headers: { "Content-Type": "application/json", ...authHeaders },
+          method: "POST"
+        })
+        const payload = await response.json()
+        if (!response.ok) {
+          const detail = payload?.detail
+          throw new Error(
+            typeof detail === "string"
+              ? detail
+              : detail?.message || payload?.error || "Backend Clara menolak delivery."
+          )
         }
-
-        if (isWhatsAppTabUrl(tab.url)) {
+        return payload
+      }
+      const sendThroughBrowser = async (
+        governedPayload?: object
+      ): Promise<WhatsAppActionResponse & Record<string, any>> => {
+        try {
+          return (await chrome.tabs.sendMessage(tab.id, {
+            ...governedPayload,
+            text: suggestion,
+            type: "SEND_ACTIVE_CHANNEL_REPLY"
+          })) as WhatsAppActionResponse & Record<string, any>
+        } catch (messageError) {
+          const message =
+            messageError instanceof Error
+              ? messageError.message
+              : String(messageError)
+          if (governedPayload || !message.includes("Receiving end does not exist")) {
+            throw messageError
+          }
+          if (!isWhatsAppTabUrl(tab.url)) {
+            throw new Error(getContentScriptUnavailableMessage(tab.url))
+          }
           const [result] = await chrome.scripting.executeScript({
             args: [suggestion],
             func: sendReplyFromPanel,
-            target: {
-              tabId: tab.id
-            }
+            target: { tabId: tab.id }
           })
-
-          response = result?.result as WhatsAppActionResponse | undefined
-        } else {
-          throw new Error(getContentScriptUnavailableMessage(tab.url))
+          return result?.result as WhatsAppActionResponse & Record<string, any>
         }
       }
 
+      let deliveryMode = "LEGACY"
+      let authorization: any = null
+      let currentIdentity = deliveryContext
+
+      if (deliveryContext) {
+        const currentSnapshot = await readChatFromActiveTab()
+        currentIdentity = {
+          ...(await buildDeliveryIdentity(currentSnapshot)),
+          conversationId: deliveryContext.conversationId,
+          suggestionVersion: deliveryContext.suggestionVersion
+        }
+        const authorizationUrl = getClaraDeliveryAuthorizationUrl(
+          replySuggestionId,
+          chatData?.channel
+        )
+        if (!authorizationUrl) {
+          throw new Error("Endpoint delivery authorization belum dikonfigurasi.")
+        }
+        authorization = await postJson(authorizationUrl, {
+          activeChatFingerprint: currentIdentity.activeChatFingerprint,
+          explicitHumanAction: true,
+          finalReplyText: suggestion,
+          idempotencyKey: crypto.randomUUID(),
+          latestMessageFingerprint: currentIdentity.latestMessageFingerprint,
+          snapshotFingerprint: currentIdentity.snapshotFingerprint,
+          suggestionVersion: currentIdentity.suggestionVersion
+        })
+        deliveryMode = String(authorization.mode || "LEGACY")
+      }
+
+      if (deliveryMode === "GOVERNED") {
+        const permission = String(authorization?.delivery_permission || "BLOCK")
+        if (permission !== "ALLOW_MANUAL_SEND") {
+          const messages: Record<string, string> = {
+            ALREADY_SENT: "Draft ini sudah pernah terkirim.",
+            BLOCK: "Draft diblokir oleh governance Clara.",
+            RECONCILIATION_REQUIRED:
+              "Hasil pengiriman sebelumnya belum pasti. Lakukan rekonsiliasi manual.",
+            REQUIRE_REFRESH:
+              "Chat berubah setelah draft dibuat. Baca chat dan generate ulang.",
+            REQUIRE_REVIEW: "Draft masih membutuhkan review yang berwenang."
+          }
+          throw new Error(messages[permission] || "Delivery tidak diizinkan.")
+        }
+        if (!authorization.authorization_id || !authorization.authorization_token) {
+          throw new Error("Token delivery tidak tersedia. Minta authorization baru.")
+        }
+
+        const recheckedSnapshot = await readChatFromActiveTab()
+        const recheckedIdentity = await buildDeliveryIdentity(recheckedSnapshot)
+        const finalTextHash = await sha256Hex(suggestion.trim())
+        if (
+          recheckedIdentity.snapshotFingerprint !==
+            authorization.snapshot_fingerprint ||
+          recheckedIdentity.latestMessageFingerprint !==
+            authorization.latest_message_fingerprint ||
+          recheckedIdentity.activeChatFingerprint !==
+            authorization.active_chat_fingerprint ||
+          finalTextHash !== authorization.final_text_hash
+        ) {
+          throw new Error("Chat atau draft berubah sebelum claim. Generate ulang draft.")
+        }
+
+        const claimUrl = getClaraDeliveryClaimUrl(authorization.authorization_id)
+        await postJson(claimUrl, {
+          activeChatFingerprint: recheckedIdentity.activeChatFingerprint,
+          authorizationToken: authorization.authorization_token,
+          conversationId: authorization.conversation_id,
+          finalTextHash,
+          latestMessageFingerprint: recheckedIdentity.latestMessageFingerprint,
+          snapshotFingerprint: recheckedIdentity.snapshotFingerprint,
+          suggestionId: authorization.suggestion_id
+        })
+
+        const browserResult = await sendThroughBrowser({
+          activeChatFingerprint: recheckedIdentity.activeChatFingerprint,
+          authorizationClaimReference: authorization.authorization_id,
+          finalTextHash,
+          latestMessageFingerprint: recheckedIdentity.latestMessageFingerprint,
+          snapshotFingerprint: recheckedIdentity.snapshotFingerprint,
+          userTriggered: true
+        })
+        const browserStatus = String(browserResult?.status || "UNKNOWN")
+        wasSent = browserStatus === "SENT"
+        const resultUrl = getClaraDeliveryResultUrl(authorization.authorization_id)
+        const resultPayload = await postJson(resultUrl, {
+          activeChatFingerprint: recheckedIdentity.activeChatFingerprint,
+          adapterResultCode:
+            String(
+              browserResult?.adapterResultCode ||
+                browserResult?.code ||
+                "UNSPECIFIED"
+            )
+              .toUpperCase()
+              .replace(/[^A-Z0-9_]/g, "_")
+              .slice(0, 80),
+          authorizationToken: authorization.authorization_token,
+          browserEventId: browserResult?.browserEventId || crypto.randomUUID(),
+          finalTextHash,
+          latestMessageFingerprint: recheckedIdentity.latestMessageFingerprint,
+          result: browserStatus
+        })
+
+        if (resultPayload.status === "SENT") {
+          await chrome.runtime.sendMessage({
+            tabId: tab.id,
+            type: "CLEAR_PENDING_REPLY"
+          })
+          setFeedback("Pesan terkonfirmasi terkirim dan sudah direkonsiliasi di Clara.")
+          return
+        }
+        if (resultPayload.reconciliation_required) {
+          throw new Error(
+            "Hasil kirim belum dapat dipastikan. Jangan kirim ulang; lakukan rekonsiliasi manual."
+          )
+        }
+        throw new Error(browserResult?.error || "Pengiriman browser gagal.")
+      }
+
+      const response = await sendThroughBrowser()
       if (!response?.ok) {
-        throw new Error(
-          response?.error || "Gagal mengirim draft ke chat aktif."
-        )
+        throw new Error(response?.error || "Gagal mengirim draft ke chat aktif.")
       }
-
       wasSent = true
-
-      if (!replySuggestionId) {
-        setFeedback(
-          "Pesan terkirim, tetapi belum bisa ditandai di Clara karena reply suggestion id tidak tersedia."
-        )
-        return
-      }
-
       const claraSendUrl = getClaraSendReplyUrl(
         replySuggestionId,
         chatData?.channel
       )
-
       if (!claraSendUrl) {
-        setFeedback(
-          "Pesan terkirim, tetapi sinkronisasi status ke Clara belum dikonfigurasi."
-        )
-        return
+        throw new Error("Sinkronisasi status sent belum dikonfigurasi.")
       }
-
-      const syncResponse = await fetch(claraSendUrl, {
-        body: JSON.stringify({
-          finalReplyText: suggestion,
-          selectedReplyText: suggestion,
-          sentByName: "extension_user"
-        }),
-        headers: {
-          "Content-Type": "application/json",
-          ...(await getClaraAuthHeaders())
-        },
-        method: "POST"
+      const syncPayload = await postJson(claraSendUrl, {
+        finalReplyText: suggestion,
+        selectedReplyText: suggestion,
+        sentByName: "extension_user"
       })
-
-      const syncPayload = await syncResponse.json()
-
-      if (!syncResponse.ok) {
-        throw new Error(
-          syncPayload?.detail ||
-            syncPayload?.error ||
-            "Pesan terkirim, tetapi gagal ditandai sebagai sent di Clara."
-        )
-      }
-
       await chrome.runtime.sendMessage({
         tabId: tab.id,
         type: "CLEAR_PENDING_REPLY"
       })
-
       setFeedback(
-        syncPayload?.auto_approved
-          ? "Pesan terkirim dan otomatis dianggap approved + sent di Clara."
-          : "Pesan terkirim dan status sent sudah tercatat di Clara."
+        deliveryMode === "OBSERVE"
+          ? "Pesan terkirim lewat alur legacy; keputusan governed dicatat sebagai observasi."
+          : syncPayload?.auto_approved
+            ? "Pesan terkirim dan otomatis dianggap approved + sent di Clara."
+            : "Pesan terkirim dan status sent sudah tercatat di Clara."
       )
     } catch (err) {
       const message =
@@ -3046,6 +3231,7 @@ function ClaraSidePanel() {
           : message
       )
     } finally {
+      sendInFlightRef.current = false
       setIsInsertingIndex(null)
     }
   }

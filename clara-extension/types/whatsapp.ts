@@ -51,15 +51,19 @@ export interface WhatsAppSuggestionDetail {
 }
 
 export interface WhatsAppSuggestionResult {
+  activeChatFingerprint?: string
   actionMode?: string
   cached?: boolean
   conversationId?: string
   customerSummary?: string
   nextBestAction?: string
   replySuggestionId?: string
+  latestMessageFingerprint?: string
   riskLevel?: string
   suggestionDetails?: WhatsAppSuggestionDetail[]
   suggestions: string[]
+  snapshotFingerprint?: string
+  suggestionVersion?: number
 }
 
 export interface ClaraExtensionSessionUser {
