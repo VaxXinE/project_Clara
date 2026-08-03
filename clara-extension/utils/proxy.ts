@@ -225,6 +225,40 @@ export const getClaraSendReplyUrl = (
   }
 }
 
+export const getClaraDeliveryAuthorizationUrl = (
+  replySuggestionId: string,
+  channel?: string | null,
+  apiBaseUrl = getConfiguredClaraApiBaseUrl()
+) =>
+  apiBaseUrl && replySuggestionId.trim()
+    ? buildClaraApiUrl(
+        apiBaseUrl,
+        `/extension/${normalizeExtensionChannel(channel)}/reply-suggestions/${replySuggestionId.trim()}/delivery-authorizations`
+      )
+    : ""
+
+export const getClaraDeliveryClaimUrl = (
+  authorizationId: string,
+  apiBaseUrl = getConfiguredClaraApiBaseUrl()
+) =>
+  apiBaseUrl && authorizationId.trim()
+    ? buildClaraApiUrl(
+        apiBaseUrl,
+        `/extension/delivery-authorizations/${authorizationId.trim()}/claim`
+      )
+    : ""
+
+export const getClaraDeliveryResultUrl = (
+  authorizationId: string,
+  apiBaseUrl = getConfiguredClaraApiBaseUrl()
+) =>
+  apiBaseUrl && authorizationId.trim()
+    ? buildClaraApiUrl(
+        apiBaseUrl,
+        `/extension/delivery-authorizations/${authorizationId.trim()}/result`
+      )
+    : ""
+
 export const getProxyCandidates = (url: string) => {
   const normalizedUrl = (url || DEFAULT_PROXY_URL).trim()
   const candidates = [normalizedUrl]

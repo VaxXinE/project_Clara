@@ -368,3 +368,14 @@ Stage 8.1 stabilizes this as routing contract `1.1`: complete typed decisions,
 structured credential-safe complaint intake, bounded incident identity,
 append-only mutation events, support conflict fail-closed behavior, and an
 audited restoration of formatter-only Stage 8 files. The default is unchanged.
+
+## 20. Tahap 6 Extension Delivery Contract
+
+`CLARA_EXTENSION_DELIVERY_MODE` supports `LEGACY`, `OBSERVE`, and `GOVERNED`,
+default `LEGACY`. `GOVERNED` binds the reviewed suggestion to user,
+organization, conversation, version, active chat, snapshot, latest inbound
+message, and final-text hashes. A short-lived token is stored only as SHA-256,
+claimed atomically before DOM send, and reconciled as `SENT`, `FAILED`, or
+`RECONCILIATION_REQUIRED`. Delivery consumes existing policy, fact, state, and
+routing authority without overriding it. See
+`docs/architecture/CLARA_EXTENSION_DELIVERY_CONTRACT.md`.

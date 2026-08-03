@@ -315,7 +315,9 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     } satisfies ParsedReplyAwareMessage
   }
 
-  const getMessageText = (container: HTMLElement) => {
+  const getMessageText = (
+    container: HTMLElement
+  ): ParsedReplyAwareMessage => {
     const primaryCandidates = getPreferredMessageTexts(
       Array.from(
         container.querySelectorAll<HTMLElement>('[data-testid="msg-text"]')
@@ -431,7 +433,9 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
         timestampLabel: parsedMeta.timestampLabel
       }
     })
-    .filter((message): message is WhatsAppMessage => Boolean(message))
+    .filter(
+      (message): message is NonNullable<typeof message> => Boolean(message)
+    )
 
   return {
     data: {
@@ -613,7 +617,7 @@ const splitReplyAwareMessageText = (candidates: string[]) => {
   } satisfies ParsedReplyAwareMessage
 }
 
-const getMessageText = (container: HTMLElement) => {
+const getMessageText = (container: HTMLElement): ParsedReplyAwareMessage => {
   const primaryCandidates = getPreferredMessageTexts(
     Array.from(container.querySelectorAll<HTMLElement>('[data-testid="msg-text"]'))
   )
@@ -969,7 +973,7 @@ const getLatestOutgoingMessageSnapshot = () => {
     .map((container, index) => ({
       direction: getMessageDirection(container),
       index,
-      text: getMessageText(container)
+      text: getMessageText(container).text
     }))
     .filter((message) => message.direction === "outgoing" && message.text.trim())
 

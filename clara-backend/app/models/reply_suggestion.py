@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,6 +39,16 @@ class ReplySuggestion(Base):
 
     selected_reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     final_reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extension_snapshot_fingerprint: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    extension_latest_message_fingerprint: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    extension_active_chat_fingerprint: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -134,6 +134,14 @@ semantic revalidation defaults during rollback.
 - Product facts do not yet have freshness/effective-date enforcement.
 - Stage 5 does not enforce automatic sending or production rollout.
 
+## Tahap 6 extension delivery interaction
+
+In extension delivery `GOVERNED`, final critical validation and reviewer
+requirements are enforced before a short-lived authorization is issued.
+Blocked drafts never receive a token. Low-risk sales review may be recorded by
+one explicit “Approve & Send” action; elevated review requires existing
+authorized approval evidence. Delivery cannot weaken a Stage 5 action.
+
 ## Stage 6 product-fact interaction
 
 Stage 6 closes the freshness/effective-date authority gap through a separate

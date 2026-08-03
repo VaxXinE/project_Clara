@@ -4902,6 +4902,7 @@ def approve_reply_suggestion(
     suggestion.selected_reply_text = payload.selected_reply_text
     suggestion.final_reply_text = payload.final_reply_text
     suggestion.approval_status = "approved"
+    suggestion.version += 1
 
     log = ApprovalLog(
         reply_suggestion_id=suggestion.id,

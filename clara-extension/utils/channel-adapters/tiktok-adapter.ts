@@ -74,7 +74,7 @@ const getDeepestExistingCaretTarget = (
 
   if (current !== root && current.parentNode) {
     const siblings = Array.from(current.parentNode.childNodes)
-    const currentIndex = siblings.indexOf(current)
+    const currentIndex = siblings.indexOf(current as ChildNode)
 
     return {
       node: current.parentNode,

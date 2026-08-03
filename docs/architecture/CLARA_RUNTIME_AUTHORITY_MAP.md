@@ -8,6 +8,11 @@ Base commit: `9ae6fee910bb6415552716e19b93a33564a7c296`
 
 Dokumen ini memetakan perilaku yang **benar-benar dilewati runtime**. Isi Markdown yang tidak memiliki jalur panggilan runtime tidak dianggap sebagai backend enforcement.
 
+> Tahap 6 extension-first adaptation: browser delivery authority now belongs to
+> the extension delivery contract. In `GOVERNED`, backend authorization and an
+> atomic claim precede DOM send; the human click remains the only send trigger.
+> Default remains `LEGACY`, and Tawk webhook ownership is unchanged.
+
 ## A. Executive Summary
 
 Clara membentuk reply melalui dua analisis yang berbeda. `analyze_conversation()` meminta model membuat extraction terstruktur dan langsung menyimpan stage, temperature, risk, intent, serta account category. `create_reply_suggestion()` lalu mengambil extraction terbaru, menghitung policy, memilih variant, memuat persona dan knowledge, membangun prompt, meminta model membuat draft, memvalidasi sebagian output, lalu menyimpan suggestion berstatus `pending`.

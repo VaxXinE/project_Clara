@@ -21,6 +21,7 @@ class SentMessage(Base):
     reply_suggestion_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("reply_suggestions.id", ondelete="SET NULL"),
         nullable=True,
+        unique=True,
         index=True,
     )
 

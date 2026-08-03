@@ -1,14 +1,15 @@
 {
   "name": "clara-extension",
   "displayName": "Clara Extension",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Browser extension Clara untuk membaca chat aktif WhatsApp Web dengan sinkronisasi snapshot yang lebih stabil.",
   "author": "newsmaker.id",
   "scripts": {
     "dev": "concurrently \"node scripts/plasmo-cli.mjs dev\" \"node server/openai-proxy.mjs\"",
     "build": "node scripts/plasmo-cli.mjs build",
     "package": "node scripts/plasmo-cli.mjs package",
-    "proxy": "node server/openai-proxy.mjs"
+    "proxy": "node server/openai-proxy.mjs",
+    "test": "node --no-warnings --experimental-strip-types --test tests/*.test.mjs"
   },
   "dependencies": {
     "plasmo": "0.90.5",
