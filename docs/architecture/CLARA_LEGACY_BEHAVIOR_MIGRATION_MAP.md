@@ -1,5 +1,13 @@
 # Clara Legacy Behavior Migration Map
 
+## Stage 7 governed bundle checkpoint
+
+The Mini bundle is a governed release unit for the five persona sections. It
+does not remove the legacy overlay or migrate hidden behavior. Production
+continues in `LEGACY`; bundle provenance only makes the selected five-section
+source atomic and observable. Existing per-section/Markdown fallback remains
+available until the first explicit complete bundle publication.
+
 Status: Stage 2 implementation
 
 Source audited: `clara-backend/app/services/reply_suggestion_service.py`
