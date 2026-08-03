@@ -14,6 +14,15 @@
 !/docs/architecture/CLARA_EXTENSION_DELIVERY_MIGRATION_MAP.md
 !/docs/architecture/CLARA_FIVE_PROMPT_BUNDLE_CONTRACT.md
 !/docs/architecture/CLARA_PERSONA_BUNDLE_MIGRATION_MAP.md
+!/docs/quality/
+/docs/quality/*
+!/docs/quality/CLARA_SHADOW_REVIEW_RUBRIC.md
+!/docs/quality/CLARA_STAGE_4_READINESS_REPORT.md
+!/docs/quality/clara_shadow_review_template.json
+!/docs/quality/CLARA_GOLDEN_V2_CONTRACT.md
+!/docs/quality/CLARA_GOLDEN_V2_EVALUATION_RUNBOOK.md
+!/docs/quality/CLARA_GOLDEN_V1_TO_V2_MIGRATION_MAP.md
+!/docs/quality/CLARA_GOLDEN_V2_RELEASE_REPORT_TEMPLATE.md
 !/docs/operations/
 /docs/operations/*
 !/docs/operations/CLARA_CS_AND_COMPLAINT_RUNBOOK.md

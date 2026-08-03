@@ -287,3 +287,6 @@ Stage 8.1 completes safe routing metadata and complaint/support governance but
 does not promote routing above policy enforcement or change any production
 default. Formatter-only changes to unrelated Stage 0–7 authorities were
 restored and catalogued in `CLARA_STAGE_8_CHANGE_AUDIT.md`.
+## Stage 8 evaluation authority
+
+Golden V2 evaluation is an isolated evidence plane. Deterministic validators own detection/enforcement checks; five persona playbooks own behavioral communication; human reviewers own nuanced quality judgments; certification owns release eligibility. Evaluation profiles are immutable snapshots and never modify process-wide runtime defaults. Certification authorizes only the exact candidate bundle to proceed to the existing publication transaction—it does not change runtime authority by itself.
