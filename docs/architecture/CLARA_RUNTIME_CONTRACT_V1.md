@@ -394,3 +394,14 @@ routing authority without overriding it. See
 ## Stage 8 evidence extension
 
 Runtime Contract V1 gains no new production mode. Stage 8 records the current runtime modes, candidate bundle identity, five section hashes, dataset/evaluator contracts, deterministic findings, and human review as versioned evidence. Production defaults remain `LEGACY/OFF/OBSERVE/LEGACY/LEGACY/LEGACY/LEGACY`. No evaluation path sends a message or changes the runtime effective source.
+
+## 21. Stage 9 Rollout Envelope
+
+Stage 9 contract `1.0` wraps Runtime Contract V1 with an optional,
+request-scoped selection decision. The new control defaults to `OFF`; thus the
+runtime tuple remains `LEGACY/OFF/OBSERVE/LEGACY/LEGACY/LEGACY/LEGACY`.
+`OBSERVE` cannot override that tuple. `GOVERNED` requires an explicitly active
+plan bound to the exact current published Mini bundle and Golden V2
+certification. The decision records hashes and lane metadata, never prompt or
+message content. Runtime services continue to normalize and enforce their own
+canonical modes. Human approval/edit and explicit send remain invariant.

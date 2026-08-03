@@ -32,6 +32,11 @@ from app.services.access_control_service import (
     get_accessible_conversation_or_raise,
     get_accessible_reply_suggestion_or_raise,
 )
+from app.services.clara_rollout_service import (
+    RolloutControlMode,
+    active_runtime_decision,
+    resolve_rollout_decision,
+)
 
 router = APIRouter(tags=["reply-suggestions"])
 
@@ -56,9 +61,23 @@ def create_reply_suggestion_endpoint(
             current_user=current_user,
         )
 
-        suggestion = create_reply_suggestion(db=db, conversation_id=conversation_id)
+        rollout_decision = resolve_rollout_decision(
+            db,
+            organization_id=current_user.organization_id,
+            user=current_user,
+        )
+        suggestion = create_reply_suggestion(
+            db=db,
+            conversation_id=conversation_id,
+            rollout_decision=active_runtime_decision(rollout_decision),
+        )
         enforcement_mode = normalize_policy_enforcement_mode(
-            settings.clara_policy_enforcement_mode
+            rollout_decision.runtime_profile.get(
+                "policy_mode", settings.clara_policy_enforcement_mode
+            )
+            if rollout_decision.control_mode == RolloutControlMode.GOVERNED.value
+            and rollout_decision.plan_id is not None
+            else settings.clara_policy_enforcement_mode
         ).mode
 
         create_audit_log(
@@ -90,6 +109,7 @@ def create_reply_suggestion_endpoint(
                 "enforcement_applied": (
                     enforcement_mode == PolicyEnforcementMode.ENFORCE
                 ),
+                **rollout_decision.debug_metadata(),
             },
         )
 

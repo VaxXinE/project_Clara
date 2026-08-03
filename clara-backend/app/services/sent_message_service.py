@@ -18,6 +18,10 @@ from app.services.clara_policy_enforcement_service import (
     ClaraEnforcementError,
     assert_suggestion_can_be_sent,
 )
+from app.services.clara_rollout_service import (
+    ClaraRolloutError,
+    assert_rollout_suggestion_sendable,
+)
 
 
 class SentMessageError(RuntimeError):
@@ -180,6 +184,11 @@ def mark_reply_suggestion_as_sent(
 
     if suggestion.approval_status != "approved":
         raise SentMessageError("Only approved reply suggestions can be marked as sent.")
+
+    try:
+        assert_rollout_suggestion_sendable(db, suggestion)
+    except ClaraRolloutError as exc:
+        raise SentMessageError(str(exc)) from exc
 
     if not suggestion.final_reply_text:
         raise SentMessageError("Approved reply has no final reply text.")

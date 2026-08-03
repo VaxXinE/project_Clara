@@ -287,6 +287,18 @@ Stage 8.1 completes safe routing metadata and complaint/support governance but
 does not promote routing above policy enforcement or change any production
 default. Formatter-only changes to unrelated Stage 0–7 authorities were
 restored and catalogued in `CLARA_STAGE_8_CHANGE_AUDIT.md`.
+
+## O. Stage 9 Request-Scoped Rollout Authority
+
+Stage 9 adds an outer request-selection layer; it does not become prompt or
+domain authority. `CLARA_ROLLOUT_CONTROL_MODE` defaults to `OFF`. In
+`GOVERNED`, an explicitly active, exact-certified Mini plan may select a
+request-scoped profile for deterministic reviewer cohorts. Each selected
+component remains owned by its existing policy, fact, process, routing,
+persona, or delivery service. Shadow candidates have no send authority;
+canary candidates retain approval and explicit-manual-send gates. Pause,
+stop, rollback, stale certification, or hash mismatch selects baseline without
+mutating global settings. See `CLARA_SHADOW_ROLLOUT_CONTRACT.md`.
 ## Stage 8 evaluation authority
 
 Golden V2 evaluation is an isolated evidence plane. Deterministic validators own detection/enforcement checks; five persona playbooks own behavioral communication; human reviewers own nuanced quality judgments; certification owns release eligibility. Evaluation profiles are immutable snapshots and never modify process-wide runtime defaults. Certification authorizes only the exact candidate bundle to proceed to the existing publication transaction—it does not change runtime authority by itself.

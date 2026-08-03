@@ -27,3 +27,12 @@ Certification requires 30 valid cases, 5 per category, zero critical/error/leak/
 The isolated matrix compares `LEGACY`, `HYBRID`, and `PERSONA` without mutating global settings. Profiles are `PRODUCTION_BASELINE` and `GOVERNED_OFFLINE_SIMULATION`; extension delivery stays `LEGACY` and never sends.
 
 Evidence binds to candidate bundle ID/hash, all five section version IDs/hashes, dataset version/hash, evaluator version, configuration snapshot/hash, and synthetic-grounding version. A changed section invalidates prior certification. Stored evidence contains hashes and safe findings—not prompts, chain of thought, credentials, production chats, or full outputs.
+
+## Stage 9 rollout use
+
+Golden V2 certification is necessary but not sufficient for rollout. A Stage 9
+plan stores the exact run/report and bundle hashes, then revalidates them at
+readiness, promotion, and request selection. Fixture PASS alone cannot
+authorize a canary: current-stage sampled evidence, human coverage, explicit
+thresholds, operational readiness, and no open critical incident are separate
+gates. Certification never activates or promotes a plan.
