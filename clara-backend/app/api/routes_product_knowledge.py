@@ -158,9 +158,7 @@ def list_product_knowledge_endpoint(
     category: str | None = Query(default=None, min_length=1, max_length=100),
     is_active: bool | None = Query(default=None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
 ):
     try:
         return list_product_knowledge(

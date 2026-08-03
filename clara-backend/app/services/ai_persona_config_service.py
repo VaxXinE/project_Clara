@@ -29,7 +29,9 @@ def list_persona_versions(
     if variant:
         statement = statement.where(AIPersonaConfigVersion.variant == variant)
     if section_key:
-        statement = statement.where(AIPersonaConfigVersion.section_key == section_key)
+        statement = statement.where(
+            AIPersonaConfigVersion.section_key == section_key
+        )
     statement = statement.order_by(
         AIPersonaConfigVersion.variant,
         AIPersonaConfigVersion.section_key,

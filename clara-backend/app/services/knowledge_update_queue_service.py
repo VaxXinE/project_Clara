@@ -41,9 +41,7 @@ def build_knowledge_update_proposal_item(
         id=proposal.id,
         organization_id=proposal.organization_id,
         conversation_id=proposal.conversation_id,
-        conversation_title=proposal.conversation.title
-        if proposal.conversation
-        else None,
+        conversation_title=proposal.conversation.title if proposal.conversation else None,
         chat_review_case_id=proposal.chat_review_case_id,
         lead_id=proposal.lead_id,
         proposed_by_user_id=proposal.proposed_by_user_id,
@@ -161,9 +159,7 @@ def get_knowledge_update_proposal_or_raise(
     if proposal.organization_id != current_user.organization_id:
         raise AccessDeniedError("Knowledge proposal not found.")
 
-    conversation = proposal.conversation or db.get(
-        Conversation, proposal.conversation_id
-    )
+    conversation = proposal.conversation or db.get(Conversation, proposal.conversation_id)
     if conversation is None:
         raise KnowledgeUpdateProposalError("Conversation not found.")
 
@@ -291,7 +287,9 @@ def review_knowledge_update_proposal(
     proposal.reviewed_by_user_id = current_user.id
     proposal.reviewed_at = datetime.now(timezone.utc)
     proposal.review_decision_note = (
-        payload.review_decision_note.strip() if payload.review_decision_note else None
+        payload.review_decision_note.strip()
+        if payload.review_decision_note
+        else None
     )
 
     if normalized_status == "approved":

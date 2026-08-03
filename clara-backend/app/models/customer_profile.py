@@ -28,19 +28,11 @@ class CustomerProfile(Base):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
-    temperature: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="unknown"
-    )
-    temperature_source: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="auto"
-    )
+    temperature: Mapped[str] = mapped_column(String(20), nullable=False, default="unknown")
+    temperature_source: Mapped[str] = mapped_column(String(20), nullable=False, default="auto")
     canonical_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    identity_confidence: Mapped[float] = mapped_column(
-        Float, nullable=False, default=0.92
-    )
-    match_strategy: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="name_exact"
-    )
+    identity_confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.92)
+    match_strategy: Mapped[str] = mapped_column(String(50), nullable=False, default="name_exact")
     merge_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     merged_into_profile_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("customer_profiles.id", ondelete="SET NULL"),

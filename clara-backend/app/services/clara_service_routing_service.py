@@ -4,14 +4,17 @@ from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
 
+from app.core.clara_runtime_contract import ConversationIntent, TopLevelRouteIntent
 from app.services.clara_policy_enforcement_service import (
     GOVERNANCE_BYPASS_PATTERN,
+    ReviewerRequirement,
     classify_safe_handoff_category,
 )
 from app.services.clara_safe_handoff_service import SafeHandoffCategory
 
 
-CLARA_SERVICE_ROUTING_CONTRACT_VERSION = "1.0"
+CLARA_SERVICE_ROUTING_CONTRACT_VERSION = "1.1"
+ServiceRoute = TopLevelRouteIntent
 
 
 class ServiceRoutingMode(StrEnum):
@@ -20,13 +23,21 @@ class ServiceRoutingMode(StrEnum):
     ROUTED = "ROUTED"
 
 
-class ServiceRoute(StrEnum):
-    SALES = "SALES"
-    COMPLIANCE_GENERAL = "COMPLIANCE_GENERAL"
-    CS_GENERAL = "CS_GENERAL"
-    COMPLAINT = "COMPLAINT"
-    OFF_TOPIC = "OFF_TOPIC"
-    UNKNOWN = "UNKNOWN"
+class ServiceGenerationStrategy(StrEnum):
+    EXISTING_SALES_GENERATION = "EXISTING_SALES_GENERATION"
+    COMPLIANCE_EDUCATION = "COMPLIANCE_EDUCATION"
+    SUPPORT_KNOWLEDGE_DRAFT = "SUPPORT_KNOWLEDGE_DRAFT"
+    SUPPORT_SAFE_HANDOFF = "SUPPORT_SAFE_HANDOFF"
+    COMPLAINT_SAFE_HANDOFF = "COMPLAINT_SAFE_HANDOFF"
+    OFF_TOPIC_BOUNDARY = "OFF_TOPIC_BOUNDARY"
+    NO_CUSTOMER_DRAFT = "NO_CUSTOMER_DRAFT"
+
+
+class ComplaintSeverity(StrEnum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
 
 
 class SupportLevel(StrEnum):
@@ -58,24 +69,54 @@ class SupportTopic(StrEnum):
 
 @dataclass(frozen=True)
 class ServiceRoutingDecision:
-    route: ServiceRoute
+    top_level_route: TopLevelRouteIntent
+    conversation_intent: ConversationIntent
     support_level: SupportLevel
     support_topic: SupportTopic
-    reason_codes: tuple[str, ...]
     complaint_category: SafeHandoffCategory | None
+    complaint_severity: ComplaintSeverity | None
+    route_reason_codes: tuple[str, ...]
+    confidence_score: float
+    requires_human: bool
+    create_case: bool
+    generation_strategy: ServiceGenerationStrategy
+    reviewer_requirement: ReviewerRequirement
+    source_type: str
     decision_hash: str
-    contract_version: str = CLARA_SERVICE_ROUTING_CONTRACT_VERSION
+    routing_contract_version: str = CLARA_SERVICE_ROUTING_CONTRACT_VERSION
+
+    @property
+    def route(self) -> TopLevelRouteIntent:
+        return self.top_level_route
+
+    @property
+    def reason_codes(self) -> tuple[str, ...]:
+        return self.route_reason_codes
+
+    @property
+    def contract_version(self) -> str:
+        return self.routing_contract_version
 
     def debug_metadata(self) -> dict:
         return {
-            "service_routing_contract_version": self.contract_version,
-            "service_route": self.route.value,
+            "service_routing_contract_version": self.routing_contract_version,
+            "top_level_route": self.top_level_route.value,
+            "conversation_intent": self.conversation_intent.value,
             "support_level": self.support_level.value,
             "support_topic": self.support_topic.value,
-            "reason_codes": list(self.reason_codes),
             "complaint_category": self.complaint_category.value
             if self.complaint_category
             else None,
+            "complaint_severity": self.complaint_severity.value
+            if self.complaint_severity
+            else None,
+            "route_reason_codes": list(self.route_reason_codes),
+            "confidence_score": self.confidence_score,
+            "requires_human": self.requires_human,
+            "create_case": self.create_case,
+            "generation_strategy": self.generation_strategy.value,
+            "reviewer_requirement": self.reviewer_requirement.value,
+            "source_type": self.source_type,
             "decision_hash": self.decision_hash,
         }
 
@@ -91,8 +132,7 @@ _SECURITY = re.compile(
     r"\b(password|kata\s+sandi|otp|pin|kode\s+verifikasi|akun\s+dibajak)\b", re.I
 )
 _STATUS = re.compile(
-    r"\b(?:status|sudah|belum)\b.{0,30}\b(?:verifikasi|verified|aktivasi|withdraw|penarikan|deposit)\b|"
-    r"\b(?:verifikasi|verified|aktivasi|withdraw|penarikan|deposit)\b.{0,30}\b(?:status|sudah|belum|cek)\b",
+    r"\b(?:status|sudah|belum)\b.{0,30}\b(?:verifikasi|verified|aktivasi|withdraw|penarikan|deposit)\b|\b(?:verifikasi|verified|aktivasi|withdraw|penarikan|deposit)\b.{0,30}\b(?:status|sudah|belum|cek)\b",
     re.I,
 )
 _CS_PATTERNS: tuple[tuple[SupportTopic, re.Pattern[str]], ...] = (
@@ -135,116 +175,237 @@ _CS_PATTERNS: tuple[tuple[SupportTopic, re.Pattern[str]], ...] = (
     ),
 )
 _COMPLIANCE = re.compile(
-    r"\b(legal|legalitas|izin|bappebti|regulator|risiko|risk|aturan)\b", re.I
+    r"\b(legal|legalitas|izin|bappebti|regulator|risiko|risk|aturan|refund policy|kebijakan refund)\b",
+    re.I,
 )
 _SALES = re.compile(
     r"\b(harga|produk|mini|regular|reguler|trading|modal|spread|komisi|margin|instrumen)\b",
     re.I,
 )
 _OFF_TOPIC = re.compile(r"\b(cuaca|resep|sepak\s*bola|film|musik)\b", re.I)
+_HIGH_COMPLAINT = re.compile(
+    r"\b(?:dana|uang|saldo)\s+(?:saya\s+)?(?:hilang|berkurang)|"
+    r"\b(?:refund|kompensasi|ganti\s+rugi|ditipu|fraud|somasi|gugat)\b",
+    re.I,
+)
 
 
 def route_service_message(message: str) -> ServiceRoutingDecision:
     text = " ".join((message or "").split())[:4000]
     if GOVERNANCE_BYPASS_PATTERN.search(text):
         return _decision(
-            ServiceRoute.UNKNOWN,
+            TopLevelRouteIntent.UNKNOWN,
+            ConversationIntent.UNKNOWN,
             SupportLevel.HUMAN_REQUIRED,
             SupportTopic.SECURITY_CONCERN,
             ("security_boundary",),
+            1.0,
+            True,
+            False,
+            ServiceGenerationStrategy.NO_CUSTOMER_DRAFT,
+            ReviewerRequirement.NO_REVIEW_ALLOWED,
         )
+
     complaint = classify_safe_handoff_category(text)
     if _SECURITY.search(text):
         return _decision(
-            ServiceRoute.CS_GENERAL,
+            TopLevelRouteIntent.CS_GENERAL,
+            ConversationIntent.COMPLAINT_OR_PROBLEM,
             SupportLevel.HUMAN_REQUIRED,
             SupportTopic.SECURITY_CONCERN,
             ("security_support",),
+            0.98,
+            True,
+            False,
+            ServiceGenerationStrategy.SUPPORT_SAFE_HANDOFF,
+            ReviewerRequirement.SUPERVISOR_OR_COMPLIANCE_REVIEW,
             complaint,
         )
-    # Routine access trouble is CS unless the customer explicitly asks for a human.
     if (
         _CS_PATTERNS[0][1].search(text)
         and complaint != SafeHandoffCategory.HUMAN_REQUEST
     ):
         return _decision(
-            ServiceRoute.CS_GENERAL,
+            TopLevelRouteIntent.CS_GENERAL,
+            ConversationIntent.POST_ACTIVATION_SUPPORT,
             SupportLevel.LEVEL_1,
             SupportTopic.LOGIN_GENERAL,
-            ("support_topic_match",),
+            ("routine_account_access",),
+            0.95,
+            False,
+            False,
+            ServiceGenerationStrategy.SUPPORT_KNOWLEDGE_DRAFT,
+            ReviewerRequirement.SALES_REVIEW,
         )
     if complaint:
+        severity = (
+            ComplaintSeverity.HIGH
+            if _HIGH_COMPLAINT.search(text)
+            else _complaint_severity(complaint)
+        )
         return _decision(
-            ServiceRoute.COMPLAINT,
+            TopLevelRouteIntent.COMPLAINT,
+            ConversationIntent.COMPLAINT_OR_PROBLEM,
             SupportLevel.HUMAN_REQUIRED,
             SupportTopic.UNKNOWN,
             ("contextual_complaint",),
+            0.98,
+            True,
+            True,
+            ServiceGenerationStrategy.COMPLAINT_SAFE_HANDOFF,
+            ReviewerRequirement.COMPLIANCE_REVIEW
+            if severity in {ComplaintSeverity.HIGH, ComplaintSeverity.CRITICAL}
+            else ReviewerRequirement.MANAGER_REVIEW,
             complaint,
+            severity,
         )
     if _COMPLIANCE.search(text):
+        intent = (
+            ConversationIntent.RISK_CHECK
+            if re.search(r"\b(risiko|risk)\b", text, re.I)
+            else ConversationIntent.LEGALITY_CHECK
+        )
         return _decision(
-            ServiceRoute.COMPLIANCE_GENERAL,
+            TopLevelRouteIntent.COMPLIANCE_GENERAL,
+            intent,
             SupportLevel.LEVEL_0,
             SupportTopic.UNKNOWN,
-            ("general_compliance_question",),
+            ("general_compliance_education",),
+            0.9,
+            False,
+            False,
+            ServiceGenerationStrategy.COMPLIANCE_EDUCATION,
+            ReviewerRequirement.COMPLIANCE_REVIEW,
         )
     if _STATUS.search(text):
         return _decision(
-            ServiceRoute.CS_GENERAL,
+            TopLevelRouteIntent.CS_GENERAL,
+            ConversationIntent.PROCESS_CHECK,
             SupportLevel.HUMAN_REQUIRED,
             SupportTopic.STATUS_REQUEST,
             ("status_requires_authorized_access",),
+            0.98,
+            True,
+            False,
+            ServiceGenerationStrategy.SUPPORT_SAFE_HANDOFF,
+            ReviewerRequirement.MANAGER_REVIEW,
         )
     for topic, pattern in _CS_PATTERNS:
         if pattern.search(text):
             return _decision(
-                ServiceRoute.CS_GENERAL,
+                TopLevelRouteIntent.CS_GENERAL,
+                ConversationIntent.POST_ACTIVATION_SUPPORT,
                 SupportLevel.LEVEL_1,
                 topic,
                 ("support_topic_match",),
+                0.9,
+                False,
+                False,
+                ServiceGenerationStrategy.SUPPORT_KNOWLEDGE_DRAFT,
+                ReviewerRequirement.SALES_REVIEW,
             )
     if _SALES.search(text):
+        intent = (
+            ConversationIntent.COST_CHECK
+            if re.search(r"\b(harga|modal|spread|komisi|margin)\b", text, re.I)
+            else ConversationIntent.INFO_SEEKING
+        )
         return _decision(
-            ServiceRoute.SALES,
+            TopLevelRouteIntent.SALES,
+            intent,
             SupportLevel.NOT_APPLICABLE,
             SupportTopic.UNKNOWN,
             ("sales_topic_match",),
+            0.85,
+            False,
+            False,
+            ServiceGenerationStrategy.EXISTING_SALES_GENERATION,
+            ReviewerRequirement.SALES_REVIEW,
         )
     if _OFF_TOPIC.search(text):
         return _decision(
-            ServiceRoute.OFF_TOPIC,
+            TopLevelRouteIntent.OFF_TOPIC,
+            ConversationIntent.UNKNOWN,
             SupportLevel.NOT_APPLICABLE,
             SupportTopic.UNKNOWN,
             ("off_topic_match",),
+            0.9,
+            False,
+            False,
+            ServiceGenerationStrategy.OFF_TOPIC_BOUNDARY,
+            ReviewerRequirement.SALES_REVIEW,
         )
     return _decision(
-        ServiceRoute.UNKNOWN,
+        TopLevelRouteIntent.UNKNOWN,
+        ConversationIntent.UNKNOWN,
         SupportLevel.NOT_APPLICABLE,
         SupportTopic.UNKNOWN,
         ("no_deterministic_match",),
+        0.0,
+        False,
+        False,
+        ServiceGenerationStrategy.EXISTING_SALES_GENERATION,
+        ReviewerRequirement.SALES_REVIEW,
     )
 
 
+def _complaint_severity(category: SafeHandoffCategory) -> ComplaintSeverity:
+    if category in {
+        SafeHandoffCategory.FRAUD_ALLEGATION,
+        SafeHandoffCategory.LEGAL_OR_REGULATOR_THREAT,
+        SafeHandoffCategory.FINANCIAL_LOSS_CLAIM,
+        SafeHandoffCategory.REFUND_OR_COMPENSATION,
+    }:
+        return ComplaintSeverity.HIGH
+    return ComplaintSeverity.MEDIUM
+
+
 def _decision(
-    route: ServiceRoute,
+    route: TopLevelRouteIntent,
+    intent: ConversationIntent,
     level: SupportLevel,
     topic: SupportTopic,
     reasons: tuple[str, ...],
+    confidence: float,
+    human: bool,
+    create_case: bool,
+    strategy: ServiceGenerationStrategy,
+    reviewer: ReviewerRequirement,
     complaint: SafeHandoffCategory | None = None,
+    severity: ComplaintSeverity | None = None,
 ) -> ServiceRoutingDecision:
     payload = {
-        "route": route.value,
+        "top_level_route": route.value,
+        "conversation_intent": intent.value,
         "support_level": level.value,
         "support_topic": topic.value,
-        "reason_codes": reasons,
         "complaint_category": complaint.value if complaint else None,
-        "contract_version": CLARA_SERVICE_ROUTING_CONTRACT_VERSION,
+        "complaint_severity": severity.value if severity else None,
+        "route_reason_codes": reasons,
+        "confidence_score": confidence,
+        "requires_human": human,
+        "create_case": create_case,
+        "generation_strategy": strategy.value,
+        "reviewer_requirement": reviewer.value,
+        "source_type": "DETERMINISTIC_RULES",
+        "routing_contract_version": CLARA_SERVICE_ROUTING_CONTRACT_VERSION,
     }
+    decision_hash = sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
     return ServiceRoutingDecision(
         route,
+        intent,
         level,
         topic,
-        reasons,
         complaint,
-        sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest(),
+        severity,
+        reasons,
+        confidence,
+        human,
+        create_case,
+        strategy,
+        reviewer,
+        "DETERMINISTIC_RULES",
+        decision_hash,
     )

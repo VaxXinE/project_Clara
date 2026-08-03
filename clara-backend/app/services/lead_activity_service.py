@@ -52,9 +52,7 @@ def create_lead_activity_event(
     return event
 
 
-def list_lead_activity_events(
-    *, db: Session, lead_id: UUID
-) -> list[LeadActivityEventItem]:
+def list_lead_activity_events(*, db: Session, lead_id: UUID) -> list[LeadActivityEventItem]:
     statement = (
         select(LeadActivityEvent)
         .where(LeadActivityEvent.lead_id == lead_id)

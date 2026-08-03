@@ -390,10 +390,9 @@ def analyze_conversation(
             conversation_text
         )
     elif extraction_data.account_category_prediction.value in {"mini", "reguler"}:
-        inferred_account_category = (
-            infer_account_category_from_conversation_text(conversation_text)
-            or extraction_data.account_category_prediction.value
-        )
+        inferred_account_category = infer_account_category_from_conversation_text(
+            conversation_text
+        ) or extraction_data.account_category_prediction.value
 
     lead = sync_lead_from_conversation(
         db=db,

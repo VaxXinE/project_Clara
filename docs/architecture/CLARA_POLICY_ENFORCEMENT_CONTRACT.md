@@ -1,6 +1,6 @@
 # Clara Policy Enforcement Contract
 
-> Stage 8: service routing does not override this contract. Backend security
+> Stage 8/8.1: service routing does not override this contract. Backend security
 > and policy stay higher authority; complaint routing reuses its contextual
 > classifier and deterministic handoff categories.
 

@@ -21,10 +21,7 @@ from app.services.clara_process_state_service import (
     reconcile_customer_process_states,
 )
 from app.services.role_service import is_superadmin_like
-from app.services.source_intelligence_service import (
-    build_source_label,
-    normalize_source_channel,
-)
+from app.services.source_intelligence_service import build_source_label, normalize_source_channel
 
 ALLOWED_CUSTOMER_PROFILE_STATUSES = {"active", "inactive"}
 CUSTOMER_PROFILE_CONTACT_FIELD_NAMES = {"phone", "email", "address", "status"}
@@ -44,7 +41,10 @@ def _get_customer_profile_column_names(db: Session) -> set[str]:
         return cached
 
     inspector = sqlalchemy_inspect(db.connection())
-    columns = {column["name"] for column in inspector.get_columns("customer_profiles")}
+    columns = {
+        column["name"]
+        for column in inspector.get_columns("customer_profiles")
+    }
     _CUSTOMER_PROFILE_COLUMN_CACHE[cache_key] = columns
     return columns
 
@@ -201,9 +201,7 @@ def normalize_customer_identity_name(name: str | None) -> str:
         return "unknown-customer"
 
     normalized = re.sub(r"[^a-z0-9]+", " ", name.strip().lower())
-    normalized = re.sub(
-        r"\b(customer|cust|buyer|lead|prospect|client|calon)\b", " ", normalized
-    )
+    normalized = re.sub(r"\b(customer|cust|buyer|lead|prospect|client|calon)\b", " ", normalized)
     normalized = " ".join(part for part in normalized.split() if part)
     return normalized or "unknown-customer"
 
@@ -273,9 +271,7 @@ def normalize_customer_temperature(value: str | None) -> str:
 
 
 def derive_customer_temperature_from_leads(leads: list[Lead]) -> str:
-    temperatures = {
-        normalize_customer_temperature(lead.lead_temperature) for lead in leads
-    }
+    temperatures = {normalize_customer_temperature(lead.lead_temperature) for lead in leads}
     if "hot" in temperatures:
         return "hot"
     if "warm" in temperatures:
@@ -336,10 +332,7 @@ def calculate_profile_match_score(
     reasons: list[str] = []
     if overlap:
         reasons.append(f"Overlap token: {', '.join(sorted(overlap))}.")
-    if (
-        source_profile.assigned_user_id
-        and source_profile.assigned_user_id == candidate_profile.assigned_user_id
-    ):
+    if source_profile.assigned_user_id and source_profile.assigned_user_id == candidate_profile.assigned_user_id:
         score += 0.15
         reasons.append("PIC yang sama.")
     if source_profile.display_name.lower() == candidate_profile.display_name.lower():
@@ -347,9 +340,7 @@ def calculate_profile_match_score(
         reasons.append("Nama display identik.")
 
     score = min(round(score, 2), 0.99)
-    return score, " ".join(
-        reasons
-    ) if reasons else "Kecocokan dasar dari canonical key."
+    return score, " ".join(reasons) if reasons else "Kecocokan dasar dari canonical key."
 
 
 def build_merge_candidates(
@@ -359,10 +350,7 @@ def build_merge_candidates(
 ) -> list[dict]:
     candidates: list[dict] = []
     for candidate in visible_profiles:
-        if (
-            candidate.id == profile.id
-            or _get_profile_merged_into_profile_id(candidate) is not None
-        ):
+        if candidate.id == profile.id or _get_profile_merged_into_profile_id(candidate) is not None:
             continue
 
         match_score, overlap_reason = calculate_profile_match_score(profile, candidate)
@@ -380,12 +368,8 @@ def build_merge_candidates(
                 "match_score": match_score,
                 "overlap_reason": overlap_reason,
                 "lead_count": len(candidate_leads),
-                "conversation_count": sum(
-                    len(lead.conversations) for lead in candidate_leads
-                ),
-                "source_labels": sorted(
-                    {build_source_label(lead.source) for lead in candidate_leads}
-                ),
+                "conversation_count": sum(len(lead.conversations) for lead in candidate_leads),
+                "source_labels": sorted({build_source_label(lead.source) for lead in candidate_leads}),
                 "last_contact_at": candidate.last_contact_at,
             }
         )
@@ -425,9 +409,7 @@ def ensure_customer_profile_for_lead(
     lead: Lead,
     preferred_name: str | None = None,
 ) -> CustomerProfile:
-    display_name = resolve_customer_profile_name(
-        lead=lead, preferred_name=preferred_name
-    )
+    display_name = resolve_customer_profile_name(lead=lead, preferred_name=preferred_name)
     canonical_key = normalize_customer_identity_name(display_name)
     identity_confidence, match_strategy = compute_identity_metadata(
         display_name=display_name,
@@ -464,20 +446,20 @@ def ensure_customer_profile_for_lead(
         lead_last_contact = ensure_aware_utc(lead.last_contact_at)
         profile_last_contact = ensure_aware_utc(existing_profile.last_contact_at)
         if lead_last_contact and (
-            profile_last_contact is None or lead_last_contact > profile_last_contact
+            profile_last_contact is None
+            or lead_last_contact > profile_last_contact
         ):
             existing_profile.last_contact_at = lead_last_contact
-        if is_placeholder_profile_name(
-            existing_profile.display_name
-        ) and not is_placeholder_profile_name(display_name):
+        if (
+            is_placeholder_profile_name(existing_profile.display_name)
+            and not is_placeholder_profile_name(display_name)
+        ):
             existing_profile.display_name = display_name
             existing_profile.canonical_key = canonical_key
         elif len(display_name.strip()) > len(existing_profile.display_name.strip()):
             existing_profile.display_name = display_name
             existing_profile.canonical_key = canonical_key
-        existing_profile.identity_confidence = max(
-            existing_profile.identity_confidence, identity_confidence
-        )
+        existing_profile.identity_confidence = max(existing_profile.identity_confidence, identity_confidence)
         existing_profile.match_strategy = match_strategy
         db.add(existing_profile)
         db.flush([existing_profile])
@@ -538,9 +520,7 @@ def build_customer_profile_summary(
         "id": profile.id,
         "organization_id": profile.organization_id,
         "assigned_user_id": profile.assigned_user_id,
-        "assigned_user_name": profile.assigned_user.name
-        if profile.assigned_user
-        else None,
+        "assigned_user_name": profile.assigned_user.name if profile.assigned_user else None,
         "display_name": profile.display_name,
         "phone": _get_profile_phone(profile),
         "email": _get_profile_email(profile),
@@ -580,9 +560,7 @@ def build_customer_profile_list_item(
     return {
         "id": profile.id,
         "assigned_user_id": profile.assigned_user_id,
-        "assigned_user_name": profile.assigned_user.name
-        if profile.assigned_user
-        else None,
+        "assigned_user_name": profile.assigned_user.name if profile.assigned_user else None,
         "display_name": profile.display_name,
         "phone": _get_profile_phone(profile),
         "email": _get_profile_email(profile),
@@ -619,9 +597,12 @@ def get_customer_profile_model_for_user(
             detail="Customer profile not found.",
         )
 
-    if not is_superadmin_like(current_user.role) and (
-        current_user.organization_id is None
-        or profile.organization_id != current_user.organization_id
+    if (
+        not is_superadmin_like(current_user.role)
+        and (
+            current_user.organization_id is None
+            or profile.organization_id != current_user.organization_id
+        )
     ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -634,9 +615,7 @@ def get_customer_profile_model_for_user(
     )
     if accessible_user_ids is not None:
         accessible_leads = [
-            lead
-            for lead in profile.leads
-            if lead.assigned_user_id in accessible_user_ids
+            lead for lead in profile.leads if lead.assigned_user_id in accessible_user_ids
         ]
         if not accessible_leads:
             raise HTTPException(
@@ -688,13 +667,9 @@ def get_customer_profile_for_user(
         visible_profiles = [
             candidate
             for candidate in visible_profiles
-            if any(
-                lead.assigned_user_id in accessible_user_ids for lead in candidate.leads
-            )
+            if any(lead.assigned_user_id in accessible_user_ids for lead in candidate.leads)
         ]
-    merge_candidates = build_merge_candidates(
-        profile, visible_profiles=visible_profiles
-    )
+    merge_candidates = build_merge_candidates(profile, visible_profiles=visible_profiles)
     return build_customer_profile_summary(
         profile,
         visible_leads=visible_leads,
@@ -727,14 +702,10 @@ def list_customer_profiles_for_user(
             and profile.organization_id == current_user.organization_id
         ]
 
-    accessible_user_ids = get_accessible_sales_user_ids(
-        db=db, current_user=current_user
-    )
+    accessible_user_ids = get_accessible_sales_user_ids(db=db, current_user=current_user)
 
     normalized_query = query.strip().lower() if query and query.strip() else None
-    normalized_status = (
-        status_value.strip().lower() if status_value and status_value.strip() else None
-    )
+    normalized_status = status_value.strip().lower() if status_value and status_value.strip() else None
 
     items: list[dict] = []
     for profile in profiles:
@@ -907,9 +878,7 @@ def apply_ai_autofill_to_customer_profile(
 
     profile = lead.customer_profile
     if profile is None:
-        profile = ensure_customer_profile_for_lead(
-            db=db, lead=lead, preferred_name=lead.display_name
-        )
+        profile = ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
 
     updated_fields: list[str] = []
 
@@ -938,9 +907,7 @@ def apply_ai_autofill_to_customer_profile(
         return profile
 
     profile.match_strategy = "ai_auto_fill"
-    profile.identity_confidence = max(
-        profile.identity_confidence, autofill.confidence_score
-    )
+    profile.identity_confidence = max(profile.identity_confidence, autofill.confidence_score)
     db.add(profile)
     create_lead_activity_event(
         db=db,
@@ -996,9 +963,7 @@ def merge_customer_profiles(
     ):
         target_profile.last_contact_at = source_last_contact
 
-    if len(source_profile.display_name.strip()) > len(
-        target_profile.display_name.strip()
-    ):
+    if len(source_profile.display_name.strip()) > len(target_profile.display_name.strip()):
         target_profile.display_name = source_profile.display_name
         target_profile.canonical_key = source_profile.canonical_key
     if not target_profile.phone and source_profile.phone:
@@ -1029,11 +994,7 @@ def merge_customer_profiles(
         target_profile.merge_notes = merge_notes.strip()
 
     source_profile.merged_into_profile_id = target_profile.id
-    source_profile.merge_notes = (
-        merge_notes.strip()
-        if merge_notes and merge_notes.strip()
-        else "Merged manually"
-    )
+    source_profile.merge_notes = merge_notes.strip() if merge_notes and merge_notes.strip() else "Merged manually"
     source_profile.match_strategy = "merged_manual"
 
     reconcile_customer_process_states(
@@ -1084,9 +1045,7 @@ def merge_customer_profiles(
     )
     visible_profiles = db.scalars(
         select(CustomerProfile)
-        .where(
-            CustomerProfile.organization_id == refreshed_target_profile.organization_id
-        )
+        .where(CustomerProfile.organization_id == refreshed_target_profile.organization_id)
         .options(load_only(*customer_profile_load_only_columns(db)))
         .options(customer_profile_lead_relationship_load())
     ).all()
@@ -1094,9 +1053,7 @@ def merge_customer_profiles(
         visible_profiles = [
             candidate
             for candidate in visible_profiles
-            if any(
-                lead.assigned_user_id in accessible_user_ids for lead in candidate.leads
-            )
+            if any(lead.assigned_user_id in accessible_user_ids for lead in candidate.leads)
         ]
     return build_customer_profile_summary(
         refreshed_target_profile,

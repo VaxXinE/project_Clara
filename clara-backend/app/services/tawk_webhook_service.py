@@ -57,13 +57,9 @@ def _resolve_latest_sales_message(
     payload: TawkWebhookEnvelope,
 ) -> TawkWebhookTranscriptMessagePayload:
     if payload.chat is None:
-        raise TawkWebhookError(
-            "Payload Tawk tidak punya transcript chat untuk menentukan owner."
-        )
+        raise TawkWebhookError("Payload Tawk tidak punya transcript chat untuk menentukan owner.")
 
-    for message in sorted(
-        payload.chat.messages, key=lambda item: item.time, reverse=True
-    ):
+    for message in sorted(payload.chat.messages, key=lambda item: item.time, reverse=True):
         if _map_sender_type(message) == "sales":
             return message
 
@@ -290,9 +286,7 @@ def _find_or_create_conversation(
 
 
 def _map_sender_type(message: TawkWebhookTranscriptMessagePayload) -> str:
-    sender_type = (
-        (message.sender.t if message.sender is not None else "").strip().lower()
-    )
+    sender_type = (message.sender.t if message.sender is not None else "").strip().lower()
     if sender_type == "v":
         return "customer"
     return "sales"
@@ -320,9 +314,7 @@ def _map_sender_name(
 def _format_attachment_text(message: TawkWebhookTranscriptMessagePayload) -> str:
     attachment_labels: list[str] = []
     for attachment in message.attchs:
-        file_payload = (
-            attachment.content.file if attachment.content is not None else None
-        )
+        file_payload = attachment.content.file if attachment.content is not None else None
         if file_payload is None:
             continue
         if file_payload.name and file_payload.name.strip():
@@ -365,9 +357,7 @@ def _normalized_attachment_metadata(
 ) -> str:
     normalized_attachments: list[dict[str, str | int | None]] = []
     for attachment in message.attchs:
-        file_payload = (
-            attachment.content.file if attachment.content is not None else None
-        )
+        file_payload = attachment.content.file if attachment.content is not None else None
         if file_payload is None:
             continue
         url_digest = (
@@ -496,9 +486,7 @@ def ingest_tawk_webhook(
     payload: TawkWebhookEnvelope,
     event_id: str | None,
 ) -> TawkWebhookIngestResponse:
-    transcript_message_count = (
-        len(payload.chat.messages) if payload.chat is not None else 0
-    )
+    transcript_message_count = len(payload.chat.messages) if payload.chat is not None else 0
 
     if payload.event != "chat:transcript_created" or payload.chat is None:
         return TawkWebhookIngestResponse(
@@ -527,16 +515,8 @@ def ingest_tawk_webhook(
             received_at=datetime.now(UTC),
         )
     sorted_messages = sorted(payload.chat.messages, key=lambda item: item.time)
-    started_at = (
-        sorted_messages[0].time.astimezone(UTC)
-        if sorted_messages
-        else payload.time.astimezone(UTC)
-    )
-    last_message_at = (
-        sorted_messages[-1].time.astimezone(UTC)
-        if sorted_messages
-        else payload.time.astimezone(UTC)
-    )
+    started_at = sorted_messages[0].time.astimezone(UTC) if sorted_messages else payload.time.astimezone(UTC)
+    last_message_at = sorted_messages[-1].time.astimezone(UTC) if sorted_messages else payload.time.astimezone(UTC)
     transcript_text = _build_transcript_text(payload)
 
     conversation = _find_or_create_conversation(

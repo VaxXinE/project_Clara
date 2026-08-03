@@ -20,9 +20,7 @@ class AIExtraction(Base):
     )
 
     model_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    schema_version: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="v1"
-    )
+    schema_version: Mapped[str] = mapped_column(String(50), nullable=False, default="v1")
 
     lead_temperature: Mapped[str] = mapped_column(String(20), nullable=False)
     pipeline_stage: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -30,13 +28,9 @@ class AIExtraction(Base):
     sentiment: Mapped[str] = mapped_column(String(30), nullable=False)
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    main_objections: Mapped[list[str]] = mapped_column(
-        JSONB, nullable=False, default=list
-    )
+    main_objections: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     budget_signal: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    recommended_reply_strategy: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, default=dict
-    )
+    recommended_reply_strategy: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
     customer_summary: Mapped[str] = mapped_column(Text, nullable=False)
     next_best_action: Mapped[str] = mapped_column(Text, nullable=False)

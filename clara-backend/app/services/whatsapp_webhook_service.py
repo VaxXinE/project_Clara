@@ -50,9 +50,7 @@ class WhatsAppWebhookProvider(Protocol):
         challenge: str | None,
     ) -> str: ...
 
-    def validate_signature(
-        self, *, body: bytes, signature_header: str | None
-    ) -> None: ...
+    def validate_signature(self, *, body: bytes, signature_header: str | None) -> None: ...
 
     def ingest(
         self,
@@ -94,9 +92,7 @@ def _resolve_webhook_context(db: Session) -> ResolvedWebhookContext:
         )
     ).first()
     if organization is None:
-        raise WhatsAppWebhookError(
-            "Organization default webhook WhatsApp tidak ditemukan."
-        )
+        raise WhatsAppWebhookError("Organization default webhook WhatsApp tidak ditemukan.")
 
     sales_user = db.scalars(
         select(User).where(

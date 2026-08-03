@@ -108,10 +108,7 @@ def _validate_assignee(
                 detail="Assigned user harus satu organization.",
             )
 
-    if (
-        accessible_sales_user_ids is not None
-        and assignee.id not in accessible_sales_user_ids
-    ):
+    if accessible_sales_user_ids is not None and assignee.id not in accessible_sales_user_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Assigned user di luar scope manager.",
@@ -132,11 +129,7 @@ def _validate_sales_user(
         return None
 
     sales_user = db.get(User, sales_user_id)
-    if (
-        sales_user is None
-        or not sales_user.is_active
-        or not is_sales_like(sales_user.role)
-    ):
+    if sales_user is None or not sales_user.is_active or not is_sales_like(sales_user.role):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Sales user invalid atau inactive.",
@@ -149,10 +142,7 @@ def _validate_sales_user(
                 detail="Sales user harus satu organization.",
             )
 
-    if (
-        accessible_sales_user_ids is not None
-        and sales_user.id not in accessible_sales_user_ids
-    ):
+    if accessible_sales_user_ids is not None and sales_user.id not in accessible_sales_user_ids:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sales user di luar scope manager.",
@@ -200,9 +190,7 @@ def build_performance_action_item(action: PerformanceAction) -> PerformanceActio
         id=action.id,
         organization_id=action.organization_id,
         created_by_user_id=action.created_by_user_id,
-        created_by_user_name=action.created_by_user.name
-        if action.created_by_user
-        else None,
+        created_by_user_name=action.created_by_user.name if action.created_by_user else None,
         assigned_to_user_id=action.assigned_to_user_id,
         assigned_to_user_name=(
             action.assigned_to_user.name if action.assigned_to_user else None
@@ -257,9 +245,7 @@ def list_performance_actions(
         )
 
     if is_sales_like(current_user.role):
-        statement = statement.where(
-            PerformanceAction.assigned_to_user_id == current_user.id
-        )
+        statement = statement.where(PerformanceAction.assigned_to_user_id == current_user.id)
     else:
         accessible_sales_user_ids, accessible_team_ids = _get_scope(
             db=db,
@@ -271,12 +257,8 @@ def list_performance_actions(
                 filters.append(
                     or_(
                         PerformanceAction.sales_user_id.in_(accessible_sales_user_ids),
-                        PerformanceAction.assigned_to_user_id.in_(
-                            accessible_sales_user_ids
-                        ),
-                        PerformanceAction.created_by_user_id.in_(
-                            accessible_sales_user_ids
-                        ),
+                        PerformanceAction.assigned_to_user_id.in_(accessible_sales_user_ids),
+                        PerformanceAction.created_by_user_id.in_(accessible_sales_user_ids),
                     )
                 )
             if accessible_team_ids:
@@ -356,11 +338,7 @@ def create_performance_action(
         accessible_sales_user_ids=accessible_sales_user_ids,
     )
 
-    if (
-        payload.team_id is None
-        and sales_user is not None
-        and sales_user.team_id is not None
-    ):
+    if payload.team_id is None and sales_user is not None and sales_user.team_id is not None:
         team = _validate_team(
             db=db,
             current_user=current_user,
@@ -412,10 +390,7 @@ def _get_action_or_raise(
         )
 
     if not is_superadmin_like(current_user.role):
-        if (
-            current_user.organization_id is None
-            or action.organization_id != current_user.organization_id
-        ):
+        if current_user.organization_id is None or action.organization_id != current_user.organization_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Performance action tidak ditemukan.",
@@ -436,17 +411,9 @@ def _get_action_or_raise(
     if accessible_sales_user_ids is None and accessible_team_ids is None:
         return action
 
-    if (
-        action.team_id is not None
-        and accessible_team_ids
-        and action.team_id in accessible_team_ids
-    ):
+    if action.team_id is not None and accessible_team_ids and action.team_id in accessible_team_ids:
         return action
-    if (
-        action.sales_user_id is not None
-        and accessible_sales_user_ids
-        and action.sales_user_id in accessible_sales_user_ids
-    ):
+    if action.sales_user_id is not None and accessible_sales_user_ids and action.sales_user_id in accessible_sales_user_ids:
         return action
     if (
         action.assigned_to_user_id is not None
@@ -490,9 +457,7 @@ def update_performance_action_status(
             detail="Transisi status action tidak valid.",
         )
 
-    resolution_note = (
-        payload.resolution_note.strip() if payload.resolution_note else None
-    )
+    resolution_note = payload.resolution_note.strip() if payload.resolution_note else None
     if payload.status == "skipped" and not resolution_note:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

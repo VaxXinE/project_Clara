@@ -123,11 +123,7 @@ def derive_lead_display_name(
     if customer_messages:
         return customer_messages[0].sender_name.strip()
 
-    if (
-        preferred_name
-        and preferred_name.strip()
-        and not is_placeholder_profile_name(preferred_name)
-    ):
+    if preferred_name and preferred_name.strip() and not is_placeholder_profile_name(preferred_name):
         return preferred_name.strip()
 
     if conversation.title.strip():
@@ -262,9 +258,7 @@ def sync_lead_from_conversation(
                 title="Jadwal follow-up diperbarui dari analisis",
                 description="AI menyarankan follow-up date baru untuk lead ini.",
                 actor_user_id=conversation.sales_user_id,
-                from_value=lead.next_follow_up_at.isoformat()
-                if lead.next_follow_up_at
-                else None,
+                from_value=lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
                 to_value=next_follow_up_at.isoformat(),
             )
         lead.next_follow_up_at = next_follow_up_at
@@ -305,9 +299,7 @@ def build_lead_list_item(lead: Lead) -> LeadListItem:
         assigned_user_id=lead.assigned_user_id,
         assigned_user_name=lead.assigned_user.name if lead.assigned_user else None,
         customer_profile_id=lead.customer_profile_id,
-        customer_profile_name=lead.customer_profile.display_name
-        if lead.customer_profile
-        else None,
+        customer_profile_name=lead.customer_profile.display_name if lead.customer_profile else None,
         display_name=lead.display_name,
         source=lead.source,
         source_channel=normalize_source_channel(lead.source),
@@ -420,12 +412,8 @@ def get_lead_model_for_user(
             customer_profile_loader,
             selectinload(Lead.tasks).selectinload(LeadTask.assigned_user),
             selectinload(Lead.deal).selectinload(LeadDeal.owner_user),
-            selectinload(Lead.activity_events).selectinload(
-                LeadActivityEvent.actor_user
-            ),
-            selectinload(Lead.discipline_logs).selectinload(
-                LeadDisciplineLog.actor_user
-            ),
+            selectinload(Lead.activity_events).selectinload(LeadActivityEvent.actor_user),
+            selectinload(Lead.discipline_logs).selectinload(LeadDisciplineLog.actor_user),
         )
     )
     lead = db.scalars(statement).first()
@@ -436,9 +424,12 @@ def get_lead_model_for_user(
             detail="Lead not found.",
         )
 
-    if not is_superadmin_like(current_user.role) and (
-        current_user.organization_id is None
-        or lead.organization_id != current_user.organization_id
+    if (
+        not is_superadmin_like(current_user.role)
+        and (
+            current_user.organization_id is None
+            or lead.organization_id != current_user.organization_id
+        )
     ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -449,10 +440,7 @@ def get_lead_model_for_user(
         db=db,
         current_user=current_user,
     )
-    if (
-        accessible_user_ids is not None
-        and lead.assigned_user_id not in accessible_user_ids
-    ):
+    if accessible_user_ids is not None and lead.assigned_user_id not in accessible_user_ids:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Lead not found.",
@@ -471,9 +459,7 @@ def get_leads_for_user(
     customer_profile_loader = selectinload(Lead.customer_profile).options(
         load_only(*customer_profile_load_only_columns(db)),
     )
-    if current_user.organization_id is None and not is_superadmin_like(
-        current_user.role
-    ):
+    if current_user.organization_id is None and not is_superadmin_like(current_user.role):
         return []
 
     statement = select(Lead).options(
@@ -482,9 +468,7 @@ def get_leads_for_user(
         customer_profile_loader,
     )
     if not is_superadmin_like(current_user.role):
-        statement = statement.where(
-            Lead.organization_id == current_user.organization_id
-        )
+        statement = statement.where(Lead.organization_id == current_user.organization_id)
     statement = statement.order_by(desc(Lead.created_at), desc(Lead.updated_at))
 
     statement = apply_sales_user_scope_filter(
@@ -504,9 +488,7 @@ def get_leads_for_user(
     can_backfill_customer_profiles = customer_profile_contact_fields_supported(db)
     for lead in leads:
         if can_backfill_customer_profiles and lead.customer_profile_id is None:
-            ensure_customer_profile_for_lead(
-                db=db, lead=lead, preferred_name=lead.display_name
-            )
+            ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
             backfilled = True
     if backfilled:
         db.commit()
@@ -528,9 +510,7 @@ def get_lead_for_user(
         customer_profile_contact_fields_supported(db)
         and lead.customer_profile_id is None
     ):
-        ensure_customer_profile_for_lead(
-            db=db, lead=lead, preferred_name=lead.display_name
-        )
+        ensure_customer_profile_for_lead(db=db, lead=lead, preferred_name=lead.display_name)
         db.commit()
         db.refresh(lead)
     return build_lead_detail_for_user(db=db, lead=lead, current_user=current_user)
@@ -655,12 +635,8 @@ def update_lead_for_user(
                 title="Jadwal follow-up diperbarui",
                 description="Tanggal follow-up berikutnya diubah.",
                 actor_user_id=current_user.id,
-                from_value=lead.next_follow_up_at.isoformat()
-                if lead.next_follow_up_at
-                else None,
-                to_value=payload.next_follow_up_at.isoformat()
-                if payload.next_follow_up_at
-                else None,
+                from_value=lead.next_follow_up_at.isoformat() if lead.next_follow_up_at else None,
+                to_value=payload.next_follow_up_at.isoformat() if payload.next_follow_up_at else None,
             )
             lead.next_follow_up_at = payload.next_follow_up_at
 
@@ -685,9 +661,7 @@ def update_lead_for_user(
                 title="PIC lead diperbarui",
                 description="Lead dipindahkan ke user lain.",
                 actor_user_id=current_user.id,
-                from_value=str(lead.assigned_user_id)
-                if lead.assigned_user_id
-                else None,
+                from_value=str(lead.assigned_user_id) if lead.assigned_user_id else None,
                 to_value=str(next_assignee_id) if next_assignee_id else None,
             )
             lead.assigned_user_id = next_assignee_id

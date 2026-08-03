@@ -58,7 +58,8 @@ def generate_marketing_snapshot(
                 item.model_dump() for item in insights.pipeline_stage_breakdown
             ],
             "top_content_recommendations": [
-                item.model_dump() for item in insights.top_content_recommendations
+                item.model_dump()
+                for item in insights.top_content_recommendations
             ],
             "kpi_summary": insights.kpi_summary.model_dump(),
             "generated_at": insights.generated_at.isoformat(),
@@ -87,9 +88,7 @@ def list_marketing_snapshots(
             MarketingInsightSnapshot.organization_id == current_user.organization_id
         )
 
-    statement = statement.order_by(desc(MarketingInsightSnapshot.created_at)).limit(
-        limit
-    )
+    statement = statement.order_by(desc(MarketingInsightSnapshot.created_at)).limit(limit)
 
     snapshots = list(db.scalars(statement).all())
     return build_snapshot_response_list(snapshots)
@@ -139,7 +138,8 @@ def compare_snapshots(
     return MarketingInsightSnapshotComparison(
         conversation_delta=current.total_conversations - previous.total_conversations,
         analyzed_delta=(
-            current.total_analyzed_conversations - previous.total_analyzed_conversations
+            current.total_analyzed_conversations
+            - previous.total_analyzed_conversations
         ),
         reply_sent_rate_delta=round(
             current.kpi_summary.reply_sent_rate - previous.kpi_summary.reply_sent_rate,

@@ -136,7 +136,9 @@ def get_extension_channel_context(
             "live_chat" if normalized_channel == "tawk" else normalized_channel
         ),
         provider=normalized_provider,
-        provider_key=("tawk" if normalized_channel == "tawk" else normalized_provider),
+        provider_key=(
+            "tawk" if normalized_channel == "tawk" else normalized_provider
+        ),
         source=source,
         message_key_prefix=message_key_prefix,
         send_mode=send_mode,
@@ -315,7 +317,9 @@ def dedupe_normalized_snapshot_messages(
 
 def normalize_extension_message_text(value: str) -> str:
     return "\n".join(
-        line.strip() for line in (value or "").splitlines() if line.strip()
+        line.strip()
+        for line in (value or "").splitlines()
+        if line.strip()
     ).strip()
 
 
@@ -363,7 +367,8 @@ def split_reply_context_from_snapshot_text(
     relevant_previous_messages = [
         message
         for message in previous_messages[-6:]
-        if message.text.strip() and message.sender_type != sender_type
+        if message.text.strip()
+        and message.sender_type != sender_type
     ]
     if not relevant_previous_messages:
         return normalized_text, None
@@ -467,7 +472,9 @@ def validate_tawk_extension_identity(
     current_user: User,
     external_thread_id: str | None,
 ) -> str:
-    match = TAWK_EXTERNAL_THREAD_PATTERN.fullmatch((external_thread_id or "").strip())
+    match = TAWK_EXTERNAL_THREAD_PATTERN.fullmatch(
+        (external_thread_id or "").strip()
+    )
     if match is None:
         raise ExtensionSnapshotError("Identitas percakapan Tawk tidak valid.")
 
@@ -482,7 +489,9 @@ def validate_tawk_extension_identity(
         ) from exc
 
     if organization.id != current_user.organization_id:
-        raise ExtensionSnapshotError("Percakapan Tawk tidak tersedia untuk akun ini.")
+        raise ExtensionSnapshotError(
+            "Percakapan Tawk tidak tersedia untuk akun ini."
+        )
 
     return match.group(0)
 
@@ -505,7 +514,9 @@ def ensure_tawk_conversation_access(
         current_user=current_user,
         conversation=conversation,
     ):
-        raise ExtensionSnapshotError("Percakapan Tawk tidak tersedia untuk akun ini.")
+        raise ExtensionSnapshotError(
+            "Percakapan Tawk tidak tersedia untuk akun ini."
+        )
 
 
 def get_latest_ai_extraction_for_conversation(
@@ -759,7 +770,9 @@ def find_matching_synthetic_sales_message(
         recent_fallback_candidates = [
             message
             for message in exact_text_candidates
-            if abs(ensure_aware_utc(message.created_at) - datetime.now(timezone.utc))
+            if abs(
+                ensure_aware_utc(message.created_at) - datetime.now(timezone.utc)
+            )
             <= SYNTHETIC_SALES_MATCH_WINDOW
         ]
 
@@ -774,7 +787,6 @@ def find_matching_synthetic_sales_message(
             ensure_aware_utc(message.message_timestamp) - incoming_timestamp
         ),
     )
-
 
 def is_extension_cache_fresh(
     *,
@@ -911,13 +923,17 @@ def sync_extension_snapshot(
         conversation.title = snapshot.chat_title.strip()
         conversation.raw_text = transcript
         if channel_context.channel == "tawk":
-            if conversation.started_at is None or ensure_aware_utc(
-                started_at
-            ) < ensure_aware_utc(conversation.started_at):
+            if (
+                conversation.started_at is None
+                or ensure_aware_utc(started_at)
+                < ensure_aware_utc(conversation.started_at)
+            ):
                 conversation.started_at = started_at
-            if conversation.last_message_at is None or ensure_aware_utc(
-                last_message_at
-            ) > ensure_aware_utc(conversation.last_message_at):
+            if (
+                conversation.last_message_at is None
+                or ensure_aware_utc(last_message_at)
+                > ensure_aware_utc(conversation.last_message_at)
+            ):
                 conversation.last_message_at = last_message_at
         else:
             conversation.started_at = started_at
@@ -947,9 +963,7 @@ def sync_extension_snapshot(
             db=db,
             conversation=conversation,
             preferred_name=(
-                customer_messages[0].author
-                if customer_messages
-                else snapshot.chat_title
+                customer_messages[0].author if customer_messages else snapshot.chat_title
             ),
         )
 
@@ -1022,7 +1036,8 @@ def build_extension_reply_suggestions_response(
                 reasoning=str(item.get("reasoning", "")),
             )
             for item in suggestion.suggested_replies
-            if isinstance(item, dict) and str(item.get("text", "")).strip()
+            if isinstance(item, dict)
+            and str(item.get("text", "")).strip()
         ]
 
     if not suggestion_details:
@@ -1082,10 +1097,13 @@ def generate_extension_reply_suggestions_for_channel(
         conversation_id=snapshot_result.conversation_id,
     )
 
-    if snapshot_result.duplicate and is_extension_cache_fresh(
-        conversation=conversation,
-        extraction=latest_extraction,
-        suggestion=latest_suggestion,
+    if (
+        snapshot_result.duplicate
+        and is_extension_cache_fresh(
+            conversation=conversation,
+            extraction=latest_extraction,
+            suggestion=latest_suggestion,
+        )
     ):
         return build_extension_reply_suggestions_response(
             snapshot_result=snapshot_result,

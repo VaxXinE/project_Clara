@@ -70,9 +70,7 @@ class MarketingExecutionItem(Base):
         nullable=False,
     )
 
-    organization = relationship(
-        "Organization", back_populates="marketing_execution_items"
-    )
+    organization = relationship("Organization", back_populates="marketing_execution_items")
     created_by_user = relationship(
         "User",
         back_populates="created_marketing_execution_items",

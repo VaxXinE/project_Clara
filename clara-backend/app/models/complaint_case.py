@@ -48,6 +48,8 @@ class ComplaintCase(Base):
     fingerprint: Mapped[str] = mapped_column(
         String(64), nullable=False, unique=True, index=True
     )
+    issue_signature: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    incident_bucket: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     first_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
