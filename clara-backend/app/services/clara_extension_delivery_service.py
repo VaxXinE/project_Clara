@@ -30,6 +30,11 @@ from app.services.clara_policy_enforcement_service import (
     assert_user_can_review_requirement,
     reviewer_requirement_for_suggestion,
 )
+from app.services.clara_rollout_service import (
+    ClaraRolloutError,
+    assert_rollout_suggestion_sendable,
+    hard_stop_candidate_suggestion,
+)
 from app.services.sent_message_service import (
     SentMessageError,
     mark_reply_suggestion_as_sent,
@@ -315,8 +320,10 @@ def authorize_extension_delivery(
     idempotency_key: str,
     explicit_human_action: bool,
 ) -> ExtensionDeliveryDecision:
+    rollout_metadata = suggestion.persona_bundle_metadata or {}
     mode = normalize_extension_delivery_mode(
-        settings.clara_extension_delivery_mode
+        rollout_metadata.get("rollout_extension_delivery_mode")
+        or settings.clara_extension_delivery_mode
     ).mode
     normalized_text = final_reply_text.strip()
     final_hash = hash_text(normalized_text)
@@ -331,6 +338,20 @@ def authorize_extension_delivery(
     conversation = db.get(Conversation, suggestion.conversation_id)
     if conversation is None or conversation.organization_id != current_user.organization_id:
         raise ExtensionDeliveryError("Conversation is not available.")
+    if not explicit_human_action:
+        candidate_stopped = hard_stop_candidate_suggestion(
+            db,
+            suggestion=suggestion,
+            category="AUTOMATIC_CUSTOMER_SEND",
+            reason_codes=("MISSING_EXPLICIT_HUMAN_ACTION",),
+            actor=current_user,
+        )
+        if candidate_stopped:
+            raise ExtensionDeliveryError("Explicit human action is required for candidate delivery.")
+    try:
+        assert_rollout_suggestion_sendable(db, suggestion)
+    except ClaraRolloutError as exc:
+        raise ExtensionDeliveryError(str(exc)) from exc
 
     existing_sent = db.scalars(
         select(SentMessage).where(SentMessage.reply_suggestion_id == suggestion.id)
@@ -442,6 +463,14 @@ def authorize_extension_delivery(
         )
         if not expected or expected != actual
     )
+    if "active_chat_mismatch" in mismatch_reasons:
+        hard_stop_candidate_suggestion(
+            db,
+            suggestion=suggestion,
+            category="WRONG_ACTIVE_CHAT_DELIVERY",
+            reason_codes=("ACTIVE_CHAT_FINGERPRINT_MISMATCH",),
+            actor=current_user,
+        )
     if mismatch_reasons or suggestion.version != suggestion_version:
         governed_permission = DeliveryPermission.REQUIRE_REFRESH
         reasons = mismatch_reasons + (
@@ -465,6 +494,13 @@ def authorize_extension_delivery(
             else ("previous_delivery_unresolved",)
         )
     elif suggestion.approval_status in {"blocked", "rejected"} or suggestion.action_mode.upper() == "BLOCK":
+        hard_stop_candidate_suggestion(
+            db,
+            suggestion=suggestion,
+            category="BLOCKED_POLICY_SENDABLE",
+            reason_codes=("BLOCKED_SUGGESTION_DELIVERY_ATTEMPT",),
+            actor=current_user,
+        )
         governed_permission = DeliveryPermission.BLOCK
         reasons = ("suggestion_blocked",)
     else:
@@ -744,11 +780,29 @@ def reconcile_extension_delivery(
         or authorization.latest_message_fingerprint != latest_message_fingerprint
         or authorization.final_text_hash != final_text_hash
     ):
+        suggestion = db.get(ReplySuggestion, authorization.reply_suggestion_id)
+        if suggestion is not None:
+            hard_stop_candidate_suggestion(
+                db,
+                suggestion=suggestion,
+                category="WRONG_ACTIVE_CHAT_DELIVERY",
+                reason_codes=("DELIVERY_RESULT_BINDING_MISMATCH",),
+                actor=current_user,
+            )
         raise ExtensionDeliveryError("Delivery result binding mismatch.")
 
     browser_event_hash = hash_text(browser_event_id)
     if authorization.browser_event_hash is not None:
         if authorization.browser_event_hash != browser_event_hash:
+            suggestion = db.get(ReplySuggestion, authorization.reply_suggestion_id)
+            if suggestion is not None:
+                hard_stop_candidate_suggestion(
+                    db,
+                    suggestion=suggestion,
+                    category="DUPLICATE_CONFIRMED_SEND",
+                    reason_codes=("CONFLICTING_BROWSER_DELIVERY_EVENT",),
+                    actor=current_user,
+                )
             raise ExtensionDeliveryError("Delivery result already recorded by another browser event.")
         sent = db.scalars(
             select(SentMessage).where(

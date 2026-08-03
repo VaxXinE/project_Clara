@@ -5,6 +5,7 @@ from app import models as _models  # noqa: F401
 from app.api.routes_ai import router as ai_router
 from app.api.routes_ai_persona_config import router as ai_persona_config_router
 from app.api.routes_clara_evaluation import router as clara_evaluation_router
+from app.api.routes_clara_rollout import router as clara_rollout_router
 from app.api.routes_auth import router as auth_router
 from app.api.routes_conversations import router as conversations_router
 from app.api.routes_customers import router as customers_router
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(ai_router)
     app.include_router(ai_persona_config_router)
     app.include_router(clara_evaluation_router)
+    app.include_router(clara_rollout_router)
     app.include_router(reply_router)
     app.include_router(sent_messages_router)
     app.include_router(dashboard_router)

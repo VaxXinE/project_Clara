@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     clara_process_state_mode: str = "LEGACY"
     clara_service_routing_mode: str = "LEGACY"
     clara_extension_delivery_mode: str = "LEGACY"
+    clara_rollout_control_mode: str = "OFF"
     clara_extension_delivery_authorization_ttl_seconds: int = 60
     clara_complaint_incident_window_days: int = 30
     clara_product_fact_high_volatility_days: int = 7

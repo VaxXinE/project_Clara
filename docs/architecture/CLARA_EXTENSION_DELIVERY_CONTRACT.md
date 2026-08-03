@@ -94,3 +94,16 @@ Set `CLARA_EXTENSION_DELIVERY_MODE=LEGACY` and restart the backend. Existing
 authorization/event history remains available. Do not downgrade the migration
 for operational rollback. Older extension builds remain compatible while mode
 is `LEGACY`; a governed rollout must require extension `0.1.2` or newer.
+
+## Stage 9 rollout gate
+
+Canary promotion requires the plan to explicitly select `GOVERNED` extension
+delivery and provide its deployment-readiness reference. Candidate suggestions
+carry the request-scoped delivery mode. Authorization still requires a human
+action, active-chat/snapshot/message/final-text binding, and existing review
+rules. Shadow suggestions are never persisted for delivery. A paused, stopped,
+rolled-back, stale, or hash-mismatched candidate is rejected even if the
+process-wide extension mode is `LEGACY`. Wrong active-chat attempts,
+non-human candidate send attempts, blocked-policy delivery attempts, and
+conflicting confirmations can hard-stop the plan. Tawk ownership and adapter
+behavior are unchanged.

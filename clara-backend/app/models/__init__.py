@@ -10,6 +10,12 @@ from app.models.clara_evaluation import (
     ClaraEvaluationHumanReview,
     ClaraEvaluationRun,
 )
+from app.models.clara_rollout import (
+    ClaraRolloutEvent,
+    ClaraRolloutIncident,
+    ClaraRolloutObservation,
+    ClaraRolloutPlan,
+)
 from app.models.conversation import Conversation
 from app.models.complaint_case import ComplaintCase, ComplaintCaseEvent
 from app.models.customer_profile import CustomerProfile
@@ -57,6 +63,10 @@ __all__ = [
     "ClaraEvaluationCaseResult",
     "ClaraEvaluationHumanReview",
     "ClaraEvaluationRun",
+    "ClaraRolloutEvent",
+    "ClaraRolloutIncident",
+    "ClaraRolloutObservation",
+    "ClaraRolloutPlan",
     "Conversation",
     "ComplaintCase",
     "ComplaintCaseEvent",

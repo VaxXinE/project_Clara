@@ -35,6 +35,12 @@ from app.services.clara_policy_enforcement_service import (
     normalize_policy_enforcement_mode,
 )
 from app.services.reply_suggestion_service import create_reply_suggestion
+from app.services.clara_rollout_service import (
+    ClaraRolloutError,
+    active_runtime_decision,
+    assert_rollout_suggestion_sendable,
+    resolve_rollout_decision,
+)
 from app.services.tawk_webhook_service import (
     TawkWebhookIgnoredError,
     resolve_tawk_property_organization,
@@ -1173,9 +1179,16 @@ def generate_extension_reply_suggestions_for_channel(
         channel_context=channel_context,
         conversation_id=snapshot_result.conversation_id,
     )
+    cached_rollout_usable = True
+    if latest_suggestion is not None:
+        try:
+            assert_rollout_suggestion_sendable(db, latest_suggestion)
+        except ClaraRolloutError:
+            cached_rollout_usable = False
 
     if (
         snapshot_result.duplicate
+        and cached_rollout_usable
         and is_extension_cache_fresh(
             conversation=conversation,
             extraction=latest_extraction,
@@ -1211,10 +1224,16 @@ def generate_extension_reply_suggestions_for_channel(
             conversation_id=snapshot_result.conversation_id,
         )
 
+    rollout_decision = resolve_rollout_decision(
+        db,
+        organization_id=current_user.organization_id,
+        user=current_user,
+    )
     suggestion = create_reply_suggestion(
         db=db,
         conversation_id=snapshot_result.conversation_id,
         desired_count=1,
+        rollout_decision=active_runtime_decision(rollout_decision),
     )
     suggestion.extension_snapshot_fingerprint = snapshot_result.snapshot_fingerprint
     suggestion.extension_latest_message_fingerprint = (

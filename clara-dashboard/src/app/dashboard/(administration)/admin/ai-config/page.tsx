@@ -129,6 +129,38 @@ type BundleCertification = {
   message: string;
 };
 
+type RolloutPlan = {
+  id: string;
+  name: string;
+  status: string;
+  current_stage: string | null;
+  candidate_bundle_id: string;
+  candidate_bundle_hash: string;
+  certification_run_id: string;
+  certification_report_hash: string;
+  baseline_profile: Record<string, string>;
+  candidate_profile: Record<string, string>;
+  cohort_percentage: number;
+  shadow_sample_percentage: number;
+  daily_shadow_limit: number;
+  promotion_thresholds: Record<string, number>;
+  required_sample_size: number;
+  observation_count: number;
+  open_critical_incident_count: number;
+  version: number;
+  control_mode: "OFF" | "OBSERVE" | "GOVERNED";
+  manual_send_required: true;
+};
+
+type RolloutIncident = {
+  id: string;
+  severity: string;
+  category: string;
+  reason_codes: string[];
+  status: string;
+  created_at: string;
+};
+
 const REVIEW_DIMENSIONS = [
   "factual_correctness",
   "directness",
@@ -200,6 +232,29 @@ export default function AiPersonaConfigPage() {
   );
   const [certification, setCertification] =
     useState<BundleCertification | null>(null);
+  const [rolloutPlans, setRolloutPlans] = useState<RolloutPlan[]>([]);
+  const [rolloutMetrics, setRolloutMetrics] = useState<Record<string, unknown>>({});
+  const [rolloutIncidents, setRolloutIncidents] = useState<RolloutIncident[]>([]);
+  const [rolloutProfileJson, setRolloutProfileJson] = useState(
+    JSON.stringify(
+      {
+        persona_authority_mode: "PERSONA",
+        semantic_revalidation_mode: "OFF",
+        policy_mode: "ENFORCE",
+        product_fact_mode: "LEGACY",
+        process_state_mode: "LEGACY",
+        service_routing_mode: "LEGACY",
+        extension_delivery_mode: "GOVERNED",
+      },
+      null,
+      2,
+    ),
+  );
+  const [rolloutThresholdsJson, setRolloutThresholdsJson] = useState("{}");
+  const [rolloutShadowSample, setRolloutShadowSample] = useState(0);
+  const [rolloutDailyLimit, setRolloutDailyLimit] = useState(0);
+  const [rolloutRequiredSample, setRolloutRequiredSample] = useState(0);
+  const activeRollout = rolloutPlans[0] ?? null;
 
   const currentBundle = bundles.find((bundle) => bundle.status === "published");
   const candidateBundle = bundles.find(
@@ -221,7 +276,7 @@ export default function AiPersonaConfigPage() {
     setErrorMessage("");
     try {
       const params = new URLSearchParams({ variant: nextVariant });
-      const [effective, history, bundleHistory, bundleState, evaluationHistory] = await Promise.all([
+      const [effective, history, bundleHistory, bundleState, evaluationHistory, rolloutHistory] = await Promise.all([
         apiFetch<EffectiveSection[]>(
           `/ai-persona-config/effective?${params.toString()}`,
         ),
@@ -241,11 +296,31 @@ export default function AiPersonaConfigPage() {
         nextVariant === "mini"
           ? apiFetch<EvaluationRun[]>("/clara-evaluations")
           : Promise.resolve([]),
+        nextVariant === "mini"
+          ? apiFetch<RolloutPlan[]>("/clara-rollouts")
+          : Promise.resolve([]),
       ]);
       setEffectiveSections(effective);
       setVersions(history);
       setBundles(bundleHistory);
       setEffectiveBundleState(bundleState);
+      setRolloutPlans(rolloutHistory);
+      const latestRollout = rolloutHistory[0];
+      if (latestRollout) {
+        const [metricState, incidentState] = await Promise.all([
+          apiFetch<{ values: Record<string, unknown> }>(
+            `/clara-rollouts/${latestRollout.id}/metrics`,
+          ),
+          apiFetch<RolloutIncident[]>(
+            `/clara-rollouts/${latestRollout.id}/incidents`,
+          ),
+        ]);
+        setRolloutMetrics(metricState.values);
+        setRolloutIncidents(incidentState);
+      } else {
+        setRolloutMetrics({});
+        setRolloutIncidents([]);
+      }
       const candidate = bundleHistory.find(
         (bundle) => bundle.status === "draft" || bundle.status === "validated",
       );
@@ -619,6 +694,90 @@ export default function AiPersonaConfigPage() {
       URL.revokeObjectURL(url);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Report gagal diunduh.");
+    }
+  }
+
+  async function createRolloutPlan() {
+    if (!currentBundle?.bundle_sha256) return;
+    try {
+      const candidateProfile = JSON.parse(rolloutProfileJson) as Record<string, string>;
+      const promotionThresholds = JSON.parse(rolloutThresholdsJson) as Record<string, number>;
+      if (!window.confirm(
+        `Buat draft rollout untuk bundle ${currentBundle.bundle_sha256}?\n\nTidak ada aktivasi otomatis. Manual review dan explicit send tetap wajib.`,
+      )) return;
+      setIsSubmitting(true);
+      setErrorMessage("");
+      await apiFetch<RolloutPlan>("/clara-rollouts", {
+        method: "POST",
+        body: {
+          name: `Mini rollout bundle v${currentBundle.bundle_version}`,
+          candidate_bundle_id: currentBundle.id,
+          candidate_profile: candidateProfile,
+          cohort_seed: `mini-bundle-${currentBundle.bundle_version}`,
+          shadow_sample_percentage: rolloutShadowSample,
+          daily_shadow_limit: rolloutDailyLimit,
+          promotion_thresholds: promotionThresholds,
+          required_sample_size: rolloutRequiredSample,
+        },
+      });
+      setSuccessMessage("Draft rollout dibuat; belum aktif.");
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Konfigurasi rollout tidak valid.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function rolloutAction(path: string, body: Record<string, unknown>, success: string) {
+    if (!activeRollout) return;
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await apiFetch<RolloutPlan>(`/clara-rollouts/${activeRollout.id}/${path}`, {
+        method: "POST",
+        body: { expected_version: activeRollout.version, ...body },
+      });
+      setSuccessMessage(success);
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Aksi rollout gagal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function promoteRollout(targetStage: string, path = "promote") {
+    if (!activeRollout) return;
+    const differences = Object.entries(activeRollout.candidate_profile)
+      .filter(([key, value]) => activeRollout.baseline_profile[key] !== value)
+      .map(([key, value]) => `${key}: ${activeRollout.baseline_profile[key] ?? "-"} → ${value}`)
+      .join("\n");
+    if (!window.confirm(
+      `Promosi manual rollout?\n\nCurrent: ${activeRollout.current_stage ?? "READY"}\nTarget: ${targetStage}\nBundle: ${activeRollout.candidate_bundle_hash}\nProfile differences:\n${differences || "none"}\nSample: ${String(rolloutMetrics.sample_count ?? 0)} / ${activeRollout.required_sample_size}\nUnresolved critical incidents: ${activeRollout.open_critical_incident_count}\n\nAI hanya membuat draft. Human review/edit dan explicit manual send tetap wajib.`,
+    )) return;
+    await rolloutAction(
+      path,
+      path === "promote" ? { target_stage: targetStage } : {},
+      `Rollout berpindah ke ${targetStage}.`,
+    );
+  }
+
+  async function resolveRolloutIncident(incident: RolloutIncident) {
+    const note = window.prompt(`Resolusi aman untuk ${incident.category} (tanpa PII/secrets):`);
+    if (!note) return;
+    setIsSubmitting(true);
+    try {
+      await apiFetch(`/clara-rollouts/incidents/${incident.id}/resolve`, {
+        method: "POST",
+        body: { resolution_note: note },
+      });
+      setSuccessMessage("Incident ditandai resolved; rollout tidak otomatis resume.");
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Resolusi incident gagal.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -1039,6 +1198,131 @@ export default function AiPersonaConfigPage() {
                     <p className="mt-2 text-xs text-slate-500">
                       COMPLAINT dan ADVERSARIAL_COMPLIANCE wajib direview dua superadmin berbeda; konflik harus direkonsiliasi reviewer ketiga.
                     </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {variant === "mini" && (
+          <section className="clara-card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-600">
+                  Stage 9 Rollout Control Plane
+                </p>
+                <h2 className="mt-1 text-lg font-bold clara-text-primary">
+                  Governed shadow & reviewer canary
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Tidak ada aktivasi, promosi, resume, atau customer send otomatis.
+                </p>
+              </div>
+              <span className="clara-badge">
+                Control: {activeRollout?.control_mode ?? "OFF"}
+              </span>
+            </div>
+
+            {!activeRollout ? (
+              <div className="mt-4 space-y-3 rounded-xl border border-slate-200 p-4">
+                <p className="text-sm font-semibold clara-text-primary">
+                  Buat draft dari exact published + certified Mini bundle
+                </p>
+                <p className="break-all text-xs text-slate-500">
+                  Bundle: {currentBundle?.bundle_sha256 ?? "Belum ada published bundle"}
+                </p>
+                <label className="block text-xs font-semibold text-slate-600">
+                  Candidate runtime profile (canonical JSON)
+                  <textarea
+                    value={rolloutProfileJson}
+                    onChange={(event) => setRolloutProfileJson(event.target.value)}
+                    rows={10}
+                    spellCheck={false}
+                    className="clara-input mt-1 w-full font-mono text-xs"
+                  />
+                </label>
+                <label className="block text-xs font-semibold text-slate-600">
+                  Promotion thresholds JSON (contoh: approval_rate_min / rejection_rate_max)
+                  <textarea
+                    value={rolloutThresholdsJson}
+                    onChange={(event) => setRolloutThresholdsJson(event.target.value)}
+                    rows={3}
+                    spellCheck={false}
+                    className="clara-input mt-1 w-full font-mono text-xs"
+                  />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <label className="text-xs text-slate-600">
+                    Shadow sample %
+                    <input type="number" min={0} max={100} value={rolloutShadowSample} onChange={(event) => setRolloutShadowSample(Number(event.target.value))} className="clara-input mt-1 w-full" />
+                  </label>
+                  <label className="text-xs text-slate-600">
+                    Daily shadow limit
+                    <input type="number" min={0} value={rolloutDailyLimit} onChange={(event) => setRolloutDailyLimit(Number(event.target.value))} className="clara-input mt-1 w-full" />
+                  </label>
+                  <label className="text-xs text-slate-600">
+                    Required sample / stage
+                    <input type="number" min={0} value={rolloutRequiredSample} onChange={(event) => setRolloutRequiredSample(Number(event.target.value))} className="clara-input mt-1 w-full" />
+                  </label>
+                </div>
+                <button type="button" className="clara-button clara-button-primary" disabled={isSubmitting || !currentBundle} onClick={() => void createRolloutPlan()}>
+                  Create rollout draft
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-4">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 p-4 text-sm">
+                    <p className="font-semibold">{activeRollout.name}</p>
+                    <p>Status: {activeRollout.status}</p>
+                    <p>Stage: {activeRollout.current_stage ?? "not activated"}</p>
+                    <p>Cohort: {activeRollout.cohort_percentage}%</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 p-4 text-xs">
+                    <p className="font-semibold">Exact certification binding</p>
+                    <p className="mt-1 break-all">Bundle: {activeRollout.candidate_bundle_hash}</p>
+                    <p className="mt-1 break-all">Certification run: {activeRollout.certification_run_id}</p>
+                    <p className="mt-1 break-all">Report: {activeRollout.certification_report_hash}</p>
+                    <p className="mt-1 font-semibold">
+                      Current bundle hash match: {currentBundle?.bundle_sha256 === activeRollout.candidate_bundle_hash ? "yes" : "no"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 p-4 text-xs">
+                    <p className="font-semibold">Evidence gate</p>
+                    <p>Samples: {String(rolloutMetrics.sample_count ?? 0)} / {activeRollout.required_sample_size}</p>
+                    <p>Human reviews: {String(rolloutMetrics.human_review_count ?? 0)}</p>
+                    <p>Critical incidents: {activeRollout.open_critical_incident_count}</p>
+                    <p>Shadow: {activeRollout.shadow_sample_percentage}% · max {activeRollout.daily_shadow_limit}/day</p>
+                  </div>
+                </div>
+
+                <details className="rounded-xl border border-slate-200 p-4 text-xs">
+                  <summary className="cursor-pointer font-semibold">Profile, thresholds, dan safe metrics</summary>
+                  <pre className="mt-3 overflow-auto whitespace-pre-wrap">{JSON.stringify({ candidate_profile: activeRollout.candidate_profile, promotion_thresholds: activeRollout.promotion_thresholds, metrics: rolloutMetrics }, null, 2)}</pre>
+                </details>
+
+                <div className="flex flex-wrap gap-2">
+                  {activeRollout.status === "DRAFT" && <button type="button" className="clara-button clara-button-ghost" disabled={isSubmitting} onClick={() => void rolloutAction("readiness", {}, "Readiness tervalidasi; belum aktif.")}>Validate readiness</button>}
+                  {activeRollout.status === "READY" && <button type="button" className="clara-button clara-button-primary" disabled={isSubmitting} onClick={() => void promoteRollout("INTERNAL_SIMULATION", "activate-internal")}>Start internal simulation</button>}
+                  {activeRollout.status === "ACTIVE" && activeRollout.current_stage === "INTERNAL_SIMULATION" && <button type="button" className="clara-button clara-button-primary" disabled={isSubmitting} onClick={() => void promoteRollout("SHADOW", "activate-shadow")}>Start shadow</button>}
+                  {activeRollout.status === "ACTIVE" && activeRollout.current_stage === "SHADOW" && <button type="button" className="clara-button clara-button-primary" disabled={isSubmitting} onClick={() => void promoteRollout("REVIEWER_CANARY_10")}>Promote to 10%</button>}
+                  {activeRollout.status === "ACTIVE" && activeRollout.current_stage === "REVIEWER_CANARY_10" && <button type="button" className="clara-button clara-button-primary" disabled={isSubmitting} onClick={() => void promoteRollout("REVIEWER_CANARY_30")}>Promote to 30%</button>}
+                  {activeRollout.status === "ACTIVE" && activeRollout.current_stage === "REVIEWER_CANARY_30" && <button type="button" className="clara-button clara-button-primary" disabled={isSubmitting} onClick={() => void promoteRollout("SEMI_AUTOMATIC_100")}>Promote to 100%</button>}
+                  {activeRollout.status === "ACTIVE" && <button type="button" className="clara-button clara-button-ghost" disabled={isSubmitting} onClick={() => void rolloutAction("pause", { reason_codes: ["MANUAL_EMERGENCY_PAUSE"] }, "Rollout dipause; request baru fallback ke baseline.")}>Emergency pause</button>}
+                  {activeRollout.status === "PAUSED" && <button type="button" className="clara-button clara-button-ghost" disabled={isSubmitting} onClick={() => void rolloutAction("resume", {}, "Rollout di-resume melalui aksi manual.")}>Reviewed resume</button>}
+                  {["ACTIVE", "PAUSED", "STOPPED"].includes(activeRollout.status) && <button type="button" className="clara-button clara-button-ghost" disabled={isSubmitting} onClick={() => void rolloutAction("rollback", { reason_codes: ["MANUAL_ROLLBACK"] }, "Rollout di-rollback; baseline dipulihkan.")}>Immediate rollback</button>}
+                </div>
+
+                {rolloutIncidents.length > 0 && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">
+                    <p className="font-semibold text-red-900">Critical incidents</p>
+                    {rolloutIncidents.map((incident) => (
+                      <div key={incident.id} className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-red-200 pt-2">
+                        <span>{incident.category} · {incident.status} · {incident.reason_codes.join(", ")}</span>
+                        {incident.status !== "RESOLVED" && <button type="button" className="clara-button clara-button-ghost" disabled={isSubmitting} onClick={() => void resolveRolloutIncident(incident)}>Resolve reviewed</button>}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

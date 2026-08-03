@@ -49,6 +49,12 @@ from app.models.clara_evaluation import (
     ClaraEvaluationHumanReview,
     ClaraEvaluationRun,
 )
+from app.models.clara_rollout import (
+    ClaraRolloutEvent,
+    ClaraRolloutIncident,
+    ClaraRolloutObservation,
+    ClaraRolloutPlan,
+)
 from app.models.conversation import Conversation
 from app.models.complaint_case import ComplaintCase, ComplaintCaseEvent
 from app.models.customer_profile import CustomerProfile
@@ -140,6 +146,10 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             ClaraEvaluationCaseResult.__table__,
             ClaraEvaluationHumanReview.__table__,
             ReplySuggestion.__table__,
+            ClaraRolloutPlan.__table__,
+            ClaraRolloutEvent.__table__,
+            ClaraRolloutObservation.__table__,
+            ClaraRolloutIncident.__table__,
             ExtensionDeliveryAuthorization.__table__,
             ExtensionDeliveryEvent.__table__,
             ApprovalLog.__table__,
@@ -192,6 +202,10 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             ApprovalLog.__table__,
             ExtensionDeliveryEvent.__table__,
             ExtensionDeliveryAuthorization.__table__,
+            ClaraRolloutIncident.__table__,
+            ClaraRolloutObservation.__table__,
+            ClaraRolloutEvent.__table__,
+            ClaraRolloutPlan.__table__,
             ReplySuggestion.__table__,
             ClaraEvaluationHumanReview.__table__,
             ClaraEvaluationCaseResult.__table__,

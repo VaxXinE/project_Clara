@@ -17,3 +17,11 @@ Certify only after automated PASS and complete review. Reject unsafe evidence. C
 ## Safe report handling
 
 Download only the safe JSON report or locally generated synthetic review pack. Keep artifacts out of git. They contain hashes, synthetic fixture text, reason codes, and scores—not production conversations, system prompts, secrets, or chain of thought. Delete restricted local artifacts after the release decision according to the team's retention policy.
+
+## Stage 9 handoff
+
+After publication, an authorized administrator may bind the exact valid
+certification to a `DRAFT` rollout plan. This handoff is not activation.
+Re-check the certification before readiness and every promotion. Keep Golden
+fixture evidence distinct from shadow and canary operational evidence; only
+observations from the current rollout stage satisfy the next promotion gate.

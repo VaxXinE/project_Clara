@@ -90,3 +90,12 @@ overlay presence. Full prompt text is never stored in bundle metadata or logs.
 ## Stage 8 certification gate
 
 Publication of a complete Mini candidate now requires immutable Golden V2 certification bound to the exact bundle hash, five section IDs/hashes, dataset hash, evaluator version, and supported contract. Evaluation never publishes. Changing a section invalidates evidence. Rollback may reuse historical certification only when its bundle content hash and current dataset/evaluator contracts still match. Stage 7 validation, warning acknowledgement, optimistic concurrency, and atomic publish remain required.
+
+## Stage 9 rollout binding
+
+A rollout may reference only the exact currently published Mini bundle and its
+valid Golden V2 certification. The plan stores IDs and hashes and does not copy
+section content. Publishing another Mini bundle archives the prior source, so
+runtime readiness fails closed and candidate selection returns to baseline.
+The bundle remains persona authority only; rollout controls selection, not the
+five prompt contents.

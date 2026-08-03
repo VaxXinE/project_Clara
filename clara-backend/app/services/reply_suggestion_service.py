@@ -85,6 +85,16 @@ from app.services.clara_process_state_service import (
     normalize_process_state_mode,
     state_rank,
 )
+from app.services.clara_rollout_service import (
+    ClaraRolloutError,
+    GenerationLane,
+    RolloutDecision,
+    assert_rollout_suggestion_sendable,
+    canonical_hash as rollout_hash,
+    get_plan as get_rollout_plan,
+    record_observation as record_rollout_observation,
+    trigger_hard_stop,
+)
 from app.services.clara_legacy_behavior_service import (
     AuthoritySystemPrompt,
     build_authority_debug_metadata,
@@ -832,6 +842,18 @@ def _truncate_text(value: str, limit: int = 180) -> str:
 
 def _round_duration_ms(start_time: float) -> float:
     return round((perf_counter() - start_time) * 1000, 2)
+
+
+def run_shadow_generation_safely(generate, profile: dict, safe_metadata: dict):
+    started_at = perf_counter()
+    try:
+        return generate(profile), None, _round_duration_ms(started_at)
+    except Exception as exc:
+        reply_logger.warning(
+            "rollout_shadow_candidate_failed",
+            extra={**safe_metadata, "error_type": type(exc).__name__},
+        )
+        return None, type(exc).__name__, _round_duration_ms(started_at)
 
 
 def _extract_minimum_hint(value: str) -> str | None:
@@ -3891,6 +3913,7 @@ def call_openai_for_reply_suggestion(
     organization_id: UUID | None = None,
     canonical_process_state: str | None = None,
     process_state_mode: ProcessStateMode = ProcessStateMode.LEGACY,
+    runtime_mode_overrides: dict[str, str] | None = None,
 ) -> ReplySuggestionCreate:
     if not settings.openai_api_key:
         raise ReplySuggestionError("OPENAI_API_KEY is not configured.")
@@ -3913,12 +3936,15 @@ def call_openai_for_reply_suggestion(
     )
     system_playbook = playbook_composition.system_playbook
     response_playbook = playbook_composition.supporting_playbook
+    runtime_mode_overrides = runtime_mode_overrides or {}
     mode_resolution = normalize_persona_authority_mode(
-        settings.clara_persona_authority_mode
+        runtime_mode_overrides.get(
+            "persona_authority_mode", settings.clara_persona_authority_mode
+        )
     )
     persona_authority_mode = PersonaAuthorityMode(mode_resolution.canonical_value)
     product_fact_mode_resolution = normalize_product_fact_mode(
-        settings.clara_product_fact_mode
+        runtime_mode_overrides.get("product_fact_mode", settings.clara_product_fact_mode)
     )
     product_fact_mode = product_fact_mode_resolution.mode
     requested_fact_keys = {
@@ -4061,7 +4087,9 @@ def call_openai_for_reply_suggestion(
         },
     }
     semantic_revalidation_mode = normalize_semantic_revalidation_mode(
-        settings.clara_semantic_revalidation_mode
+        runtime_mode_overrides.get(
+            "semantic_revalidation_mode", settings.clara_semantic_revalidation_mode
+        )
     )
     generation_authority_metadata["semantic_revalidation_mode"] = (
         semantic_revalidation_mode.value
@@ -4439,6 +4467,7 @@ def create_reply_suggestion(
     db: Session,
     conversation_id: UUID,
     desired_count: int = 3,
+    rollout_decision: RolloutDecision | None = None,
 ) -> ReplySuggestion:
     total_started_at = perf_counter()
     statement = (
@@ -4462,16 +4491,29 @@ def create_reply_suggestion(
             "No AI extraction found. Analyze the conversation first."
         )
 
+    if (
+        rollout_decision
+        and normalize_account_category(
+            conversation.lead.account_category if conversation.lead else None
+        )
+        != "mini"
+    ):
+        rollout_decision = rollout_decision.baseline_fallback()
+    runtime_profile = rollout_decision.runtime_profile if rollout_decision else {}
     policy_decision = decide_reply_action(extraction)
     enforcement_mode_resolution = normalize_policy_enforcement_mode(
-        settings.clara_policy_enforcement_mode
+        runtime_profile.get("policy_mode", settings.clara_policy_enforcement_mode)
     )
     persona_authority_mode = PersonaAuthorityMode(
         normalize_persona_authority_mode(
             settings.clara_persona_authority_mode
+            if not runtime_profile
+            else runtime_profile["persona_authority_mode"]
         ).canonical_value
     )
-    process_state_mode = normalize_process_state_mode(settings.clara_process_state_mode)
+    process_state_mode = normalize_process_state_mode(
+        runtime_profile.get("process_state_mode", settings.clara_process_state_mode)
+    )
     canonical_process_state: str | None = None
     if process_state_mode == ProcessStateMode.FSM:
         canonical_process_state = ProcessState.UNKNOWN.value
@@ -4488,7 +4530,7 @@ def create_reply_suggestion(
     include_all_variants = should_include_all_product_variants(conversation)
     latest_customer_message = get_latest_customer_message(conversation)
     service_routing_mode = normalize_service_routing_mode(
-        settings.clara_service_routing_mode
+        runtime_profile.get("service_routing_mode", settings.clara_service_routing_mode)
     )
     service_routing_decision = route_service_message(latest_customer_message)
     preliminary_enforcement_decision = decide_enforcement(
@@ -4595,44 +4637,59 @@ def create_reply_suggestion(
         }
     )
     reply_data = None
+    shadow_reply_data = None
+    shadow_error_code = None
+    shadow_duration_ms = 0.0
     if not skip_normal_generation:
-        reply_data = call_openai_for_reply_suggestion(
-            conversation_text=conversation_text,
-            extraction=extraction,
-            action_mode=policy_decision.action_mode,
-            grounded_knowledge=grounded_knowledge,
-            account_category=conversation.lead.account_category
-            if conversation.lead
-            else None,
-            include_all_variants=include_all_variants,
-            latest_customer_message=latest_customer_message,
-            latest_sales_message=latest_sales_message,
-            avoid_product_variant_locking=avoid_product_variant_locking,
-            preferred_reply_register=preferred_reply_register,
-            must_answer_with_product_options=must_answer_with_product_options,
-            should_avoid_repeating_sales_reply=should_avoid_repeating_sales_reply,
-            product_option_summary=product_option_summary,
-            must_give_concrete_steps=must_give_concrete_steps,
-            must_give_detailed_explanation=must_give_detailed_explanation,
-            discusses_scalping_or_setup=discusses_scalping_context,
-            latest_customer_intent=latest_customer_intent,
-            prioritized_knowledge_brief=prioritized_knowledge_brief,
-            answer_commitment_level=answer_commitment_level,
-            variant_response_mode=variant_response_mode,
-            customer_has_variant_commitment=customer_has_variant_commitment,
-            conversation_variant_focus=conversation_variant_focus,
-            customer_has_identity_submission=customer_has_identity_submission,
-            known_identity_fields=known_identity_fields,
-            customer_has_verification_completion=(customer_has_verification_completion),
-            latency_profile=latency_profile,
-            desired_count=desired_count,
-            previous_customer_message=previous_customer_message,
-            db=db,
-            organization_id=conversation.organization_id,
-            canonical_process_state=canonical_process_state,
-            process_state_mode=process_state_mode,
-        )
-    generation_duration_ms = _round_duration_ms(generation_started_at)
+        def generate(profile):
+            return call_openai_for_reply_suggestion(
+                conversation_text=conversation_text,
+                extraction=extraction,
+                action_mode=policy_decision.action_mode,
+                grounded_knowledge=grounded_knowledge,
+                account_category=conversation.lead.account_category if conversation.lead else None,
+                include_all_variants=include_all_variants,
+                latest_customer_message=latest_customer_message,
+                latest_sales_message=latest_sales_message,
+                avoid_product_variant_locking=avoid_product_variant_locking,
+                preferred_reply_register=preferred_reply_register,
+                must_answer_with_product_options=must_answer_with_product_options,
+                should_avoid_repeating_sales_reply=should_avoid_repeating_sales_reply,
+                product_option_summary=product_option_summary,
+                must_give_concrete_steps=must_give_concrete_steps,
+                must_give_detailed_explanation=must_give_detailed_explanation,
+                discusses_scalping_or_setup=discusses_scalping_context,
+                latest_customer_intent=latest_customer_intent,
+                prioritized_knowledge_brief=prioritized_knowledge_brief,
+                answer_commitment_level=answer_commitment_level,
+                variant_response_mode=variant_response_mode,
+                customer_has_variant_commitment=customer_has_variant_commitment,
+                conversation_variant_focus=conversation_variant_focus,
+                customer_has_identity_submission=customer_has_identity_submission,
+                known_identity_fields=known_identity_fields,
+                customer_has_verification_completion=customer_has_verification_completion,
+                latency_profile=latency_profile,
+                desired_count=desired_count,
+                previous_customer_message=previous_customer_message,
+                db=db,
+                organization_id=conversation.organization_id,
+                canonical_process_state=canonical_process_state,
+                process_state_mode=process_state_mode,
+                runtime_mode_overrides=profile,
+            )
+
+        reply_data = generate(runtime_profile)
+        generation_duration_ms = _round_duration_ms(generation_started_at)
+        if rollout_decision and rollout_decision.shadow_sampled:
+            shadow_reply_data, shadow_error_code, shadow_duration_ms = (
+                run_shadow_generation_safely(
+                    generate,
+                    rollout_decision.candidate_profile or {},
+                    rollout_decision.debug_metadata(),
+                )
+            )
+    else:
+        generation_duration_ms = _round_duration_ms(generation_started_at)
 
     critical_validator_ids: tuple[str, ...] = ()
     warning_validator_ids: tuple[str, ...] = ()
@@ -4640,7 +4697,7 @@ def create_reply_suggestion(
     if reply_data is not None and enforcement_mode != PolicyEnforcementMode.OFF:
         try:
             enforcement_fact_mode = normalize_product_fact_mode(
-                settings.clara_product_fact_mode
+                runtime_profile.get("product_fact_mode", settings.clara_product_fact_mode)
             ).mode
             enforcement_fact_composition = compose_product_fact_prompt(
                 db,
@@ -4682,6 +4739,28 @@ def create_reply_suggestion(
                     ),
                 },
             )
+
+    canary_bundle_mismatch = bool(
+        rollout_decision
+        and rollout_decision.generation_lane == GenerationLane.CANARY_CANDIDATE.value
+        and reply_data
+        and reply_data.generation_metadata.get("persona_bundle_hash")
+        != rollout_decision.candidate_bundle_hash
+    )
+    shadow_bundle_mismatch = bool(
+        rollout_decision
+        and rollout_decision.shadow_sampled
+        and shadow_reply_data
+        and shadow_reply_data.generation_metadata.get("persona_bundle_hash")
+        != rollout_decision.candidate_bundle_hash
+    )
+    if canary_bundle_mismatch:
+        critical_validator_ids = tuple(
+            dict.fromkeys((*critical_validator_ids, "certification_bundle_hash_mismatch"))
+        )
+    if shadow_bundle_mismatch:
+        shadow_reply_data = None
+        shadow_error_code = "CERTIFICATION_BUNDLE_HASH_MISMATCH"
 
     enforcement_decision = decide_enforcement(
         legacy_policy_action=policy_decision.action_mode,
@@ -4827,12 +4906,145 @@ def create_reply_suggestion(
         approval_status=approval_status,
         suggested_replies=suggested_replies,
         policy_reasons=applied_policy_reasons,
-        persona_bundle_metadata=(
-            reply_data.generation_metadata if reply_data is not None else {}
-        ),
+        persona_bundle_metadata={
+            **(reply_data.generation_metadata if reply_data is not None else {}),
+            **(
+                {
+                    "rollout_contract_version": "1.0",
+                    "rollout_plan_id": str(rollout_decision.plan_id)
+                    if rollout_decision.plan_id
+                    else None,
+                    "rollout_stage": rollout_decision.rollout_stage,
+                    "generation_lane": rollout_decision.generation_lane,
+                    "rollout_profile_hash": rollout_decision.profile_hash,
+                    "candidate_bundle_hash": rollout_decision.candidate_bundle_hash,
+                    "cohort_eligible": rollout_decision.cohort_eligible,
+                    "shadow_only": rollout_decision.shadow_only,
+                    "send_eligible": rollout_decision.send_eligible,
+                    "rollout_decision_hash": rollout_decision.rollout_decision_hash,
+                    "rollout_extension_delivery_mode": runtime_profile.get(
+                        "extension_delivery_mode"
+                    ),
+                }
+                if rollout_decision
+                else {}
+            ),
+        },
     )
 
     db.add(suggestion)
+    db.flush()
+    rollout_stop_map = {
+        "guaranteed_profit_claim": "GUARANTEED_PROFIT_CLAIM",
+        "risk_free_claim": "GUARANTEED_PROFIT_CLAIM",
+        "specific_buy_sell_instruction": "BLOCKED_POLICY_SENDABLE",
+        "all_in_or_full_margin_instruction": "BLOCKED_POLICY_SENDABLE",
+        "fake_verification_status_access": "UNSUPPORTED_PRODUCT_FACT",
+        "fake_account_or_fund_status_access": "UNSUPPORTED_PRODUCT_FACT",
+        "unsupported_refund_or_compensation_promise": "WRONG_LEGALITY_OR_REGULATOR_CLAIM",
+        "missing_legality_authority": "WRONG_LEGALITY_OR_REGULATOR_CLAIM",
+        "unsupported_fixed_sensitive_number": "UNSUPPORTED_PRODUCT_FACT",
+        "sensitive_data_exposure": "SENSITIVE_DATA_LEAKAGE",
+        "internal_prompt_disclosure": "INTERNAL_PROMPT_LEAKAGE",
+        "post_signup_regression": "PROCESS_STATE_REGRESSION",
+    }
+    rollout_stop_category = (
+        "CERTIFICATION_BUNDLE_HASH_MISMATCH"
+        if canary_bundle_mismatch or shadow_bundle_mismatch
+        else next(
+            (
+                rollout_stop_map[item]
+                for item in critical_validator_ids
+                if item in rollout_stop_map
+            ),
+            None,
+        )
+    )
+    if rollout_decision and rollout_decision.plan_id:
+        record_rollout_observation(
+            db,
+            plan_id=rollout_decision.plan_id,
+            organization_id=conversation.organization_id,
+            rollout_stage=rollout_decision.rollout_stage or "UNKNOWN",
+            generation_lane=rollout_decision.generation_lane,
+            profile_hash=rollout_decision.profile_hash,
+            bundle_hash=rollout_decision.candidate_bundle_hash or "baseline",
+            suggestion_id=suggestion.id,
+            conversation_id=conversation.id,
+            cohort_eligible=rollout_decision.cohort_eligible,
+            shadow_only=False,
+            send_eligible=rollout_decision.send_eligible,
+            validator_ids=critical_validator_ids,
+            input_length=len(conversation_text),
+            output_hash=rollout_hash(suggested_replies),
+            output_length=sum(len(item.get("text", "")) for item in suggested_replies),
+            generation_latency_ms=int(generation_duration_ms),
+            is_production_sample=(
+                rollout_decision.generation_lane
+                == GenerationLane.CANARY_CANDIDATE.value
+            ),
+            policy_action=applied_action_mode,
+            process_state=canonical_process_state,
+            route=service_routing_decision.route.value,
+        )
+        if rollout_decision.shadow_sampled:
+            shadow_replies = (
+                [item.model_dump() for item in shadow_reply_data.suggested_replies]
+                if shadow_reply_data
+                else []
+            )
+            record_rollout_observation(
+                db,
+                plan_id=rollout_decision.plan_id,
+                organization_id=conversation.organization_id,
+                rollout_stage=rollout_decision.rollout_stage or "SHADOW",
+                generation_lane=GenerationLane.SHADOW_CANDIDATE.value,
+                profile_hash=rollout_hash(rollout_decision.candidate_profile or {}),
+                bundle_hash=rollout_decision.candidate_bundle_hash or "missing",
+                reviewer_user_id=None,
+                suggestion_id=None,
+                conversation_id=conversation.id,
+                cohort_eligible=False,
+                shadow_only=True,
+                send_eligible=False,
+                reason_codes=(shadow_error_code,) if shadow_error_code else (),
+                input_length=len(conversation_text),
+                output_hash=rollout_hash(shadow_replies) if shadow_replies else None,
+                output_length=sum(len(item.get("text", "")) for item in shadow_replies),
+                generation_latency_ms=int(shadow_duration_ms),
+                is_production_sample=shadow_reply_data is not None,
+                route=service_routing_decision.route.value,
+                policy_action=applied_action_mode,
+                process_state=canonical_process_state,
+            )
+        should_hard_stop = bool(
+            rollout_stop_category
+            and (
+                rollout_decision.generation_lane
+                == GenerationLane.CANARY_CANDIDATE.value
+                or shadow_bundle_mismatch
+            )
+        )
+        if should_hard_stop:
+            if rollout_decision.generation_lane == GenerationLane.CANARY_CANDIDATE.value:
+                suggestion.approval_status = "blocked"
+                suggestion.persona_bundle_metadata = {
+                    **suggestion.persona_bundle_metadata,
+                    "send_eligible": False,
+                }
+            trigger_hard_stop(
+                db,
+                plan=get_rollout_plan(db, rollout_decision.plan_id),
+                category=rollout_stop_category,
+                reason_codes=(
+                    ("CERTIFICATION_BUNDLE_HASH_MISMATCH",)
+                    if shadow_bundle_mismatch
+                    else critical_validator_ids
+                ),
+                actor=None,
+                source_suggestion_id=suggestion.id,
+                source_conversation_id=conversation.id,
+            )
 
     reply_logger.info(
         "reply_suggestion_created",
@@ -4868,6 +5080,7 @@ def create_reply_suggestion(
             "service_routing_mode": service_routing_mode.value,
             **service_routing_decision.debug_metadata(),
             "enforcement_applied": (enforcement_mode == PolicyEnforcementMode.ENFORCE),
+            **(rollout_decision.debug_metadata() if rollout_decision else {}),
         },
     )
     db.commit()
@@ -4903,6 +5116,11 @@ def approve_reply_suggestion(
 
     if suggestion.approval_status != "pending":
         raise ReplySuggestionError("Reply suggestion is not pending.")
+
+    try:
+        assert_rollout_suggestion_sendable(db, suggestion)
+    except ClaraRolloutError as exc:
+        raise ReplySuggestionError(str(exc)) from exc
 
     try:
         assert_suggestion_can_be_approved(
