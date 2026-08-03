@@ -19,7 +19,7 @@ Metric contract version: `1.0`. Default reporting window is plan lifetime; promo
 | complaint leakage | complaint-sales-leak validator occurrences | observations | none |
 | sensitive-data leakage | sensitive-leak validator occurrences | observations | none |
 | prompt leakage | prompt-leak validator occurrences | observations | none |
-| critical validator failure | observations with critical validator IDs | observations | none |
+| critical validator failure | observations with at least one canonically classified critical validator ID (one count maximum per observation) | all eligible observations in the selected stage | none |
 | rollback/pause count | `PAUSED` and `ROLLED_BACK` events | plan | none |
 
 Original and edited reply text are read only from the existing authorized suggestion when a reviewer submits a label; only the aggregate distance is added to rollout observations. Observations contain identifiers, hashes, decisions, counts, timings, labels, and safe reason codes—not prompts, transcripts, raw DOM, credentials, or customer PII.

@@ -450,6 +450,45 @@ def test_metrics_are_versioned_deterministic_and_store_no_raw_text(
     db.close()
 
 
+def test_critical_validator_failure_counts_failed_observations_once(
+    db_session_factory, seeded_data
+):
+    db = db_session_factory()
+    plan = _plan(db, seeded_data)
+
+    def observe(validator_ids=(), stage="SHADOW"):
+        record_observation(
+            db,
+            plan_id=plan.id,
+            organization_id=plan.organization_id,
+            rollout_stage=stage,
+            generation_lane="SHADOW_CANDIDATE",
+            profile_hash="1" * 64,
+            bundle_hash=plan.candidate_bundle_hash,
+            validator_ids=validator_ids,
+        )
+        db.flush()
+        db.expire(plan, ["observations"])
+
+    observe()
+    assert calculate_metrics(plan, "SHADOW")["critical_validator_failure"] == 0
+
+    observe(("generic_opening",))
+    assert calculate_metrics(plan, "SHADOW")["critical_validator_failure"] == 0
+
+    observe(("guaranteed_profit_claim",))
+    assert calculate_metrics(plan, "SHADOW")["critical_validator_failure"] == pytest.approx(1 / 3)
+
+    observe(("risk_free_claim", "specific_buy_sell_instruction"))
+    assert calculate_metrics(plan, "SHADOW")["critical_validator_failure"] == 0.5
+
+    observe(("unsupported_variant",))
+    observe(("guaranteed_profit_claim",), stage="INTERNAL_SIMULATION")
+    assert calculate_metrics(plan, "SHADOW")["critical_validator_failure"] == 0.4
+    assert calculate_metrics(plan, "INTERNAL_SIMULATION")["critical_validator_failure"] == 1
+    db.close()
+
+
 def test_rollback_invalidates_candidate_and_preserves_history(
     db_session_factory, seeded_data, monkeypatch
 ):
