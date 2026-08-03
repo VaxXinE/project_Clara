@@ -31,6 +31,7 @@ from app.services.clara_evaluation_service import get_valid_certification
 from app.services.clara_policy_enforcement_service import PolicyEnforcementMode
 from app.services.clara_process_state_service import ProcessStateMode
 from app.services.clara_product_fact_service import ProductFactMode
+from app.services.clara_reply_retry_service import VALIDATOR_RULES_BY_ID
 from app.services.clara_reply_validation_service import SemanticRevalidationMode
 from app.services.clara_service_routing_service import ServiceRoutingMode
 
@@ -112,7 +113,7 @@ _METRIC_PARTS = {
     "complaint_leakage": ("complaint sales leakage", "candidate observations", "internal fixtures"),
     "sensitive_data_leakage": ("sensitive leakage", "candidate observations", "none"),
     "prompt_leakage": ("prompt leakage", "candidate observations", "none"),
-    "critical_validator_failure": ("critical validator observations", "candidate observations", "none"),
+    "critical_validator_failure": ("observations with at least one critical validator", "eligible observations in selected stage", "none"),
     "rollback_pause_count": ("pause and rollback events", "rollout plan", "none"),
 }
 METRIC_DEFINITIONS = {
@@ -401,7 +402,14 @@ def calculate_metrics(plan: ClaraRolloutPlan, rollout_stage: str | None = None) 
         "complaint_leakage": validator_ids.count("complaint_sales_leakage") / count if count else None,
         "sensitive_data_leakage": validator_ids.count("sensitive_data_exposure") / count if count else None,
         "prompt_leakage": validator_ids.count("internal_prompt_disclosure") / count if count else None,
-        "critical_validator_failure": sum(bool(item.validator_ids) for item in observations) / count if count else None,
+        "critical_validator_failure": sum(
+            any(
+                VALIDATOR_RULES_BY_ID[validator_id].severity == "CRITICAL"
+                for validator_id in item.validator_ids
+                if validator_id in VALIDATOR_RULES_BY_ID
+            )
+            for item in observations
+        ) / count if count else None,
         "rollback_pause_count": sum(item.event_type in {"PAUSED", "ROLLED_BACK"} for item in plan.events),
     }
     return result
