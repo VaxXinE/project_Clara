@@ -12,10 +12,13 @@
 !/docs/architecture/CLARA_STAGE_8_CHANGE_AUDIT.md
 !/docs/architecture/CLARA_EXTENSION_DELIVERY_CONTRACT.md
 !/docs/architecture/CLARA_EXTENSION_DELIVERY_MIGRATION_MAP.md
+!/docs/architecture/CLARA_FIVE_PROMPT_BUNDLE_CONTRACT.md
+!/docs/architecture/CLARA_PERSONA_BUNDLE_MIGRATION_MAP.md
 !/docs/operations/
 /docs/operations/*
 !/docs/operations/CLARA_CS_AND_COMPLAINT_RUNBOOK.md
 !/docs/operations/CLARA_EXTENSION_MANUAL_SEND_RUNBOOK.md
+!/docs/operations/CLARA_FIVE_PROMPT_PUBLICATION_RUNBOOK.md
 /clara_knowledge/AGENTS.md
 /clara-backend/AGENTS.md
 /clara-frontend/AGENTS.md

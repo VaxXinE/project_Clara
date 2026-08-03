@@ -14,6 +14,30 @@ def create_audit_log(
     request: Request | None = None,
     metadata: dict | None = None,
 ) -> AuditLog:
+    audit_log = add_audit_log(
+        db=db,
+        action=action,
+        resource_type=resource_type,
+        resource_id=resource_id,
+        current_user=current_user,
+        request=request,
+        metadata=metadata,
+    )
+    db.commit()
+    db.refresh(audit_log)
+    return audit_log
+
+
+def add_audit_log(
+    db: Session,
+    action: str,
+    resource_type: str,
+    resource_id: str | None = None,
+    current_user: User | None = None,
+    request: Request | None = None,
+    metadata: dict | None = None,
+) -> AuditLog:
+    """Add an audit row without committing, for atomic business transactions."""
     ip_address = None
     user_agent = None
     metadata_payload = metadata or {}
@@ -42,7 +66,4 @@ def create_audit_log(
     )
 
     db.add(audit_log)
-    db.commit()
-    db.refresh(audit_log)
-
     return audit_log

@@ -1,5 +1,17 @@
 # Clara Runtime Contract V1
 
+## Stage 7 addendum: five-prompt bundle
+
+The five playbooks may be sourced from one governed Mini bundle. Runtime order
+remains `instruction`, `guardrail`, `flow`, `personality_mode`, `auto_adapt`;
+roadmap review order is recorded separately as `guardrail`, `instruction`,
+`flow`, `personality_mode`, `auto_adapt`.
+
+Safe runtime provenance includes bundle ID/version/hash/contract, section
+version IDs and hashes, effective-source state, and fallback reason. It never
+contains prompt content. `CLARA_PERSONA_AUTHORITY_MODE` remains the sole
+persona runtime switch and defaults to `LEGACY`.
+
 Status: Stage 1 implementation
 
 Version: `1.0`

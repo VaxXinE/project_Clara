@@ -1,5 +1,13 @@
 # Clara Persona Parity and Retry Contract
 
+## Stage 7 bundle publication boundary
+
+Stage 7 changes publication granularity, not retry authority. HYBRID/PERSONA
+continue to consume the five canonical playbooks in the existing runtime
+order. When a complete bundle is active, retry composition receives those five
+versions as one coherent source; technical retry and validator ownership remain
+unchanged. No bundle publication activates HYBRID or PERSONA.
+
 Status: Stage 3 implementation
 
 Contract version: `CLARA_RETRY_CONTRACT_VERSION = "1.0"`

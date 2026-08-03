@@ -4027,10 +4027,13 @@ def call_openai_for_reply_suggestion(
         canonical_process_state=canonical_process_state,
     )
     system_prompt = authority_system_prompt.content
+    playbook_debug_metadata = playbook_composition.debug_metadata(
+        persona_authority_mode
+    )
     runtime_contract_debug = build_authority_debug_metadata(
         authority_prompt=authority_system_prompt,
         user_prompt=prompt,
-        playbook_metadata=playbook_composition.debug_metadata(persona_authority_mode),
+        playbook_metadata=playbook_debug_metadata,
         mode_original_value=mode_resolution.original_value,
         mode_was_normalized=mode_resolution.was_normalized,
     )
@@ -4051,6 +4054,11 @@ def call_openai_for_reply_suggestion(
         **product_fact_composition.debug_metadata(),
         "process_state_mode": process_state_mode.value,
         "current_process_state": canonical_process_state or ProcessState.UNKNOWN.value,
+        **{
+            key: value
+            for key, value in playbook_debug_metadata.items()
+            if key.startswith("persona_bundle_")
+        },
     }
     semantic_revalidation_mode = normalize_semantic_revalidation_mode(
         settings.clara_semantic_revalidation_mode
@@ -4237,7 +4245,9 @@ def call_openai_for_reply_suggestion(
                 "total_duration_ms": _round_duration_ms(total_started_at),
             },
         )
-        return reply_payload
+        return reply_payload.model_copy(
+            update={"generation_metadata": generation_authority_metadata}
+        )
 
     retry_composition = compose_retry_prompt(
         authority_mode=persona_authority_mode,
@@ -4361,7 +4371,9 @@ def call_openai_for_reply_suggestion(
                 "total_duration_ms": _round_duration_ms(total_started_at),
             },
         )
-        return retried_payload
+        return retried_payload.model_copy(
+            update={"generation_metadata": generation_authority_metadata}
+        )
     except Exception:
         repair_validation_report = (
             primary_validation_report
@@ -4405,7 +4417,9 @@ def call_openai_for_reply_suggestion(
                 "total_duration_ms": _round_duration_ms(total_started_at),
             },
         )
-        return reply_payload
+        return reply_payload.model_copy(
+            update={"generation_metadata": generation_authority_metadata}
+        )
 
 
 def get_latest_extraction(
@@ -4813,6 +4827,9 @@ def create_reply_suggestion(
         approval_status=approval_status,
         suggested_replies=suggested_replies,
         policy_reasons=applied_policy_reasons,
+        persona_bundle_metadata=(
+            reply_data.generation_metadata if reply_data is not None else {}
+        ),
     )
 
     db.add(suggestion)

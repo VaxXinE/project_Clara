@@ -1,5 +1,17 @@
 # Clara Runtime Authority Map — Stage 0
 
+## Stage 7: complete Mini bundle authority
+
+When a valid complete Mini bundle is published, all five behavioral sections
+come from that single `DATABASE_PUBLISHED_BUNDLE`. Runtime never mixes an
+active bundle with unrelated database sections or Markdown. Without a bundle,
+the documented legacy per-section precedence remains unchanged. An invalid
+published bundle fails closed with an observable fallback reason.
+
+Bundle publication does not change the higher authority of backend safety,
+policy, product facts, process state, service routing, complaint handling, or
+extension delivery.
+
 Tanggal audit: 2026-07-31
 
 Branch audit: `audit/clara-stage-0-baseline`

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.clara_runtime_contract import (
     CLARA_RUNTIME_CONTRACT_VERSION,
@@ -18,6 +18,12 @@ from app.core.clara_runtime_contract import (
     SYSTEM_PLAYBOOK_SECTION_ORDER,
 )
 from app.models.ai_persona_config_version import AIPersonaConfigVersion
+from app.models.ai_persona_bundle import AIPersonaBundle, AIPersonaBundleSection
+from app.services.ai_persona_bundle_service import (
+    CLARA_PERSONA_BUNDLE_CONTRACT_VERSION,
+    RUNTIME_SECTION_ORDER,
+    _bundle_hash,
+)
 from app.services.business_segmentation_service import normalize_account_category
 
 playbook_logger = logging.getLogger("clara.playbook")
@@ -80,6 +86,11 @@ class PromptSectionProvenance:
     content_hash: str
     load_timestamp: str
     fallback_reason: str | None
+    version_id: str | None = None
+    bundle_id: str | None = None
+    bundle_version: int | None = None
+    bundle_hash: str | None = None
+    bundle_contract_version: str | None = None
 
     def as_debug_dict(self) -> dict:
         return {
@@ -91,6 +102,11 @@ class PromptSectionProvenance:
             "content_hash": self.content_hash,
             "load_timestamp": self.load_timestamp,
             "fallback_reason": self.fallback_reason,
+            "version_id": self.version_id,
+            "bundle_id": self.bundle_id,
+            "bundle_version": self.bundle_version,
+            "bundle_hash": self.bundle_hash,
+            "bundle_contract_version": self.bundle_contract_version,
         }
 
 
@@ -120,6 +136,10 @@ class ClaraPlaybookComposition:
         self,
         persona_authority_mode: PersonaAuthorityMode = PersonaAuthorityMode.LEGACY,
     ) -> dict:
+        bundle_section = next(
+            (section for section in self.system_sections if section.provenance.bundle_id),
+            None,
+        )
         return {
             "runtime_contract_version": CLARA_RUNTIME_CONTRACT_VERSION,
             "authority_order": [layer.value for layer in RUNTIME_AUTHORITY_ORDER],
@@ -134,6 +154,50 @@ class ClaraPlaybookComposition:
             "legacy_overlay_name": LEGACY_BEHAVIOR_OVERLAY,
             "supporting_knowledge_count": self.supporting_knowledge_count,
             "response_example_count": self.response_example_count,
+            "persona_bundle_id": (
+                bundle_section.provenance.bundle_id if bundle_section else None
+            ),
+            "persona_bundle_version": (
+                bundle_section.provenance.bundle_version if bundle_section else None
+            ),
+            "persona_bundle_hash": (
+                bundle_section.provenance.bundle_hash if bundle_section else None
+            ),
+            "persona_bundle_source": (
+                PromptSectionSource.DATABASE_PUBLISHED_BUNDLE.value
+                if bundle_section
+                else None
+            ),
+            "persona_bundle_contract_version": (
+                bundle_section.provenance.bundle_contract_version
+                if bundle_section
+                else None
+            ),
+            "persona_bundle_section_versions": {
+                section.section_key: section.provenance.version_id
+                for section in self.system_sections
+                if section.provenance.version_id
+            },
+            "persona_bundle_section_hashes": {
+                section.section_key: section.provenance.content_hash
+                for section in self.system_sections
+                if section.provenance.bundle_id
+            },
+            "persona_bundle_effective_source_status": (
+                "COMPLETE_PUBLISHED_BUNDLE" if bundle_section else "LEGACY_FALLBACK"
+            ),
+            "persona_bundle_fallback_reason": (
+                None
+                if bundle_section
+                else next(
+                    (
+                        section.provenance.fallback_reason
+                        for section in self.system_sections
+                        if section.provenance.fallback_reason
+                    ),
+                    "NO_PUBLISHED_BUNDLE",
+                )
+            ),
             "missing_required_sections": [
                 f"{section.variant}:{section.section_key}"
                 for section in self.system_sections
@@ -392,8 +456,24 @@ def load_effective_system_sections(
     ]
     database_unavailable = False
     published_entries: list[AIPersonaConfigVersion] = []
+    published_bundles: dict[str, AIPersonaBundle] = {}
     if db is not None:
         try:
+            bundle_entries = list(
+                db.scalars(
+                    select(AIPersonaBundle)
+                    .where(
+                        AIPersonaBundle.variant.in_(variants),
+                        AIPersonaBundle.status == "published",
+                    )
+                    .options(
+                        selectinload(AIPersonaBundle.sections).selectinload(
+                            AIPersonaBundleSection.persona_config_version
+                        )
+                    )
+                ).all()
+            )
+            published_bundles = {bundle.variant: bundle for bundle in bundle_entries}
             published_entries = list(
                 db.scalars(
                     select(AIPersonaConfigVersion).where(
@@ -416,6 +496,102 @@ def load_effective_system_sections(
     load_timestamp = datetime.now(timezone.utc).isoformat()
     sections: list[EffectiveSystemSection] = []
     for knowledge_dir, variant in zip(knowledge_dirs, variants, strict=True):
+        bundle = published_bundles.get(variant)
+        if bundle:
+            bundle_sections = {
+                item.section_key: item for item in bundle.sections
+            }
+            valid_bundle = (
+                len(bundle.sections) == 5
+                and set(bundle_sections) == set(RUNTIME_SECTION_ORDER)
+                and [
+                    item.section_key
+                    for item in sorted(bundle.sections, key=lambda row: row.position)
+                ]
+                == list(RUNTIME_SECTION_ORDER)
+                and all(
+                    item.persona_config_version is not None
+                    and item.persona_config_version.variant == variant
+                    and item.persona_config_version.section_key == item.section_key
+                    and _content_hash(item.persona_config_version.content.strip())
+                    == item.content_sha256
+                    == item.persona_config_version.content_sha256
+                    for item in bundle.sections
+                )
+                and bundle.bundle_sha256 == _bundle_hash(bundle)
+            )
+            if not valid_bundle:
+                playbook_logger.error(
+                    "ai_persona_published_bundle_invalid",
+                    extra={
+                        "variant": variant,
+                        "bundle_id": str(bundle.id),
+                        "bundle_hash": bundle.bundle_sha256,
+                    },
+                )
+                for filename in SYSTEM_PLAYBOOK_FILES:
+                    section_key = SYSTEM_SECTION_KEYS[filename]
+                    sections.append(
+                        EffectiveSystemSection(
+                            content="",
+                            filename=filename,
+                            section_key=section_key,
+                            variant=variant,
+                            provenance=PromptSectionProvenance(
+                                section_name=section_key,
+                                effective_source=PromptSectionSource.MISSING,
+                                source_identifier=None,
+                                version=None,
+                                publication_timestamp=None,
+                                content_hash=_content_hash(""),
+                                load_timestamp=load_timestamp,
+                                fallback_reason="INVALID_PUBLISHED_BUNDLE_FAIL_CLOSED",
+                                bundle_id=str(bundle.id),
+                                bundle_version=bundle.bundle_version,
+                                bundle_hash=bundle.bundle_sha256,
+                                bundle_contract_version=(
+                                    CLARA_PERSONA_BUNDLE_CONTRACT_VERSION
+                                ),
+                            ),
+                        )
+                    )
+                continue
+            for filename in SYSTEM_PLAYBOOK_FILES:
+                section_key = SYSTEM_SECTION_KEYS[filename]
+                item = bundle_sections[section_key]
+                version = item.persona_config_version
+                sections.append(
+                    EffectiveSystemSection(
+                        content=version.content,
+                        filename=filename,
+                        section_key=section_key,
+                        variant=variant,
+                        provenance=PromptSectionProvenance(
+                            section_name=section_key,
+                            effective_source=(
+                                PromptSectionSource.DATABASE_PUBLISHED_BUNDLE
+                            ),
+                            source_identifier=f"ai_persona_bundles:{bundle.id}",
+                            version=version.version_number,
+                            publication_timestamp=(
+                                bundle.published_at.isoformat()
+                                if bundle.published_at
+                                else None
+                            ),
+                            content_hash=item.content_sha256,
+                            load_timestamp=load_timestamp,
+                            fallback_reason=None,
+                            version_id=str(version.id),
+                            bundle_id=str(bundle.id),
+                            bundle_version=bundle.bundle_version,
+                            bundle_hash=bundle.bundle_sha256,
+                            bundle_contract_version=(
+                                CLARA_PERSONA_BUNDLE_CONTRACT_VERSION
+                            ),
+                        ),
+                    )
+                )
+            continue
         for filename in SYSTEM_PLAYBOOK_FILES:
             section_key = SYSTEM_SECTION_KEYS[filename]
             entry = published_by_key.get((variant, section_key))
@@ -439,6 +615,7 @@ def load_effective_system_sections(
                             content_hash=_content_hash(entry.content),
                             load_timestamp=load_timestamp,
                             fallback_reason=None,
+                            version_id=str(entry.id),
                         ),
                     )
                 )
@@ -517,15 +694,20 @@ def load_effective_persona_sections(
             source=(
                 "database"
                 if section.provenance.effective_source
-                == PromptSectionSource.DATABASE_PUBLISHED
+                in {
+                    PromptSectionSource.DATABASE_PUBLISHED,
+                    PromptSectionSource.DATABASE_PUBLISHED_BUNDLE,
+                }
                 else "markdown"
             ),
             variant=section.variant,
             version_id=(
-                section.provenance.source_identifier.rsplit(":", 1)[-1]
+                section.provenance.version_id
                 if section.provenance.effective_source
-                == PromptSectionSource.DATABASE_PUBLISHED
-                and section.provenance.source_identifier
+                in {
+                    PromptSectionSource.DATABASE_PUBLISHED,
+                    PromptSectionSource.DATABASE_PUBLISHED_BUNDLE,
+                }
                 else None
             ),
             version_number=section.provenance.version,

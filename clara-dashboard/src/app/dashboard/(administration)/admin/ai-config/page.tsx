@@ -37,16 +37,72 @@ type PersonaVersion = {
   published_at: string | null;
 };
 
+type BundleSection = {
+  section_key: PersonaSectionKey;
+  persona_config_version_id: string;
+  version_number: number;
+  content: string;
+  content_sha256: string;
+  character_count: number;
+  source_type: string;
+  published_at: string | null;
+};
+
+type PersonaBundle = {
+  id: string;
+  variant: PersonaVariant;
+  bundle_version: number;
+  status: "draft" | "validated" | "published" | "archived" | "rejected";
+  bundle_sha256: string | null;
+  validation_status: "pending" | "valid" | "invalid";
+  validation_report: {
+    warnings?: { code: string; section_key: PersonaSectionKey | null }[];
+    blocking_errors?: { code: string; section_key: PersonaSectionKey | null }[];
+  };
+  validation_report_hash: string | null;
+  source_bundle_id: string | null;
+  created_at: string;
+  published_at: string | null;
+  sections: BundleSection[];
+};
+
+type BundleValidation = {
+  complete: boolean;
+  blocking_errors: { code: string; section_key: PersonaSectionKey | null }[];
+  warnings: { code: string; section_key: PersonaSectionKey | null }[];
+  bundle_hash: string;
+  changed_section_keys: PersonaSectionKey[];
+};
+
+type BundleDiff = {
+  changed_section_keys: PersonaSectionKey[];
+  truncated: boolean;
+  sections: {
+    section_key: PersonaSectionKey;
+    changed: boolean;
+    added_lines: number;
+    removed_lines: number;
+    diff: string;
+  }[];
+};
+
+type EffectiveBundleState = {
+  effective_source: string;
+  fallback_reason: string | null;
+  persona_authority_mode: string;
+  legacy_overlay_present: boolean;
+};
+
 const SECTIONS: { key: PersonaSectionKey; label: string; description: string }[] = [
-  {
-    key: "instruction",
-    label: "Instruction",
-    description: "Tujuan utama dan aturan kerja Clara.",
-  },
   {
     key: "guardrail",
     label: "Guardrail",
     description: "Batas keamanan, compliance, dan larangan.",
+  },
+  {
+    key: "instruction",
+    label: "Instruction",
+    description: "Tujuan utama dan aturan kerja Clara.",
   },
   {
     key: "flow",
@@ -80,6 +136,18 @@ export default function AiPersonaConfigPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [bundles, setBundles] = useState<PersonaBundle[]>([]);
+  const [bundleValidation, setBundleValidation] =
+    useState<BundleValidation | null>(null);
+  const [bundleDiff, setBundleDiff] = useState<BundleDiff | null>(null);
+  const [previewedBundleId, setPreviewedBundleId] = useState<string | null>(null);
+  const [effectiveBundleState, setEffectiveBundleState] =
+    useState<EffectiveBundleState | null>(null);
+
+  const currentBundle = bundles.find((bundle) => bundle.status === "published");
+  const candidateBundle = bundles.find(
+    (bundle) => bundle.status === "draft" || bundle.status === "validated",
+  );
 
   const effectiveSection = useMemo(
     () => effectiveSections.find((item) => item.section_key === sectionKey),
@@ -96,18 +164,37 @@ export default function AiPersonaConfigPage() {
     setErrorMessage("");
     try {
       const params = new URLSearchParams({ variant: nextVariant });
-      const [effective, history] = await Promise.all([
+      const [effective, history, bundleHistory, bundleState] = await Promise.all([
         apiFetch<EffectiveSection[]>(
           `/ai-persona-config/effective?${params.toString()}`,
         ),
         apiFetch<PersonaVersion[]>(
           `/ai-persona-config?${params.toString()}`,
         ),
+        nextVariant === "mini"
+          ? apiFetch<PersonaBundle[]>(
+              `/ai-persona-config/bundles?${params.toString()}`,
+            )
+          : Promise.resolve([]),
+        nextVariant === "mini"
+          ? apiFetch<EffectiveBundleState>(
+              `/ai-persona-config/bundles/effective/current?${params.toString()}`,
+            )
+          : Promise.resolve(null),
       ]);
       setEffectiveSections(effective);
       setVersions(history);
+      setBundles(bundleHistory);
+      setEffectiveBundleState(bundleState);
+      const draftSection = bundleHistory
+        .find(
+          (bundle) => bundle.status === "draft" || bundle.status === "validated",
+        )
+        ?.sections.find((item) => item.section_key === sectionKey);
       setContent(
-        effective.find((item) => item.section_key === sectionKey)?.content ?? "",
+        draftSection?.content ??
+          effective.find((item) => item.section_key === sectionKey)?.content ??
+          "",
       );
     } catch (error) {
       setErrorMessage(
@@ -159,16 +246,216 @@ export default function AiPersonaConfigPage() {
     setErrorMessage("");
     setSuccessMessage("");
     try {
-      await apiFetch<PersonaVersion>(
+      const saved = await apiFetch<PersonaVersion>(
         `/ai-persona-config/${variant}/${sectionKey}/drafts`,
         { method: "POST", body: { content: cleanedContent } },
       );
-      setSuccessMessage("Draft berhasil disimpan. Publish untuk mengaktifkannya.");
+      if (variant === "mini") {
+        if (!candidateBundle) {
+          throw new Error(
+            "Import current effective terlebih dahulu untuk membuat kandidat bundle.",
+          );
+        }
+        await apiFetch<PersonaBundle>(
+          `/ai-persona-config/bundles/${candidateBundle.id}/sections/${sectionKey}`,
+          {
+            method: "PUT",
+            body: { persona_config_version_id: saved.id },
+          },
+        );
+        setBundleValidation(null);
+        setBundleDiff(null);
+        setPreviewedBundleId(null);
+        setSuccessMessage("Draft tersimpan dan dipilih ke kandidat bundle Mini.");
+      } else {
+        setSuccessMessage("Draft berhasil disimpan. Publish untuk mengaktifkannya.");
+      }
       await loadPersona(variant);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Gagal menyimpan draft.",
       );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function importCurrentBundle() {
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await apiFetch<PersonaBundle>("/ai-persona-config/bundles/import-current", {
+        method: "POST",
+      });
+      setSuccessMessage("Current effective berhasil diimpor sebagai kandidat bundle.");
+      setBundleValidation(null);
+      setBundleDiff(null);
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Gagal membuat bundle.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function selectVersionForCandidate(version: PersonaVersion) {
+    if (!candidateBundle) return;
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await apiFetch<PersonaBundle>(
+        `/ai-persona-config/bundles/${candidateBundle.id}/sections/${version.section_key}`,
+        {
+          method: "PUT",
+          body: { persona_config_version_id: version.id },
+        },
+      );
+      setBundleValidation(null);
+      setBundleDiff(null);
+      setPreviewedBundleId(null);
+      setSuccessMessage(
+        `${version.section_key} v${version.version_number} dipilih ke kandidat bundle.`,
+      );
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Gagal memilih versi.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function validateCandidate() {
+    if (!candidateBundle) return;
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      const [validation, diff] = await Promise.all([
+        apiFetch<BundleValidation>(
+          `/ai-persona-config/bundles/${candidateBundle.id}/validate`,
+          { method: "POST" },
+        ),
+        apiFetch<BundleDiff>("/ai-persona-config/bundles/diff", {
+          method: "POST",
+          body: {
+            old_bundle_id: currentBundle?.id ?? null,
+            new_bundle_id: candidateBundle.id,
+          },
+        }),
+      ]);
+      setBundleValidation(validation);
+      setBundleDiff(diff);
+      setSuccessMessage(
+        validation.complete
+          ? "Bundle lengkap dan tervalidasi. Review preview/diff sebelum publish."
+          : "Validasi selesai dengan blocker.",
+      );
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Validasi gagal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function publishCandidate() {
+    if (!candidateBundle || !bundleValidation?.complete) return;
+    const versions = candidateBundle.sections
+      .map((item) => `${item.section_key} v${item.version_number}`)
+      .join("\n");
+    const warningCodes = [...new Set(bundleValidation.warnings.map((item) => item.code))];
+    if (
+      !window.confirm(
+        `Publish complete Mini bundle?\n\n${versions}\n\nCurrent: ${currentBundle?.bundle_sha256 ?? "none"}\nCandidate: ${bundleValidation.bundle_hash}\nWarnings: ${warningCodes.join(", ") || "none"}\n\nPublication affects Clara's effective five-prompt source.`,
+      )
+    ) return;
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await apiFetch<PersonaBundle>(
+        `/ai-persona-config/bundles/${candidateBundle.id}/publish`,
+        {
+          method: "POST",
+          body: {
+            expected_current_bundle_hash: currentBundle?.bundle_sha256 ?? null,
+            acknowledged_warning_codes: warningCodes,
+          },
+        },
+      );
+      setSuccessMessage("Complete Mini bundle berhasil dipublish secara atomik.");
+      setBundleValidation(null);
+      setBundleDiff(null);
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Publish gagal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function previewCandidate() {
+    if (!candidateBundle) return;
+    setIsSubmitting(true);
+    try {
+      await apiFetch<unknown>(
+        `/ai-persona-config/bundles/${candidateBundle.id}/preview`,
+      );
+      setPreviewedBundleId(candidateBundle.id);
+      setSuccessMessage(
+        "Preview exact five-section bundle dan provenance berhasil dimuat.",
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Preview gagal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function cloneHistorical(bundle: PersonaBundle) {
+    setIsSubmitting(true);
+    try {
+      await apiFetch<PersonaBundle>(
+        `/ai-persona-config/bundles/${bundle.id}/clone`,
+        { method: "POST" },
+      );
+      setSuccessMessage(`Bundle v${bundle.bundle_version} diklon sebagai draft baru.`);
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Clone gagal.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function rollbackWholeBundle(bundle: PersonaBundle) {
+    if (!currentBundle) return;
+    setIsSubmitting(true);
+    try {
+      const validation = await apiFetch<BundleValidation>(
+        `/ai-persona-config/bundles/${bundle.id}/validate`,
+        { method: "POST" },
+      );
+      const warningCodes = [
+        ...new Set(validation.warnings.map((item) => item.code)),
+      ];
+      if (
+        !window.confirm(
+          `Rollback seluruh bundle ke v${bundle.bundle_version}?\n\nWarnings: ${warningCodes.join(", ") || "none"}\nCurrent: ${currentBundle.bundle_sha256}\nTarget source: ${bundle.bundle_sha256}`,
+        )
+      ) return;
+      await apiFetch<PersonaBundle>(
+        `/ai-persona-config/bundles/${bundle.id}/rollback`,
+        {
+          method: "POST",
+          body: {
+            expected_current_bundle_hash: currentBundle.bundle_sha256,
+            acknowledged_warning_codes: warningCodes,
+          },
+        },
+      );
+      setSuccessMessage("Whole-bundle rollback berhasil dipublish.");
+      await loadPersona("mini");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Rollback gagal.");
     } finally {
       setIsSubmitting(false);
     }
@@ -269,6 +556,121 @@ export default function AiPersonaConfigPage() {
           </div>
         </section>
 
+        {variant === "mini" && (
+          <section className="clara-card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-amber-600">
+                  Mini Bundle Workspace
+                </p>
+                <h2 className="mt-1 text-lg font-bold clara-text-primary">
+                  Governed Five-Prompt Bundle
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Review: Guardrail → Instruction → Conversation Flow → Personality → Auto Adapt.
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Runtime order tetap: Instruction → Guardrail → Flow → Personality Mode → Auto Adapt.
+                </p>
+                <p className="mt-2 text-xs font-semibold text-slate-600">
+                  Authority: {effectiveBundleState?.persona_authority_mode ?? "-"} · Legacy overlay: {effectiveBundleState?.legacy_overlay_present ? "aktif" : "nonaktif"} · Source: {effectiveBundleState?.effective_source ?? "-"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {!candidateBundle && (
+                  <button
+                    type="button"
+                    className="clara-button clara-button-primary"
+                    disabled={isSubmitting}
+                    onClick={() => void importCurrentBundle()}
+                  >
+                    Import current effective
+                  </button>
+                )}
+                {candidateBundle && (
+                  <>
+                    <button
+                      type="button"
+                      className="clara-button clara-button-ghost"
+                      disabled={isSubmitting}
+                      onClick={() => void validateCandidate()}
+                    >
+                      Validate bundle
+                    </button>
+                    <button
+                      type="button"
+                      className="clara-button clara-button-ghost"
+                      disabled={isSubmitting}
+                      onClick={() => void previewCandidate()}
+                    >
+                      Preview exact bundle
+                    </button>
+                    <button
+                      type="button"
+                      className="clara-button clara-button-primary"
+                      disabled={
+                        isSubmitting ||
+                        !bundleValidation?.complete ||
+                        previewedBundleId !== candidateBundle.id
+                      }
+                      onClick={() => void publishCandidate()}
+                    >
+                      Publish complete bundle
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-bold uppercase text-slate-400">Current effective</p>
+                <p className="mt-1 font-semibold clara-text-primary">
+                  {currentBundle ? `Bundle v${currentBundle.bundle_version}` : "Legacy section / Markdown fallback"}
+                </p>
+                <p className="mt-1 break-all text-xs text-slate-500">
+                  {currentBundle?.bundle_sha256 ?? "Belum ada complete published bundle"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {currentBundle?.published_at
+                    ? `Published ${formatDateTime(currentBundle.published_at)}`
+                    : `Fallback: ${effectiveBundleState?.fallback_reason ?? "none"}`}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-bold uppercase text-slate-400">Candidate</p>
+                <p className="mt-1 font-semibold clara-text-primary">
+                  {candidateBundle ? `Bundle v${candidateBundle.bundle_version} · ${candidateBundle.status}` : "Belum ada kandidat"}
+                </p>
+                <p className="mt-1 break-all text-xs text-slate-500">
+                  {candidateBundle?.bundle_sha256 ?? "Import current effective untuk mulai"}
+                </p>
+              </div>
+            </div>
+
+            {bundleValidation && (
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm">
+                  <p className="font-semibold text-red-900">Blocking errors</p>
+                  <p className="mt-1 text-red-700">
+                    {bundleValidation.blocking_errors.length
+                      ? bundleValidation.blocking_errors.map((item) => `${item.code}${item.section_key ? ` (${item.section_key})` : ""}`).join(", ")
+                      : "Tidak ada"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+                  <p className="font-semibold text-amber-900">Warnings — acknowledged saat publish</p>
+                  <p className="mt-1 text-amber-700">
+                    {bundleValidation.warnings.length
+                      ? bundleValidation.warnings.map((item) => `${item.code}${item.section_key ? ` (${item.section_key})` : ""}`).join(", ")
+                      : "Tidak ada"}
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
         {errorMessage && (
           <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
@@ -298,9 +700,13 @@ export default function AiPersonaConfigPage() {
                     onClick={() => {
                       setSectionKey(section.key);
                       setContent(
-                        effectiveSections.find(
+                        candidateBundle?.sections.find(
                           (item) => item.section_key === section.key,
-                        )?.content ?? "",
+                        )?.content ??
+                          effectiveSections.find(
+                            (item) => item.section_key === section.key,
+                          )?.content ??
+                          "",
                       );
                       setSuccessMessage("");
                     }}
@@ -328,10 +734,12 @@ export default function AiPersonaConfigPage() {
                     {SECTIONS.find((item) => item.key === sectionKey)?.label}
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Aktif dari{" "}
-                    {effectiveSection?.source === "database"
+                    {variant === "mini" && candidateBundle
+                      ? `Kandidat bundle v${candidateBundle.bundle_version}`
+                      : "Aktif dari "}
+                    {!(variant === "mini" && candidateBundle) && (effectiveSection?.source === "database"
                       ? `database v${effectiveSection.version_number}`
-                      : "file Markdown bawaan"}
+                      : "file Markdown bawaan")}
                     .
                   </p>
                 </div>
@@ -376,7 +784,7 @@ export default function AiPersonaConfigPage() {
                   >
                     Simpan draft
                   </button>
-                  {latestDraft && (
+                  {variant === "reguler" && latestDraft && (
                     <button
                       type="button"
                       onClick={() => void publishVersion(latestDraft)}
@@ -398,6 +806,23 @@ export default function AiPersonaConfigPage() {
                 Publish atau pulihkan versi lama tanpa menghapus histori.
               </p>
               <div className="mt-4 space-y-3">
+                {variant === "mini" && bundleDiff && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs">
+                    <p className="font-semibold text-amber-900">Section diff</p>
+                    {bundleDiff.sections
+                      .filter((item) => item.section_key === sectionKey)
+                      .map((item) => (
+                        <div key={item.section_key} className="mt-2">
+                          <p className="text-amber-800">
+                            +{item.added_lines} / -{item.removed_lines} · {item.changed ? "changed" : "unchanged"}
+                          </p>
+                          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-[11px] text-slate-700">
+                            {item.diff || "Tidak ada perubahan."}
+                          </pre>
+                        </div>
+                      ))}
+                  </div>
+                )}
                 {sectionVersions.length === 0 ? (
                   <div className="clara-empty-state text-sm">
                     Belum ada versi database. Clara memakai file bawaan.
@@ -421,7 +846,17 @@ export default function AiPersonaConfigPage() {
                         {version.content}
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {version.status === "draft" && (
+                        {variant === "mini" && candidateBundle && (
+                          <button
+                            type="button"
+                            className="clara-button clara-button-ghost"
+                            disabled={isSubmitting}
+                            onClick={() => void selectVersionForCandidate(version)}
+                          >
+                            Pilih ke bundle
+                          </button>
+                        )}
+                        {variant === "reguler" && version.status === "draft" && (
                           <button
                             type="button"
                             className="clara-button clara-button-primary"
@@ -431,7 +866,7 @@ export default function AiPersonaConfigPage() {
                             Publish
                           </button>
                         )}
-                        {version.status === "archived" && (
+                        {variant === "reguler" && version.status === "archived" && (
                           <button
                             type="button"
                             className="clara-button clara-button-ghost"
@@ -446,6 +881,34 @@ export default function AiPersonaConfigPage() {
                   ))
                 )}
               </div>
+              {variant === "mini" && bundles.length > 0 && (
+                <div className="mt-6 border-t border-slate-200 pt-4">
+                  <p className="text-sm font-bold clara-text-primary">Riwayat bundle Mini</p>
+                  <div className="mt-3 space-y-2">
+                    {bundles.map((bundle) => (
+                      <div key={bundle.id} className="rounded-xl border border-slate-200 p-3 text-xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold">Bundle v{bundle.bundle_version}</span>
+                          <span className="clara-badge">{bundle.status}</span>
+                        </div>
+                        <p className="mt-1 text-slate-500">{formatDateTime(bundle.created_at)}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {bundle.status === "archived" && (
+                            <>
+                              <button type="button" className="clara-button clara-button-ghost" disabled={isSubmitting || Boolean(candidateBundle)} onClick={() => void cloneHistorical(bundle)}>
+                                Clone draft
+                              </button>
+                              <button type="button" className="clara-button clara-button-ghost" disabled={isSubmitting || !currentBundle} onClick={() => void rollbackWholeBundle(bundle)}>
+                                Rollback whole bundle
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </aside>
           </div>
         )}

@@ -36,6 +36,9 @@ class ReplySuggestion(Base):
 
     suggested_replies: Mapped[list[dict]] = mapped_column(JSONB, nullable=False, default=list)
     policy_reasons: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    persona_bundle_metadata: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
 
     selected_reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     final_reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)
