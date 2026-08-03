@@ -355,7 +355,7 @@ backend security, product facts, policy, reviewer, approval/send, complaint,
 or Tawk authority. See
 `docs/architecture/CLARA_PROCESS_STATE_FSM_CONTRACT.md`.
 
-## 19. Stage 8 Service Routing Contract
+## 19. Stage 8/8.1 Service Routing Contract
 
 Stage 8 adds `CLARA_SERVICE_ROUTING_MODE` with safe default `LEGACY`.
 `SHADOW` records only deterministic route metadata. `ROUTED` separates CS
@@ -363,3 +363,8 @@ L0/L1 and contextual complaints from sales generation; complaints reuse the
 Stage 5 handoff and create an idempotent case ledger. Missing CS knowledge
 fails to human handoff. Other defaults, facts, process state, policy,
 approval/send, and Tawk behavior remain unchanged.
+
+Stage 8.1 stabilizes this as routing contract `1.1`: complete typed decisions,
+structured credential-safe complaint intake, bounded incident identity,
+append-only mutation events, support conflict fail-closed behavior, and an
+audited restoration of formatter-only Stage 8 files. The default is unchanged.

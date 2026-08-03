@@ -2,6 +2,17 @@
 /sales-command-center/
 /docs/assets/
 /docs/
+!/docs/
+/docs/*
+!/docs/architecture/
+/docs/architecture/*
+!/docs/architecture/CLARA_SERVICE_ROUTING_CONTRACT.md
+!/docs/architecture/CLARA_SUPPORT_KNOWLEDGE_CONTRACT.md
+!/docs/architecture/CLARA_COMPLAINT_CASE_CONTRACT.md
+!/docs/architecture/CLARA_STAGE_8_CHANGE_AUDIT.md
+!/docs/operations/
+/docs/operations/*
+!/docs/operations/CLARA_CS_AND_COMPLAINT_RUNBOOK.md
 /clara_knowledge/AGENTS.md
 /clara-backend/AGENTS.md
 /clara-frontend/AGENTS.md

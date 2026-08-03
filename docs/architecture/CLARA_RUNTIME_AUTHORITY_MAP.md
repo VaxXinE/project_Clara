@@ -259,9 +259,14 @@ approval/send, complaints, security, or Tawk.
 
 Contract: `docs/architecture/CLARA_PROCESS_STATE_FSM_CONTRACT.md`.
 
-## N. Stage 8 Service Routing Authority Update
+## N. Stage 8/8.1 Service Routing Authority Update
 
 Stage 8 adds a deterministic service lane below backend security/policy and
 above domain knowledge selection. Opt-in `ROUTED` uses governed CS knowledge
 or the existing complaint handoff plus a case ledger. Persona, facts, process
 state, approval/send, and Tawk remain separate. Default remains `LEGACY`.
+
+Stage 8.1 completes safe routing metadata and complaint/support governance but
+does not promote routing above policy enforcement or change any production
+default. Formatter-only changes to unrelated Stage 0–7 authorities were
+restored and catalogued in `CLARA_STAGE_8_CHANGE_AUDIT.md`.

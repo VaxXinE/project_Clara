@@ -82,6 +82,18 @@ const nextConfig: NextConfig = {
         destination: "/dashboard/knowledge",
       },
       {
+        source: "/support-knowledge",
+        destination: "/dashboard/support-knowledge",
+      },
+      {
+        source: "/complaints",
+        destination: "/dashboard/complaints",
+      },
+      {
+        source: "/complaints/:path*",
+        destination: "/dashboard/complaints/:path*",
+      },
+      {
         source: "/kpi",
         destination: "/dashboard/kpi",
       },
