@@ -624,6 +624,15 @@ def _publish_in_transaction(
 ) -> None:
     if bundle.status != "validated" or bundle.validation_status != "valid":
         raise AIPersonaBundleError("Bundle must be validated before publication.")
+    from app.services.clara_evaluation_service import (
+        ClaraEvaluationError,
+        assert_bundle_certified_for_publication,
+    )
+
+    try:
+        assert_bundle_certified_for_publication(db, bundle)
+    except ClaraEvaluationError as exc:
+        raise AIPersonaBundleError(str(exc)) from exc
     current = get_published_bundle(db, variant=bundle.variant, for_update=True)
     actual_current_hash = current.bundle_sha256 if current else None
     if expected_current_bundle_hash != actual_current_hash:
@@ -733,23 +742,9 @@ def rollback_bundle(
         )
         for item in source.sections:
             source_version = item.persona_config_version
-            clone = AIPersonaConfigVersion(
-                variant=source_version.variant,
-                section_key=source_version.section_key,
-                version_number=_next_section_version(
-                    db, source_version.variant, source_version.section_key
-                ),
-                status="draft",
-                content=source_version.content,
-                content_sha256=source_version.content_sha256,
-                created_by_user_id=current_user.id,
-                source_version_id=source_version.id,
-            )
-            db.add(clone)
-            db.flush()
             _attach_version(
                 bundle,
-                clone,
+                source_version,
                 source_type="BUNDLE_ROLLBACK",
                 source_identifier=f"ai_persona_bundles:{source.id}",
             )

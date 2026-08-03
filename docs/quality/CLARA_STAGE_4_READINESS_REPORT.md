@@ -106,3 +106,6 @@ The new gate covers deterministic critical outputs, contextual complaint safe
 handoff, reviewer authorization, and extension pending-approval bypass. Known
 Stage 4 gaps remain for nuanced claims, product-fact freshness, process FSM,
 dedicated compliance role, and persisted shadow-decision analytics.
+## Stage 8 implementation note
+
+The historical Stage 4 findings above are unchanged. Stage 8 adds Golden V2 evaluation and exact-bundle certification evidence; it does not alter the historical readiness verdict and does not activate HYBRID or PERSONA. Current readiness must be reassessed from a certified 30-case run plus human review, not inferred from this historical report.

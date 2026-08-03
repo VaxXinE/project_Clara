@@ -37,3 +37,6 @@ Keep `CLARA_PERSONA_AUTHORITY_MODE=LEGACY` until a later controlled rollout.
 Do not activate `HYBRID`, `PERSONA`, policy enforcement, product registry,
 process FSM, routed service handling, or governed extension delivery as part of
 this runbook.
+## Stage 8 pre-publication evidence
+
+After validation and preview, create and complete a Golden V2 run for the exact candidate. Confirm automated PASS, all PERSONA human reviews, dual critical-case reviews, reconciliations, `CERTIFIED` status, and bundle hash match. The backend rejects publication without this evidence even if the UI is bypassed. Certification is not production activation; publication remains a separate confirmed action. If any section changes, create a new run.

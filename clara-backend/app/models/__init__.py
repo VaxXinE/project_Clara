@@ -5,6 +5,11 @@ from app.models.approval_log import ApprovalLog
 from app.models.audit_log import AuditLog
 from app.models.chat_review_case import ChatReviewCase
 from app.models.chat_review_note import ChatReviewNote
+from app.models.clara_evaluation import (
+    ClaraEvaluationCaseResult,
+    ClaraEvaluationHumanReview,
+    ClaraEvaluationRun,
+)
 from app.models.conversation import Conversation
 from app.models.complaint_case import ComplaintCase, ComplaintCaseEvent
 from app.models.customer_profile import CustomerProfile
@@ -49,6 +54,9 @@ __all__ = [
     "AuditLog",
     "ChatReviewCase",
     "ChatReviewNote",
+    "ClaraEvaluationCaseResult",
+    "ClaraEvaluationHumanReview",
+    "ClaraEvaluationRun",
     "Conversation",
     "ComplaintCase",
     "ComplaintCaseEvent",

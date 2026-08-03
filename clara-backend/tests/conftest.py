@@ -44,6 +44,11 @@ from app.models.approval_log import ApprovalLog
 from app.models.audit_log import AuditLog
 from app.models.chat_review_case import ChatReviewCase
 from app.models.chat_review_note import ChatReviewNote
+from app.models.clara_evaluation import (
+    ClaraEvaluationCaseResult,
+    ClaraEvaluationHumanReview,
+    ClaraEvaluationRun,
+)
 from app.models.conversation import Conversation
 from app.models.complaint_case import ComplaintCase, ComplaintCaseEvent
 from app.models.customer_profile import CustomerProfile
@@ -131,6 +136,9 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             AIPersonaConfigVersion.__table__,
             AIPersonaBundle.__table__,
             AIPersonaBundleSection.__table__,
+            ClaraEvaluationRun.__table__,
+            ClaraEvaluationCaseResult.__table__,
+            ClaraEvaluationHumanReview.__table__,
             ReplySuggestion.__table__,
             ExtensionDeliveryAuthorization.__table__,
             ExtensionDeliveryEvent.__table__,
@@ -185,6 +193,9 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             ExtensionDeliveryEvent.__table__,
             ExtensionDeliveryAuthorization.__table__,
             ReplySuggestion.__table__,
+            ClaraEvaluationHumanReview.__table__,
+            ClaraEvaluationCaseResult.__table__,
+            ClaraEvaluationRun.__table__,
             AIPersonaBundleSection.__table__,
             AIPersonaBundle.__table__,
             AIPersonaConfigVersion.__table__,
