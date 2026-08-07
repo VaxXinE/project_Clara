@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -9,6 +9,18 @@ from app.db.session import Base
 
 class Conversation(Base):
     __tablename__ = "conversations"
+    __table_args__ = (
+        Index(
+            "uq_conversations_org_channel_provider_thread",
+            "organization_id",
+            "channel",
+            "provider",
+            "external_thread_key",
+            unique=True,
+            postgresql_where=text("external_thread_key IS NOT NULL"),
+            sqlite_where=text("external_thread_key IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
 

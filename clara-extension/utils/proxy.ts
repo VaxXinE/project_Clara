@@ -10,7 +10,12 @@ const DEFAULT_PRODUCTION_CLARA_DASHBOARD_URL = "https://crm.sg-berjangka.com"
 const DEFAULT_AUTH_COOKIE_NAME = "clara_access_token"
 const DEFAULT_DEV_FALLBACK_FLAG = "false"
 
-const isProductionBuild = () => process.env.NODE_ENV === "production"
+const isLocalRuntime = () =>
+  (process.env.PLASMO_PUBLIC_CLARA_RUNTIME || "").trim().toLowerCase() ===
+  "local"
+
+const isProductionBuild = () =>
+  process.env.NODE_ENV === "production" && !isLocalRuntime()
 
 const isLoopbackUrl = (value: string) => {
   try {

@@ -43,7 +43,8 @@ const AUTO_REFRESH_INTERVAL_MS = 2500
 const LOGIN_MESSAGE =
   "Login dulu di dashboard Clara supaya extension terhubung ke akun yang sama."
 const AUTH_REFRESH_INTERVAL_MS = 2000
-const EXTENSION_BUILD_LABEL = "v0.1.2-governed-manual-delivery-1"
+const EXTENSION_BUILD_LABEL = "v0.1.11-production-api"
+const OWNERSHIP_CONFLICT_CODE = "CONVERSATION_OWNED_BY_OTHER_SALES"
 const CHATGPT_EMBED_URL =
   "https://chatgpt.com/g/g-69cde65d2fa081919907393fcd892e6e-solid-prime-sales"
 const CHATGPT_CONTEXT_MESSAGE_LIMIT = 12
@@ -51,6 +52,15 @@ const CHATGPT_CONTEXT_TEXT_LIMIT = 280
 const CHATGPT_CONTEXT_REGION_ID = "clara-chatgpt-context-details"
 const CHATGPT_CONTEXT_PROMPT_ID = "clara-chatgpt-context-prompt"
 const DRAFT_REPLY_TEXTAREA_ID = "clara-draft-reply"
+
+class ConversationOwnershipError extends Error {}
+
+const getBackendErrorMessage = (payload: any) =>
+  (typeof payload?.error === "string" && payload.error.trim()) ||
+  (typeof payload?.detail === "string" && payload.detail.trim()) ||
+  (typeof payload?.detail?.message === "string" &&
+    payload.detail.message.trim()) ||
+  ""
 
 const panelCss = `
   html,
@@ -1806,14 +1816,12 @@ const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
 
       const payload = await response.json()
 
-      const backendErrorMessage =
-        (typeof payload?.error === "string" && payload.error.trim()) ||
-        (typeof payload?.detail === "string" && payload.detail.trim()) ||
-        (typeof payload?.detail?.message === "string" &&
-          payload.detail.message.trim()) ||
-        ""
+      const backendErrorMessage = getBackendErrorMessage(payload)
 
       if (!response.ok) {
+        if (payload?.detail?.code === OWNERSHIP_CONFLICT_CODE) {
+          throw new ConversationOwnershipError(backendErrorMessage)
+        }
         throw new Error(
           backendErrorMessage ||
             `API snapshot chat gagal memproses data scraping di ${proxyUrl}.`
@@ -1830,6 +1838,9 @@ const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
               : ""
       }
     } catch (error) {
+      if (error instanceof ConversationOwnershipError) {
+        throw error
+      }
       lastFetchError =
         error instanceof Error ? error.message : "Failed to fetch"
     }
@@ -1914,9 +1925,12 @@ const fetchSuggestionsFromClaraBackendOnly = async (
       const payload = await response.json()
 
       if (!response.ok) {
+        const backendErrorMessage = getBackendErrorMessage(payload)
+        if (payload?.detail?.code === OWNERSHIP_CONFLICT_CODE) {
+          throw new ConversationOwnershipError(backendErrorMessage)
+        }
         throw new Error(
-          payload?.detail ||
-            payload?.error ||
+          backendErrorMessage ||
             `Backend Clara gagal memproses saran jawaban di ${proxyUrl}.`
         )
       }
@@ -1929,6 +1943,9 @@ const fetchSuggestionsFromClaraBackendOnly = async (
 
       return normalized
     } catch (error) {
+      if (error instanceof ConversationOwnershipError) {
+        throw error
+      }
       lastFetchError =
         error instanceof Error ? error.message : "Failed to fetch"
     }
@@ -2578,7 +2595,9 @@ function ClaraSidePanel() {
         )
       } catch (syncError) {
         setError(
-          syncError instanceof Error
+          syncError instanceof ConversationOwnershipError
+            ? syncError.message
+            : syncError instanceof Error
             ? `Chat berhasil dibaca, tapi gagal dikirim ke API: ${syncError.message}`
             : "Chat berhasil dibaca, tapi gagal dikirim ke API."
         )

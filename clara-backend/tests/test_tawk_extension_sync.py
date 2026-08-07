@@ -8,6 +8,8 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.models.conversation import Conversation
+from app.models.customer_profile import CustomerProfile
+from app.models.lead import Lead
 from app.models.message import Message
 from app.schemas.ai_extraction_schema import AIExtractionCreate
 from app.schemas.reply_suggestion_schema import ReplySuggestionCreate
@@ -201,6 +203,7 @@ def test_equal_titles_with_different_chat_ids_stay_separate(
 
 def test_existing_owner_cannot_be_hijacked_and_manager_cannot_create(
     client: TestClient,
+    db_session_factory: sessionmaker,
     seeded_data: dict[str, object],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -211,7 +214,35 @@ def test_existing_owner_cannot_be_hijacked_and_manager_cannot_create(
 
     login(client, seeded_data["marketing_b"].email)
     rejected_sales = post_snapshot(client, snapshot())
-    assert rejected_sales.status_code == 400
+    assert rejected_sales.status_code == 409
+    assert rejected_sales.json()["detail"] == {
+        "code": "CONVERSATION_OWNED_BY_OTHER_SALES",
+        "message": "Chat ini berhasil terbaca, tetapi sudah dimiliki oleh Marketing Alpha.",
+    }
+
+    db = db_session_factory()
+    conversations = db.scalars(
+        select(Conversation).where(
+            Conversation.provider_key == "tawk",
+            Conversation.external_thread_key == f"tawk:{PROPERTY_A}:chat-one",
+        )
+    ).all()
+    assert len(conversations) == 1
+    assert conversations[0].sales_user_id == seeded_data["marketing_a"].id
+    assert len(
+        db.scalars(
+            select(Message).where(Message.conversation_id == conversations[0].id)
+        ).all()
+    ) == 1
+    assert len(
+        db.scalars(
+            select(Lead).where(Lead.id == conversations[0].lead_id)
+        ).all()
+    ) == 1
+    lead = db.get(Lead, conversations[0].lead_id)
+    assert lead is not None
+    assert db.get(CustomerProfile, lead.customer_profile_id) is not None
+    db.close()
 
     login(client, seeded_data["manager_a"].email, "ManagerPass123!")
     rejected_manager = post_snapshot(client, snapshot(chat_id="new-manager-chat"))

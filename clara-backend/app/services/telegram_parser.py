@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 
@@ -52,17 +52,45 @@ PLAIN_MESSAGE_PATTERN = re.compile(
     re.VERBOSE,
 )
 
-MESSAGE_PATTERNS = (BRACKET_MESSAGE_PATTERN, PLAIN_MESSAGE_PATTERN)
+SENDER_FIRST_BRACKET_PATTERN = re.compile(
+    r"""
+    ^
+    (?P<sender>.+?)
+    ,\s*\[
+    (?P<date>\d{1,2}[./-]\d{1,2}[./-]\d{4})
+    \s+
+    (?P<time>\d{1,2}:\d{2}(?::\d{2})?(?:\s?(?:AM|PM|am|pm))?)
+    \]
+    \s*
+    (?P<message>.*)
+    $
+    """,
+    re.VERBOSE,
+)
+
+QUOTED_SENDER_PATTERN = re.compile(
+    r"^>\s*(?P<sender>[^:\n]{1,200}):\s*(?P<message>.*)$"
+)
+
+MESSAGE_PATTERNS = (
+    BRACKET_MESSAGE_PATTERN,
+    PLAIN_MESSAGE_PATTERN,
+    SENDER_FIRST_BRACKET_PATTERN,
+)
 
 EXPLICIT_SALES_KEYWORDS = ("sales", "admin", "cs", "clara")
 EXPLICIT_CUSTOMER_KEYWORDS = ("cust", "customer", "client", "prospect", "lead")
 
 
 def parse_telegram_datetime(date_text: str, time_text: str) -> datetime:
-    raw_value = f"{date_text} {time_text.strip()}"
+    normalized_date = re.sub(r"[/-]", ".", date_text)
+    normalized_time = re.sub(r"\s+", " ", time_text.strip()).upper()
+    raw_value = f"{normalized_date} {normalized_time}"
     formats = [
         "%d.%m.%Y %H:%M",
         "%d.%m.%Y %H:%M:%S",
+        "%d.%m.%Y %I:%M %p",
+        "%d.%m.%Y %I:%M:%S %p",
     ]
     for fmt in formats:
         try:
@@ -167,6 +195,12 @@ def infer_sender_types(
 def parse_telegram_txt(raw_text: str) -> list[ParsedTelegramMessage]:
     messages: list[ParsedTelegramMessage] = []
     current_message: ParsedTelegramMessage | None = None
+    synthetic_timestamp = datetime.now(JAKARTA_TZ).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
 
     for raw_line in raw_text.splitlines():
         line = raw_line.strip()
@@ -174,16 +208,33 @@ def parse_telegram_txt(raw_text: str) -> list[ParsedTelegramMessage]:
             continue
 
         parsed_message = parse_message_line(line)
+        if parsed_message is None:
+            quoted_sender = QUOTED_SENDER_PATTERN.match(line)
+            if quoted_sender is not None:
+                parsed_message = ParsedTelegramMessage(
+                    sender_name=quoted_sender.group("sender").strip(),
+                    sender_type=detect_sender_type(
+                        quoted_sender.group("sender").strip()
+                    ),
+                    message_text=quoted_sender.group("message").strip(),
+                    message_timestamp=synthetic_timestamp
+                    + timedelta(seconds=len(messages)),
+                )
         if parsed_message is not None:
             current_message = parsed_message
             messages.append(current_message)
             continue
 
         if current_message is not None:
+            message_text = (
+                f"{current_message.message_text}\n{line}"
+                if current_message.message_text
+                else line
+            )
             updated = ParsedTelegramMessage(
                 sender_name=current_message.sender_name,
                 sender_type=current_message.sender_type,
-                message_text=f"{current_message.message_text}\n{line}",
+                message_text=message_text,
                 message_timestamp=current_message.message_timestamp,
             )
             messages[-1] = updated

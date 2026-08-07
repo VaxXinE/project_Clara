@@ -81,7 +81,7 @@ def _bundle_hash(bundle: AIPersonaBundle) -> str:
         "sections": [
             {
                 "section_key": key,
-                "version_id": str(sections[key].persona_config_version_id),
+                "version_id": str(sections[key].persona_config_version.id),
                 "content_sha256": sections[key].content_sha256,
             }
             for key in RUNTIME_SECTION_ORDER
@@ -172,11 +172,16 @@ def _attach_version(
         (item for item in bundle.sections if item.section_key == version.section_key),
         None,
     )
-    if existing:
-        bundle.sections.remove(existing)
     content = version.content.strip()
-    bundle.sections.append(
-        AIPersonaBundleSection(
+    if existing:
+        existing.persona_config_version = version
+        existing.position = RUNTIME_SECTION_ORDER.index(version.section_key) + 1
+        existing.content_sha256 = version.content_sha256
+        existing.character_count = len(content)
+        existing.source_type = source_type
+        existing.source_identifier = source_identifier
+    else:
+        bundle.sections.append(AIPersonaBundleSection(
             section_key=version.section_key,
             persona_config_version=version,
             position=RUNTIME_SECTION_ORDER.index(version.section_key) + 1,
@@ -184,8 +189,7 @@ def _attach_version(
             character_count=len(content),
             source_type=source_type,
             source_identifier=source_identifier,
-        )
-    )
+        ))
     bundle.validation_status = "pending"
     bundle.validation_report = {}
     bundle.validation_report_hash = None
@@ -274,6 +278,125 @@ def import_current_effective_bundle(
             source_identifier=section.provenance.source_identifier,
         )
     db.commit()
+    return get_bundle_or_raise(db, bundle.id)
+
+
+def publish_bundle_section_immediately(
+    db: Session,
+    *,
+    current_user: User,
+    section_key: str,
+    content: str,
+) -> AIPersonaBundle:
+    if section_key not in RUNTIME_SECTION_ORDER:
+        raise AIPersonaBundleError("Unsupported persona section key.")
+    content = content.strip()
+    if not content:
+        raise AIPersonaBundleError("Persona content cannot be blank.")
+
+    current = get_published_bundle(db, variant="mini", for_update=True)
+    if current:
+        current_section = next(
+            item for item in current.sections if item.section_key == section_key
+        )
+        if current_section.persona_config_version.content.strip() == content:
+            return current
+        source_versions = {
+            item.section_key: item.persona_config_version for item in current.sections
+        }
+    else:
+        from app.services.clara_playbook_service import load_effective_system_sections
+
+        effective = load_effective_system_sections(db, "mini")
+        if len(effective) != len(RUNTIME_SECTION_ORDER):
+            raise AIPersonaBundleError("Current effective Mini source is incomplete.")
+        source_versions = {}
+        for item in effective:
+            version = (
+                db.get(AIPersonaConfigVersion, item.provenance.version_id)
+                if item.provenance.version_id
+                else None
+            )
+            if version is None:
+                source_content = item.content.strip()
+                version = AIPersonaConfigVersion(
+                    variant="mini",
+                    section_key=item.section_key,
+                    version_number=_next_section_version(db, "mini", item.section_key),
+                    status="draft",
+                    content=source_content,
+                    content_sha256=sha256(source_content.encode()).hexdigest(),
+                    created_by_user_id=current_user.id,
+                )
+                db.add(version)
+                db.flush()
+            source_versions[item.section_key] = version
+
+    bundle = create_bundle_draft(
+        db,
+        current_user=current_user,
+        source_type="immediate_publish",
+        source_bundle_id=current.id if current else None,
+        commit=False,
+    )
+    for key, version in source_versions.items():
+        _attach_version(
+            bundle,
+            version,
+            source_type="BUNDLE_CLONE" if current else "CURRENT_EFFECTIVE",
+            source_identifier=(
+                f"ai_persona_bundles:{current.id}" if current else None
+            ),
+        )
+
+    replacement = AIPersonaConfigVersion(
+        variant="mini",
+        section_key=section_key,
+        version_number=_next_section_version(db, "mini", section_key),
+        status="draft",
+        content=content,
+        content_sha256=sha256(content.encode()).hexdigest(),
+        created_by_user_id=current_user.id,
+    )
+    db.add(replacement)
+    db.flush()
+    _attach_version(
+        bundle,
+        replacement,
+        source_type="IMMEDIATE_PUBLISH",
+        source_identifier=f"ai_persona_config_versions:{replacement.id}",
+    )
+
+    report = _evaluate_bundle(db, bundle)
+    if not report.complete:
+        db.rollback()
+        codes = ", ".join(item["code"] for item in report.blocking_errors)
+        raise AIPersonaBundleError(f"Persona validation failed: {codes}.")
+    bundle.validation_status = "valid"
+    bundle.status = "validated"
+    bundle.bundle_sha256 = report.bundle_hash
+    bundle.validation_report = json.loads(json.dumps(report.as_dict(), default=str))
+    bundle.validation_report_hash = report.validation_report_hash
+    bundle.validation_contract_version = CLARA_PERSONA_BUNDLE_CONTRACT_VERSION
+    bundle.validated_by_user_id = current_user.id
+    bundle.validated_at = report.validated_at
+
+    try:
+        _publish_in_transaction(
+            db,
+            bundle=bundle,
+            current_user=current_user,
+            expected_current_bundle_hash=current.bundle_sha256 if current else None,
+            acknowledged_warning_codes=[item["code"] for item in report.warnings],
+            audit_action="ai_persona_bundle.immediate_publish",
+            require_certification=False,
+        )
+        db.commit()
+    except (IntegrityError, AIPersonaBundleError) as exc:
+        db.rollback()
+        if isinstance(exc, AIPersonaBundleError):
+            raise
+        raise AIPersonaBundleError("Concurrent bundle publication conflict.") from exc
     return get_bundle_or_raise(db, bundle.id)
 
 
@@ -621,18 +744,20 @@ def _publish_in_transaction(
     expected_current_bundle_hash: str | None,
     acknowledged_warning_codes: list[str],
     audit_action: str,
+    require_certification: bool = True,
 ) -> None:
     if bundle.status != "validated" or bundle.validation_status != "valid":
         raise AIPersonaBundleError("Bundle must be validated before publication.")
-    from app.services.clara_evaluation_service import (
-        ClaraEvaluationError,
-        assert_bundle_certified_for_publication,
-    )
+    if require_certification:
+        from app.services.clara_evaluation_service import (
+            ClaraEvaluationError,
+            assert_bundle_certified_for_publication,
+        )
 
-    try:
-        assert_bundle_certified_for_publication(db, bundle)
-    except ClaraEvaluationError as exc:
-        raise AIPersonaBundleError(str(exc)) from exc
+        try:
+            assert_bundle_certified_for_publication(db, bundle)
+        except ClaraEvaluationError as exc:
+            raise AIPersonaBundleError(str(exc)) from exc
     current = get_published_bundle(db, variant=bundle.variant, for_update=True)
     actual_current_hash = current.bundle_sha256 if current else None
     if expected_current_bundle_hash != actual_current_hash:
@@ -662,7 +787,7 @@ def _publish_in_transaction(
             .with_for_update()
         ).all()
     )
-    selected_ids = {item.persona_config_version_id for item in bundle.sections}
+    selected_ids = {item.persona_config_version.id for item in bundle.sections}
     for version in published_sections:
         if version.id not in selected_ids:
             version.status = "archived"
@@ -687,7 +812,7 @@ def _publish_in_transaction(
             "bundle_sha256": bundle.bundle_sha256,
             "source_bundle_id": str(bundle.source_bundle_id) if bundle.source_bundle_id else None,
             "review_order": list(ROADMAP_REVIEW_ORDER),
-            "section_version_ids": [str(item.persona_config_version_id) for item in bundle.sections],
+            "section_version_ids": [str(item.persona_config_version.id) for item in bundle.sections],
             "warning_codes": sorted(required_warnings),
         },
     )

@@ -35,6 +35,7 @@ from app.services.audit_service import create_audit_log
 from app.services.ai_extraction_service import AIExtractionError
 from app.services.extension_ingest_service import (
     confirm_extension_reply_sent_for_channel,
+    ExtensionOwnershipConflictError,
     ExtensionSnapshotError,
     generate_extension_reply_suggestions_for_channel,
     sync_extension_snapshot,
@@ -142,6 +143,14 @@ def _sync_extension_snapshot(
         )
 
         return ExtensionSnapshotSyncResponse.model_validate(result.model_dump())
+    except ExtensionOwnershipConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "CONVERSATION_OWNED_BY_OTHER_SALES",
+                "message": str(exc),
+            },
+        ) from exc
     except ExtensionSnapshotError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

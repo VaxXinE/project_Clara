@@ -48,3 +48,8 @@ scripts/docker-up.sh
 # macOS Finder metadata
 .DS_Store
 **/.DS_Store
+
+# Local and generated development artifacts
+*.dump
+*.tsbuildinfo
+/node_modules/

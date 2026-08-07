@@ -19,12 +19,14 @@ PORT=9898
 PLASMO_PUBLIC_OPENAI_PROXY_URL=http://127.0.0.1:9898/reply-suggestions
 PLASMO_PUBLIC_CLARA_API_BASE_URL=http://127.0.0.1:8000
 PLASMO_PUBLIC_CLARA_DASHBOARD_URL=http://localhost:3000
+PLASMO_PUBLIC_CLARA_RUNTIME=local
 PLASMO_PUBLIC_CLARA_ALLOW_DEV_FALLBACK=false
 ```
 
 Catatan:
 - `PLASMO_PUBLIC_CLARA_API_BASE_URL` dipakai untuk sync snapshot dan generate reply suggestion via backend Clara
 - `PLASMO_PUBLIC_CLARA_DASHBOARD_URL` dipakai extension untuk membuka halaman login dashboard Clara
+- `PLASMO_PUBLIC_CLARA_RUNTIME=local` mengizinkan build lokal memakai URL loopback; hapus flag ini untuk build production
 - `PLASMO_PUBLIC_OPENAI_PROXY_URL` hanya dipakai jika fallback development diaktifkan eksplisit
 - `PLASMO_PUBLIC_CLARA_ALLOW_DEV_FALLBACK=true` hanya untuk development lokal, jangan dipakai pada build production
 

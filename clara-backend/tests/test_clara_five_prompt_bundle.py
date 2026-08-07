@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.core.clara_runtime_contract import PromptSectionSource
-from app.models.ai_persona_bundle import AIPersonaBundle
+from app.models.ai_persona_bundle import AIPersonaBundle, AIPersonaBundleSection
 from app.models.ai_persona_config_version import AIPersonaConfigVersion
 from app.models.audit_log import AuditLog
 from app.services.ai_persona_bundle_service import (
@@ -14,7 +14,9 @@ from app.services.ai_persona_bundle_service import (
     AIPersonaBundleError,
     create_bundle_draft,
     diff_bundles,
+    publish_bundle_section_immediately,
     publish_bundle,
+    replace_bundle_section,
     rollback_bundle,
     validate_bundle,
 )
@@ -23,8 +25,10 @@ from app.services.clara_playbook_service import compose_clara_playbooks
 from app.services import clara_evaluation_service
 from app.services.ai_persona_config_service import (
     AIPersonaConfigError,
+    publish_persona_content_immediately,
     publish_persona_version,
 )
+from app.schemas.ai_persona_config_schema import AIPersonaDraftCreateRequest
 
 
 
@@ -93,6 +97,52 @@ def test_bundle_validation_hash_order_and_diff_are_deterministic(
     db.close()
 
 
+def test_replacing_bundle_section_updates_existing_row(
+    db_session_factory,
+    seeded_data,
+):
+    db = db_session_factory()
+    bundle = _complete_bundle(db, seeded_data["owner"])
+    bundle.validation_status = "valid"
+    bundle.validation_report = {"complete": True}
+    bundle.validation_report_hash = "1" * 64
+    bundle.bundle_sha256 = "2" * 64
+    db.commit()
+    content = "Replacement instruction"
+    replacement = AIPersonaConfigVersion(
+        variant="mini",
+        section_key="instruction",
+        version_number=2,
+        status="draft",
+        content=content,
+        content_sha256=sha256(content.encode()).hexdigest(),
+        created_by_user_id=seeded_data["owner"].id,
+    )
+    db.add(replacement)
+    db.flush()
+
+    updated = replace_bundle_section(
+        db,
+        bundle_id=bundle.id,
+        section_key="instruction",
+        version_id=replacement.id,
+    )
+
+    assert db.scalar(
+        select(func.count())
+        .select_from(AIPersonaBundleSection)
+        .where(
+            AIPersonaBundleSection.bundle_id == bundle.id,
+            AIPersonaBundleSection.section_key == "instruction",
+        )
+    ) == 1
+    instruction = next(item for item in updated.sections if item.section_key == "instruction")
+    assert instruction.persona_config_version_id == replacement.id
+    assert updated.validation_status == "pending"
+    assert updated.bundle_sha256 is None
+    db.close()
+
+
 def test_incomplete_and_unsafe_bundle_cannot_publish(db_session_factory, seeded_data):
     db = db_session_factory()
     bundle = create_bundle_draft(db, current_user=seeded_data["owner"])
@@ -153,6 +203,72 @@ def test_atomic_publish_runtime_provenance_and_legacy_section_guard(
             version_id=published.sections[0].persona_config_version_id,
             current_user=seeded_data["owner"],
         )
+    db.close()
+
+
+def test_mini_section_change_is_published_immediately(
+    db_session_factory,
+    seeded_data,
+):
+    db = db_session_factory()
+    original = _complete_bundle(db, seeded_data["owner"])
+    report = validate_bundle(
+        db, bundle_id=original.id, current_user=seeded_data["owner"]
+    )
+    original = publish_bundle(
+        db,
+        bundle_id=original.id,
+        current_user=seeded_data["owner"],
+        expected_current_bundle_hash=None,
+        acknowledged_warning_codes=[item["code"] for item in report.warnings],
+    )
+
+    published = publish_bundle_section_immediately(
+        db,
+        current_user=seeded_data["owner"],
+        section_key="instruction",
+        content="Instruction langsung aktif",
+    )
+
+    assert original.status == "archived"
+    assert published.status == "published"
+    assert published.source_bundle_id == original.id
+    assert next(
+        item for item in published.sections if item.section_key == "instruction"
+    ).persona_config_version.content == "Instruction langsung aktif"
+    assert db.scalar(
+        select(func.count()).select_from(AIPersonaBundle).where(
+            AIPersonaBundle.status == "draft"
+        )
+    ) == 0
+    assert "Instruction langsung aktif" in {
+        item.content for item in load_effective_system_sections(db, "mini")
+    }
+    db.close()
+
+
+def test_regular_content_is_published_without_draft(
+    db_session_factory,
+    seeded_data,
+):
+    db = db_session_factory()
+
+    published = publish_persona_content_immediately(
+        db,
+        variant="reguler",
+        section_key="instruction",
+        payload=AIPersonaDraftCreateRequest(content="Instruction reguler aktif"),
+        current_user=seeded_data["owner"],
+    )
+
+    assert published.status == "published"
+    assert db.scalar(
+        select(func.count()).select_from(AIPersonaConfigVersion).where(
+            AIPersonaConfigVersion.variant == "reguler",
+            AIPersonaConfigVersion.section_key == "instruction",
+            AIPersonaConfigVersion.status == "draft",
+        )
+    ) == 0
     db.close()
 
 
@@ -320,6 +436,11 @@ def test_whole_bundle_rollback_creates_new_versions(db_session_factory, seeded_d
 def test_bundle_api_requires_superadmin_and_csrf(client, seeded_data):
     login(client, seeded_data["marketing_a"].email, "MarketingPass123!")
     assert client.get("/ai-persona-config/bundles").status_code == 403
+    assert client.put(
+        "/ai-persona-config/mini/instruction/publish",
+        json={"content": "Tidak boleh dipublish marketing"},
+        headers=csrf_headers(client),
+    ).status_code == 403
 
     login(client, seeded_data["owner"].email, "OwnerPass123!")
     assert client.post("/ai-persona-config/bundles/import-current").status_code == 403
@@ -329,6 +450,17 @@ def test_bundle_api_requires_superadmin_and_csrf(client, seeded_data):
     )
     assert response.status_code == 201, response.text
     assert len(response.json()["sections"]) == 5
+    assert client.put(
+        "/ai-persona-config/mini/instruction/publish",
+        json={"content": "Instruction langsung dari UI"},
+    ).status_code == 403
+    response = client.put(
+        "/ai-persona-config/mini/instruction/publish",
+        json={"content": "Instruction langsung dari UI"},
+        headers=csrf_headers(client),
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["content"] == "Instruction langsung dari UI"
 
 
 def test_migration_does_not_publish_bundle(db_session_factory):

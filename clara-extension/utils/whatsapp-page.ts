@@ -185,6 +185,27 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     return ""
   }
 
+  const getExternalThreadId = (containers: HTMLElement[]) => {
+    for (const container of containers) {
+      const dataId =
+        container.getAttribute("data-id") ||
+        container
+          .querySelector<HTMLElement>("[data-id]")
+          ?.getAttribute("data-id") ||
+        container.closest<HTMLElement>("[data-id]")?.getAttribute("data-id") ||
+        ""
+      const match = dataId.match(
+        /(?:^|_)([^_]+@(?:c\.us|g\.us|lid|s\.whatsapp\.net))(?:_|$)/i
+      )
+
+      if (match?.[1]) {
+        return `whatsapp:${match[1].toLowerCase()}`
+      }
+    }
+
+    return undefined
+  }
+
   const getMessageDirection = (
     container: HTMLElement
   ): WhatsAppMessageDirection => {
@@ -448,6 +469,7 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
         firstMessageText: messages[0]?.text || "",
         lastMessageText: messages[messages.length - 1]?.text || ""
       },
+      externalThreadId: getExternalThreadId(messageContainers),
       messages
     },
     ok: true

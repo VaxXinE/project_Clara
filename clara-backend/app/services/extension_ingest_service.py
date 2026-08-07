@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from difflib import SequenceMatcher
 import hashlib
 import json
 import re
@@ -87,6 +88,10 @@ class ExtensionSnapshotError(RuntimeError):
     pass
 
 
+class ExtensionOwnershipConflictError(ExtensionSnapshotError):
+    pass
+
+
 @dataclass(frozen=True)
 class NormalizedSnapshotMessage:
     external_message_id: str
@@ -121,6 +126,15 @@ class ExtensionChannelContext:
 SYNTHETIC_SALES_MATCH_WINDOW = timedelta(minutes=10)
 TAWK_OFFICIAL_MATCH_WINDOW = timedelta(minutes=2)
 REPLY_CONTEXT_MIN_LENGTH = 18
+
+
+def build_ownership_conflict_message(conversation: Conversation) -> str:
+    owner_name = (
+        conversation.sales_user.name.strip()
+        if conversation.sales_user and conversation.sales_user.name.strip()
+        else "sales lain"
+    )
+    return f"Chat ini berhasil terbaca, tetapi sudah dimiliki oleh {owner_name}."
 
 
 def get_extension_channel_context(
@@ -168,6 +182,40 @@ def build_snapshot_signature(
             *message_lines,
         ]
     ).strip()
+
+
+def build_message_content_signature(messages: list) -> tuple[tuple[str, str], ...]:
+    signature: list[tuple[str, str]] = []
+    for message in messages:
+        text = getattr(message, "text", None)
+        if text is None:
+            text = getattr(message, "message_text", "")
+        signature.append(
+            (
+                str(message.sender_type).strip().lower(),
+                " ".join(str(text).split()),
+            )
+        )
+    return tuple(signature)
+
+
+def message_content_signatures_match(
+    left: tuple[tuple[str, str], ...],
+    right: tuple[tuple[str, str], ...],
+) -> bool:
+    if left == right:
+        return True
+
+    shorter_length = min(len(left), len(right))
+    if shorter_length < 3:
+        return False
+
+    longest_match = SequenceMatcher(
+        a=left,
+        b=right,
+        autojunk=False,
+    ).find_longest_match()
+    return longest_match.size >= 3 and longest_match.size / shorter_length >= 0.6
 
 
 def build_extension_delivery_identity(
@@ -473,6 +521,9 @@ def get_existing_extension_conversation(
     current_user: User,
     chat_title: str,
     external_thread_id: str | None = None,
+    shared_thread_identity: bool = False,
+    transcript: str | None = None,
+    normalized_messages: list[NormalizedSnapshotMessage] | None = None,
 ) -> Conversation | None:
     if channel_context.channel == "tawk":
         statement = (
@@ -483,6 +534,62 @@ def get_existing_extension_conversation(
             .order_by(desc(Conversation.created_at))
         )
         return db.scalars(statement).first()
+
+    if shared_thread_identity:
+        stable_conversation = db.scalars(
+            select(Conversation)
+            .where(Conversation.organization_id == current_user.organization_id)
+            .where(Conversation.channel == channel_context.storage_channel)
+            .where(Conversation.provider == channel_context.provider)
+            .where(Conversation.external_thread_key == external_thread_id)
+            .order_by(desc(Conversation.created_at))
+        ).first()
+        if stable_conversation is not None:
+            return stable_conversation
+
+        legacy_conversation = db.scalars(
+            select(Conversation)
+            .where(Conversation.organization_id == current_user.organization_id)
+            .where(Conversation.source == channel_context.source)
+            .where(Conversation.title == chat_title.strip())
+            .where(Conversation.raw_text == transcript)
+            .order_by(Conversation.created_at.asc())
+        ).first()
+        if legacy_conversation is not None:
+            return legacy_conversation
+
+    if transcript:
+        matching_snapshot = db.scalars(
+            select(Conversation)
+            .where(Conversation.organization_id == current_user.organization_id)
+            .where(Conversation.source == channel_context.source)
+            .where(Conversation.title == chat_title.strip())
+            .where(Conversation.raw_text == transcript)
+            .order_by(Conversation.created_at.asc())
+        ).first()
+        if matching_snapshot is not None:
+            return matching_snapshot
+
+    if normalized_messages and len(normalized_messages) >= 2:
+        incoming_signature = build_message_content_signature(normalized_messages)
+        candidates = db.scalars(
+            select(Conversation)
+            .where(Conversation.organization_id == current_user.organization_id)
+            .where(Conversation.source == channel_context.source)
+            .where(Conversation.title == chat_title.strip())
+            .options(selectinload(Conversation.messages))
+            .order_by(Conversation.created_at.asc())
+        ).all()
+        for candidate in candidates:
+            persisted_messages = sorted(
+                candidate.messages,
+                key=lambda message: (message.message_timestamp, message.created_at),
+            )
+            if message_content_signatures_match(
+                build_message_content_signature(persisted_messages),
+                incoming_signature,
+            ):
+                return candidate
 
     statement = (
         select(Conversation)
@@ -522,10 +629,16 @@ def build_extension_thread_key(
     channel_context: ExtensionChannelContext,
     current_user: User,
     chat_title: str,
+    provider_thread_id: str | None = None,
 ) -> str:
+    normalized_provider_thread_id = (provider_thread_id or "").strip().lower()
+    thread_identity = normalized_provider_thread_id or chat_title.strip().lower()
+    ownership_scope = (
+        "organization" if normalized_provider_thread_id else f"sales:{current_user.id}"
+    )
     key_source = (
         f"{channel_context.message_key_prefix}:thread:{current_user.organization_id}:"
-        f"{current_user.id}:{chat_title.strip().lower()}"
+        f"{ownership_scope}:{thread_identity}"
     )
     digest = hashlib.sha256(key_source.encode("utf-8")).hexdigest()
     return f"{channel_context.message_key_prefix}:thread:{digest}"
@@ -573,6 +686,14 @@ def ensure_tawk_conversation_access(
                 "Percakapan Tawk tidak tersedia untuk akun ini."
             )
         return
+
+    if (
+        current_user.role == "sales"
+        and conversation.sales_user_id != current_user.id
+    ):
+        raise ExtensionOwnershipConflictError(
+            build_ownership_conflict_message(conversation)
+        )
 
     if not can_access_conversation_in_scope(
         db=db,
@@ -914,6 +1035,7 @@ def sync_extension_snapshot(
             channel_context=channel_context,
             current_user=current_user,
             chat_title=snapshot.chat_title,
+            provider_thread_id=snapshot.external_thread_id,
         )
 
     normalized_messages = normalize_snapshot_messages(snapshot)
@@ -939,6 +1061,9 @@ def sync_extension_snapshot(
         current_user=current_user,
         chat_title=snapshot.chat_title,
         external_thread_id=external_thread_id,
+        shared_thread_identity=bool(snapshot.external_thread_id),
+        transcript=transcript,
+        normalized_messages=normalized_messages,
     )
     if channel_context.channel == "tawk":
         ensure_tawk_conversation_access(
@@ -946,8 +1071,29 @@ def sync_extension_snapshot(
             conversation=conversation,
             current_user=current_user,
         )
+    elif (
+        conversation is not None
+        and conversation.sales_user_id != current_user.id
+    ):
+        raise ExtensionOwnershipConflictError(
+            build_ownership_conflict_message(conversation)
+        )
+
+    adopted_stable_identity = bool(
+        conversation is not None
+        and snapshot.external_thread_id
+        and conversation.external_thread_key != external_thread_id
+    )
+    if adopted_stable_identity and conversation is not None:
+        conversation.external_thread_id = external_thread_id
+        conversation.external_thread_key = external_thread_id
+        db.add(conversation)
+        db.flush()
 
     if conversation is not None and (conversation.raw_text or "").strip() == transcript:
+        if adopted_stable_identity:
+            db.commit()
+            db.refresh(conversation)
         try_auto_analyze_extension_conversation(
             db=db,
             channel_context=channel_context,
@@ -988,12 +1134,16 @@ def sync_extension_snapshot(
         if channel_context.channel != "tawk":
             conversation.channel = channel_context.storage_channel
             conversation.provider = channel_context.provider
-        conversation.external_thread_id = (
-            conversation.external_thread_id or external_thread_id
-        )
-        conversation.external_thread_key = (
-            conversation.external_thread_key or external_thread_id
-        )
+        if snapshot.external_thread_id:
+            conversation.external_thread_id = external_thread_id
+            conversation.external_thread_key = external_thread_id
+        else:
+            conversation.external_thread_id = (
+                conversation.external_thread_id or external_thread_id
+            )
+            conversation.external_thread_key = (
+                conversation.external_thread_key or external_thread_id
+            )
         if conversation.source == channel_context.source:
             conversation.status = "synced"
         conversation.title = snapshot.chat_title.strip()
