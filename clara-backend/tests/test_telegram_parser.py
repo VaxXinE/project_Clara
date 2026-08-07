@@ -1,9 +1,11 @@
 from pathlib import Path
 import sys
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.services.telegram_parser import parse_telegram_txt
+from app.services.telegram_parser import TelegramParseError, parse_telegram_txt
 
 
 def test_parse_telegram_txt_supports_bracket_format() -> None:
@@ -33,6 +35,64 @@ def test_parse_telegram_txt_supports_plain_dash_format_and_multiline() -> None:
     assert len(messages) == 2
     assert messages[0].message_text == "Halo kak\nsaya masih ragu."
     assert messages[1].sender_type == "sales"
+
+
+def test_parse_telegram_txt_supports_desktop_copy_format() -> None:
+    raw_text = """
+    Customer Leoni, [18.05.2026 09:12]
+    Halo kak, saya tertarik.
+    Saya ingin tahu detailnya.
+    Sales Aria, [18.05.2026 09:13]
+    Siap kak, saya bantu jelaskan.
+    """.strip()
+
+    messages = parse_telegram_txt(raw_text)
+
+    assert len(messages) == 2
+    assert messages[0].sender_name == "Customer Leoni"
+    assert messages[0].message_text == (
+        "Halo kak, saya tertarik.\nSaya ingin tahu detailnya."
+    )
+    assert messages[1].sender_type == "sales"
+
+
+def test_parse_telegram_txt_supports_quoted_copy_format_without_timestamps() -> None:
+    raw_text = """
+    > D:
+    YAKANNNN
+
+    > D:
+    ku beri bintang 1
+
+    > ya:
+    Bener banget
+
+    > ya:
+    Kenapa gak tenang?
+    """.strip()
+
+    messages = parse_telegram_txt(raw_text)
+
+    assert [message.sender_name for message in messages] == ["D", "D", "ya", "ya"]
+    assert [message.message_text for message in messages] == [
+        "YAKANNNN",
+        "ku beri bintang 1",
+        "Bener banget",
+        "Kenapa gak tenang?",
+    ]
+    assert messages[0].sender_type == "customer"
+    assert messages[2].sender_type == "sales"
+    assert messages == sorted(messages, key=lambda message: message.message_timestamp)
+
+
+def test_parse_telegram_txt_rejects_whatsapp_export() -> None:
+    raw_text = """
+    18/05/2026, 09.12 - Customer Leoni: Halo kak, saya tertarik.
+    18/05/2026, 09.13 - Sales Aria: Siap kak, saya bantu jelaskan.
+    """.strip()
+
+    with pytest.raises(TelegramParseError, match="No valid Telegram messages"):
+        parse_telegram_txt(raw_text)
 
 
 def test_parse_telegram_txt_infers_customer_and_sales_for_two_plain_names() -> None:

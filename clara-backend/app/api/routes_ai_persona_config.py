@@ -41,6 +41,7 @@ from app.services.ai_persona_bundle_service import (
     list_bundles,
     preview_bundle,
     publish_bundle,
+    publish_bundle_section_immediately,
     replace_bundle_section,
     rollback_bundle,
     serialize_bundle,
@@ -50,6 +51,7 @@ from app.services.ai_persona_config_service import (
     AIPersonaConfigError,
     create_persona_draft,
     list_persona_versions,
+    publish_persona_content_immediately,
     publish_persona_version,
     rollback_persona_version,
 )
@@ -145,6 +147,55 @@ def create_persona_draft_endpoint(
         metadata=_audit_metadata(entry),
     )
     return entry
+
+
+@router.put(
+    "/{variant}/{section_key}/publish",
+    response_model=AIPersonaEffectiveSectionResponse,
+)
+def publish_persona_content_endpoint(
+    variant: AIPersonaVariant,
+    section_key: AIPersonaSectionKey,
+    payload: AIPersonaDraftCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("superadmin")),
+):
+    try:
+        if variant == "mini":
+            publish_bundle_section_immediately(
+                db,
+                current_user=current_user,
+                section_key=section_key,
+                content=payload.content,
+            )
+        else:
+            entry = publish_persona_content_immediately(
+                db,
+                variant=variant,
+                section_key=section_key,
+                payload=payload,
+                current_user=current_user,
+            )
+            create_audit_log(
+                db=db,
+                action="ai_persona_config.immediate_publish",
+                resource_type="ai_persona_config_version",
+                resource_id=str(entry.id),
+                current_user=current_user,
+                request=request,
+                metadata=_audit_metadata(entry),
+            )
+    except AIPersonaBundleError as exc:
+        raise _handle_bundle_error(exc) from exc
+    except AIPersonaConfigError as exc:
+        raise _handle_persona_error(exc) from exc
+
+    return next(
+        item
+        for item in load_effective_persona_sections(db, variant)
+        if item.section_key == section_key
+    )
 
 
 @router.post(

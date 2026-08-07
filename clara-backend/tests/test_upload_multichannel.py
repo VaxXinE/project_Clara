@@ -35,8 +35,10 @@ def test_upload_telegram_txt_creates_conversation_and_lead(
     login(client, email=marketing_a.email, password="MarketingPass123!")
 
     raw_text = """
-    [18.05.2026 09:12] Customer Leoni: Halo kak, saya tertarik.
-    [18.05.2026 09:13] Sales Aria: Siap kak, saya bantu jelaskan.
+    Customer Leoni, [18.05.2026 09:12]
+    Halo kak, saya tertarik.
+    Sales Aria, [18.05.2026 09:13]
+    Siap kak, saya bantu jelaskan.
     """.strip()
 
     response = client.post(
@@ -111,13 +113,16 @@ def test_paste_telegram_text_creates_conversation_and_lead(
     login(client, email=marketing_a.email, password="MarketingPass123!")
 
     raw_text = """
-    [18.05.2026 09:12] Customer Leoni: Halo kak, saya tertarik.
-    [18.05.2026 09:13] Sales Aria: Siap kak, saya bantu jelaskan.
+    > D:
+    Halo kak, saya tertarik.
+
+    > ya:
+    Siap kak, saya bantu jelaskan.
     """.strip()
 
     response = client.post(
         "/upload/telegram-text",
-        json={"raw_text": raw_text},
+        json={"raw_text": raw_text, "title": "D"},
         headers=csrf_headers(client),
     )
     assert response.status_code == 201, response.text
@@ -131,10 +136,12 @@ def test_paste_telegram_text_creates_conversation_and_lead(
     assert conversation.source == "telegram_txt"
     assert conversation.raw_filename is None
     assert conversation.external_thread_id is not None
+    assert conversation.title == "D"
 
     lead = db.get(Lead, conversation.lead_id)
     assert lead is not None
     assert lead.source == "telegram_txt"
+    assert lead.display_name == "D"
 
 
 def test_list_upload_channels_returns_registry(
@@ -163,8 +170,11 @@ def test_detect_upload_channel_prefers_telegram_for_telegram_text(
     login(client, email=marketing_a.email, password="MarketingPass123!")
 
     raw_text = """
-    [18.05.2026 09:12] Customer Leoni: Halo kak, saya tertarik.
-    [18.05.2026 09:13] Sales Aria: Siap kak, saya bantu jelaskan.
+    > Customer Leoni:
+    Halo kak, saya tertarik.
+
+    > Sales Aria:
+    Siap kak, saya bantu jelaskan.
     """.strip()
 
     response = client.post(

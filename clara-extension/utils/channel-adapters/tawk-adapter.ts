@@ -4,21 +4,17 @@ import type {
   WhatsAppReadResponse
 } from "~/types/whatsapp"
 
+import {
+  isLikelyTawkConversationTitle,
+  isValidTawkIdComponent,
+  parseTawkInboxRoute,
+  type TawkThreadIdentity
+} from "../tawk-route"
 import type { ChannelAdapter } from "./base"
 
 const TAWK_HOSTNAME = "dashboard.tawk.to"
 const MAX_MESSAGES = 80
 const MAX_TEXT_LENGTH = 5000
-const ID_COMPONENT_PATTERN = /^[A-Za-z0-9._-]{1,100}$/
-const INBOX_CHAT_ROUTE_PATTERN =
-  /^\/inbox\/([A-Za-z0-9._-]{1,100})\/chats\/([A-Za-z0-9._-]{1,100})\/?$/
-const RESERVED_ID_COMPONENTS = new Set([
-  "all",
-  "analytics",
-  "dashboard",
-  "properties",
-  "settings"
-])
 
 const ACTIVE_PANE_SELECTORS = [
   '[data-testid="active-chat"]',
@@ -33,6 +29,8 @@ const REAL_ACTIVE_CHATS_SELECTOR = "#active-chats"
 const REAL_CHAT_HEADER_SELECTOR = ".tawk-chat-header"
 const REAL_CHAT_BODY_SELECTOR = ".tawk-chat-body"
 const REAL_MESSAGE_CONTAINER_SELECTOR = ".tawk-chat-message-container"
+const INBOX_CHAT_TITLE_SELECTOR =
+  ".tawk-flex-1.tawk-overflow-hidden.tawk-text-regular-2.tawk-text-truncate"
 const EXCLUDED_NAVIGATION_SELECTOR =
   "#tawk-live-chats-navigation, #tawk-chat-navigation-list"
 const SCOPED_ROUTE_SELECTOR = '[to^="/inbox/"][to*="/chats/"]'
@@ -95,14 +93,7 @@ const normalizeText = (
     .trim()
     .slice(0, max)
 
-const isValidIdComponent = (value: string) =>
-  ID_COMPONENT_PATTERN.test(value) &&
-  !RESERVED_ID_COMPONENTS.has(value.toLowerCase())
-
-interface TawkThreadIdentity {
-  chatId: string
-  propertyId: string
-}
+const isValidIdComponent = isValidTawkIdComponent
 
 const isVisible = (element: Element) => {
   const bounds = element.getBoundingClientRect()
@@ -121,7 +112,8 @@ const isInViewport = (element: Element) => {
     const centerX =
       (Math.max(0, bounds.left) + Math.min(window.innerWidth, bounds.right)) / 2
     const centerY =
-      (Math.max(0, bounds.top) + Math.min(window.innerHeight, bounds.bottom)) / 2
+      (Math.max(0, bounds.top) + Math.min(window.innerHeight, bounds.bottom)) /
+      2
     const foreground = document.elementFromPoint(centerX, centerY)
     return Boolean(foreground && element.contains(foreground))
   }
@@ -142,20 +134,6 @@ const firstVisibleMatch = (
   return null
 }
 
-const parseInboxChatRoute = (
-  value: string | null
-): TawkThreadIdentity | null => {
-  const match = (value || "").trim().match(INBOX_CHAT_ROUTE_PATTERN)
-  const propertyId = match?.[1] || ""
-  const chatId = match?.[2] || ""
-
-  if (!isValidIdComponent(propertyId) || !isValidIdComponent(chatId)) {
-    return null
-  }
-
-  return { chatId, propertyId }
-}
-
 const getRouteElements = (root: ParentNode) => {
   const elements = Array.from(
     root.querySelectorAll<HTMLElement>(SCOPED_ROUTE_SELECTOR)
@@ -171,7 +149,7 @@ const getSingleRouteIdentity = (
 ): TawkThreadIdentity | null => {
   const identities = new Map<string, TawkThreadIdentity>()
   for (const element of elements) {
-    const identity = parseInboxChatRoute(element.getAttribute("to"))
+    const identity = parseTawkInboxRoute(element.getAttribute("to"))
     if (identity) {
       identities.set(`${identity.propertyId}:${identity.chatId}`, identity)
     }
@@ -186,7 +164,7 @@ const getDocumentRouteIdentity = (
   pane: HTMLElement
 ): TawkThreadIdentity | null => {
   const matchingRoutes = getRouteElements(document).filter((element) =>
-    parseInboxChatRoute(element.getAttribute("to"))
+    parseTawkInboxRoute(element.getAttribute("to"))
   )
   if (matchingRoutes.length !== 1) {
     return null
@@ -199,7 +177,7 @@ const getDocumentRouteIdentity = (
     Boolean(header && routeElement.contains(header))
 
   return isStructurallyLinked
-    ? parseInboxChatRoute(routeElement.getAttribute("to"))
+    ? parseTawkInboxRoute(routeElement.getAttribute("to"))
     : null
 }
 
@@ -219,13 +197,8 @@ const getUrlValue = (names: string[]) => {
 }
 
 const getInboxRouteIdentity = () => {
-  const route = `${window.location.pathname}/${window.location.hash.split("?")[0]}`
-  const match = route.match(
-    /\/inbox\/([A-Za-z0-9._-]{1,100})\/chats\/([A-Za-z0-9._-]{1,100})(?:\/|$)/
-  )
-  return parseInboxChatRoute(
-    match ? `/inbox/${match[1]}/chats/${match[2]}` : null
-  )
+  const hashRoute = window.location.hash.split("?")[0].replace(/^#/, "")
+  return parseTawkInboxRoute(hashRoute)
 }
 
 const getAttributeId = (
@@ -312,6 +285,12 @@ const hasRealChatStructure = (element: HTMLElement) =>
       element.querySelector(REAL_MESSAGE_CONTAINER_SELECTOR)
   )
 
+const hasInboxChatStructure = (element: HTMLElement) =>
+  Boolean(
+    element.querySelector(REAL_CHAT_BODY_SELECTOR) &&
+      element.querySelector(REAL_MESSAGE_CONTAINER_SELECTOR)
+  )
+
 const getRealChatCard = (
   activeHeader: HTMLElement,
   activeChats: HTMLElement
@@ -348,6 +327,34 @@ const findRealActivePane = (): HTMLElement | null => {
   return activeHeader ? getRealChatCard(activeHeader, activeChats) : null
 }
 
+const findInboxActivePane = (): HTMLElement | null => {
+  if (!getInboxRouteIdentity()) {
+    return null
+  }
+
+  const panes = new Set<HTMLElement>()
+  const messageContainers = Array.from(
+    document.querySelectorAll<HTMLElement>(REAL_MESSAGE_CONTAINER_SELECTOR)
+  ).filter(
+    (container) =>
+      isInViewport(container) &&
+      !container.closest(EXCLUDED_NAVIGATION_SELECTOR)
+  )
+
+  for (const container of messageContainers) {
+    let candidate = container.parentElement
+    while (candidate && candidate !== document.body) {
+      if (isVisible(candidate) && hasInboxChatStructure(candidate)) {
+        panes.add(candidate)
+        break
+      }
+      candidate = candidate.parentElement
+    }
+  }
+
+  return panes.size === 1 ? Array.from(panes)[0] : null
+}
+
 const findSemanticActivePane = () => {
   for (const selector of ACTIVE_PANE_SELECTORS) {
     const candidates = Array.from(
@@ -368,7 +375,8 @@ const findSemanticActivePane = () => {
   return null
 }
 
-const findActivePane = () => findRealActivePane() || findSemanticActivePane()
+const findActivePane = () =>
+  findRealActivePane() || findInboxActivePane() || findSemanticActivePane()
 
 const findMessageElements = (pane: HTMLElement) => {
   const unique = new Set<HTMLElement>()
@@ -379,7 +387,19 @@ const findMessageElements = (pane: HTMLElement) => {
       }
     })
   }
-  return Array.from(unique)
+  const elements = Array.from(unique)
+  return elements
+    .filter(
+      (element) =>
+        !elements.some(
+          (candidate) => candidate !== element && candidate.contains(element)
+        )
+    )
+    .sort((left, right) =>
+      left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_PRECEDING
+        ? 1
+        : -1
+    )
 }
 
 const collectActiveMessageElements = (pane: HTMLElement) =>
@@ -523,7 +543,8 @@ const readMessages = async (
 
 const getChatTitle = (pane: HTMLElement) => {
   const header = pane.querySelector<HTMLElement>(REAL_CHAT_HEADER_SELECTOR)
-  const title = firstVisibleMatch(pane, [
+  const titleSelectors = [
+    INBOX_CHAT_TITLE_SELECTOR,
     '[data-testid="chat-title"]',
     '[data-testid="conversation-title"]',
     "[data-chat-title]",
@@ -533,13 +554,77 @@ const getChatTitle = (pane: HTMLElement) => {
     'header [role="heading"]',
     "header h1",
     "header h2"
-  ])
-  const semanticTitle = normalizeText(
-    title && !title.closest(HEADER_CONTROL_SELECTOR)
-      ? title.getAttribute("data-chat-title") || title.textContent
-      : "",
-    255
-  )
+  ]
+  const paneBounds = pane.getBoundingClientRect()
+  const exactInboxTitle = getInboxRouteIdentity()
+    ? Array.from(
+        document.querySelectorAll<HTMLElement>(INBOX_CHAT_TITLE_SELECTOR)
+      )
+        .filter((candidate) => {
+          if (!isVisible(candidate)) {
+            return false
+          }
+          const bounds = candidate.getBoundingClientRect()
+          return (
+            bounds.right > paneBounds.left && bounds.left < paneBounds.right
+          )
+        })
+        .map((candidate) => ({
+          distance: Math.abs(
+            candidate.getBoundingClientRect().bottom - paneBounds.top
+          ),
+          text: normalizeText(candidate.textContent, 255)
+        }))
+        .filter(({ text }) => isLikelyTawkConversationTitle(text))
+        .sort((left, right) => left.distance - right.distance)[0]?.text || ""
+    : ""
+  const inboxHeaderTitle =
+    exactInboxTitle ||
+    (getInboxRouteIdentity()
+      ? Array.from(
+          document.querySelectorAll<HTMLElement>(titleSelectors.join(","))
+        )
+          .filter((candidate) => {
+            if (!isVisible(candidate)) {
+              return false
+            }
+            const bounds = candidate.getBoundingClientRect()
+            return (
+              bounds.right > paneBounds.left &&
+              bounds.left < paneBounds.right &&
+              bounds.bottom <= paneBounds.top + 12 &&
+              bounds.bottom >= paneBounds.top - 200
+            )
+          })
+          .map((candidate) => ({
+            bottom: candidate.getBoundingClientRect().bottom,
+            text: normalizeText(
+              candidate.getAttribute("data-chat-title") ||
+                candidate.textContent,
+              255
+            )
+          }))
+          .filter(({ text }) => isLikelyTawkConversationTitle(text))
+          .sort((left, right) => right.bottom - left.bottom)[0]?.text || ""
+      : "")
+  const semanticTitle =
+    inboxHeaderTitle ||
+    titleSelectors
+      .flatMap((selector) =>
+        Array.from(pane.querySelectorAll<HTMLElement>(selector))
+      )
+      .filter(
+        (candidate) =>
+          isVisible(candidate) && !candidate.closest(HEADER_CONTROL_SELECTOR)
+      )
+      .map((candidate) =>
+        normalizeText(
+          candidate.getAttribute("data-chat-title") || candidate.textContent,
+          255
+        )
+      )
+      .find(isLikelyTawkConversationTitle) ||
+    ""
   if (semanticTitle) {
     return semanticTitle
   }
@@ -559,7 +644,9 @@ const getChatTitle = (pane: HTMLElement) => {
       isVisible(parent) &&
       !parent.closest(HEADER_CONTROL_SELECTOR)
     ) {
-      candidates.push(text)
+      if (isLikelyTawkConversationTitle(text)) {
+        candidates.push(text)
+      }
     }
     node = walker.nextNode()
   }
@@ -567,7 +654,7 @@ const getChatTitle = (pane: HTMLElement) => {
   const joinedCandidates = normalizeText(candidates.join(" "), 255)
   return (
     candidates.find((candidate) => candidate.includes(" - ")) ||
-    (joinedCandidates.includes(" - ") ? joinedCandidates : "") ||
+    (isLikelyTawkConversationTitle(joinedCandidates) ? joinedCandidates : "") ||
     candidates.sort((left, right) => right.length - left.length)[0] ||
     ""
   )
@@ -592,11 +679,12 @@ const readOpenChat = async (): Promise<WhatsAppReadResponse> => {
     const activeChats = document.querySelector(REAL_ACTIVE_CHATS_SELECTOR)
     console.warn("[Clara][Tawk] Active pane detection failed.", {
       activeChatsFound: Boolean(activeChats),
-      chatHeaderCount:
-        activeChats?.querySelectorAll(REAL_CHAT_HEADER_SELECTOR).length || 0,
-      messageContainerCount:
-        activeChats?.querySelectorAll(REAL_MESSAGE_CONTAINER_SELECTOR).length ||
-        0
+      inboxRouteFound: Boolean(getInboxRouteIdentity()),
+      chatHeaderCount: document.querySelectorAll(REAL_CHAT_HEADER_SELECTOR)
+        .length,
+      messageContainerCount: document.querySelectorAll(
+        REAL_MESSAGE_CONTAINER_SELECTOR
+      ).length
     })
     return readError(
       "TAWK_ACTIVE_CHAT_NOT_FOUND",

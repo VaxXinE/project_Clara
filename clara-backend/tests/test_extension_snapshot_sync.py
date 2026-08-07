@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
 from app.models.conversation import Conversation
+from app.models.lead import Lead
 from app.models.message import Message
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
@@ -20,6 +21,9 @@ from app.schemas.ai_extraction_schema import AIExtractionCreate
 from app.schemas.reply_suggestion_schema import ReplySuggestionCreate
 from app.services.extension_ingest_service import (
     NormalizedSnapshotMessage,
+    build_extension_thread_key,
+    get_extension_channel_context,
+    message_content_signatures_match,
     split_reply_context_from_snapshot_text,
 )
 
@@ -36,6 +40,20 @@ def csrf_headers(client: TestClient) -> dict[str, str]:
     csrf_token = client.cookies.get(settings.csrf_cookie_name)
     assert csrf_token
     return {"X-CSRF-Token": csrf_token}
+
+
+def test_message_content_signature_matches_a_visible_chat_window() -> None:
+    full_chat = tuple(
+        ("customer" if index % 2 == 0 else "sales", f"message-{index}")
+        for index in range(10)
+    )
+
+    assert message_content_signatures_match(full_chat, full_chat[3:9]) is True
+    assert message_content_signatures_match(full_chat, full_chat[:2]) is False
+    assert message_content_signatures_match(
+        full_chat,
+        (("customer", "different-1"), ("sales", "different-2"), ("customer", "different-3")),
+    ) is False
 
 
 def test_extension_snapshot_sync_creates_conversation_and_messages(
@@ -105,6 +123,233 @@ def test_extension_snapshot_sync_creates_conversation_and_messages(
     assert messages[1].channel == "whatsapp"
     assert messages[1].provider == "extension"
     assert messages[1].sender_type == "sales"
+
+
+def test_stable_extension_thread_is_owned_by_first_sales_only(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    marketing_b = seeded_data["marketing_b"]
+    marketing_other_org = seeded_data["marketing_other_org"]
+    payload = {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:00:00.000Z",
+            "chatTitle": "Shared WhatsApp Customer",
+            "chatSubtitle": "online",
+            "externalThreadId": "whatsapp:6281234567890@c.us",
+            "messages": [
+                {
+                    "id": "09.00-0",
+                    "author": "Shared WhatsApp Customer",
+                    "direction": "incoming",
+                    "text": "Halo kak, saya tertarik.",
+                    "timestampLabel": "09.00",
+                }
+            ],
+        }
+    }
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+    first_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=payload,
+        headers=csrf_headers(client),
+    )
+    assert first_response.status_code == 201, first_response.text
+
+    duplicate_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=payload,
+        headers=csrf_headers(client),
+    )
+    assert duplicate_response.status_code == 201, duplicate_response.text
+    assert duplicate_response.json()["duplicate"] is True
+    assert duplicate_response.json()["conversation_id"] == first_response.json()[
+        "conversation_id"
+    ]
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+    conflict_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=payload,
+        headers=csrf_headers(client),
+    )
+    assert conflict_response.status_code == 409, conflict_response.text
+    assert conflict_response.json()["detail"]["code"] == (
+        "CONVERSATION_OWNED_BY_OTHER_SALES"
+    )
+    assert conflict_response.json()["detail"]["message"] == (
+        "Chat ini berhasil terbaca, tetapi sudah dimiliki oleh Marketing Alpha."
+    )
+
+    login(client, email=marketing_other_org.email, password="MarketingPass123!")
+    other_org_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=payload,
+        headers=csrf_headers(client),
+    )
+    assert other_org_response.status_code == 201, other_org_response.text
+
+    db = db_session_factory()
+    org_a_conversations = list(
+        db.scalars(
+            select(Conversation).where(
+                Conversation.organization_id == marketing_a.organization_id,
+                Conversation.title == "Shared WhatsApp Customer",
+            )
+        ).all()
+    )
+    assert len(org_a_conversations) == 1
+    assert org_a_conversations[0].sales_user_id == marketing_a.id
+    assert len(
+        db.scalars(
+            select(Lead).where(
+                Lead.organization_id == marketing_a.organization_id,
+                Lead.display_name == "Shared WhatsApp Customer",
+            )
+        ).all()
+    ) == 1
+
+
+def test_snapshot_fallback_locks_owner_and_adopts_stable_identity(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    marketing_b = seeded_data["marketing_b"]
+    payload = {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:00:00.000Z",
+            "chatTitle": "Legacy Shared Customer",
+            "chatSubtitle": "online",
+            "messages": [
+                {
+                    "id": "09.00-0",
+                    "author": "Legacy Shared Customer",
+                    "direction": "incoming",
+                    "text": "Halo dari chat lama.",
+                    "timestampLabel": "09.00",
+                }
+            ],
+        }
+    }
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+    first_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=payload,
+        headers=csrf_headers(client),
+    )
+    assert first_response.status_code == 201, first_response.text
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+    sales_b_payload = {
+        "chatData": {
+            **payload["chatData"],
+            "messages": [
+                {
+                    **payload["chatData"]["messages"][0],
+                    "author": "Nama kontak di akun Sales B",
+                },
+                {
+                    "id": "09.01-1",
+                    "author": "Sales B",
+                    "direction": "outgoing",
+                    "text": "Siap, saya bantu.",
+                    "timestampLabel": "09.01",
+                },
+            ],
+        }
+    }
+    owner_continuation_payload = {
+        "chatData": {
+            **payload["chatData"],
+            "messages": [
+                *payload["chatData"]["messages"],
+                {
+                    "id": "09.01-1",
+                    "author": "Sales A",
+                    "direction": "outgoing",
+                    "text": "Siap, saya bantu.",
+                    "timestampLabel": "09.01",
+                },
+            ],
+        }
+    }
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+    continuation_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=owner_continuation_payload,
+        headers=csrf_headers(client),
+    )
+    assert continuation_response.status_code == 201, continuation_response.text
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+    fallback_conflict_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=sales_b_payload,
+        headers=csrf_headers(client),
+    )
+    assert fallback_conflict_response.status_code == 409, fallback_conflict_response.text
+
+    stable_payload = {
+        "chatData": {
+            **sales_b_payload["chatData"],
+            "externalThreadId": "whatsapp:6289999999999@c.us",
+        }
+    }
+    conflict_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=stable_payload,
+        headers=csrf_headers(client),
+    )
+    assert conflict_response.status_code == 409, conflict_response.text
+
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+    adoption_response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=stable_payload,
+        headers=csrf_headers(client),
+    )
+    assert adoption_response.status_code == 201, adoption_response.text
+    assert adoption_response.json()["conversation_id"] == first_response.json()[
+        "conversation_id"
+    ]
+
+    db = db_session_factory()
+    conversations = list(
+        db.scalars(
+            select(Conversation).where(
+                Conversation.organization_id == marketing_a.organization_id,
+                Conversation.title == "Legacy Shared Customer",
+            )
+        ).all()
+    )
+    assert len(conversations) == 1
+    assert len({conversation.lead_id for conversation in conversations}) == 1
+    first_conversation = db.get(
+        Conversation,
+        UUID(first_response.json()["conversation_id"]),
+    )
+    assert first_conversation is not None
+    expected_stable_key = build_extension_thread_key(
+        channel_context=get_extension_channel_context(
+            channel="whatsapp",
+            provider="extension",
+        ),
+        current_user=marketing_a,
+        chat_title="Legacy Shared Customer",
+        provider_thread_id="whatsapp:6289999999999@c.us",
+    )
+    assert first_conversation.external_thread_key == expected_stable_key
+    assert sum(
+        conversation.external_thread_key
+        == expected_stable_key
+        for conversation in conversations
+    ) == 1
 
 
 def test_generic_extension_snapshot_endpoint_supports_whatsapp(

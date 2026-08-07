@@ -123,6 +123,58 @@ def create_persona_draft(
     return entry
 
 
+def publish_persona_content_immediately(
+    db: Session,
+    *,
+    variant: AIPersonaVariant,
+    section_key: AIPersonaSectionKey,
+    payload: AIPersonaDraftCreateRequest,
+    current_user: User,
+) -> AIPersonaConfigVersion:
+    content = payload.content.strip()
+    if not content:
+        raise AIPersonaConfigError("Persona content cannot be blank.")
+    content_sha256 = sha256(content.encode("utf-8")).hexdigest()
+    current = db.scalars(
+        select(AIPersonaConfigVersion)
+        .where(
+            AIPersonaConfigVersion.variant == variant,
+            AIPersonaConfigVersion.section_key == section_key,
+            AIPersonaConfigVersion.status == "published",
+        )
+        .with_for_update()
+    ).first()
+    if current and current.content_sha256 == content_sha256:
+        return current
+
+    _archive_current_published(db, variant=variant, section_key=section_key)
+    entry = AIPersonaConfigVersion(
+        variant=variant,
+        section_key=section_key,
+        version_number=_next_version_number(
+            db,
+            variant=variant,
+            section_key=section_key,
+        ),
+        status="published",
+        content=content,
+        content_sha256=content_sha256,
+        created_by_user_id=current_user.id,
+        published_by_user_id=current_user.id,
+        published_at=datetime.now(timezone.utc),
+    )
+    db.add(entry)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise AIPersonaConfigError(
+            "Persona publish conflicted with another request. Reload and try again."
+        ) from exc
+    db.refresh(entry)
+    return entry
+
+
 def _archive_current_published(
     db: Session,
     *,

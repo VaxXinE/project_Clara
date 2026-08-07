@@ -110,7 +110,7 @@ export function WhatsAppUploadForm() {
     setDetectionMessage("");
 
     const normalizedConversationTitle = conversationTitle.trim();
-    if (normalizedConversationTitle.length < 2) {
+    if (normalizedConversationTitle.length === 0) {
       setErrorMessage("Nama customer wajib diisi untuk judul conversation.");
       return;
     }
@@ -469,7 +469,7 @@ export function WhatsAppUploadForm() {
         disabled={
           isUploading ||
           channelOptions.length === 0 ||
-          conversationTitle.trim().length < 2 ||
+          conversationTitle.trim().length === 0 ||
           (inputMode === "file"
             ? !selectedFile
             : pastedText.trim().length === 0)

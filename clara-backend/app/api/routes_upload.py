@@ -226,7 +226,7 @@ def resolve_manual_conversation_title(
     source: str,
 ) -> str:
     normalized_title = (raw_title or "").strip()
-    if len(normalized_title) >= 2:
+    if normalized_title:
         return normalized_title
     return infer_conversation_title_from_messages(
         parsed_messages=parsed_messages,
