@@ -117,11 +117,9 @@ def test_system_sections_use_per_section_precedence_and_provenance(
         latency_profile="fast",
     )
     combined = composition.combined_playbook()
-    assert combined.index("MARKDOWN INSTRUCTION.md") < combined.index(
-        "SUPPORTING POSITIONING"
-    )
+    assert "SUPPORTING POSITIONING" not in combined
     assert combined.count("MARKDOWN INSTRUCTION.md") == 1
-    assert composition.supporting_knowledge_count == 1
+    assert composition.supporting_knowledge_count == 0
 
     debug_json = json.dumps(composition.debug_metadata())
     assert published_content not in debug_json

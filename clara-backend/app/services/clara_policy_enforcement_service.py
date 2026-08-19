@@ -105,11 +105,22 @@ PERSONAL_PATTERN = re.compile(
 )
 CONCRETE_PROBLEM_PATTERN = re.compile(
     r"\b(rugi|hilang|tidak\s+masuk|belum\s+masuk|terpotong|dibekukan|"
-    r"tidak\s+bisa|bermasalah|kejadian|transaksi|deposit|penarikan|withdraw)\b",
+    r"tidak\s+bisa|bermasalah)\b|"
+    r"\b(?:masalah|kendala|gagal)\b.{0,20}\b"
+    r"(?:transaksi|deposit|penarikan|withdraw)\b|"
+    r"\b(?:transaksi|deposit|penarikan|withdraw)\b.{0,20}\b"
+    r"(?:masalah|kendala|gagal)\b",
     re.IGNORECASE,
 )
 FINANCIAL_LOSS_PATTERN = re.compile(
     r"\b(rugi|kehilangan|dana\s+hilang|saldo\s+berkurang|uang\s+hilang)\b",
+    re.IGNORECASE,
+)
+RISK_FREE_EDUCATION_PATTERN = re.compile(
+    r"\b(?:pasti\s+aman|"
+    r"pasti\s+(?:tidak|tak|nggak|gak|ngga|ga)\s+rugi|"
+    r"(?:tidak|tak|nggak|gak|ngga|ga)\s+(?:mungkin|akan)\s+"
+    r"(?:rugi|hilang|berkurang))\b",
     re.IGNORECASE,
 )
 REFUND_PATTERN = re.compile(
@@ -179,8 +190,9 @@ def classify_safe_handoff_category(
     if HUMAN_REQUEST_PATTERN.search(message):
         return SafeHandoffCategory.HUMAN_REQUEST
 
+    incident_text = RISK_FREE_EDUCATION_PATTERN.sub("", message)
     personal = bool(PERSONAL_PATTERN.search(message))
-    concrete = bool(CONCRETE_PROBLEM_PATTERN.search(message))
+    concrete = bool(CONCRETE_PROBLEM_PATTERN.search(incident_text))
     if not personal:
         return None
     if REFUND_REQUEST_PATTERN.search(message):
@@ -195,7 +207,7 @@ def classify_safe_handoff_category(
         return SafeHandoffCategory.FRAUD_ALLEGATION
     if LEGAL_THREAT_PATTERN.search(message) and concrete:
         return SafeHandoffCategory.LEGAL_OR_REGULATOR_THREAT
-    if FINANCIAL_LOSS_PATTERN.search(message):
+    if FINANCIAL_LOSS_PATTERN.search(incident_text):
         return SafeHandoffCategory.FINANCIAL_LOSS_CLAIM
     if HIGH_EMOTION_PATTERN.search(message) and concrete:
         return SafeHandoffCategory.HIGH_EMOTION

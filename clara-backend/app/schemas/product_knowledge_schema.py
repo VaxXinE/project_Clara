@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ProductKnowledgeCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     category: str = Field(default="general", min_length=1, max_length=100)
-    content: str = Field(min_length=1, max_length=5000)
+    content: str = Field(min_length=1, max_length=50000)
     source_type: str = Field(default="manual_note", min_length=1, max_length=50)
     is_active: bool = True
 
@@ -15,7 +15,7 @@ class ProductKnowledgeCreateRequest(BaseModel):
 class ProductKnowledgeUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     category: str | None = Field(default=None, min_length=1, max_length=100)
-    content: str | None = Field(default=None, min_length=1, max_length=5000)
+    content: str | None = Field(default=None, min_length=1, max_length=50000)
     source_type: str | None = Field(default=None, min_length=1, max_length=50)
     is_active: bool | None = None
 
@@ -40,7 +40,7 @@ class ProductKnowledgeResponse(BaseModel):
 class KnowledgeUpdateProposalUpsertRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     category: str = Field(default="general", min_length=1, max_length=100)
-    proposed_content: str = Field(min_length=1, max_length=5000)
+    proposed_content: str = Field(min_length=1, max_length=50000)
     source_type: str = Field(default="coaching_case", min_length=1, max_length=50)
     rationale: str | None = Field(default=None, min_length=1, max_length=3000)
     status: str = Field(default="draft", min_length=1, max_length=50)

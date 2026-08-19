@@ -1,6 +1,7 @@
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
@@ -11,6 +12,7 @@ from app.core.config import settings
 from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
 from app.models.message import Message
+from app.models.product_knowledge import ProductKnowledge
 from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
 from app.models.user import User
@@ -229,6 +231,42 @@ def test_only_superadmin_can_create_product_knowledge(
     assert payload["title"] == "Knowledge Superadmin"
     assert payload["organization_id"] is None
     assert payload["scope_type"] == "global"
+
+
+def test_superadmin_can_store_50k_and_delete_soft_deactivates_knowledge(
+    client: TestClient,
+    seeded_data: dict[str, object],
+    db_session_factory: sessionmaker,
+) -> None:
+    owner = seeded_data["owner"]
+    login(client, email=owner.email, password="OwnerPass123!")
+    content = "K" * 50_000
+    create_response = client.post(
+        "/product-knowledge",
+        json={
+            "title": "Knowledge panjang",
+            "category": "general",
+            "content": content,
+            "source_type": "manual_note",
+            "is_active": True,
+        },
+        headers=csrf_headers(client),
+    )
+    assert create_response.status_code == 201, create_response.text
+    knowledge_id = create_response.json()["id"]
+
+    delete_response = client.delete(
+        f"/product-knowledge/{knowledge_id}",
+        headers=csrf_headers(client),
+    )
+    assert delete_response.status_code == 204, delete_response.text
+
+    db = db_session_factory()
+    entry = db.get(ProductKnowledge, UUID(knowledge_id))
+    assert entry is not None
+    assert entry.content == content
+    assert entry.is_active is False
+    db.close()
 
 
 def test_sales_can_view_global_product_knowledge_but_cannot_access_marketing_insights(

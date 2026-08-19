@@ -64,6 +64,7 @@ from app.services.clara_policy_enforcement_service import (
 from app.services.clara_safe_handoff_service import build_safe_handoff
 from app.services.clara_complaint_service import create_or_touch_complaint_case
 from app.services.clara_service_routing_service import (
+    CLARA_IDENTITY_OR_APP_COMPARISON_PATTERN,
     ServiceGenerationStrategy,
     ServiceRoute,
     ServiceRoutingMode,
@@ -71,9 +72,8 @@ from app.services.clara_service_routing_service import (
     route_service_message,
 )
 from app.services.clara_support_knowledge_service import (
-    MISSING_SUPPORT_HANDOFF,
-    STATUS_ACCESS_HANDOFF,
     resolve_support_article,
+    safe_support_fallback,
 )
 from app.services.clara_product_fact_service import (
     ProductFactMode,
@@ -103,7 +103,6 @@ from app.services.clara_legacy_behavior_service import (
     build_technical_prompt_shell,
     compose_authority_system_prompt,
 )
-from app.services.official_source_service import get_official_source_entries
 from app.services.policy_engine import decide_reply_action
 from app.services.product_knowledge_service import (
     get_active_product_knowledge_for_organization,
@@ -419,8 +418,17 @@ PRODUCT_VARIANT_DISCOVERY_PATTERN = re.compile(
     r"ada apa aja|ada apa saja|opsinya apa aja|opsinya apa saja|"
     r"produk dari solid|program dari solid|solid punya apa aja|"
     r"mini atau reguler|reguler atau mini|regular atau mini|mini atau regular|"
-    r"pilihan produk|opsi produk|opsi program"
+    r"mini (?:dan|dengan|vs) (?:reguler|regular)|"
+    r"(?:reguler|regular) (?:dan|dengan|vs) mini|"
+    r"pilihan produk|opsi produk|opsi program|"
+    r"belum (?:tahu|tau) (?:mau )?(?:bikin|buat|pilih) akun apa"
     r")\b",
+    re.IGNORECASE,
+)
+
+ACCOUNT_POSITIONING_REQUEST_PATTERN = re.compile(
+    r"\b(?:akun|account)\s+(?:mini|reguler|regular)\b.{0,80}\b"
+    r"(?:apa(?:\s+sih|sih)?|seperti\s+apa|cocok(?:nya)?(?:\s+untuk)?\s+siapa)\b",
     re.IGNORECASE,
 )
 
@@ -508,7 +516,8 @@ CONCRETE_TERMS_PATTERN = re.compile(
 )
 
 LEGALITY_REQUEST_PATTERN = re.compile(
-    r"\b(legal|legalitas|resmi|bappebti|izin|diawasi|pengawasan)\b",
+    r"\b(legal|legalitas|resmi|bappebti|izin|diawasi|pengawasan|"
+    r"ojk|bank indonesia|bbj|kbi|spab|spa|puva|nomor izin|nomor legalitas)\b",
     re.IGNORECASE,
 )
 
@@ -520,8 +529,67 @@ SAFETY_REQUEST_PATTERN = re.compile(
 MECHANISM_REQUEST_PATTERN = re.compile(
     r"\b("
     r"sistem(?:nya)?|cara kerja|mekanisme(?:nya)?|alur(?:nya)?|proses(?:nya)?|tahapan(?:nya)?|"
-    r"margin|spread|lot|leverage|tradingnya gimana|cara trading|pair apa aja|pair apa saja"
+    r"margin|spread|lot|leverage|tradingnya gimana|cara trading|pair apa aja|pair apa saja|"
+    r"jam trading|trading hours?|contract size|ukuran kontrak|fix rate|"
+    r"maks(?:imum)? net open|auto liquidation|call margin|abs level"
     r")\b",
+    re.IGNORECASE,
+)
+
+PRODUCT_COST_REQUEST_PATTERN = re.compile(
+    r"\b("
+    r"storage(?:\s+fee)?|rollover(?:\s+fee)?|swap(?:nya)?|spread(?:nya)?|"
+    r"komisi(?:nya)?|commission(?:nya)?|"
+    r"biaya\s+transaksi|biaya\s+nginep|biaya\s+menginap|overnight\s+fee|"
+    r"margin(?:\s+per\s+lot)?"
+    r")\b",
+    re.IGNORECASE,
+)
+
+PRODUCT_COST_FACT_PATTERNS = (
+    (re.compile(r"\b(storage|rollover|swap|nginep|menginap|overnight)\b", re.I), "trading.storage_fee"),
+    (re.compile(r"\bspread\b", re.I), "trading.spread"),
+    (re.compile(r"\b(komisi|commission|biaya transaksi)\b", re.I), "trading.commission"),
+    (re.compile(r"\bmargin\b", re.I), "trading.margin"),
+)
+
+PROCESS_FACT_PATTERNS = (
+    (
+        re.compile(
+            r"\b(?:website|aplikasi)\b.{0,50}\b(?:daftar|registrasi|pendaftaran)\b|"
+            r"\b(?:daftar|registrasi|pendaftaran)\b.{0,50}\b(?:website|aplikasi)\b",
+            re.I,
+        ),
+        ("process.initial_data",),
+    ),
+    (
+        re.compile(
+            r"\b(?:akun\s+demo|transaksi\s+demo|video\s*call|wpb|wakil\s+pialang)\b",
+            re.I,
+        ),
+        ("process.verification_steps",),
+    ),
+    (
+        re.compile(
+            r"\b(?:dokumen|berkas|ktp|identitas)\b.{0,50}\b(?:daftar|verifikasi|kyc|siapkan)\b|"
+            r"\b(?:daftar|verifikasi|kyc|siapkan)\b.{0,50}\b(?:dokumen|berkas|ktp|identitas)\b",
+            re.I,
+        ),
+        ("process.kyc_requirements",),
+    ),
+)
+
+UNHELPFUL_ANSWER_PATTERN = re.compile(
+    r"\b(?:masih|tetap)\s+(?:belum|tidak|nggak|gak)\s+"
+    r"(?:mengerti|ngerti|paham)\b|"
+    r"\b(?:jawaban|penjelasan)(?:\s+\w+){0,3}\s+"
+    r"(?:belum|tidak|nggak|gak)\s+(?:membantu|jelas)\b",
+    re.IGNORECASE,
+)
+HANDOFF_FOLLOWUP_PATTERN = re.compile(
+    r"\b(masih|tetap|sudah\s+menunggu|makin|jangan\s+arahkan|"
+    r"tunggu\s+di\s+sini|tunggu\s+disini|belum\s+selesai|belum\s+beres|"
+    r"lanjutkan\s+di\s+sini)\b",
     re.IGNORECASE,
 )
 
@@ -561,7 +629,7 @@ CUSTOMER_CHOSE_REGULAR_PATTERN = re.compile(
 CUSTOMER_FOCUS_MINI_PATTERN = re.compile(
     r"\b("
     r"tentang mini|soal mini|mau tanya mini|tanya mini|bahas mini|"
-    r"mini kak|fokus mini|yang mini"
+    r"mini kak|fokus mini|yang mini|akun mini|mini account"
     r")\b",
     re.IGNORECASE,
 )
@@ -571,7 +639,8 @@ CUSTOMER_FOCUS_REGULAR_PATTERN = re.compile(
     r"tentang reguler|tentang regular|soal reguler|soal regular|"
     r"mau tanya reguler|mau tanya regular|tanya reguler|tanya regular|"
     r"bahas reguler|bahas regular|reguler kak|regular kak|"
-    r"fokus reguler|fokus regular|yang reguler|yang regular"
+    r"fokus reguler|fokus regular|yang reguler|yang regular|"
+    r"akun reguler|akun regular|regular account"
     r")\b",
     re.IGNORECASE,
 )
@@ -917,6 +986,8 @@ def infer_latest_customer_intent(latest_customer_message: str) -> str:
     if not message:
         return "general"
 
+    if CLARA_IDENTITY_OR_APP_COMPARISON_PATTERN.search(message):
+        return "service_identity"
     if TRADING_READY_PATTERN.search(message):
         return "trading_ready"
     if ACTIVATION_COMPLETE_PATTERN.search(message):
@@ -929,24 +1000,89 @@ def infer_latest_customer_intent(latest_customer_message: str) -> str:
         return "identity_submission"
     if should_message_ask_product_options(message):
         return "product_options"
-    if LEGALITY_REQUEST_PATTERN.search(message):
-        return "legality"
+    if ACCOUNT_POSITIONING_REQUEST_PATTERN.search(message):
+        return "account_positioning"
+    if SCALPING_REQUEST_PATTERN.search(message):
+        return "setup_scalping"
+    if PRODUCT_COST_REQUEST_PATTERN.search(message):
+        return "product_costs"
     if SAFETY_REQUEST_PATTERN.search(message):
         return "safety"
+    if LEGALITY_REQUEST_PATTERN.search(message):
+        return "legality"
     if MINIMUM_CAPITAL_PATTERN.search(message):
         return "minimum_capital"
     if TIMING_REQUEST_PATTERN.search(message):
         return "timing"
     if STEP_REQUEST_PATTERN.search(message):
         return "next_step"
-    if SCALPING_REQUEST_PATTERN.search(message):
-        return "setup_scalping"
     if MECHANISM_REQUEST_PATTERN.search(message):
         return "mechanism"
     if BEGINNER_REQUEST_PATTERN.search(message):
         return "beginner"
 
     return "general"
+
+
+def get_requested_product_fact_keys(
+    latest_customer_message: str,
+    latest_customer_intent: str,
+) -> tuple[str, ...]:
+    for pattern, fact_keys in PROCESS_FACT_PATTERNS:
+        if pattern.search(latest_customer_message):
+            return fact_keys
+
+    if latest_customer_intent == "product_costs":
+        matched = tuple(
+            fact_key
+            for pattern, fact_key in PRODUCT_COST_FACT_PATTERNS
+            if pattern.search(latest_customer_message)
+        )
+        if matched:
+            return matched
+
+    if latest_customer_intent == "product_options" and re.search(
+        r"\bproduk\b", latest_customer_message, re.I
+    ):
+        return ("account.eligible_products",)
+
+    return {
+        "service_identity": ("process.initial_data",),
+        "identity_submission": (
+            "process.kyc_requirements",
+            "process.verification_steps",
+        ),
+        "verification_complete": (
+            "process.verification_steps",
+            "process.activation_steps",
+        ),
+        "verification_status": ("process.verification_steps",),
+        "activation_complete": ("process.activation_steps",),
+        "next_step": (
+            "process.initial_data",
+            "process.kyc_requirements",
+            "process.verification_steps",
+            "process.activation_steps",
+        ),
+        "timing": ("process.verification_steps",),
+        "minimum_capital": ("account.minimum_opening_amount",),
+        "legality": (
+            "company.regulator",
+            "company.regulatory_status",
+            "company.license_reference",
+        ),
+        "mechanism": (
+            "account.minimum_lot",
+            "account.eligible_products",
+            "account.currency",
+            "trading.margin",
+            "trading.overnight_requirement",
+            "trading.instruments",
+        ),
+    }.get(
+        latest_customer_intent,
+        (),
+    )
 
 
 def infer_customer_subject_focus(message_text: str) -> str | None:
@@ -1026,12 +1162,24 @@ def is_short_faq_customer_message(latest_customer_message: str) -> bool:
 
 def get_intent_guidance(latest_customer_intent: str) -> str:
     guidance_map = {
+        "service_identity": (
+            "- Customer menanyakan identitas Clara atau perbedaannya dengan Aplikasi SOLID.\n"
+            "- Jawab kedua bagian secara langsung memakai knowledge base; jangan alihkan ke petugas hanya karena ada kata aplikasi.\n"
+            "- Jangan menawarkan Mini atau Reguler jika customer belum menanyakannya."
+        ),
         "product_options": (
             "- Customer sedang minta daftar opsi produk/program.\n"
             "- Jawab langsung dengan opsi yang ada di knowledge base.\n"
+            "- Setelah menyebut produk, jelaskan singkat bahwa setiap instrumen tetap memiliki risiko pergerakan harga.\n"
             "- Ringkas per opsi: cocok untuk siapa, positioning, dan minimal jika tersedia.\n"
             "- Kalau kategori akun belum pasti, jangan paksa salah satu opsi.\n"
             "- Jika customer bertanya 'ada apa saja', jawab keduanya dulu; jangan langsung memilih satu produk."
+        ),
+        "account_positioning": (
+            "- Jawab definisi dan kecocokan akun yang ditanyakan, bukan legalitas atau akun lain.\n"
+            "- Untuk Mini: jelaskan nilai transaksi lebih ringan, kecocokan secara bersyarat untuk belajar bertahap, dan risiko leverage/pergerakan harga.\n"
+            "- Untuk Regular: jelaskan kesiapan pengalaman, sistem/kontrol, modal, dan risiko tanpa merendahkan Mini.\n"
+            "- Jangan menyatakan akun pasti cocok dan jangan mengarang angka yang tidak ada di Product Fact aktif."
         ),
         "legality": (
             "- Customer sedang mengecek legalitas/resmi/tata pengawasan.\n"
@@ -1084,11 +1232,20 @@ def get_intent_guidance(latest_customer_intent: str) -> str:
         ),
         "setup_scalping": (
             "- Customer sedang membahas setup/scalping/entry.\n"
-            "- Jawab dengan elemen teknis dasar yang aman untuk pemula: arah market, area entry, batas risiko."
+            "- Jawab dengan elemen teknis dasar yang aman untuk pemula: arah market, area entry, batas risiko.\n"
+            "- Jika yang ditanya stop loss, jelaskan bahwa fungsinya membatasi risiko, bukan menjamin bebas rugi; slippage atau gap tetap mungkin terjadi."
+        ),
+        "product_costs": (
+            "- Jawab tepat komponen biaya atau mekanisme yang ditanyakan, jangan beralih ke modal awal atau pilihan akun.\n"
+            "- Untuk definisi margin, jelaskan sebagai dana jaminan dan bahwa nilainya bergantung pada produk serta akun.\n"
+            "- Untuk definisi spread, jelaskan sebagai selisih bid dan ask yang dapat berubah mengikuti kondisi pasar.\n"
+            "- Jika customer menyebut swap, jawab bahwa Gold tidak menggunakan swap forex; istilah resminya Storage/Rollover Fee. Jangan membuka jawaban dengan 'ada'.\n"
+            "- Kutip angka Product Fact aktif beserta unitnya apa adanya; jangan menghitung total turunan sendiri."
         ),
         "mechanism": (
             "- Customer sedang bertanya sistem, alur, atau cara kerja.\n"
             "- Jawab inti mekanisme dulu secara langsung dan sederhana, lalu baru arahkan lanjut jika perlu.\n"
+            "- Untuk auto liquidation, jelaskan penutupan posisi otomatis dan kutip level equity dari Product Fact aktif jika tersedia.\n"
             "- Jangan berhenti di kalimat abstrak seperti 'ada alurnya'; sebut inti proses yang benar-benar bisa dibayangkan customer."
         ),
         "beginner": (
@@ -1120,6 +1277,9 @@ def get_register_guidance(preferred_reply_register: str) -> str:
 
 def get_answer_shape_guidance(latest_customer_intent: str) -> str:
     shape_map = {
+        "service_identity": (
+            "- Pola jawaban: jelaskan siapa Clara -> bedakan dari Aplikasi SOLID -> sebut bantuan yang dapat diberikan Clara."
+        ),
         "product_options": (
             "- Pola jawaban: pembuka 1 kalimat -> daftar opsi ringkas -> beda inti tiap opsi -> tutup singkat.\n"
             "- Wajib ada pembeda konkret antar opsi, misalnya target user, modal awal, atau pendekatan pendampingan.\n"
@@ -1185,6 +1345,7 @@ def infer_answer_commitment_level(
         return "compare_then_recommend"
 
     if latest_customer_intent in {
+        "service_identity",
         "legality",
         "safety",
         "minimum_capital",
@@ -1242,6 +1403,16 @@ def infer_customer_variant_focus(message_text: str) -> str | None:
         return "compare_all"
 
     return None
+
+
+def resolve_response_account_category(
+    account_category: str | None,
+    latest_customer_message: str,
+) -> str | None:
+    requested_category = infer_customer_variant_focus(latest_customer_message)
+    if requested_category in {"mini", "reguler"}:
+        return requested_category
+    return account_category
 
 
 def customer_is_already_post_signup_or_deposit(latest_customer_message: str) -> bool:
@@ -1364,11 +1535,9 @@ def get_conversation_customer_variant_focus(conversation: Conversation) -> str |
         if current_focus is None:
             continue
         if current_focus == "compare_all":
-            return "compare_all"
-        if focus is None:
-            focus = current_focus
-        elif focus != current_focus:
-            return "compare_all"
+            focus = "compare_all"
+            continue
+        focus = current_focus
 
     return focus
 
@@ -1500,6 +1669,7 @@ def infer_latency_profile(
         "safety",
         "minimum_capital",
         "beginner",
+        "product_costs",
     }:
         return "ultra_fast"
 
@@ -2014,6 +2184,11 @@ def _score_knowledge_entry(
         elif term in searchable_fields:
             score += 3
 
+    if latest_customer_intent == "service_identity" and (
+        "clara" in searchable_fields and "aplikasi solid" in searchable_fields
+    ):
+        score += 40
+
     if latest_customer_intent == "product_options":
         if _classify_product_variant(category, title, content):
             score += 18
@@ -2021,6 +2196,14 @@ def _score_knowledge_entry(
             score += 16
         if "position" in searchable_fields or "minimum" in searchable_fields:
             score += 4
+
+    if latest_customer_intent == "account_positioning":
+        requested_variant = infer_customer_variant_focus(latest_customer_message)
+        entry_variant = _classify_product_variant(category, title, content)
+        if entry_variant and entry_variant == requested_variant:
+            score += 30
+        if "position" in searchable_fields or "cocok" in searchable_fields:
+            score += 14
 
     if latest_customer_intent == "legality" and LEGALITY_REQUEST_PATTERN.search(
         searchable_fields
@@ -2051,6 +2234,14 @@ def _score_knowledge_entry(
         score += 12
         if category in {"faq", "product_reference", "handoff"}:
             score += 14
+
+    if (
+        latest_customer_intent == "product_costs"
+        and PRODUCT_COST_REQUEST_PATTERN.search(searchable_fields)
+    ):
+        score += 20
+        if category == "product_reference":
+            score += 20
 
     if latest_customer_intent == "setup_scalping" and SCALPING_REQUEST_PATTERN.search(
         searchable_fields
@@ -2229,6 +2420,19 @@ def build_required_fact_brief(
             facts.extend(mechanism_lines[:3])
             return "\n".join(facts)
 
+    if latest_customer_intent == "product_costs":
+        cost_lines = [
+            line
+            for line in knowledge_lines
+            if PRODUCT_COST_REQUEST_PATTERN.search(line)
+        ]
+        facts.append(
+            "- Jawab topik biaya yang ditanyakan secara langsung. Sebut angka hanya "
+            "jika Product Fact aktif menyediakannya; selain itu jelaskan konsepnya."
+        )
+        facts.extend(cost_lines[:2])
+        return "\n".join(facts)
+
     facts.append(
         "- Gunakan hanya fakta paling relevan dari knowledge base yang sudah diprioritaskan."
     )
@@ -2238,7 +2442,8 @@ def build_required_fact_brief(
 
 def should_message_ask_product_options(latest_customer_message: str) -> bool:
     return bool(
-        re.search(
+        PRODUCT_VARIANT_DISCOVERY_PATTERN.search(latest_customer_message)
+        or re.search(
             r"\b("
             r"produk apa saja|produk apa aja|program apa saja|program apa aja|"
             r"tipe tipe produk|tipe-tipe produk|tipe produk|"
@@ -2787,16 +2992,17 @@ def build_grounded_knowledge_context(
 ) -> tuple[str, str]:
     include_all_variants = should_include_all_product_variants(conversation)
     account_category = conversation.lead.account_category if conversation.lead else None
+    account_category = resolve_response_account_category(
+        account_category,
+        latest_customer_message,
+    )
     entries = get_active_product_knowledge_for_organization(
         db=db,
         organization_id=conversation.organization_id,
         account_category=account_category,
         include_all_variants=include_all_variants,
     )
-    official_entries = get_official_source_entries()
-    combined_entries = [*entries, *official_entries]
-
-    if not combined_entries:
+    if not entries:
         fallback = (
             "- Tidak ada knowledge base produk yang tersimpan.\n"
             "- Untuk detail harga, promo, legalitas, refund, garansi, atau klaim hasil:"
@@ -2805,9 +3011,7 @@ def build_grounded_knowledge_context(
         )
         return fallback, "- Tidak ada fakta prioritas yang cocok."
 
-    serialized_entries = tuple(
-        _serialize_knowledge_entry(entry) for entry in combined_entries
-    )
+    serialized_entries = tuple(_serialize_knowledge_entry(entry) for entry in entries)
 
     return _build_cached_grounded_knowledge_context(
         serialized_entries=serialized_entries,
@@ -2970,6 +3174,41 @@ def get_previous_customer_message(conversation: Conversation) -> str:
     return customer_messages[-2]
 
 
+def should_handoff_after_repeated_unhelpful_answers(
+    conversation: Conversation,
+) -> bool:
+    customer_messages = [
+        message.message_text.strip()
+        for message in conversation.messages
+        if message.sender_type == "customer" and message.message_text.strip()
+    ]
+    return len(customer_messages) >= 3 and all(
+        UNHELPFUL_ANSWER_PATTERN.search(message)
+        for message in customer_messages[-3:]
+    )
+
+
+def get_effective_service_routing_message(conversation: Conversation) -> str:
+    latest_message = get_latest_customer_message(conversation)
+    if not latest_message:
+        return ""
+    if should_handoff_after_repeated_unhelpful_answers(conversation):
+        return f"{latest_message} Tolong sambungkan ke petugas manusia."
+
+    current_decision = route_service_message(latest_message)
+    if current_decision.requires_human:
+        return latest_message
+
+    previous_message = get_previous_customer_message(conversation)
+    if (
+        previous_message
+        and HANDOFF_FOLLOWUP_PATTERN.search(latest_message)
+        and route_service_message(previous_message).requires_human
+    ):
+        return f"{previous_message}\n{latest_message}"
+    return latest_message
+
+
 def should_avoid_product_variant_locking(conversation: Conversation) -> bool:
     latest_customer_message = get_latest_customer_message(conversation)
     normalized_category = normalize_account_category(
@@ -2988,6 +3227,13 @@ def should_avoid_product_variant_locking(conversation: Conversation) -> bool:
 def should_answer_with_product_options(conversation: Conversation) -> bool:
     latest_customer_message = get_latest_customer_message(conversation)
     if not latest_customer_message:
+        return False
+
+    if re.search(
+        r"\b(?:produk|instrumen)\s+apa\s+(?:saja|aja)\b",
+        latest_customer_message,
+        re.IGNORECASE,
+    ):
         return False
 
     return should_message_ask_product_options(latest_customer_message)
@@ -3441,6 +3687,313 @@ def response_uses_vague_legality_deflection(
     )
 
 
+def response_lacks_legality_risk_boundary(
+    text: str,
+    latest_customer_intent: str,
+) -> bool:
+    if latest_customer_intent != "legality":
+        return False
+
+    normalized = _compact_whitespace(text)
+    return not bool(
+        re.search(
+            r"\b(?:legal(?:itas)?|resmi|izin|diawasi)\b.{0,100}"
+            r"\b(?:tidak|bukan|nggak|gak)\b.{0,60}"
+            r"\b(?:jaminan?|menjamin|menghilangkan|menghapus|membuat)\b.{0,60}"
+            r"\b(?:aman|untung|profit|risiko|resiko|rugi|kerugian)\b|"
+            r"\b(?:trading|transaksi)\b.{0,40}\b(?:tetap|masih)\b.{0,30}"
+            r"\b(?:berisiko|risiko|resiko|rugi|kerugian)\b",
+            normalized,
+            re.IGNORECASE,
+        )
+    )
+
+
+def _response_contains_number(text: str, value: int | float) -> bool:
+    normalized = text.replace(",", ".")
+    number = f"{value:g}" if isinstance(value, float) else str(value)
+    return bool(re.search(rf"(?<![\d.]){re.escape(number)}(?![\d.])", normalized))
+
+
+def response_ignores_requested_product_fact(
+    text: str,
+    latest_customer_message: str,
+    requested_product_fact_values: dict[str, object],
+) -> bool:
+    normalized = _compact_whitespace(text)
+    message = _compact_whitespace(latest_customer_message)
+
+    eligible_products = requested_product_fact_values.get("account.eligible_products")
+    if isinstance(eligible_products, list) and re.search(r"\bproduk\b", message, re.I):
+        aliases = {
+            "XUL10": r"\b(?:xul10|gold|emas)\b",
+            "BCO10_BBJ": r"\b(?:bco10_bbj|brent\s+oil)\b",
+        }
+        missing_product = any(
+            not re.search(aliases.get(str(product), re.escape(str(product))), normalized, re.I)
+            for product in eligible_products
+        )
+        missing_risk = not re.search(
+            r"\b(?:berisiko|risiko|resiko|rugi|kerugian|fluktuasi|volatilitas)\b|"
+            r"\bharga\b.{0,30}\b(?:berubah|naik|turun|bergerak)\b",
+            normalized,
+            re.I,
+        )
+        return missing_product or missing_risk
+
+    margin_fact = requested_product_fact_values.get("trading.margin")
+    if isinstance(margin_fact, dict) and re.search(
+        r"\b(?:auto\s+liquidation|likuidasi\s+otomatis|abs(?:\s+level)?)\b",
+        message,
+        re.I,
+    ):
+        level = margin_fact.get("auto_liquidation_level_percent")
+        if isinstance(level, (int, float)):
+            has_definition = bool(
+                re.search(r"\b(?:penutupan|menutup)\b.{0,40}\bposisi\b", normalized, re.I)
+            )
+            return not bool(
+                has_definition
+                and re.search(r"\b(?:equity|ekuitas)\b", normalized, re.I)
+                and _response_contains_number(normalized, level)
+            )
+
+    if isinstance(margin_fact, dict) and re.search(r"\bmargin\b", message, re.I):
+        if re.search(r"\b(?:apa|maksud|pengertian)\b", message, re.I):
+            return not bool(
+                re.search(r"\bdana\s+jaminan\b", normalized, re.I)
+                and re.search(r"\b(?:produk|akun|account)\b", normalized, re.I)
+            )
+
+    spread_fact = requested_product_fact_values.get("trading.spread")
+    if isinstance(spread_fact, dict) and re.search(r"\bspread\b", message, re.I):
+        if re.search(r"\b(?:apa|maksud|pengertian)\b", message, re.I):
+            return not bool(
+                re.search(r"\b(?:bid|harga\s+beli)\b", normalized, re.I)
+                and re.search(r"\b(?:ask|harga\s+jual)\b", normalized, re.I)
+                and re.search(
+                    r"\b(?:berubah|dinamis|kondisi\s+pasar|likuiditas|volatilitas)\b",
+                    normalized,
+                    re.I,
+                )
+            )
+        requested_product = next(
+            (
+                (code, details)
+                for code, details in spread_fact.items()
+                if re.search(rf"\b{re.escape(str(code))}\b", message, re.I)
+            ),
+            None,
+        )
+        if requested_product:
+            _, details = requested_product
+            if isinstance(details, dict) and details.get("minimum") is not None:
+                unit = str(details.get("unit", ""))
+                required_unit_terms = [
+                    term
+                    for term in ("troy ounce", "pips", "barrel")
+                    if term in unit.lower()
+                ]
+                return not bool(
+                    _response_contains_number(normalized, details["minimum"])
+                    and all(term in normalized.lower() for term in required_unit_terms)
+                    and re.search(r"\b(?:sisi|side)\b", normalized, re.I)
+                )
+
+    commission_fact = requested_product_fact_values.get("trading.commission")
+    if isinstance(commission_fact, dict) and re.search(
+        r"\b(?:komisi|commission)\b", message, re.I
+    ):
+        amount = commission_fact.get("amount_usd")
+        per_lot = commission_fact.get("per_lot")
+        vat = commission_fact.get("vat_percent")
+        if all(isinstance(value, (int, float)) for value in (amount, per_lot, vat)):
+            derived_total = float(amount) * (1 + float(vat) / 100)
+            return bool(
+                not _response_contains_number(normalized, amount)
+                or not _response_contains_number(normalized, per_lot)
+                or not _response_contains_number(normalized, vat)
+                or _response_contains_number(normalized, derived_total)
+            )
+
+    storage_fact = requested_product_fact_values.get("trading.storage_fee")
+    if isinstance(storage_fact, dict) and re.search(r"\bswap\b", message, re.I):
+        uses_official_term = bool(
+            re.search(r"\b(?:storage|rollover)(?:\s+fee)?\b", normalized, re.I)
+        )
+        denies_forex_swap = bool(
+            re.search(
+                r"\b(?:tidak|nggak|gak|bukan)\b.{0,30}\bswap(?:\s+forex)?\b|"
+                r"\bswap(?:\s+forex)?\b.{0,20}\b(?:tidak|nggak|gak|bukan)\b",
+                normalized,
+                re.I,
+            )
+        )
+        contradictory_opening = bool(
+            re.search(r"^\s*(?:ada|iya|ya)\s*(?:[,.;]|$)", normalized, re.I)
+            or re.search(r"\bada\s+(?:biaya\s+)?swap\b", normalized, re.I)
+        )
+        return contradictory_opening or not (uses_official_term and denies_forex_swap)
+
+    registration_fact = requested_product_fact_values.get("process.initial_data")
+    if isinstance(registration_fact, dict) and re.search(
+        r"\b(?:daftar|registrasi|pendaftaran)\b",
+        latest_customer_message,
+        re.I,
+    ):
+        app_only = (
+            registration_fact.get("internal_registration_channel")
+            == "official_mobile_app_only"
+            and registration_fact.get("website_registration_available") is False
+        )
+        if app_only:
+            mentions_app = bool(re.search(r"\b(?:aplikasi|solid)\b", normalized, re.I))
+            closes_website = bool(
+                re.search(
+                    r"\b(?:website|situs)\b.{0,35}\b(?:tidak|nggak|gak)\b"
+                    r".{0,20}\b(?:bisa|tersedia|digunakan|dipakai)\b",
+                    normalized,
+                    re.I,
+                )
+            )
+            contradicts = bool(
+                re.search(
+                    r"\b(?:belum bisa dipastikan|masih perlu dikonfirmasi|"
+                    r"belum konsisten|bisa melalui website|website masih bisa)\b",
+                    normalized,
+                    re.I,
+                )
+            )
+            return contradicts or not (mentions_app and closes_website)
+
+    fact = requested_product_fact_values.get("process.verification_steps")
+    if not isinstance(fact, dict):
+        return False
+
+    method_requested = bool(re.search(r"\bvideo\s*call\b", message, re.I))
+    role_requested = bool(
+        re.search(r"\b(?:wpb|wakil\s+pialang(?:\s+berjangka)?)\b", message, re.I)
+    )
+    method_active = str(fact.get("verification_method", "")).lower() == "video_call"
+    role_active = bool(
+        re.search(
+            r"\b(?:wpb|wakil\s+pialang(?:\s+berjangka)?)\b",
+            str(fact.get("verification_role", "")),
+            re.I,
+        )
+    )
+    method_denied = bool(
+        re.search(
+            r"\b(?:tidak|nggak|gak|belum\s+tentu)(?:\s+\w+){0,3}\s+"
+            r"(?:harus\s+)?video\s*call\b|"
+            r"\bvideo\s*call\b(?:\s+\w+){0,3}\s+"
+            r"\b(?:tidak|nggak|gak|belum\s+tentu)\b",
+            normalized,
+            re.I,
+        )
+    )
+    role_denied = bool(
+        re.search(
+            r"\b(?:tidak|nggak|gak|bukan)(?:\s+\w+){0,3}\s+"
+            r"(?:wpb|wakil\s+pialang(?:\s+berjangka)?)\b",
+            normalized,
+            re.I,
+        )
+    )
+    demo_requested = bool(
+        re.search(r"\b(?:akun\s+demo|transaksi(?:\s+di\s+akun)?\s+demo)\b", message, re.I)
+    )
+    demo_count = fact.get("demo_transactions_required_before_real_account")
+    demo_denied = bool(
+        re.search(
+            r"\b(?:tidak|nggak|gak)\s+wajib\b|\b(?:tidak|nggak|gak)\s+perlu\b",
+            normalized,
+            re.I,
+        )
+    )
+    demo_count_missing = bool(
+        demo_requested
+        and isinstance(demo_count, int)
+        and not re.search(
+            rf"\b(?:{demo_count}|{'dua' if demo_count == 2 else demo_count})\b",
+            normalized,
+            re.I,
+        )
+    )
+    return bool(
+        method_requested
+        and method_active
+        and (method_denied or not re.search(r"\bvideo\s*call\b", normalized, re.I))
+    ) or bool(
+        role_requested
+        and role_active
+        and (
+            role_denied
+            or not re.search(
+                r"\b(?:wpb|wakil\s+pialang(?:\s+berjangka)?)\b",
+                normalized,
+                re.I,
+            )
+        )
+    ) or bool(
+        demo_requested
+        and isinstance(demo_count, int)
+        and (demo_denied or demo_count_missing)
+    )
+
+
+def build_requested_product_fact_fallback(
+    *,
+    latest_customer_message: str,
+    account_category: str | None,
+    requested_product_fact_values: dict[str, object],
+) -> str | None:
+    message = _compact_whitespace(latest_customer_message)
+    eligible_products = requested_product_fact_values.get("account.eligible_products")
+    if eligible_products and isinstance(eligible_products, list) and re.search(
+        r"\b(?:produk|instrumen)\s+apa\s+(?:saja|aja)\b",
+        message,
+        re.IGNORECASE,
+    ):
+        labels = {
+            "XUL10": "XUL10 (Gold/Emas)",
+            "BCO10_BBJ": "BCO10_BBJ (Brent Oil)",
+        }
+        products = " dan ".join(
+            labels.get(str(product), str(product)) for product in eligible_products
+        )
+        return (
+            f"Produk aktif yang bisa dipelajari adalah {products}. "
+            "Setiap instrumen tetap memiliki risiko karena harga dapat bergerak."
+        )
+
+    commission = requested_product_fact_values.get("trading.commission")
+    if isinstance(commission, dict) and re.search(
+        r"\b(?:komisi|commission)\b", message, re.IGNORECASE
+    ):
+        amount = commission.get("amount_usd")
+        per_lot = commission.get("per_lot")
+        vat = commission.get("vat_percent")
+        if all(isinstance(value, (int, float)) for value in (amount, per_lot, vat)):
+            resolved_category = resolve_response_account_category(
+                account_category,
+                latest_customer_message,
+            )
+            account_label = {
+                "mini": "akun Mini",
+                "reguler": "akun Regular",
+            }.get(resolved_category, "akun ini")
+            amount_text = f"{float(amount):g}".replace(".", ",")
+            per_lot_text = f"{float(per_lot):g}".replace(".", ",")
+            vat_text = f"{float(vat):g}".replace(".", ",")
+            return (
+                f"Komisi {account_label} adalah USD {amount_text} per "
+                f"{per_lot_text} lot + PPN {vat_text}%."
+            )
+
+    return None
+
+
 def response_mentions_variant_not_in_grounding(
     text: str,
     product_option_summary: str,
@@ -3689,10 +4242,18 @@ def response_lacks_concrete_detail(
 def response_misses_latest_customer_intent(
     text: str,
     latest_customer_intent: str,
+    latest_customer_message: str = "",
 ) -> bool:
     normalized = _compact_whitespace(text)
     if not normalized:
         return True
+
+    if latest_customer_intent == "service_identity":
+        return not bool(
+            re.search(r"\bclara\b", normalized, re.I)
+            and re.search(r"\baplikasi\s+solid(?:\s+prime)?\b", normalized, re.I)
+            and re.search(r"\b(?:beda|berbeda|bukan|tidak\s+sama)\b", normalized, re.I)
+        )
 
     if latest_customer_intent == "product_options":
         lowered = normalized.lower()
@@ -3703,6 +4264,41 @@ def response_misses_latest_customer_intent(
                 re.I,
             )
         )
+
+    if latest_customer_intent == "account_positioning":
+        requested_variant = infer_customer_variant_focus(latest_customer_message)
+        variant_pattern = (
+            r"\bmini\b"
+            if requested_variant == "mini"
+            else r"\b(?:regular|reguler)\b"
+        )
+        has_positioning = bool(
+            re.search(
+                r"\b(?:cocok|ditujukan|kesiapan|pemula|pengalaman|modal|"
+                r"belajar|lebih ringan)\b",
+                normalized,
+                re.I,
+            )
+        )
+        has_risk = bool(
+            re.search(
+                r"\b(?:berisiko|risiko|resiko|rugi|kerugian)\b",
+                normalized,
+                re.I,
+            )
+        )
+        if not (
+            re.search(variant_pattern, normalized, re.I)
+            and has_positioning
+            and has_risk
+        ):
+            return True
+        if requested_variant == "reguler":
+            return not bool(
+                re.search(r"\b(?:sistem|kontrol|risk management)\b", normalized, re.I)
+                and re.search(r"\b(?:modal|dana|nominal)\b", normalized, re.I)
+            )
+        return False
 
     if latest_customer_intent == "legality":
         return not bool(
@@ -3798,6 +4394,9 @@ def response_misses_latest_customer_intent(
             )
         )
 
+    if latest_customer_intent == "product_costs":
+        return not bool(PRODUCT_COST_REQUEST_PATTERN.search(normalized))
+
     if latest_customer_intent == "mechanism":
         return not bool(
             re.search(
@@ -3838,10 +4437,12 @@ def response_starts_too_generic(
         return True
 
     keyword_checks = {
+        "service_identity": r"\b(clara|aplikasi\s+solid)\b",
         "product_options": r"\b(mini|regular|reguler|opsi|produk)\b",
         "legality": r"\b(legal|legalitas|resmi|bappebti|diawasi)\b",
         "safety": r"\b(aman|risiko|rugi)\b",
         "minimum_capital": r"\b(minimal|minimum|modal|deposit|rp)\b",
+        "product_costs": r"\b(storage|rollover|swap|spread|komisi|commission|margin|biaya)\b",
         "verification_status": r"\b(status|verifikasi|onboarding|langkah berikutnya)\b",
         "verification_complete": r"\b(verifikasi|onboarding|aktivasi|selanjutnya|langkah berikutnya)\b",
         "activation_complete": r"\b(aktivasi|penggunaan|platform|mulai|langkah berikutnya)\b",
@@ -3918,6 +4519,10 @@ def call_openai_for_reply_suggestion(
     if not settings.openai_api_key:
         raise ReplySuggestionError("OPENAI_API_KEY is not configured.")
 
+    account_category = resolve_response_account_category(
+        account_category,
+        latest_customer_message,
+    )
     total_started_at = perf_counter()
     client = OpenAI(api_key=settings.openai_api_key)
     reply_model = get_reply_generation_model(
@@ -3944,19 +4549,14 @@ def call_openai_for_reply_suggestion(
     )
     persona_authority_mode = PersonaAuthorityMode(mode_resolution.canonical_value)
     product_fact_mode_resolution = normalize_product_fact_mode(
-        runtime_mode_overrides.get("product_fact_mode", settings.clara_product_fact_mode)
+        runtime_mode_overrides.get(
+            "product_fact_mode", settings.clara_product_fact_mode
+        )
     )
     product_fact_mode = product_fact_mode_resolution.mode
-    requested_fact_keys = {
-        "minimum_capital": ("account.minimum_opening_amount",),
-        "legality": ("company.regulator", "company.regulatory_status"),
-    }.get(
+    requested_fact_keys = get_requested_product_fact_keys(
+        latest_customer_message,
         latest_customer_intent,
-        (
-            "account.minimum_opening_amount",
-            "company.regulator",
-            "company.regulatory_status",
-        ),
     )
     product_fact_composition = compose_product_fact_prompt(
         db,
@@ -3966,11 +4566,6 @@ def call_openai_for_reply_suggestion(
         legacy_content=build_legacy_product_fact_injection(account_category),
         fact_keys=requested_fact_keys,
     )
-    if product_fact_mode == ProductFactMode.REGISTRY:
-        grounded_knowledge = product_fact_composition.content
-        prioritized_knowledge_brief = product_fact_composition.content
-        product_option_summary = product_fact_composition.content
-        response_playbook = ""
     available_system_sections = frozenset(
         section.section_key
         for section in playbook_composition.system_sections
@@ -4208,6 +4803,9 @@ def call_openai_for_reply_suggestion(
             for key, value in product_fact_composition.validator_fact_values.items()
             if key == "account.minimum_opening_amount" and isinstance(value, int)
         ),
+        requested_product_fact_values=dict(
+            product_fact_composition.validator_fact_values
+        ),
         capabilities=ReplyValidationCapabilities(
             customer_is_verified=customer_has_verification_completion,
             account_is_active=(
@@ -4329,20 +4927,50 @@ def call_openai_for_reply_suggestion(
             _normalize_reply_payload(retry_json)
         )
         retried_text = retried_payload.suggested_replies[0].text
-        retry_validation_report = None
-        if semantic_revalidation_mode == SemanticRevalidationMode.OBSERVE:
-            try:
-                retry_validation_report = evaluate_reply(
-                    retried_text, validation_context
+        retry_evaluation = None
+        try:
+            retry_evaluation = evaluate_reply(retried_text, validation_context)
+            if (
+                "missing_requested_product_fact"
+                in retry_evaluation.failed_validator_ids
+            ):
+                fact_fallback = build_requested_product_fact_fallback(
+                    latest_customer_message=latest_customer_message,
+                    account_category=account_category,
+                    requested_product_fact_values=(
+                        validation_context.requested_product_fact_values
+                    ),
                 )
-            except Exception:
-                reply_logger.exception(
-                    "reply_semantic_revalidation_observation_failed",
-                    extra={
-                        **generation_authority_metadata,
-                        "retry_used": True,
-                    },
-                )
+                if fact_fallback:
+                    suggested_replies = list(retried_payload.suggested_replies)
+                    suggested_replies[0] = suggested_replies[0].model_copy(
+                        update={
+                            "text": fact_fallback,
+                            "reasoning": "Jawaban dikoreksi memakai Product Fact aktif.",
+                        }
+                    )
+                    retried_payload = retried_payload.model_copy(
+                        update={"suggested_replies": suggested_replies}
+                    )
+                    retried_text = fact_fallback
+                    retry_evaluation = evaluate_reply(
+                        retried_text,
+                        validation_context,
+                    )
+        except Exception:
+            reply_logger.exception(
+                "reply_retry_validation_failed",
+                extra={
+                    **generation_authority_metadata,
+                    "retry_used": True,
+                },
+            )
+
+        retry_validation_report = (
+            retry_evaluation
+            if semantic_revalidation_mode == SemanticRevalidationMode.OBSERVE
+            else None
+        )
         repair_validation_report = (
             retry_validation_report
             if retry_used_plain_json_fallback and retry_validation_report
@@ -4532,11 +5160,16 @@ def create_reply_suggestion(
     service_routing_mode = normalize_service_routing_mode(
         runtime_profile.get("service_routing_mode", settings.clara_service_routing_mode)
     )
-    service_routing_decision = route_service_message(latest_customer_message)
+    effective_service_routing_message = get_effective_service_routing_message(
+        conversation
+    )
+    service_routing_decision = route_service_message(
+        effective_service_routing_message
+    )
     preliminary_enforcement_decision = decide_enforcement(
         legacy_policy_action=policy_decision.action_mode,
         policy_risk_level=extraction.risk_level,
-        latest_customer_message=latest_customer_message,
+        latest_customer_message=effective_service_routing_message,
     )
     previous_customer_message = get_previous_customer_message(conversation)
     latest_sales_message = get_latest_sales_message(conversation)
@@ -4641,13 +5274,16 @@ def create_reply_suggestion(
     shadow_error_code = None
     shadow_duration_ms = 0.0
     if not skip_normal_generation:
+
         def generate(profile):
             return call_openai_for_reply_suggestion(
                 conversation_text=conversation_text,
                 extraction=extraction,
                 action_mode=policy_decision.action_mode,
                 grounded_knowledge=grounded_knowledge,
-                account_category=conversation.lead.account_category if conversation.lead else None,
+                account_category=conversation.lead.account_category
+                if conversation.lead
+                else None,
                 include_all_variants=include_all_variants,
                 latest_customer_message=latest_customer_message,
                 latest_sales_message=latest_sales_message,
@@ -4697,7 +5333,9 @@ def create_reply_suggestion(
     if reply_data is not None and enforcement_mode != PolicyEnforcementMode.OFF:
         try:
             enforcement_fact_mode = normalize_product_fact_mode(
-                runtime_profile.get("product_fact_mode", settings.clara_product_fact_mode)
+                runtime_profile.get(
+                    "product_fact_mode", settings.clara_product_fact_mode
+                )
             ).mode
             enforcement_fact_composition = compose_product_fact_prompt(
                 db,
@@ -4756,7 +5394,9 @@ def create_reply_suggestion(
     )
     if canary_bundle_mismatch:
         critical_validator_ids = tuple(
-            dict.fromkeys((*critical_validator_ids, "certification_bundle_hash_mismatch"))
+            dict.fromkeys(
+                (*critical_validator_ids, "certification_bundle_hash_mismatch")
+            )
         )
     if shadow_bundle_mismatch:
         shadow_reply_data = None
@@ -4765,7 +5405,7 @@ def create_reply_suggestion(
     enforcement_decision = decide_enforcement(
         legacy_policy_action=policy_decision.action_mode,
         policy_risk_level=extraction.risk_level,
-        latest_customer_message=latest_customer_message,
+        latest_customer_message=effective_service_routing_message,
         critical_validator_ids=critical_validator_ids,
         warning_validator_ids=warning_validator_ids,
         validation_unavailable=validation_unavailable,
@@ -4787,7 +5427,10 @@ def create_reply_suggestion(
             f"service_routing:{reason}"
             for reason in service_routing_decision.reason_codes
         )
-        if service_routing_decision.generation_strategy == ServiceGenerationStrategy.NO_CUSTOMER_DRAFT:
+        if (
+            service_routing_decision.generation_strategy
+            == ServiceGenerationStrategy.NO_CUSTOMER_DRAFT
+        ):
             approval_status = "blocked"
             applied_action_mode = ActionMode.BLOCK.value
             model_name = "backend-service-boundary-v1"
@@ -4820,11 +5463,11 @@ def create_reply_suggestion(
                 organization_id=conversation.organization_id,
             )
             content = (
-                STATUS_ACCESS_HANDOFF
-                if service_routing_decision.support_topic.value == "STATUS_REQUEST"
-                else article.content
+                article.content
                 if article
-                else MISSING_SUPPORT_HANDOFF
+                else safe_support_fallback(
+                    service_routing_decision.support_topic.value
+                )
             )
             suggested_replies = [
                 {
@@ -5026,7 +5669,10 @@ def create_reply_suggestion(
             )
         )
         if should_hard_stop:
-            if rollout_decision.generation_lane == GenerationLane.CANARY_CANDIDATE.value:
+            if (
+                rollout_decision.generation_lane
+                == GenerationLane.CANARY_CANDIDATE.value
+            ):
                 suggestion.approval_status = "blocked"
                 suggestion.persona_bundle_metadata = {
                     **suggestion.persona_bundle_metadata,

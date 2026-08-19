@@ -86,6 +86,22 @@ VALIDATOR_RULES = (
         "legality_answer_deflected",
     ),
     ValidatorRule(
+        "missing_legality_risk_boundary",
+        "legality",
+        ValidatorAuthorityOwner.GUARDRAIL,
+        "HIGH",
+        RetryInstructionType.PERSONA_SECTION_REFERENCE,
+        "state_that_legal_status_does_not_remove_trading_loss_risk",
+    ),
+    ValidatorRule(
+        "missing_requested_product_fact",
+        "grounding",
+        ValidatorAuthorityOwner.PRODUCT_FACT,
+        "HIGH",
+        RetryInstructionType.TECHNICAL_CORRECTION,
+        "requested_active_product_fact_not_used",
+    ),
+    ValidatorRule(
         "unsupported_fixed_sensitive_number",
         "grounding",
         ValidatorAuthorityOwner.PRODUCT_FACT,
@@ -354,13 +370,14 @@ LEGACY_RETRY_FRAGMENTS = (
             {
                 "missing_legality_authority",
                 "vague_legality_deflection",
+                "missing_legality_risk_boundary",
                 "unsupported_fixed_sensitive_number",
             }
         ),
         (
             "Untuk legalitas dan angka sensitif, gunakan hanya fakta yang tersedia di "
-            "grounding; jangan mengarang detail atau mengganti jawaban dengan defleksi "
-            "kabur."
+            "grounding; tegaskan bahwa legalitas tidak menghapus risiko, jangan mengarang "
+            "detail atau mengganti jawaban dengan defleksi kabur."
         ),
     ),
 )

@@ -62,7 +62,7 @@ _TEMPLATES = {
     ),
     SafeHandoffCategory.HUMAN_REQUEST: (
         "Baik, permintaan untuk ditangani oleh petugas akan saya teruskan ke "
-        "tim yang tepat. Mohon tunggu tindak lanjut melalui kanal resmi dan "
+        "tim yang tepat. Mohon tunggu tindak lanjut di percakapan ini dan "
         "jangan mengirim password, OTP, atau data akses akun melalui chat."
     ),
     SafeHandoffCategory.HIGH_EMOTION: (

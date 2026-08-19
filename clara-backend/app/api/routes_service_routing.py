@@ -59,16 +59,15 @@ def list_support_knowledge(
         require_roles("sales", "manager", "head", "superadmin")
     ),
 ):
-    stmt = (
-        select(SupportKnowledgeArticle)
-        .where(
+    stmt = select(SupportKnowledgeArticle)
+    if normalize_role(current_user.role) != "superadmin":
+        stmt = stmt.where(
             or_(
                 SupportKnowledgeArticle.organization_id == current_user.organization_id,
                 SupportKnowledgeArticle.organization_id.is_(None),
             )
         )
-        .order_by(SupportKnowledgeArticle.updated_at.desc())
-    )
+    stmt = stmt.order_by(SupportKnowledgeArticle.updated_at.desc())
     if normalize_role(current_user.role) == "sales":
         stmt = stmt.where(
             SupportKnowledgeArticle.lifecycle_status == "ACTIVE",

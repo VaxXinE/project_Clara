@@ -132,7 +132,10 @@ _SECURITY = re.compile(
     r"\b(password|kata\s+sandi|otp|pin|kode\s+verifikasi|akun\s+dibajak)\b", re.I
 )
 _STATUS = re.compile(
-    r"\b(?:status|sudah|belum)\b.{0,30}\b(?:verifikasi|verified|aktivasi|withdraw|penarikan|deposit)\b|\b(?:verifikasi|verified|aktivasi|withdraw|penarikan|deposit)\b.{0,30}\b(?:status|sudah|belum|cek)\b",
+    r"\b(?:cek|periksa|lihat|bagaimana|gimana|status(?:nya)?|apakah)\b"
+    r".{0,40}\b(?:verifikasi|verified|aktivasi|withdraw|penarikan|deposit)\b|"
+    r"\b(?:verifikasi|verified|aktivasi|withdraw|penarikan|deposit)\b"
+    r".{0,40}\b(?:status(?:nya)?|sudah\s+belum|belum\s*\?|tolong\s+cek)\b",
     re.I,
 )
 _CS_PATTERNS: tuple[tuple[SupportTopic, re.Pattern[str]], ...] = (
@@ -175,7 +178,11 @@ _CS_PATTERNS: tuple[tuple[SupportTopic, re.Pattern[str]], ...] = (
     ),
 )
 _COMPLIANCE = re.compile(
-    r"\b(legal|legalitas|izin|bappebti|regulator|risiko|risk|aturan|refund policy|kebijakan refund)\b",
+    r"\b(legal|legalitas|izin|bappebti|regulator|risiko|resiko|risk|aman|rugi|loss|bahaya|aturan|refund policy|kebijakan refund)\b",
+    re.I,
+)
+_RISK_EDUCATION = re.compile(
+    r"\b(risiko|resiko|risk|aman|rugi|loss|bahaya)\b",
     re.I,
 )
 _SALES = re.compile(
@@ -186,6 +193,31 @@ _OFF_TOPIC = re.compile(r"\b(cuaca|resep|sepak\s*bola|film|musik)\b", re.I)
 _HIGH_COMPLAINT = re.compile(
     r"\b(?:dana|uang|saldo)\s+(?:saya\s+)?(?:hilang|berkurang)|"
     r"\b(?:refund|kompensasi|ganti\s+rugi|ditipu|fraud|somasi|gugat)\b",
+    re.I,
+)
+_TRADING_READY = re.compile(
+    r"\b(?:sudah|telah)\b.{0,25}\b(?:deposit|pendanaan|dana\s+sudah\s+masuk)\b"
+    r".{0,60}\b(?:mau|siap)\b.{0,15}\b(?:mulai\s+)?transaksi\b",
+    re.I,
+)
+_VERIFICATION_METHOD_FACT = re.compile(
+    r"\b(?:verifikasi|tahap|proses)\b.{0,60}"
+    r"\b(?:video\s*call|wpb|wakil\s+pialang(?:\s+berjangka)?)\b|"
+    r"\b(?:video\s*call|wpb|wakil\s+pialang(?:\s+berjangka)?)\b.{0,60}"
+    r"\b(?:verifikasi|tahap|proses)\b",
+    re.I,
+)
+_REGISTRATION_PRODUCT_FACT = re.compile(
+    r"\b(?:website|aplikasi)\b.{0,50}\b(?:daftar|registrasi|pendaftaran)\b|"
+    r"\b(?:daftar|registrasi|pendaftaran)\b.{0,50}\b(?:website|aplikasi)\b",
+    re.I,
+)
+CLARA_IDENTITY_OR_APP_COMPARISON_PATTERN = re.compile(
+    r"\b(?:kamu|anda|clara)\s+(?:ini\s+)?siapa\b|"
+    r"\b(?:sama|beda|berbeda)(?:\s+\w+){0,4}\s+"
+    r"(?:aplikasi\s+)?solid(?:\s+prime)?\b|"
+    r"\b(?:aplikasi\s+)?solid(?:\s+prime)?(?:\s+\w+){0,4}\s+"
+    r"(?:sama|beda|berbeda)\b",
     re.I,
 )
 
@@ -204,6 +236,20 @@ def route_service_message(message: str) -> ServiceRoutingDecision:
             False,
             ServiceGenerationStrategy.NO_CUSTOMER_DRAFT,
             ReviewerRequirement.NO_REVIEW_ALLOWED,
+        )
+
+    if CLARA_IDENTITY_OR_APP_COMPARISON_PATTERN.search(text):
+        return _decision(
+            TopLevelRouteIntent.SALES,
+            ConversationIntent.INFO_SEEKING,
+            SupportLevel.NOT_APPLICABLE,
+            SupportTopic.UNKNOWN,
+            ("clara_identity_or_solid_app_comparison",),
+            0.98,
+            False,
+            False,
+            ServiceGenerationStrategy.EXISTING_SALES_GENERATION,
+            ReviewerRequirement.SALES_REVIEW,
         )
 
     complaint = classify_safe_handoff_category(text)
@@ -262,7 +308,7 @@ def route_service_message(message: str) -> ServiceRoutingDecision:
     if _COMPLIANCE.search(text):
         intent = (
             ConversationIntent.RISK_CHECK
-            if re.search(r"\b(risiko|risk)\b", text, re.I)
+            if _RISK_EDUCATION.search(text)
             else ConversationIntent.LEGALITY_CHECK
         )
         return _decision(
@@ -289,6 +335,45 @@ def route_service_message(message: str) -> ServiceRoutingDecision:
             False,
             ServiceGenerationStrategy.SUPPORT_SAFE_HANDOFF,
             ReviewerRequirement.MANAGER_REVIEW,
+        )
+    if _TRADING_READY.search(text):
+        return _decision(
+            TopLevelRouteIntent.SALES,
+            ConversationIntent.READINESS_VALIDATION,
+            SupportLevel.NOT_APPLICABLE,
+            SupportTopic.UNKNOWN,
+            ("customer_reports_trading_ready",),
+            0.95,
+            False,
+            False,
+            ServiceGenerationStrategy.EXISTING_SALES_GENERATION,
+            ReviewerRequirement.SALES_REVIEW,
+        )
+    if _VERIFICATION_METHOD_FACT.search(text):
+        return _decision(
+            TopLevelRouteIntent.SALES,
+            ConversationIntent.PROCESS_CHECK,
+            SupportLevel.NOT_APPLICABLE,
+            SupportTopic.VERIFICATION_GENERAL,
+            ("verification_method_product_fact",),
+            0.98,
+            False,
+            False,
+            ServiceGenerationStrategy.EXISTING_SALES_GENERATION,
+            ReviewerRequirement.SALES_REVIEW,
+        )
+    if _REGISTRATION_PRODUCT_FACT.search(text):
+        return _decision(
+            TopLevelRouteIntent.SALES,
+            ConversationIntent.PROCESS_CHECK,
+            SupportLevel.NOT_APPLICABLE,
+            SupportTopic.REGISTRATION_GENERAL,
+            ("registration_channel_product_fact",),
+            0.98,
+            False,
+            False,
+            ServiceGenerationStrategy.EXISTING_SALES_GENERATION,
+            ReviewerRequirement.SALES_REVIEW,
         )
     for topic, pattern in _CS_PATTERNS:
         if pattern.search(text):

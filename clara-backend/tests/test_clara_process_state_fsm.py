@@ -128,7 +128,7 @@ def test_vocabulary_order_and_safe_mode_defaults() -> None:
     assert settings.clara_persona_authority_mode == "LEGACY"
     assert settings.clara_semantic_revalidation_mode == "OFF"
     assert settings.clara_policy_enforcement_mode == "OBSERVE"
-    assert settings.clara_product_fact_mode == "LEGACY"
+    assert settings.clara_product_fact_mode == "REGISTRY"
 
 
 def test_language_precision_blocks_question_hypothetical_and_negation() -> None:

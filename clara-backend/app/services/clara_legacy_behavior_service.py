@@ -188,24 +188,18 @@ RUNTIME_CONTEXT
 def build_legacy_product_fact_injection(account_category: str | None) -> str:
     normalized_category = (account_category or "unknown").strip().lower()
     if normalized_category == "mini":
-        variant_focus = (
-            "Fokus produk saat ini adalah Mini / Micro account untuk pemula yang "
-            "ingin mulai pelan-pelan."
-        )
+        variant_focus = "Fokus produk saat ini adalah Mini / Micro account."
     elif normalized_category == "reguler":
-        variant_focus = (
-            "Fokus produk saat ini adalah account Reguler untuk user yang sudah "
-            "lebih siap dan membutuhkan ruang lebih besar."
-        )
+        variant_focus = "Fokus produk saat ini adalah account Reguler."
     else:
         variant_focus = "Belum ada fokus varian produk tertentu."
 
     return f"""
 {LEGACY_PRODUCT_FACT_INJECTION}
-- Scope lama: PT Solid Gold Berjangka, produk SOLID PRIME.
+- Scope: PT Solid Gold Berjangka, produk SOLID PRIME.
 - {variant_focus}
-- Modal awal Mini yang dipertahankan dari runtime lama: Rp5.000.000.
-- Fakta legalitas lama yang tetap dipertahankan: PT Solid Gold Berjangka diawasi BAPPEBTI.
+- Modal awal Mini: Rp5.000.000.
+- PT Solid Gold Berjangka diawasi BAPPEBTI.
 - Detail formal, nomor izin, spread, komisi, dan spesifikasi terbaru hanya boleh berasal dari knowledge yang diberikan.
 """.strip()
 

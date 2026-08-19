@@ -28,31 +28,6 @@ from app.services.business_segmentation_service import normalize_account_categor
 
 playbook_logger = logging.getLogger("clara.playbook")
 
-PLAYBOOK_FILES = (
-    "INSTRUCTION.md",
-    "GUARDRAIL.md",
-    "FLOW.md",
-    "PERSONALITY_MODE.md",
-    "AUTO_ADAPT.md",
-    "CLOSING_ENGINE.md",
-    "POSITIONING.md",
-    "OBJECTION.md",
-    "OBJECTION_EXTREME.md",
-    "CONVERSION_BEHAVIOR_ENGINE.md",
-    "CONVERSION_LAYER.md",
-    "KB_ADDON_BULLETPROOF_SOLID_PRIME.md",
-    "KB_ADDON_BULLETPROOF_SOLID_REGULAR.md",
-    "SALES_KNOWLEDGE_BRIDGE_MINI.md",
-    "SALES_KNOWLEDGE_BRIDGE_REGULAR.md",
-    "01_solid_prime_chatbox_system_prompt.md",
-    "02_solid_prime_faq_answer_library.md",
-    "03_solid_prime_compliance_guardrail_escalation.md",
-    "04_solid_prime_product_contract_reference_kb.md",
-    "05_solid_prime_website_official_source_kb.md",
-    "06_solid_prime_lead_qualification_handoff_kb.md",
-    "07_solid_prime_conversation_examples_training_dataset_kb.md",
-)
-
 SYSTEM_PLAYBOOK_FILES = tuple(
     f"{section.name}.md" for section in SYSTEM_PLAYBOOK_SECTION_ORDER
 )
@@ -206,9 +181,6 @@ class ClaraPlaybookComposition:
         }
 
 
-SUPPORTING_PLAYBOOK_FILES = tuple(
-    filename for filename in PLAYBOOK_FILES if filename not in SYSTEM_PLAYBOOK_FILES
-)
 RESPONSE_EXAMPLE_FILES = ("07_solid_prime_conversation_examples_training_dataset_kb.md",)
 
 INTENT_PLAYBOOK_FILES: dict[str, tuple[str, ...]] = {
@@ -222,6 +194,7 @@ INTENT_PLAYBOOK_FILES: dict[str, tuple[str, ...]] = {
         "04_solid_prime_product_contract_reference_kb.md",
     ),
     "legality": (
+        "LEGALITY_KNOWLEDGE.md",
         "OBJECTION.md",
         "OBJECTION_EXTREME.md",
         "KB_ADDON_BULLETPROOF_SOLID_PRIME.md",
@@ -255,6 +228,10 @@ INTENT_PLAYBOOK_FILES: dict[str, tuple[str, ...]] = {
     "mechanism": (
         "POSITIONING.md",
         "02_solid_prime_faq_answer_library.md",
+        "04_solid_prime_product_contract_reference_kb.md",
+    ),
+    "product_costs": (
+        "PRODUCT_COSTS_KNOWLEDGE.md",
         "04_solid_prime_product_contract_reference_kb.md",
     ),
     "beginner": (
@@ -312,9 +289,6 @@ def get_selected_supporting_playbook_filenames(
     desired_count: int = 3,
     latency_profile: str = "standard",
 ) -> tuple[str, ...]:
-    if desired_count != 1:
-        return SUPPORTING_PLAYBOOK_FILES
-
     if latency_profile == "ultra_fast":
         ultra_fast_map = {
             "product_options": (
@@ -324,6 +298,7 @@ def get_selected_supporting_playbook_filenames(
                 "04_solid_prime_product_contract_reference_kb.md",
             ),
             "legality": (
+                "LEGALITY_KNOWLEDGE.md",
                 "OBJECTION.md",
                 "05_solid_prime_website_official_source_kb.md",
             ),
@@ -343,6 +318,7 @@ def get_selected_supporting_playbook_filenames(
                 "POSITIONING.md",
                 "04_solid_prime_product_contract_reference_kb.md",
             ),
+            "product_costs": ("PRODUCT_COSTS_KNOWLEDGE.md",),
         }
         return ultra_fast_map.get(
             latest_customer_intent or "",
@@ -759,7 +735,7 @@ def load_clara_response_playbook(
     return _load_playbook_sections(
         knowledge_dirs,
         selected_filenames,
-        include_remaining_files=desired_count != 1,
+        include_remaining_files=False,
         excluded_filenames=SYSTEM_PLAYBOOK_FILES,
     )
 
@@ -825,12 +801,18 @@ def compose_clara_playbooks(
         for section in system_sections
         if section.provenance.effective_source != PromptSectionSource.MISSING
     ).strip()
-    supporting_playbook = load_clara_response_playbook(
-        account_category,
-        include_all_variants=include_all_variants,
-        latest_customer_intent=latest_customer_intent,
-        desired_count=desired_count,
-        latency_profile=latency_profile,
+    # Database-backed runtime uses ProductKnowledge as the editable supporting
+    # authority. Markdown remains an offline/fallback source when no DB exists.
+    supporting_playbook = (
+        load_clara_response_playbook(
+            account_category,
+            include_all_variants=include_all_variants,
+            latest_customer_intent=latest_customer_intent,
+            desired_count=desired_count,
+            latency_profile=latency_profile,
+        )
+        if db is None
+        else ""
     )
     knowledge_dirs = get_clara_knowledge_variant_dirs(
         account_category,
@@ -845,14 +827,22 @@ def compose_clara_playbooks(
         system_playbook=system_playbook,
         supporting_playbook=supporting_playbook,
         system_sections=system_sections,
-        supporting_knowledge_count=_count_loaded_supporting_playbooks(
-            knowledge_dirs,
-            selected_filenames,
-            include_remaining_files=desired_count != 1,
+        supporting_knowledge_count=(
+            _count_loaded_supporting_playbooks(
+                knowledge_dirs,
+                selected_filenames,
+                include_remaining_files=False,
+            )
+            if db is None
+            else 0
         ),
-        response_example_count=_count_loaded_response_examples(
-            knowledge_dirs,
-            selected_filenames,
-            include_remaining_files=desired_count != 1,
+        response_example_count=(
+            _count_loaded_response_examples(
+                knowledge_dirs,
+                selected_filenames,
+                include_remaining_files=False,
+            )
+            if db is None
+            else 0
         ),
     )

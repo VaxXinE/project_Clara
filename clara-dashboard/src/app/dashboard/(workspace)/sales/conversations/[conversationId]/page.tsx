@@ -1914,6 +1914,7 @@ function ConversationDetailContent({
                           <span>Isi knowledge yang diusulkan</span>
                           <textarea
                             value={knowledgeProposalContentInput}
+                            maxLength={50_000}
                             onChange={(event) =>
                               onKnowledgeProposalContentChange(
                                 event.target.value,
@@ -1923,6 +1924,11 @@ function ConversationDetailContent({
                             className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
                             placeholder="Tulis knowledge final yang nantinya akan dipublish ke product knowledge."
                           />
+                          <span className="text-xs text-slate-500">
+                            {knowledgeProposalContentInput.length.toLocaleString(
+                              "id-ID",
+                            )} / 50.000 karakter
+                          </span>
                         </label>
 
                         <div className="flex justify-end">
