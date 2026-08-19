@@ -269,6 +269,27 @@ def test_clara_identity_and_solid_app_comparison_stays_in_answer_flow(
     assert result.generation_strategy == ServiceGenerationStrategy.EXISTING_SALES_GENERATION
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Ini ujung-ujungnya cuma disuruh deposit kan?",
+        "Intinya cuma diarahkan deposit doang kan ujung-ujungnya?",
+    ],
+)
+def test_sales_pressure_objection_is_not_misread_as_funding_support(
+    message: str,
+) -> None:
+    result = route_service_message(message)
+
+    assert result.route == ServiceRoute.SALES
+    assert result.conversation_intent.value == "OBJECTION"
+    assert result.support_topic == SupportTopic.UNKNOWN
+    assert (
+        result.generation_strategy
+        == ServiceGenerationStrategy.EXISTING_SALES_GENERATION
+    )
+
+
 def test_real_solid_app_error_remains_customer_support() -> None:
     result = route_service_message("Aplikasi Solid error saat login.")
 

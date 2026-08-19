@@ -181,6 +181,27 @@ def test_complaint_classifier_requires_personal_context() -> None:
     )
 
 
+def test_complaint_classifier_ignores_third_party_and_generic_worry() -> None:
+    assert (
+        classify_safe_handoff_category(
+            "Saya takut banget ini penipuan, soalnya banyak broker bermasalah."
+        )
+        is None
+    )
+    assert (
+        classify_safe_handoff_category(
+            "Teman saya rugi besar di trading, kenapa saya harus percaya?"
+        )
+        is None
+    )
+    assert (
+        classify_safe_handoff_category(
+            "Saya ditipu oleh oknum yang mengaku dari perusahaan ini."
+        )
+        == SafeHandoffCategory.FRAUD_ALLEGATION
+    )
+
+
 @pytest.mark.parametrize("category", list(SafeHandoffCategory))
 def test_safe_handoff_is_deterministic_and_has_no_prohibited_claims(
     category: SafeHandoffCategory,

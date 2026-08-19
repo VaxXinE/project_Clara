@@ -212,6 +212,14 @@ _REGISTRATION_PRODUCT_FACT = re.compile(
     r"\b(?:daftar|registrasi|pendaftaran)\b.{0,50}\b(?:website|aplikasi)\b",
     re.I,
 )
+_SALES_PRESSURE_OBJECTION = re.compile(
+    r"\b(?:ujung(?:[-\s]?ujungnya)?|intinya|akhirnya|endingnya)\b.{0,40}"
+    r"\b(?:cuma|hanya)?\s*(?:disuruh|diminta|diarahkan|suruh)\b.{0,20}"
+    r"\b(?:deposit|top\s*up|transfer|setor(?:\s+dana)?)\b|"
+    r"\b(?:cuma|hanya)\b.{0,20}\b(?:disuruh|diminta|diarahkan|suruh)\b.{0,20}"
+    r"\b(?:deposit|top\s*up|transfer|setor(?:\s+dana)?)\b",
+    re.I,
+)
 CLARA_IDENTITY_OR_APP_COMPARISON_PATTERN = re.compile(
     r"\b(?:kamu|anda|clara)\s+(?:ini\s+)?siapa\b|"
     r"\b(?:sama|beda|berbeda)(?:\s+\w+){0,4}\s+"
@@ -370,6 +378,19 @@ def route_service_message(message: str) -> ServiceRoutingDecision:
             SupportTopic.REGISTRATION_GENERAL,
             ("registration_channel_product_fact",),
             0.98,
+            False,
+            False,
+            ServiceGenerationStrategy.EXISTING_SALES_GENERATION,
+            ReviewerRequirement.SALES_REVIEW,
+        )
+    if _SALES_PRESSURE_OBJECTION.search(text):
+        return _decision(
+            TopLevelRouteIntent.SALES,
+            ConversationIntent.OBJECTION,
+            SupportLevel.NOT_APPLICABLE,
+            SupportTopic.UNKNOWN,
+            ("sales_pressure_objection",),
+            0.95,
             False,
             False,
             ServiceGenerationStrategy.EXISTING_SALES_GENERATION,

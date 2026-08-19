@@ -151,6 +151,14 @@ PERSONAL_LEGAL_THREAT_PATTERN = re.compile(
     r"\b(akan\s+lapor|laporkan\s+ke|somasi|gugat|pengacara|lapor\s+polisi)\b",
     re.IGNORECASE,
 )
+THIRD_PARTY_INCIDENT_CONTEXT_PATTERN = re.compile(
+    r"\b(?:banyak\s+)?(?:broker|perusahaan|pialang)(?:\s+(?:lain|lainnya))?\s+"
+    r"(?:yang\s+)?bermasalah\b|"
+    r"\b(?:teman|saudara|kerabat|keluarga|orang\s+lain|kenalan)\b"
+    r"(?:\s+\w+){0,3}\s+"
+    r"\b(?:rugi|ditipu|dicurangi|kena\s+tipu|kena\s+scam|bermasalah)\b",
+    re.IGNORECASE,
+)
 HUMAN_REQUEST_PATTERN = re.compile(
     r"\b(bicara|hubungkan|sambungkan|ditangani)\b(?:\s+\w+){0,4}\s+"
     r"\b(manusia|petugas|supervisor|manager|atasan)\b|"
@@ -191,6 +199,7 @@ def classify_safe_handoff_category(
         return SafeHandoffCategory.HUMAN_REQUEST
 
     incident_text = RISK_FREE_EDUCATION_PATTERN.sub("", message)
+    incident_text = THIRD_PARTY_INCIDENT_CONTEXT_PATTERN.sub("", incident_text)
     personal = bool(PERSONAL_PATTERN.search(message))
     concrete = bool(CONCRETE_PROBLEM_PATTERN.search(incident_text))
     if not personal:
