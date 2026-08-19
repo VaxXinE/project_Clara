@@ -69,6 +69,7 @@ class ReplyValidationContext:
     product_fact_mode: str = "LEGACY"
     canonical_process_state: str | None = None
     allowed_minimum_opening_amounts: tuple[int, ...] = (5_000_000,)
+    requested_product_fact_values: dict[str, object] = field(default_factory=dict)
     capabilities: ReplyValidationCapabilities = field(
         default_factory=ReplyValidationCapabilities
     )
@@ -300,6 +301,18 @@ def evaluate_reply(
                 text, context.latest_customer_intent
             )
         ),
+        "missing_legality_risk_boundary": (
+            validators.response_lacks_legality_risk_boundary(
+                text, context.latest_customer_intent
+            )
+        ),
+        "missing_requested_product_fact": (
+            validators.response_ignores_requested_product_fact(
+                text,
+                context.latest_customer_message,
+                context.requested_product_fact_values,
+            )
+        ),
         "unsupported_fixed_sensitive_number": (
             registry_sensitive_number_failed
             if context.product_fact_mode == "REGISTRY"
@@ -371,7 +384,9 @@ def evaluate_reply(
             )
         ),
         "missing_latest_intent": validators.response_misses_latest_customer_intent(
-            text, context.latest_customer_intent
+            text,
+            context.latest_customer_intent,
+            context.latest_customer_message,
         ),
         "generic_opening": (
             context.latency_profile not in {"ultra_fast", "fast"}

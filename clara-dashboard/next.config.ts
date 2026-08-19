@@ -82,6 +82,10 @@ const nextConfig: NextConfig = {
         destination: "/dashboard/knowledge",
       },
       {
+        source: "/product-facts",
+        destination: "/dashboard/product-facts",
+      },
+      {
         source: "/support-knowledge",
         destination: "/dashboard/support-knowledge",
       },

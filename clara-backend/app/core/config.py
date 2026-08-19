@@ -65,9 +65,9 @@ class Settings(BaseSettings):
     clara_persona_authority_mode: str = "LEGACY"
     clara_semantic_revalidation_mode: str = "OFF"
     clara_policy_enforcement_mode: str = "OBSERVE"
-    clara_product_fact_mode: str = "LEGACY"
+    clara_product_fact_mode: str = "REGISTRY"
     clara_process_state_mode: str = "LEGACY"
-    clara_service_routing_mode: str = "LEGACY"
+    clara_service_routing_mode: str = "ROUTED"
     clara_extension_delivery_mode: str = "LEGACY"
     clara_rollout_control_mode: str = "OFF"
     clara_extension_delivery_authorization_ttl_seconds: int = 60

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -6,6 +7,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.models.conversation import Conversation
 from app.schemas.reply_suggestion_schema import ReplySuggestionCreate
 from app.schemas.ai_extraction_schema import (
     AIExtractionCreate,
@@ -36,6 +38,7 @@ from app.services.reply_suggestion_service import (
     infer_latest_customer_intent,
     resolve_latest_customer_intent,
     infer_product_variant_response_mode,
+    get_requested_product_fact_keys,
     get_known_customer_identity_fields,
     response_breaks_subject_focus,
     response_defers_answer_with_question,
@@ -49,9 +52,11 @@ from app.services.reply_suggestion_service import (
     response_unnecessarily_mentions_product_variants,
     response_uses_abstract_data_requirement,
     response_uses_vague_legality_deflection,
+    should_answer_with_product_options,
 )
 from app.services.official_source_service import (
     OFFICIAL_BAPPEBTI_URL,
+    OFFICIAL_LEGALITY_URL,
     OFFICIAL_SOLID_URL,
     get_official_source_entries,
 )
@@ -173,7 +178,9 @@ def test_extract_reply_payload_from_response_handles_fenced_json() -> None:
     assert payload["suggested_replies"][0]["text"] == "Halo kak"
 
 
-def test_extract_reply_payload_from_response_falls_back_to_nested_content_text() -> None:
+def test_extract_reply_payload_from_response_falls_back_to_nested_content_text() -> (
+    None
+):
     response = SimpleNamespace(
         output_parsed=None,
         output=[
@@ -217,7 +224,9 @@ def test_normalize_reply_tone_value_maps_model_variants(
     assert _normalize_reply_tone_value(raw_tone) == expected
 
 
-def test_normalize_reply_payload_coerces_invalid_tone_before_schema_validation() -> None:
+def test_normalize_reply_payload_coerces_invalid_tone_before_schema_validation() -> (
+    None
+):
     normalized = _normalize_reply_payload(
         {
             "suggested_replies": [
@@ -316,6 +325,17 @@ def test_response_misses_latest_customer_intent_accepts_aligned_answer() -> None
     )
 
 
+def test_response_misses_latest_customer_intent_checks_product_costs() -> None:
+    assert response_misses_latest_customer_intent(
+        "Akun Mini cocok untuk mulai belajar secara bertahap.",
+        "product_costs",
+    )
+    assert not response_misses_latest_customer_intent(
+        "Storage/Rollover Fee adalah biaya yang dapat berlaku untuk posisi overnight.",
+        "product_costs",
+    )
+
+
 def test_response_starts_too_generic_flags_weak_opening() -> None:
     assert response_starts_too_generic(
         "Siap kak. Nanti saya bantu jelaskan ya.",
@@ -330,12 +350,234 @@ def test_response_starts_too_generic_accepts_direct_opening() -> None:
     )
 
 
-def test_infer_latest_customer_intent_detects_glossary_and_mechanism_questions() -> None:
-    assert infer_latest_customer_intent("Margin itu maksudnya apa?") == "mechanism"
-    assert infer_latest_customer_intent("Brent oil itu tradingnya gimana?") == "mechanism"
+def test_infer_latest_customer_intent_detects_glossary_and_mechanism_questions() -> (
+    None
+):
+    assert infer_latest_customer_intent("Margin itu maksudnya apa?") == "product_costs"
+    assert infer_latest_customer_intent("Ada biaya swap nggak?") == "product_costs"
+    assert infer_latest_customer_intent("Komisinya berapa?") == "product_costs"
+    assert (
+        infer_latest_customer_intent("Jam trading Gold sampai jam berapa?")
+        == "mechanism"
+    )
 
 
-def test_resolve_latest_customer_intent_preserves_previous_mechanism_for_short_follow_up() -> None:
+def test_product_cost_request_selects_only_the_requested_registry_fact() -> None:
+    assert get_requested_product_fact_keys(
+        "Storage fee Gold 0.1 lot per malam berapa?", "product_costs"
+    ) == ("trading.storage_fee",)
+    assert get_requested_product_fact_keys(
+        "Spread minimum XUL10 berapa?", "product_costs"
+    ) == ("trading.spread",)
+    assert get_requested_product_fact_keys(
+        "Komisi Mini per 0.1 lot berapa?", "product_costs"
+    ) == ("trading.commission",)
+    assert get_requested_product_fact_keys(
+        "Saya tertarik, tetapi tidak mau daftar langsung.", "general"
+    ) == ()
+    assert infer_latest_customer_intent("Contract size XUL10 berapa?") == "mechanism"
+    assert (
+        infer_latest_customer_intent("Brent oil itu tradingnya gimana?") == "mechanism"
+    )
+
+
+def test_p1_product_questions_route_to_the_correct_fact_authority() -> None:
+    cases = {
+        "Produk apa saja yang bisa saya pelajari?": (
+            "product_options",
+            ("account.eligible_products",),
+        ),
+        "Spread minimum XUL10 berapa per sisi?": (
+            "product_costs",
+            ("trading.spread",),
+        ),
+        "Stop loss bikin saya pasti nggak rugi lebih besar kan?": (
+            "setup_scalping",
+            (),
+        ),
+    }
+
+    for message, expected in cases.items():
+        intent = infer_latest_customer_intent(message)
+        assert (intent, get_requested_product_fact_keys(message, intent)) == expected
+
+
+def test_instrument_catalog_question_does_not_trigger_account_variant_requirement() -> (
+    None
+):
+    instrument_question = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Produk apa saja yang bisa saya pelajari?",
+            )
+        ]
+    )
+    account_question = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Mini dan Regular bedanya apa?",
+            )
+        ]
+    )
+
+    assert should_answer_with_product_options(instrument_question) is False
+    assert should_answer_with_product_options(account_question) is True
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Akun mini itu apa dan cocok untuk siapa?",
+        "Akun regular itu seperti apa dan cocok untuk siapa?",
+        "Akun mini tuh apasih dan cocoknya untuk siapa?",
+    ],
+)
+def test_p1_account_positioning_questions_have_a_dedicated_intent(
+    message: str,
+) -> None:
+    assert infer_latest_customer_intent(message) == "account_positioning"
+
+
+def test_p1_account_comparison_uses_product_options_intent() -> None:
+    assert infer_latest_customer_intent("Mini dan regular itu bedanya apa?") == (
+        "product_options"
+    )
+
+
+def test_p1_account_positioning_rejects_unrelated_legality_answer() -> None:
+    unrelated = (
+        "PT Solid Gold Berjangka berada di bawah pengawasan BAPPEBTI. "
+        "Legalitas tidak sama dengan jaminan hasil."
+    )
+    grounded = (
+        "Akun Mini memiliki nilai transaksi lebih ringan dan cocok secara "
+        "bersyarat untuk yang ingin belajar bertahap. Trading tetap berisiko."
+    )
+
+    message = "Akun mini itu apa dan cocok untuk siapa?"
+    assert response_misses_latest_customer_intent(
+        unrelated, "account_positioning", message
+    )
+    assert not response_misses_latest_customer_intent(
+        grounded, "account_positioning", message
+    )
+
+
+@pytest.mark.parametrize(
+    ("message", "answer"),
+    [
+        (
+            "Akun regular itu seperti apa dan cocok untuk siapa?",
+            "Akun Regular cocok untuk yang sudah lebih siap dan ingin "
+            "fleksibilitas transaksi yang lebih luas.",
+        ),
+        (
+            "Akun mini tuh apasih dan cocoknya untuk siapa?",
+            "Mini Account dibuat untuk mulai lebih ringan dan belajar bertahap.",
+        ),
+    ],
+)
+def test_p1_account_positioning_rejects_generic_uat_answers(
+    message: str,
+    answer: str,
+) -> None:
+    assert response_misses_latest_customer_intent(
+        answer,
+        "account_positioning",
+        message,
+    )
+
+
+def test_p1_regular_positioning_requires_system_capital_and_risk() -> None:
+    message = "Akun regular itu seperti apa dan cocok untuk siapa?"
+    grounded = (
+        "Akun Regular ditujukan untuk nasabah yang lebih siap dari sisi "
+        "pengalaman dan modal. Sistem dan kontrol risikonya perlu dipahami "
+        "karena trading tetap memiliki risiko kerugian."
+    )
+
+    assert not response_misses_latest_customer_intent(
+        grounded,
+        "account_positioning",
+        message,
+    )
+
+
+def test_p1_requested_regular_account_controls_knowledge_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, str | None] = {}
+
+    def fake_get_active_product_knowledge_for_organization(**kwargs):
+        captured["account_category"] = kwargs["account_category"]
+        return [
+            SimpleNamespace(
+                title="Regular Positioning",
+                category="positioning",
+                content="Regular membutuhkan kesiapan sistem, modal, dan risiko.",
+                source_type="markdown_import_regular",
+            )
+        ]
+
+    monkeypatch.setattr(
+        "app.services.reply_suggestion_service.get_active_product_knowledge_for_organization",
+        fake_get_active_product_knowledge_for_organization,
+    )
+    conversation = SimpleNamespace(
+        organization_id=None,
+        lead=SimpleNamespace(account_category="mini"),
+        messages=[
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Akun regular itu seperti apa dan cocok untuk siapa?",
+            )
+        ],
+    )
+
+    build_grounded_knowledge_context(
+        conversation=conversation,
+        db=None,
+        latest_customer_message=conversation.messages[0].message_text,
+        latest_customer_intent="account_positioning",
+    )
+
+    assert captured["account_category"] == "reguler"
+
+
+@pytest.mark.parametrize(
+    ("message", "intent", "expected"),
+    [
+        (
+            "Pendaftaran lewat website atau aplikasi?",
+            "general",
+            ("process.initial_data",),
+        ),
+        (
+            "Sebelum akun real wajib transaksi demo dua kali?",
+            "general",
+            ("process.verification_steps",),
+        ),
+        (
+            "Dokumen apa yang perlu disiapkan untuk verifikasi?",
+            "general",
+            ("process.kyc_requirements",),
+        ),
+        ("Kamu siapa dan apa bedanya dengan aplikasi SOLID?", "service_identity", ("process.initial_data",)),
+    ],
+)
+def test_process_questions_select_only_their_canonical_registry_fact(
+    message: str,
+    intent: str,
+    expected: tuple[str, ...],
+) -> None:
+    assert get_requested_product_fact_keys(message, intent) == expected
+
+
+def test_resolve_latest_customer_intent_preserves_previous_mechanism_for_short_follow_up() -> (
+    None
+):
     assert (
         resolve_latest_customer_intent(
             "Tolong jelasin kak",
@@ -346,42 +588,58 @@ def test_resolve_latest_customer_intent_preserves_previous_mechanism_for_short_f
     )
 
 
-def test_infer_latest_customer_intent_detects_product_option_comparison_questions() -> None:
+def test_infer_latest_customer_intent_detects_product_option_comparison_questions() -> (
+    None
+):
     assert (
         infer_latest_customer_intent("Bedanya multilateral sama bilateral apa?")
         == "product_options"
     )
 
 
-def test_response_misses_latest_customer_intent_flags_beginner_answer_that_jumps_to_source() -> None:
+def test_conversation_messages_are_loaded_chronologically() -> None:
+    assert "message_timestamp" in str(Conversation.messages.property.order_by)
+
+
+def test_response_misses_latest_customer_intent_flags_beginner_answer_that_jumps_to_source() -> (
+    None
+):
     assert response_misses_latest_customer_intent(
         "Untuk info resmi, kakak bisa cek dulu halaman BAPPEBTI dan website resminya ya.",
         "beginner",
     )
 
 
-def test_response_states_fixed_sensitive_number_allows_official_mini_initial_capital() -> None:
+def test_response_states_fixed_sensitive_number_allows_official_mini_initial_capital() -> (
+    None
+):
     assert not response_states_fixed_sensitive_number(
         "Untuk Mini, modal awalnya mulai dari Rp5.000.000 kak.",
         "minimum_capital",
     )
 
 
-def test_response_states_fixed_sensitive_number_flags_unapproved_fixed_nominal() -> None:
+def test_response_states_fixed_sensitive_number_flags_unapproved_fixed_nominal() -> (
+    None
+):
     assert response_states_fixed_sensitive_number(
         "Untuk akun mikro, minimal deposit awalnya mulai dari Rp5.000.000 ya kak.",
         "minimum_capital",
     )
 
 
-def test_response_misses_latest_customer_intent_accepts_official_mini_initial_capital_answer() -> None:
+def test_response_misses_latest_customer_intent_accepts_official_mini_initial_capital_answer() -> (
+    None
+):
     assert not response_misses_latest_customer_intent(
         "Untuk akun Mini, modal awal resminya mulai dari Rp5.000.000 kak.",
         "minimum_capital",
     )
 
 
-def test_response_misses_latest_customer_intent_flags_fixed_nominal_for_other_account() -> None:
+def test_response_misses_latest_customer_intent_flags_fixed_nominal_for_other_account() -> (
+    None
+):
     assert response_misses_latest_customer_intent(
         "Untuk akun Mikro, minimal deposit awalnya mulai dari Rp5.000.000 ya kak.",
         "minimum_capital",
@@ -406,7 +664,9 @@ def test_response_defers_answer_with_question_flags_question_first() -> None:
     )
 
 
-def test_response_defers_answer_with_question_accepts_answer_then_single_question() -> None:
+def test_response_defers_answer_with_question_accepts_answer_then_single_question() -> (
+    None
+):
     assert not response_defers_answer_with_question(
         "Sistemnya dijelaskan dulu alurnya, lalu akun disesuaikan dengan tujuan dan batas risiko. Kalau mau, saya lanjut jelaskan step awalnya ya?",
         "direct_answer_first",
@@ -435,14 +695,18 @@ def test_response_breaks_subject_focus_accepts_brent_mechanism_answer() -> None:
     )
 
 
-def test_response_breaks_subject_focus_flags_lot_contamination_inside_brent_answer() -> None:
+def test_response_breaks_subject_focus_flags_lot_contamination_inside_brent_answer() -> (
+    None
+):
     assert response_breaks_subject_focus(
         "Brent oil itu trading berjangka, tapi 1 lot itu ukuran transaksi yang dipakai di sistem.",
         "Brent oil itu tradingnya gimana?",
     )
 
 
-def test_response_breaks_subject_focus_flags_variant_contamination_inside_multilateral_answer() -> None:
+def test_response_breaks_subject_focus_flags_variant_contamination_inside_multilateral_answer() -> (
+    None
+):
     assert response_breaks_subject_focus(
         "Bilateral itu langsung antar pihak, sedangkan multilateral lewat bursa. Untuk pemula biasanya Mini lebih ringan.",
         "Bedanya multilateral dan bilateral apa?",
@@ -477,7 +741,9 @@ def test_response_is_vague_after_verification_complete_flags_backward_answer() -
     )
 
 
-def test_response_is_vague_after_verification_complete_accepts_onboarding_handoff() -> None:
+def test_response_is_vague_after_verification_complete_accepts_onboarding_handoff() -> (
+    None
+):
     assert not response_is_vague_after_identity_submission(
         "Siap kak, kalau email verifikasi sudah masuk berarti proses Mini sudah lanjut. Step berikutnya saya hubungkan ke tim onboarding supaya aktivasi dan arahan mulai-nya dibantu sampai jelas.",
         latest_customer_intent="verification_complete",
@@ -487,7 +753,9 @@ def test_response_is_vague_after_verification_complete_accepts_onboarding_handof
     )
 
 
-def test_response_is_vague_after_verification_complete_accepts_regular_activation() -> None:
+def test_response_is_vague_after_verification_complete_accepts_regular_activation() -> (
+    None
+):
     assert not response_is_vague_after_identity_submission(
         "Siap pak, berarti tahap verifikasinya sudah selesai. Setelah ini prosesnya maju ke onboarding dan aktivasi Regular, jadi tidak perlu balik lagi ke verifikasi data awal.",
         latest_customer_intent="verification_complete",
@@ -497,7 +765,9 @@ def test_response_is_vague_after_verification_complete_accepts_regular_activatio
     )
 
 
-def test_response_is_vague_after_verification_complete_flags_backward_verification() -> None:
+def test_response_is_vague_after_verification_complete_flags_backward_verification() -> (
+    None
+):
     assert response_is_vague_after_identity_submission(
         "Siap kak, langkah berikutnya saya lanjut verifikasi kelengkapan data dulu, lalu masuk pembukaan akun.",
         latest_customer_intent="verification_complete",
@@ -517,14 +787,18 @@ def test_response_is_vague_after_activation_complete_flags_email_loop() -> None:
     )
 
 
-def test_response_stays_stuck_in_onboarding_after_trading_ready_flags_wrong_direction() -> None:
+def test_response_stays_stuck_in_onboarding_after_trading_ready_flags_wrong_direction() -> (
+    None
+):
     assert response_stays_stuck_in_onboarding_after_milestone(
         "Siap kak, untuk mulai transaksi next step-nya ikuti onboarding dan cek email lanjutan dulu ya.",
         "trading_ready",
     )
 
 
-def test_response_stays_stuck_in_onboarding_after_trading_ready_accepts_operational_step() -> None:
+def test_response_stays_stuck_in_onboarding_after_trading_ready_accepts_operational_step() -> (
+    None
+):
     assert not response_stays_stuck_in_onboarding_after_milestone(
         "Siap kak, kalau akun aktif dan dana sudah masuk berarti next step-nya masuk ke arahan penggunaan platform dan persiapan mulai transaksi pertamanya.",
         "trading_ready",
@@ -558,12 +832,94 @@ def test_official_source_entries_include_bappebti_and_solid_urls(
     source_types = {entry.source_type for entry in entries}
 
     assert OFFICIAL_BAPPEBTI_URL in contents
+    assert OFFICIAL_LEGALITY_URL in contents
     assert OFFICIAL_SOLID_URL in contents
     assert "official_source_bappebti" in source_types
     assert "official_source_sg" in source_types
 
 
-def test_build_grounded_knowledge_context_includes_official_legality_source(
+def test_legality_intent_detects_regulator_and_license_terms() -> None:
+    assert infer_latest_customer_intent("Nomor izin usahanya berapa?") == "legality"
+    assert infer_latest_customer_intent("Persetujuan OJK-nya apa?") == "legality"
+    assert infer_latest_customer_intent("Apakah perusahaan anggota BBJ dan KBI?") == "legality"
+
+
+def test_legality_risk_free_question_prioritizes_safety_intent() -> None:
+    assert (
+        infer_latest_customer_intent(
+            "Kalau perusahaannya legal berarti uang saya pasti aman dan nggak mungkin rugi ya?"
+        )
+        == "safety"
+    )
+
+
+def test_clara_identity_and_solid_app_comparison_has_dedicated_intent() -> None:
+    assert (
+        infer_latest_customer_intent("Kamu siapa? Sama gak dengan aplikasi Solid?")
+        == "service_identity"
+    )
+
+
+def test_identity_question_prioritizes_master_identity_knowledge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entries = [
+        SimpleNamespace(
+            title="Mini FAQ",
+            category="faq",
+            content="Solid Prime membantu informasi produk Mini.",
+            source_type="markdown_import",
+        ),
+        SimpleNamespace(
+            title="Master Knowledge v1.8",
+            category="general",
+            content=(
+                "Clara adalah asisten AI. Clara berbeda dari Aplikasi SOLID, "
+                "yaitu aplikasi trading resmi PT Solid Gold Berjangka."
+            ),
+            source_type="markdown_import",
+        ),
+    ]
+    monkeypatch.setattr(
+        "app.services.reply_suggestion_service.get_active_product_knowledge_for_organization",
+        lambda **_: entries,
+    )
+    conversation = SimpleNamespace(
+        organization_id=None,
+        lead=SimpleNamespace(account_category="mini"),
+        messages=[
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Kamu siapa? Sama gak dengan aplikasi Solid?",
+            )
+        ],
+    )
+
+    grounded, _ = build_grounded_knowledge_context(
+        conversation=conversation,
+        db=None,
+        latest_customer_message="Kamu siapa? Sama gak dengan aplikasi Solid?",
+        latest_customer_intent="service_identity",
+        latency_profile="ultra_fast",
+        desired_count=1,
+    )
+
+    assert "Master Knowledge v1.8" in grounded
+    assert "Mini FAQ" not in grounded
+
+
+def test_identity_intent_rejects_generic_handoff_and_accepts_direct_answer() -> None:
+    assert response_misses_latest_customer_intent(
+        "Informasi tersebut perlu dicek oleh petugas yang berwenang.",
+        "service_identity",
+    )
+    assert not response_misses_latest_customer_intent(
+        "Saya Clara, asisten AI. Saya berbeda dari Aplikasi SOLID yang digunakan untuk trading.",
+        "service_identity",
+    )
+
+
+def test_build_grounded_knowledge_context_uses_only_database_knowledge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -594,9 +950,9 @@ def test_build_grounded_knowledge_context_includes_official_legality_source(
         desired_count=1,
     )
 
-    assert OFFICIAL_BAPPEBTI_URL in grounded_knowledge
-    assert "official_legality_source" in grounded_knowledge
-    assert "BAPPEBTI" in prioritized_brief
+    assert OFFICIAL_BAPPEBTI_URL not in grounded_knowledge
+    assert "Tidak ada knowledge base produk" in grounded_knowledge
+    assert "Tidak ada fakta prioritas" in prioritized_brief
 
 
 def test_response_misses_latest_customer_intent_accepts_timing_answer() -> None:
@@ -667,13 +1023,56 @@ def test_infer_customer_variant_focus_detects_mini_topic() -> None:
 def test_get_conversation_customer_variant_focus_tracks_single_variant_topic() -> None:
     conversation = SimpleNamespace(
         messages=[
-            SimpleNamespace(sender_type="customer", message_text="Halo kak, saya mau tanya tentang mini."),
-            SimpleNamespace(sender_type="sales", message_text="Siap kak, saya bantu ya."),
-            SimpleNamespace(sender_type="customer", message_text="Saya masih baru kak."),
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Halo kak, saya mau tanya tentang mini.",
+            ),
+            SimpleNamespace(
+                sender_type="sales", message_text="Siap kak, saya bantu ya."
+            ),
+            SimpleNamespace(
+                sender_type="customer", message_text="Saya masih baru kak."
+            ),
         ]
     )
 
     assert get_conversation_customer_variant_focus(conversation) == "mini"
+
+
+def test_get_conversation_customer_variant_focus_uses_latest_explicit_focus() -> None:
+    conversation = SimpleNamespace(
+        messages=[
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Saya hanya mau bahas Mini.",
+                message_timestamp=datetime(2026, 8, 13, 14, 1, tzinfo=timezone.utc),
+            ),
+            SimpleNamespace(
+                sender_type="customer",
+                message_text="Saya fokus Regular, tolong jelaskan risikonya.",
+                message_timestamp=datetime(2026, 8, 13, 16, 2, tzinfo=timezone.utc),
+            ),
+        ]
+    )
+
+    assert get_conversation_customer_variant_focus(conversation) == "reguler"
+
+
+def test_unknown_account_choice_requests_neutral_comparison() -> None:
+    message = "Saya belum tahu mau bikin akun apa."
+
+    assert infer_latest_customer_intent(message) == "product_options"
+    assert (
+        infer_product_variant_response_mode(
+            latest_customer_message=message,
+            extraction=build_extraction(predicted_value="mini", confidence_score=0.95),
+            current_account_category="mini",
+            include_all_variants=False,
+            latest_customer_intent="product_options",
+            conversation_variant_focus="mini",
+        )
+        == "compare_all"
+    )
 
 
 def test_infer_product_variant_response_mode_compares_all_for_product_options() -> None:
@@ -688,7 +1087,9 @@ def test_infer_product_variant_response_mode_compares_all_for_product_options() 
     assert mode == "compare_all"
 
 
-def test_infer_product_variant_response_mode_leans_mini_for_beginner_small_capital() -> None:
+def test_infer_product_variant_response_mode_leans_mini_for_beginner_small_capital() -> (
+    None
+):
     mode = infer_product_variant_response_mode(
         latest_customer_message="Saya masih baru mulai dan modal saya sekitar 5 juta, enaknya gimana?",
         extraction=build_extraction(
@@ -704,7 +1105,9 @@ def test_infer_product_variant_response_mode_leans_mini_for_beginner_small_capit
     assert mode == "lean_mini"
 
 
-def test_infer_product_variant_response_mode_leans_reguler_for_serious_large_capital() -> None:
+def test_infer_product_variant_response_mode_leans_reguler_for_serious_large_capital() -> (
+    None
+):
     mode = infer_product_variant_response_mode(
         latest_customer_message="Saya mau trading lebih serius dan siap modal 150 juta.",
         extraction=build_extraction(
@@ -720,7 +1123,9 @@ def test_infer_product_variant_response_mode_leans_reguler_for_serious_large_cap
     assert mode == "lean_reguler"
 
 
-def test_infer_product_variant_response_mode_anchors_existing_account_category() -> None:
+def test_infer_product_variant_response_mode_anchors_existing_account_category() -> (
+    None
+):
     mode = infer_product_variant_response_mode(
         latest_customer_message="Sistemnya gimana ya?",
         extraction=build_extraction(),
@@ -750,7 +1155,9 @@ def test_format_conversation_for_reply_uses_shorter_window_for_single_reply() ->
         def __init__(self, index: int):
             from datetime import datetime, timedelta, timezone
 
-            self.message_timestamp = datetime(2026, 6, 18, 10, 0, tzinfo=timezone.utc) + timedelta(minutes=index)
+            self.message_timestamp = datetime(
+                2026, 6, 18, 10, 0, tzinfo=timezone.utc
+            ) + timedelta(minutes=index)
             self.sender_type = "customer" if index % 2 == 0 else "sales"
             self.sender_name = f"user-{index}"
             self.message_text = f"pesan ke-{index} " + ("x" * 40)
@@ -774,7 +1181,9 @@ def test_format_conversation_for_reply_fast_profile_uses_tighter_window() -> Non
         def __init__(self, index: int):
             from datetime import datetime, timedelta, timezone
 
-            self.message_timestamp = datetime(2026, 6, 18, 10, 0, tzinfo=timezone.utc) + timedelta(minutes=index)
+            self.message_timestamp = datetime(
+                2026, 6, 18, 10, 0, tzinfo=timezone.utc
+            ) + timedelta(minutes=index)
             self.sender_type = "customer" if index % 2 == 0 else "sales"
             self.sender_name = f"user-{index}"
             self.message_text = f"pesan ke-{index} " + ("x" * 260)
@@ -851,7 +1260,9 @@ def test_get_selected_playbook_filenames_uses_ultra_fast_subset() -> None:
     assert "INSTRUCTION.md" not in filenames
 
 
-def test_get_selected_playbook_filenames_includes_new_mini_knowledge_for_fast_single_reply() -> None:
+def test_get_selected_playbook_filenames_includes_new_mini_knowledge_for_fast_single_reply() -> (
+    None
+):
     filenames = get_selected_playbook_filenames(
         latest_customer_intent="minimum_capital",
         desired_count=1,
@@ -860,10 +1271,14 @@ def test_get_selected_playbook_filenames_includes_new_mini_knowledge_for_fast_si
 
     assert "04_solid_prime_product_contract_reference_kb.md" in filenames
     assert "05_solid_prime_website_official_source_kb.md" in filenames
-    assert "07_solid_prime_conversation_examples_training_dataset_kb.md" not in filenames
+    assert (
+        "07_solid_prime_conversation_examples_training_dataset_kb.md" not in filenames
+    )
 
 
-def test_load_clara_system_instruction_playbook_contains_core_instruction_files() -> None:
+def test_load_clara_system_instruction_playbook_contains_core_instruction_files() -> (
+    None
+):
     playbook = load_clara_system_instruction_playbook("mini")
 
     assert "clara_knowledge_mini/INSTRUCTION.md" in playbook
@@ -872,7 +1287,9 @@ def test_load_clara_system_instruction_playbook_contains_core_instruction_files(
     assert "clara_knowledge_mini/POSITIONING.md" not in playbook
 
 
-def test_load_clara_response_playbook_includes_new_mini_knowledge_for_single_reply() -> None:
+def test_load_clara_response_playbook_includes_new_mini_knowledge_for_single_reply() -> (
+    None
+):
     playbook = load_clara_response_playbook(
         "mini",
         latest_customer_intent="legality",
@@ -880,8 +1297,41 @@ def test_load_clara_response_playbook_includes_new_mini_knowledge_for_single_rep
         latency_profile="ultra_fast",
     )
 
-    assert "clara_knowledge_mini/05_solid_prime_website_official_source_kb.md" in playbook
-    assert "clara_knowledge_mini/03_solid_prime_compliance_guardrail_escalation.md" not in playbook
+    assert (
+        "clara_knowledge_mini/05_solid_prime_website_official_source_kb.md" in playbook
+    )
+    assert (
+        "clara_knowledge_mini/03_solid_prime_compliance_guardrail_escalation.md"
+        not in playbook
+    )
+
+
+def test_load_clara_response_playbook_uses_cost_knowledge_without_training_examples() -> (
+    None
+):
+    playbook = load_clara_response_playbook(
+        "mini",
+        latest_customer_intent="product_costs",
+        desired_count=1,
+        latency_profile="ultra_fast",
+    )
+
+    assert "clara_knowledge_mini/PRODUCT_COSTS_KNOWLEDGE.md" in playbook
+    assert "conversation_examples_training_dataset" not in playbook
+    assert "Rp5.000.000" not in playbook
+
+
+def test_three_reply_playbook_is_still_scoped_to_cost_intent() -> None:
+    playbook = load_clara_response_playbook(
+        "mini",
+        latest_customer_intent="product_costs",
+        desired_count=3,
+        latency_profile="standard",
+    )
+
+    assert "clara_knowledge_mini/PRODUCT_COSTS_KNOWLEDGE.md" in playbook
+    assert "CLOSING_ENGINE.md" not in playbook
+    assert "conversation_examples_training_dataset" not in playbook
 
 
 def test_infer_latency_profile_prefers_fast_for_simple_single_reply() -> None:
@@ -947,7 +1397,9 @@ def test_response_uses_vague_legality_deflection_flags_non_answer() -> None:
     )
 
 
-def test_response_fails_product_option_requirement_accepts_instrument_answer_when_summary_contains_instruments() -> None:
+def test_response_fails_product_option_requirement_accepts_instrument_answer_when_summary_contains_instruments() -> (
+    None
+):
     summary = "\n".join(
         [
             "- Gold: Gold biasanya lebih mudah dipahami pemula karena familiar dan sering dibahas di berita.",
@@ -963,7 +1415,9 @@ def test_response_fails_product_option_requirement_accepts_instrument_answer_whe
     )
 
 
-def test_response_fails_product_option_requirement_flags_answer_that_ignores_instrument_options() -> None:
+def test_response_fails_product_option_requirement_flags_answer_that_ignores_instrument_options() -> (
+    None
+):
     summary = "\n".join(
         [
             "- Gold: Gold biasanya lebih mudah dipahami pemula karena familiar dan sering dibahas di berita.",
@@ -979,14 +1433,18 @@ def test_response_fails_product_option_requirement_flags_answer_that_ignores_ins
     )
 
 
-def test_response_opens_with_source_dump_flags_mechanism_answer_that_opens_with_url() -> None:
+def test_response_opens_with_source_dump_flags_mechanism_answer_that_opens_with_url() -> (
+    None
+):
     assert response_opens_with_source_dump(
         "Untuk acuan resmi bisa lihat dulu sg-berjangka.com. Margin itu dana jaminan untuk membuka posisi.",
         "mechanism",
     )
 
 
-def test_response_unnecessarily_mentions_other_variant_when_customer_focus_is_mini() -> None:
+def test_response_unnecessarily_mentions_other_variant_when_customer_focus_is_mini() -> (
+    None
+):
     assert response_unnecessarily_mentions_product_variants(
         "Untuk Mini cocok buat pemula, sedangkan Regular lebih pas kalau modalnya lebih besar.",
         latest_customer_intent="legality",

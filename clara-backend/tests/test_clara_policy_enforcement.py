@@ -161,6 +161,45 @@ def test_complaint_classifier_requires_personal_context() -> None:
         classify_safe_handoff_category("Saya minta refund.")
         == SafeHandoffCategory.REFUND_OR_COMPENSATION
     )
+    assert (
+        classify_safe_handoff_category(
+            "Kalau perusahaannya legal berarti uang saya pasti aman dan nggak mungkin rugi ya?"
+        )
+        is None
+    )
+    assert (
+        classify_safe_handoff_category(
+            "Katanya uang pasti aman dan tidak mungkin rugi, tetapi saya rugi 10 juta."
+        )
+        == SafeHandoffCategory.FINANCIAL_LOSS_CLAIM
+    )
+    assert (
+        classify_safe_handoff_category(
+            "Stop loss bikin saya pasti nggak rugi lebih besar kan?"
+        )
+        is None
+    )
+
+
+def test_complaint_classifier_ignores_third_party_and_generic_worry() -> None:
+    assert (
+        classify_safe_handoff_category(
+            "Saya takut banget ini penipuan, soalnya banyak broker bermasalah."
+        )
+        is None
+    )
+    assert (
+        classify_safe_handoff_category(
+            "Teman saya rugi besar di trading, kenapa saya harus percaya?"
+        )
+        is None
+    )
+    assert (
+        classify_safe_handoff_category(
+            "Saya ditipu oleh oknum yang mengaku dari perusahaan ini."
+        )
+        == SafeHandoffCategory.FRAUD_ALLEGATION
+    )
 
 
 @pytest.mark.parametrize("category", list(SafeHandoffCategory))

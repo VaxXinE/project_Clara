@@ -53,3 +53,5 @@ scripts/docker-up.sh
 *.dump
 *.tsbuildinfo
 /node_modules/
+/.agents/
+/skills-lock.json

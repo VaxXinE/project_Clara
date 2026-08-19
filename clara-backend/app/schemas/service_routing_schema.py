@@ -25,6 +25,7 @@ class SupportArticleResponse(BaseModel):
     title: str
     topic: str
     support_level: str
+    content: str
     customer_safe: bool
     lifecycle_status: str
     source: str

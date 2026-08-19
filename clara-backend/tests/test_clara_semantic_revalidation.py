@@ -31,6 +31,8 @@ EXISTING_VALIDATOR_IDS = (
     "unnecessary_variant",
     "missing_legality_authority",
     "vague_legality_deflection",
+    "missing_legality_risk_boundary",
+    "missing_requested_product_fact",
     "unsupported_fixed_sensitive_number",
     "post_signup_regression",
     "repeated_product_selection",
@@ -110,6 +112,262 @@ def test_existing_validator_inventory_is_preserved_and_centralized() -> None:
     assert "_collect_retry_validator_ids" not in source
     assert "needs_retry = (" not in source
     assert "evaluate_reply(primary_text, validation_context)" in source
+
+
+def test_legality_answer_requires_explicit_trading_risk_boundary() -> None:
+    context = ReplyValidationContext(latest_customer_intent="legality")
+    incomplete = evaluate_reply(
+        "PT Solid Gold Berjangka diawasi BAPPEBTI. Saya bisa jelaskan risikonya.",
+        context,
+    )
+    complete = evaluate_reply(
+        "PT Solid Gold Berjangka diawasi BAPPEBTI, tetapi legalitas tidak "
+        "menghilangkan risiko kerugian dalam trading.",
+        context,
+    )
+
+    assert "missing_legality_risk_boundary" in incomplete.failed_validator_ids
+    assert "missing_legality_risk_boundary" not in complete.failed_validator_ids
+
+
+def test_active_verification_method_fact_must_be_used_when_requested() -> None:
+    context = ReplyValidationContext(
+        latest_customer_message="Verifikasi pasti video call dengan WPB kan?",
+        requested_product_fact_values={
+            "process.verification_steps": {
+                "verification_method": "video_call",
+                "verification_role": "Wakil Pialang Berjangka (WPB)",
+            }
+        },
+    )
+    incomplete = evaluate_reply(
+        "Verifikasi biasanya tidak selalu harus video call dengan WPB.", context
+    )
+    complete = evaluate_reply(
+        "Ya, berdasarkan fakta aktif verifikasi dilakukan melalui video call "
+        "dengan Wakil Pialang Berjangka (WPB).",
+        context,
+    )
+
+    assert "missing_requested_product_fact" in incomplete.failed_validator_ids
+    assert "missing_requested_product_fact" not in complete.failed_validator_ids
+
+
+def test_active_demo_transaction_fact_must_be_answered_without_denial() -> None:
+    context = ReplyValidationContext(
+        latest_customer_message=(
+            "Sebelum akun real wajib transaksi di akun demo sebanyak 2 kali ya?"
+        ),
+        requested_product_fact_values={
+            "process.verification_steps": {
+                "demo_transactions_required_before_real_account": 2,
+            }
+        },
+    )
+    denied = evaluate_reply(
+        "Tidak wajib, akun demo umumnya hanya dipakai untuk latihan.", context
+    )
+    grounded = evaluate_reply(
+        "Ya, berdasarkan Product Fact aktif ada 2 transaksi demo yang wajib "
+        "diselesaikan sebelum akun real.",
+        context,
+    )
+
+    assert "missing_requested_product_fact" in denied.failed_validator_ids
+    assert "missing_requested_product_fact" not in grounded.failed_validator_ids
+
+
+def test_active_registration_channel_fact_must_be_answered_definitively() -> None:
+    context = ReplyValidationContext(
+        latest_customer_message=(
+            "Sekarang pendaftaran sudah tidak bisa lewat website ya? Hanya lewat aplikasi?"
+        ),
+        requested_product_fact_values={
+            "process.initial_data": {
+                "internal_registration_channel": "official_mobile_app_only",
+                "website_registration_available": False,
+            }
+        },
+    )
+    generic = evaluate_reply(
+        "Ketentuan kanal pendaftaran masih perlu dikonfirmasi dulu.", context
+    )
+    grounded = evaluate_reply(
+        "Benar, pendaftaran hanya melalui aplikasi SOLID. Pendaftaran melalui "
+        "website sudah tidak tersedia.",
+        context,
+    )
+
+    assert "missing_requested_product_fact" in generic.failed_validator_ids
+    assert "missing_requested_product_fact" not in grounded.failed_validator_ids
+
+
+@pytest.mark.parametrize(
+    ("message", "facts", "wrong", "grounded"),
+    [
+        (
+            "Produk apa saja yang bisa saya pelajari?",
+            {"account.eligible_products": ["XUL10", "BCO10_BBJ"]},
+            "Ada Mini dan Regular Account.",
+            "Produk aktif yang bisa dipelajari adalah XUL10 Gold dan BCO10_BBJ "
+            "Brent Oil. Keduanya tetap memiliki risiko karena harga dapat berubah.",
+        ),
+        (
+            "Margin itu apa?",
+            {"trading.margin": {"daytrade_usd_per_lot": 100}},
+            "Margin adalah batas otomatis pada equity.",
+            "Margin adalah dana jaminan untuk membuka posisi; nilainya bergantung pada produk dan jenis akun.",
+        ),
+        (
+            "Spread itu apa?",
+            {"trading.spread": {"XUL10": {"minimum": 0.2}}},
+            "Spread adalah biaya tetap saat membuka posisi.",
+            "Spread adalah selisih harga bid dan ask yang dapat berubah mengikuti kondisi pasar.",
+        ),
+        (
+            "Spread minimum XUL10 berapa per sisi?",
+            {
+                "trading.spread": {
+                    "XUL10": {"minimum": 0.2, "unit": "USD/Troy Ounce/side"}
+                }
+            },
+            "Saya perlu cek spread resminya dulu.",
+            "Spread minimum XUL10 adalah USD 0,2 per Troy Ounce per sisi.",
+        ),
+        (
+            "Komisi akun Mini per 0,1 lot berapa termasuk pajak?",
+            {
+                "trading.commission": {
+                    "amount_usd": 1,
+                    "per_lot": 0.1,
+                    "vat_percent": 11,
+                }
+            },
+            "Total komisinya USD 1,11 per 0,1 lot.",
+            "Komisi Mini adalah USD 1 per 0,1 lot ditambah PPN 11%.",
+        ),
+        (
+            "Di Gold ada biaya swap gak?",
+            {"trading.storage_fee": {"XUL10": {"buy": 0.5}}},
+            "Saya belum punya fakta swap Gold.",
+            "Gold tidak menggunakan swap forex; istilah resminya "
+            "Storage/Rollover Fee, sehingga posisi overnight bukan berarti bebas biaya.",
+        ),
+    ],
+)
+def test_p1_requested_knowledge_and_product_facts_are_enforced(
+    message: str,
+    facts: dict[str, object],
+    wrong: str,
+    grounded: str,
+) -> None:
+    context = ReplyValidationContext(
+        latest_customer_message=message,
+        latest_customer_intent="product_options" if "Produk apa" in message else "product_costs",
+        requested_product_fact_values=facts,
+    )
+
+    assert "missing_requested_product_fact" in evaluate_reply(
+        wrong, context
+    ).failed_validator_ids
+    assert "missing_requested_product_fact" not in evaluate_reply(
+        grounded, context
+    ).failed_validator_ids
+
+
+@pytest.mark.parametrize(
+    ("message", "facts", "wrong", "grounded"),
+    [
+        (
+            "Produk apa saja yang bisa saya pelajari?",
+            {"account.eligible_products": ["XUL10", "BCO10_BBJ"]},
+            "Yang tersedia adalah XUL10 Gold dan BCO10_BBJ Brent Oil.",
+            "Yang tersedia adalah XUL10 Gold dan BCO10_BBJ Brent Oil. "
+            "Keduanya tetap memiliki risiko kerugian karena harga dapat berubah.",
+        ),
+        (
+            "Auto liquidation itu apa dan levelnya berapa?",
+            {
+                "trading.margin": {
+                    "auto_liquidation_level_percent": 30,
+                }
+            },
+            "Auto liquidation menutup posisi otomatis, tetapi levelnya perlu dicek.",
+            "Auto liquidation adalah penutupan posisi otomatis ketika equity "
+            "mencapai level 30%.",
+        ),
+        (
+            "Di Gold ada biaya swap nggak?",
+            {"trading.storage_fee": {"XUL10": {"buy": 0.5}}},
+            "Ada, tetapi untuk Gold disebut Storage/Rollover Fee, bukan swap.",
+            "Gold tidak menggunakan swap forex; yang berlaku adalah "
+            "Storage/Rollover Fee untuk posisi overnight.",
+        ),
+    ],
+)
+def test_p1_uat_failures_require_complete_product_fact_answers(
+    message: str,
+    facts: dict[str, object],
+    wrong: str,
+    grounded: str,
+) -> None:
+    context = ReplyValidationContext(
+        latest_customer_message=message,
+        latest_customer_intent=(
+            "product_options"
+            if message.startswith("Produk")
+            else "mechanism"
+            if message.startswith("Auto")
+            else "product_costs"
+        ),
+        requested_product_fact_values=facts,
+    )
+
+    assert "missing_requested_product_fact" in evaluate_reply(
+        wrong, context
+    ).failed_validator_ids
+    assert "missing_requested_product_fact" not in evaluate_reply(
+        grounded, context
+    ).failed_validator_ids
+
+
+@pytest.mark.parametrize(
+    ("message", "account_category", "facts", "expected_parts"),
+    [
+        (
+            "Produk apa saja yang bisa saya pelajari?",
+            "mini",
+            {"account.eligible_products": ["XUL10", "BCO10_BBJ"]},
+            ("XUL10", "BCO10_BBJ", "risiko"),
+        ),
+        (
+            "Komisi akun Mini per 0,1 lot berapa termasuk pajak?",
+            "regular",
+            {
+                "trading.commission": {
+                    "amount_usd": 1,
+                    "per_lot": 0.1,
+                    "vat_percent": 11,
+                }
+            },
+            ("Mini", "USD 1", "0,1 lot", "PPN 11%"),
+        ),
+    ],
+)
+def test_p1_active_fact_has_deterministic_fallback_after_invalid_retry(
+    message: str,
+    account_category: str,
+    facts: dict[str, object],
+    expected_parts: tuple[str, ...],
+) -> None:
+    answer = reply_suggestion_service.build_requested_product_fact_fallback(
+        latest_customer_message=message,
+        account_category=account_category,
+        requested_product_fact_values=facts,
+    )
+
+    assert answer is not None
+    assert all(part in answer for part in expected_parts)
 
 
 @pytest.mark.parametrize(

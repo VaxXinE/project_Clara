@@ -37,6 +37,7 @@ CANONICAL_PRODUCT_FACT_KEYS = frozenset(
         "trading.margin",
         "trading.swap",
         "trading.rollover",
+        "trading.storage_fee",
         "trading.overnight_requirement",
         "trading.instruments",
         "company.regulatory_status",
@@ -156,6 +157,7 @@ FACT_LABELS = {
     "trading.margin": "Margin",
     "trading.swap": "Swap",
     "trading.rollover": "Rollover",
+    "trading.storage_fee": "Storage fee",
     "trading.overnight_requirement": "Ketentuan overnight",
     "trading.instruments": "Instrumen yang tersedia",
     "company.license_reference": "Referensi izin perusahaan",
@@ -305,19 +307,31 @@ def resolve_product_fact(
         )
     seen: set[tuple[UUID | None, str, str | None]] = set()
     selected: list[ProductFact] = []
+    highest_priority_history: list[ProductFact] = []
     for scope in scope_levels:
         if scope in seen:
             continue
         seen.add(scope)
-        selected = [
+        scoped_facts = [
             fact
             for fact in facts
             if fact.organization_id == scope[0]
             and fact.account_category == scope[1]
             and (fact.product_code or None) == scope[2]
         ]
-        if selected:
+        if not scoped_facts:
+            continue
+        if not highest_priority_history:
+            highest_priority_history = scoped_facts
+        if any(
+            fact.lifecycle_status == "ACTIVE" and _in_effect(fact, current)
+            for fact in scoped_facts
+        ):
+            selected = scoped_facts
             break
+
+    if not selected:
+        selected = highest_priority_history
 
     if not selected:
         return ResolvedProductFact(
@@ -382,6 +396,70 @@ def _format_fact(result: ResolvedProductFact) -> str:
         return f"- Regulator perusahaan: {result.value}."
     if result.fact_key == "company.regulatory_status":
         return f"- Status regulasi: {result.value}"
+    if result.fact_key == "account.eligible_products" and isinstance(
+        result.value, list
+    ):
+        labels = {
+            "XUL10": "XUL10 (Gold/Emas)",
+            "BCO10_BBJ": "BCO10_BBJ (Brent Oil)",
+        }
+        products = [labels.get(str(value), str(value)) for value in result.value]
+        return f"- Produk yang tersedia: {', '.join(products)}."
+    if result.fact_key == "trading.spread" and isinstance(result.value, dict):
+        products = []
+        for product_code, details in result.value.items():
+            if not isinstance(details, dict) or details.get("minimum") is None:
+                continue
+            minimum = str(details["minimum"]).replace(".", ",")
+            unit = str(details.get("unit", "")).replace("/side", " per sisi")
+            products.append(f"{product_code}: minimum {minimum} {unit}".strip())
+        if products:
+            return f"- Spread: {'; '.join(products)}."
+    if result.fact_key == "trading.commission" and isinstance(result.value, dict):
+        amount = result.value.get("amount_usd")
+        lot = result.value.get("per_lot")
+        vat = result.value.get("vat_percent")
+        if amount is not None and lot is not None and vat is not None:
+            lot_text = str(lot).replace(".", ",")
+            return (
+                f"- Komisi: USD {amount} per {lot_text} lot + PPN {vat}%. "
+                "Kutip komponen ini apa adanya; jangan menghitung total sendiri."
+            )
+    if result.fact_key == "trading.margin" and isinstance(result.value, dict):
+        daytrade = result.value.get("daytrade_usd_per_lot")
+        auto_liquidation = result.value.get("auto_liquidation_level_percent")
+        details = []
+        if daytrade is not None:
+            details.append(f"daytrade USD {daytrade} per lot")
+        if auto_liquidation is not None:
+            details.append(f"auto liquidation pada {auto_liquidation}% equity")
+        if details:
+            return (
+                f"- Margin: {'; '.join(details)}. Margin adalah dana "
+                "jaminan dan nilainya bergantung pada produk serta jenis akun."
+            )
+    if result.fact_key == "trading.storage_fee" and isinstance(result.value, dict):
+        products = []
+        for product_code, details in result.value.items():
+            if not isinstance(details, dict):
+                continue
+            buy = details.get("buy_usd_per_0_1_lot_per_night")
+            sell = details.get("sell_usd_per_0_1_lot_per_night")
+            vat = details.get("vat_percent")
+            if buy is None or sell is None or vat is None:
+                continue
+            buy_text = str(buy).replace(".", ",")
+            sell_text = str(sell).replace(".", ",")
+            fee = (
+                f"USD {buy_text}"
+                if buy == sell
+                else f"buy USD {buy_text}; sell USD {sell_text}"
+            )
+            products.append(
+                f"{product_code}: {fee} per 0,1 lot per malam + PPN {vat}%"
+            )
+        if products:
+            return f"- Storage fee: {'; '.join(products)}."
     label = FACT_LABELS.get(result.fact_key, "Fakta produk terverifikasi")
     return f"- {label}: {json.dumps(result.value, ensure_ascii=False)}"
 
@@ -643,13 +721,21 @@ def transition_product_fact(
         "approve": {"DRAFT"},
         "activate": {"APPROVED"},
         "expire": {"APPROVED", "ACTIVE"},
-        "revoke": {"APPROVED", "ACTIVE"},
+        "revoke": {"DRAFT", "APPROVED", "ACTIVE"},
     }[action]
     if fact.lifecycle_status not in allowed_from:
         raise ProductFactError(
             f"Cannot {action} a {fact.lifecycle_status} product fact."
         )
     if action == "activate":
+        if fact.fact_key.startswith("process.") and isinstance(fact.value, dict) and any(
+            fact.value.get(field)
+            for field in ("public_source_conflict", "review_note")
+        ):
+            raise ProductFactError(
+                "Unresolved process fact cannot be activated. Remove review/conflict "
+                "markers in a verified revision first."
+            )
         if fact.effective_until and (_utc(fact.effective_until) or current) <= current:
             raise ProductFactError("Expired effective period cannot be activated.")
         overlap_conditions = [

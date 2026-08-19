@@ -105,11 +105,22 @@ PERSONAL_PATTERN = re.compile(
 )
 CONCRETE_PROBLEM_PATTERN = re.compile(
     r"\b(rugi|hilang|tidak\s+masuk|belum\s+masuk|terpotong|dibekukan|"
-    r"tidak\s+bisa|bermasalah|kejadian|transaksi|deposit|penarikan|withdraw)\b",
+    r"tidak\s+bisa|bermasalah)\b|"
+    r"\b(?:masalah|kendala|gagal)\b.{0,20}\b"
+    r"(?:transaksi|deposit|penarikan|withdraw)\b|"
+    r"\b(?:transaksi|deposit|penarikan|withdraw)\b.{0,20}\b"
+    r"(?:masalah|kendala|gagal)\b",
     re.IGNORECASE,
 )
 FINANCIAL_LOSS_PATTERN = re.compile(
     r"\b(rugi|kehilangan|dana\s+hilang|saldo\s+berkurang|uang\s+hilang)\b",
+    re.IGNORECASE,
+)
+RISK_FREE_EDUCATION_PATTERN = re.compile(
+    r"\b(?:pasti\s+aman|"
+    r"pasti\s+(?:tidak|tak|nggak|gak|ngga|ga)\s+rugi|"
+    r"(?:tidak|tak|nggak|gak|ngga|ga)\s+(?:mungkin|akan)\s+"
+    r"(?:rugi|hilang|berkurang))\b",
     re.IGNORECASE,
 )
 REFUND_PATTERN = re.compile(
@@ -138,6 +149,14 @@ PERSONAL_FRAUD_INCIDENT_PATTERN = re.compile(
 PERSONAL_LEGAL_THREAT_PATTERN = re.compile(
     r"\b(saya|aku|kami)\b(?:\s+\w+){0,5}\s+"
     r"\b(akan\s+lapor|laporkan\s+ke|somasi|gugat|pengacara|lapor\s+polisi)\b",
+    re.IGNORECASE,
+)
+THIRD_PARTY_INCIDENT_CONTEXT_PATTERN = re.compile(
+    r"\b(?:banyak\s+)?(?:broker|perusahaan|pialang)(?:\s+(?:lain|lainnya))?\s+"
+    r"(?:yang\s+)?bermasalah\b|"
+    r"\b(?:teman|saudara|kerabat|keluarga|orang\s+lain|kenalan)\b"
+    r"(?:\s+\w+){0,3}\s+"
+    r"\b(?:rugi|ditipu|dicurangi|kena\s+tipu|kena\s+scam|bermasalah)\b",
     re.IGNORECASE,
 )
 HUMAN_REQUEST_PATTERN = re.compile(
@@ -179,8 +198,10 @@ def classify_safe_handoff_category(
     if HUMAN_REQUEST_PATTERN.search(message):
         return SafeHandoffCategory.HUMAN_REQUEST
 
+    incident_text = RISK_FREE_EDUCATION_PATTERN.sub("", message)
+    incident_text = THIRD_PARTY_INCIDENT_CONTEXT_PATTERN.sub("", incident_text)
     personal = bool(PERSONAL_PATTERN.search(message))
-    concrete = bool(CONCRETE_PROBLEM_PATTERN.search(message))
+    concrete = bool(CONCRETE_PROBLEM_PATTERN.search(incident_text))
     if not personal:
         return None
     if REFUND_REQUEST_PATTERN.search(message):
@@ -195,7 +216,7 @@ def classify_safe_handoff_category(
         return SafeHandoffCategory.FRAUD_ALLEGATION
     if LEGAL_THREAT_PATTERN.search(message) and concrete:
         return SafeHandoffCategory.LEGAL_OR_REGULATOR_THREAT
-    if FINANCIAL_LOSS_PATTERN.search(message):
+    if FINANCIAL_LOSS_PATTERN.search(incident_text):
         return SafeHandoffCategory.FINANCIAL_LOSS_CLAIM
     if HIGH_EMOTION_PATTERN.search(message) and concrete:
         return SafeHandoffCategory.HIGH_EMOTION

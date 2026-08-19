@@ -192,7 +192,7 @@ def delete_product_knowledge(
     )
     ensure_can_modify_product_knowledge(entry=entry, current_user=current_user)
 
-    db.delete(entry)
+    entry.is_active = False
     db.commit()
 
 

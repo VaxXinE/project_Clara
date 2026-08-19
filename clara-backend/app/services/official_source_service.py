@@ -9,6 +9,9 @@ from urllib.request import Request, urlopen
 
 
 OFFICIAL_SOLID_URL = "https://sg-berjangka.com/"
+OFFICIAL_LEGALITY_URL = (
+    "https://www.sg-berjangka.com/tentang-kami/legalitas-bisnis"
+)
 OFFICIAL_BAPPEBTI_URL = "https://bappebti.go.id/pialang_berjangka/detail/049"
 
 
@@ -152,9 +155,24 @@ def _build_bappebti_entry() -> OfficialKnowledgeEntry:
     )
 
 
+def _build_solid_legality_entry() -> OfficialKnowledgeEntry:
+    return OfficialKnowledgeEntry(
+        title="Daftar resmi legalitas PT Solid Gold Berjangka",
+        category="official_legality_source",
+        content=(
+            f"Daftar dokumen legalitas perusahaan tersedia di {OFFICIAL_LEGALITY_URL}. "
+            "Gunakan sumber ini bersama profil BAPPEBTI untuk verifikasi silang. "
+            "Persetujuan OJK dan pendaftaran Bank Indonesia harus dijelaskan hanya "
+            "untuk layanan terkait, bukan sebagai pengawasan umum seluruh kegiatan."
+        ),
+        source_type="official_source_sg",
+    )
+
+
 def get_official_source_entries() -> list[OfficialKnowledgeEntry]:
     return [
         _build_bappebti_entry(),
+        _build_solid_legality_entry(),
         _build_solid_product_entry(),
         _build_solid_company_entry(),
         _build_solid_security_entry(),

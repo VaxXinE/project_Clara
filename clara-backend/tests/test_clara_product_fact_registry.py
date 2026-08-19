@@ -12,6 +12,7 @@ from app.schemas.product_fact_schema import ProductFactDraftCreateRequest
 from app.services.audit_service import create_audit_log
 from app.services.clara_product_fact_service import (
     FreshnessStatus,
+    ProductFactError,
     ProductFactMode,
     ResolutionStatus,
     compose_product_fact_prompt,
@@ -199,6 +200,25 @@ def test_effective_start_is_inclusive_and_end_is_exclusive(
     db.close()
 
 
+def test_product_fact_draft_can_be_revoked(
+    db_session_factory: sessionmaker,
+    seeded_data,
+) -> None:
+    db = db_session_factory()
+    fact = add_fact(db, status="DRAFT")
+
+    transition_product_fact(
+        db,
+        fact_id=fact.id,
+        action="revoke",
+        current_user=seeded_data["owner"],
+        now=NOW,
+    )
+
+    assert fact.lifecycle_status == "REVOKED"
+    db.close()
+
+
 def test_resolution_prefers_exact_category_then_global_not_updated_at(
     db_session_factory: sessionmaker,
 ) -> None:
@@ -218,6 +238,39 @@ def test_resolution_prefers_exact_category_then_global_not_updated_at(
     assert result.resolution_status == ResolutionStatus.RESOLVED
     assert result.fact_id == exact.id
     assert result.value == 5_000_000
+    db.close()
+
+
+def test_resolution_uses_active_global_when_exact_scope_is_only_revoked(
+    db_session_factory: sessionmaker,
+) -> None:
+    db = db_session_factory()
+    global_fact = add_fact(
+        db,
+        key="process.verification_steps",
+        category="global",
+        value={"verification_method": "video_call"},
+        revision=3,
+    )
+    add_fact(
+        db,
+        key="process.verification_steps",
+        category="mini",
+        value={"verification_method": "legacy"},
+        status="REVOKED",
+        revision=4,
+    )
+
+    result = resolve_product_fact(
+        db,
+        fact_key="process.verification_steps",
+        account_category="mini",
+        organization_id=None,
+        now=NOW,
+    )
+
+    assert result.resolution_status == ResolutionStatus.RESOLVED
+    assert result.fact_id == global_fact.id
     db.close()
 
 
@@ -257,6 +310,62 @@ def test_mode_normalization_shadow_and_registry_prompt_behavior(
     assert registry.registry_injection_used
     assert registry.fact_revision_ids
     assert "source_reference" not in registry.content
+    db.close()
+
+
+def test_active_storage_fact_is_rendered_without_missing_fact_fallback(
+    db_session_factory: sessionmaker,
+) -> None:
+    db = db_session_factory()
+    add_fact(
+        db,
+        key="trading.storage_fee",
+        value={
+            "XUL10": {
+                "buy_usd_per_0_1_lot_per_night": 0.5,
+                "sell_usd_per_0_1_lot_per_night": 0.5,
+                "vat_percent": 11,
+            }
+        },
+    )
+
+    composition = compose_product_fact_prompt(
+        db,
+        mode=ProductFactMode.REGISTRY,
+        account_category="mini",
+        organization_id=None,
+        legacy_content="legacy",
+        fact_keys=("trading.storage_fee",),
+        now=NOW,
+    )
+
+    assert composition.resolved_fact_keys == ("trading.storage_fee",)
+    assert not composition.fallback_used
+    assert "USD 0,5 per 0,1 lot per malam + PPN 11%" in composition.content
+    db.close()
+
+
+def test_active_auto_liquidation_level_is_rendered_from_margin_fact(
+    db_session_factory: sessionmaker,
+) -> None:
+    db = db_session_factory()
+    add_fact(
+        db,
+        key="trading.margin",
+        value={"auto_liquidation_level_percent": 30},
+    )
+
+    composition = compose_product_fact_prompt(
+        db,
+        mode=ProductFactMode.REGISTRY,
+        account_category="mini",
+        organization_id=None,
+        legacy_content="legacy",
+        fact_keys=("trading.margin",),
+        now=NOW,
+    )
+
+    assert "auto liquidation pada 30% equity" in composition.content
     db.close()
 
 
@@ -345,6 +454,46 @@ def test_revision_creation_and_lifecycle_are_deterministic(
         now=NOW,
     )
     assert active.lifecycle_status == "ACTIVE"
+    db.close()
+
+
+@pytest.mark.parametrize("marker", ["public_source_conflict", "review_note"])
+def test_unresolved_process_fact_cannot_be_activated(
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    marker: str,
+) -> None:
+    db = db_session_factory()
+    payload = ProductFactDraftCreateRequest(
+        fact_key="process.verification_steps",
+        account_category="mini",
+        value_type="json",
+        value={marker: "Needs official review."},
+        source_type="internal_draft",
+        source_reference="unverified-process-source",
+        freshness_class="HIGH_VOLATILITY",
+        organization_id=seeded_data["org_a"].id,
+    )
+    fact = create_product_fact_draft(
+        db, payload=payload, current_user=seeded_data["admin_a"]
+    )
+    transition_product_fact(
+        db,
+        fact_id=fact.id,
+        action="approve",
+        current_user=seeded_data["admin_a"],
+        now=NOW,
+    )
+
+    with pytest.raises(ProductFactError, match="Unresolved process fact"):
+        transition_product_fact(
+            db,
+            fact_id=fact.id,
+            action="activate",
+            current_user=seeded_data["admin_a"],
+            now=NOW,
+        )
+
     db.close()
 
 
@@ -471,4 +620,4 @@ def test_safe_defaults_remain_unchanged() -> None:
     assert settings.clara_persona_authority_mode == "LEGACY"
     assert settings.clara_semantic_revalidation_mode == "OFF"
     assert settings.clara_policy_enforcement_mode == "OBSERVE"
-    assert settings.clara_product_fact_mode == "LEGACY"
+    assert settings.clara_product_fact_mode == "REGISTRY"

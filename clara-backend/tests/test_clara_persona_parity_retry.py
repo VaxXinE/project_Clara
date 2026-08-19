@@ -72,6 +72,8 @@ def test_validator_registry_is_complete_unique_and_structured() -> None:
         "unnecessary_variant",
         "missing_legality_authority",
         "vague_legality_deflection",
+        "missing_legality_risk_boundary",
+        "missing_requested_product_fact",
         "unsupported_fixed_sensitive_number",
         "post_signup_regression",
         "repeated_product_selection",
@@ -156,6 +158,27 @@ def test_persona_retry_has_no_python_behavioral_authority() -> None:
         "personality selection",
     ):
         assert forbidden not in result.content
+
+
+@pytest.mark.parametrize("mode", list(PersonaAuthorityMode))
+def test_legality_retry_names_the_missing_risk_boundary(
+    mode: PersonaAuthorityMode,
+) -> None:
+    result = compose_retry_prompt(
+        authority_mode=mode,
+        validator_ids=("missing_legality_risk_boundary",),
+        desired_count=1,
+        available_system_sections=ALL_SYSTEM_SECTIONS,
+    )
+
+    assert (
+        "state_that_legal_status_does_not_remove_trading_loss_risk"
+        in result.content
+    )
+    assert "CANONICAL_PLAYBOOK_AUTHORITY=GUARDRAIL" in result.content or (
+        mode == PersonaAuthorityMode.LEGACY
+        and "legacy_retry_legality_grounding" in result.content
+    )
 
 
 @pytest.mark.parametrize("mode", list(PersonaAuthorityMode))

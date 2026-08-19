@@ -269,7 +269,7 @@ def delete_product_knowledge_endpoint(
         )
         create_audit_log(
             db=db,
-            action="product_knowledge.delete",
+            action="product_knowledge.deactivate",
             resource_type="product_knowledge",
             resource_id=str(knowledge_id),
             current_user=current_user,

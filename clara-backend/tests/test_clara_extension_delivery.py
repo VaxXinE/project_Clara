@@ -118,9 +118,9 @@ def test_configuration_defaults_and_normalization() -> None:
     assert settings.clara_persona_authority_mode == "LEGACY"
     assert settings.clara_semantic_revalidation_mode == "OFF"
     assert settings.clara_policy_enforcement_mode == "OBSERVE"
-    assert settings.clara_product_fact_mode == "LEGACY"
+    assert settings.clara_product_fact_mode == "REGISTRY"
     assert settings.clara_process_state_mode == "LEGACY"
-    assert settings.clara_service_routing_mode == "LEGACY"
+    assert settings.clara_service_routing_mode == "ROUTED"
     assert normalize_extension_delivery_mode("governed").mode == ExtensionDeliveryMode.GOVERNED
     assert normalize_extension_delivery_mode("ObSeRvE").mode == ExtensionDeliveryMode.OBSERVE
     assert normalize_extension_delivery_mode("invalid").mode == ExtensionDeliveryMode.LEGACY

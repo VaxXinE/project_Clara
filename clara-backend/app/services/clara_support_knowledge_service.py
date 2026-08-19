@@ -17,10 +17,35 @@ class SupportKnowledgeError(RuntimeError):
 
 MISSING_SUPPORT_HANDOFF = "Informasi tersebut perlu dicek oleh petugas yang berwenang. Saya bantu teruskan agar ditangani dengan aman, ya."
 STATUS_ACCESS_HANDOFF = "Saya tidak memiliki akses untuk melihat status akun Anda. Saya bantu arahkan ke petugas yang berwenang untuk pengecekan resmi, ya."
+SECURITY_SUPPORT_HANDOFF = (
+    "Demi keamanan, jangan bagikan OTP, password, atau PIN melalui chat. "
+    "Saya tidak dapat login atau mengecek akun menggunakan data akses tersebut. "
+    "Untuk pengecekan status, saya bantu arahkan ke petugas yang berwenang "
+    "tanpa memakai OTP tersebut."
+)
+DOCUMENT_PREPARATION_SAFE_FALLBACK = (
+    "Demi keamanan, jangan kirim foto KTP atau buku rekening melalui chat ini. "
+    "Gunakan hanya fitur unggah atau kanal resmi yang ditentukan perusahaan. "
+    "Saya bisa membantu menjelaskan alur amannya tanpa meminta dokumen tersebut."
+)
+REGISTRATION_CHANNEL_SAFE_FALLBACK = (
+    "Kanal pendaftaran harus mengikuti Product Fact aktif. Data tersebut belum "
+    "tersedia untuk jawaban ini, jadi saya tidak akan menebak prosedurnya."
+)
 _PRODUCT_FACT_DUPLICATION = re.compile(
     r"\b(?:rp\s?[\d.]|\d+(?:[.,]\d+)?\s*%|spread|komisi|margin|swap|rollover|modal\s+(?:awal|minimum)|minimum\s+deposit)\b",
     re.I,
 )
+
+
+def safe_support_fallback(topic: str) -> str:
+    return {
+        "STATUS_REQUEST": STATUS_ACCESS_HANDOFF,
+        "SECURITY_CONCERN": SECURITY_SUPPORT_HANDOFF,
+        "PASSWORD_SAFETY": SECURITY_SUPPORT_HANDOFF,
+        "DOCUMENT_PREPARATION_GENERAL": DOCUMENT_PREPARATION_SAFE_FALLBACK,
+        "REGISTRATION_GENERAL": REGISTRATION_CHANNEL_SAFE_FALLBACK,
+    }.get(topic, MISSING_SUPPORT_HANDOFF)
 
 
 def resolve_support_article(
@@ -140,12 +165,17 @@ def transition_support_article_lifecycle(
         raise SupportKnowledgeError("Sales cannot govern support knowledge lifecycle.")
     if role != "superadmin" and article.organization_id != current_user.organization_id:
         raise SupportKnowledgeError("Organization scope denied.")
-    transitions = {
-        "approve": ("DRAFT", "APPROVED"),
-        "activate": ("APPROVED", "ACTIVE"),
-        "retire": ("ACTIVE", "RETIRED"),
+    target_by_action = {
+        "approve": "APPROVED",
+        "activate": "ACTIVE",
+        "retire": "RETIRED",
     }
-    if action not in transitions or article.lifecycle_status != transitions[action][0]:
+    allowed_from = {
+        "approve": {"DRAFT"},
+        "activate": {"APPROVED"},
+        "retire": {"DRAFT", "APPROVED", "ACTIVE"},
+    }
+    if action not in target_by_action or article.lifecycle_status not in allowed_from[action]:
         raise SupportKnowledgeError("Invalid support knowledge lifecycle transition.")
     if action in {"activate", "retire"} and role not in {"head", "superadmin"}:
         raise SupportKnowledgeError(
@@ -171,7 +201,7 @@ def transition_support_article_lifecycle(
         )
         if conflict:
             raise SupportKnowledgeError("Conflicting active support article exists.")
-    article.lifecycle_status = transitions[action][1]
+    article.lifecycle_status = target_by_action[action]
     if action == "approve":
         article.last_verified_at = current
         article.verified_by_user_id = current_user.id
