@@ -2,15 +2,13 @@ import type { Channel } from "~/types/channel"
 
 import type { ChannelAdapter } from "./base"
 import { instagramAdapter } from "./instagram-adapter"
-import { tawkAdapter } from "./tawk-adapter"
 import { tiktokAdapter } from "./tiktok-adapter"
 import { whatsappAdapter } from "./whatsapp-adapter"
 
 const REGISTERED_ADAPTERS: ChannelAdapter[] = [
   whatsappAdapter,
   instagramAdapter,
-  tiktokAdapter,
-  tawkAdapter
+  tiktokAdapter
 ]
 
 export const getRegisteredAdapters = (): ChannelAdapter[] => [

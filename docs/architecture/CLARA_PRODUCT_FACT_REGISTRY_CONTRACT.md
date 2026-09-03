@@ -80,7 +80,7 @@ Safe metadata: mode, resolved/missing/stale/conflicting/mismatch keys, revision 
 
 ## Rollback
 
-Set `CLARA_PRODUCT_FACT_MODE=LEGACY` and restart the backend. Do not delete registry history. Persona, semantic revalidation, policy enforcement, approval/send, and Tawk settings remain unchanged.
+Set `CLARA_PRODUCT_FACT_MODE=LEGACY` and restart the backend. Do not delete registry history. Persona, semantic revalidation, policy enforcement, approval/send, and live-chat settings remain unchanged.
 
 ## Known limits
 

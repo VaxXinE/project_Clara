@@ -53,4 +53,4 @@ Use `/product-facts/shadow-mismatches?account_category=mini` or the registry das
 4. Keep registry records and audit history intact.
 5. Continue human review and file a rollback incident.
 
-Do not change persona, semantic validation, policy enforcement, approval/send, or Tawk settings as part of this rollback.
+Do not change persona, semantic validation, policy enforcement, approval/send, or live-chat settings as part of this rollback.

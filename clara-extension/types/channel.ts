@@ -4,7 +4,7 @@ import type {
   WhatsAppMessage
 } from "~/types/whatsapp"
 
-export type Channel = "whatsapp" | "instagram" | "tiktok" | "tawk"
+export type Channel = "whatsapp" | "instagram" | "tiktok"
 
 export type LegacyRuntimeMessageType =
   | "READ_WHATSAPP_CHAT"

@@ -18,4 +18,4 @@ Statuses are `OPEN`, `TRIAGE_REQUIRED`, `IN_REVIEW`, `WAITING_CUSTOMER`, `ESCALA
 
 Events are append-only and cover `CREATED`, `REOBSERVED`, `ASSIGNED`, `STATUS_CHANGED`, `SEVERITY_CHANGED`, `SAFE_INTAKE_APPENDED`, `ESCALATED`, `RESOLVED`, `CLOSED`, and `REOPENED`. Mutations use optimistic versions. Sales may append only canonical safe intake. Manager handles low/medium cases. High-risk operations and severity downgrades require head/superadmin plus a reason. Cross-organization action requires explicit backend scope.
 
-Complaint intake never changes canonical process state, product facts, policy decisions, approval/send behavior, or Tawk ownership.
+Complaint intake never changes canonical process state, product facts, policy decisions, approval/send behavior, or live-chat ownership.

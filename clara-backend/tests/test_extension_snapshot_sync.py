@@ -414,9 +414,7 @@ def test_extension_config_reports_channel_flags(
     assert (
         payload["channels"]["tiktok"]["enabled"] is settings.extension_tiktok_enabled
     )
-    assert (
-        payload["channels"]["tawk"]["enabled"] is settings.extension_tawk_enabled
-    )
+    assert set(payload["channels"]) == {"whatsapp", "instagram", "tiktok"}
     assert payload["channels"]["whatsapp"]["provider"] == "extension"
 
 

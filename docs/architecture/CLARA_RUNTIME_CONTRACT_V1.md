@@ -19,7 +19,7 @@ Module: `clara-backend/app/core/clara_runtime_contract.py`
 
 ## 1. Purpose
 
-Kontrak ini memberikan vocabulary, urutan authority, normalisasi legacy, urutan system playbook, dan provenance yang deterministic. Stage 1 tidak mengubah policy decision, approval/send gate, product facts, Tawk ownership, process-state persistence, atau public API values.
+Kontrak ini memberikan vocabulary, urutan authority, normalisasi legacy, urutan system playbook, dan provenance yang deterministic. Stage 1 tidak mengubah policy decision, approval/send gate, product facts, live-chat ownership, process-state persistence, atau public API values.
 
 ## 2. Canonical Authority Order
 
@@ -223,7 +223,7 @@ Sebelum Stage 1, `load_clara_response_playbook()` dengan multi-reply dapat memas
 
 Stage 1 mengecualikan lima system files dari supporting composition. System section tetap memuat content yang sama melalui canonical DB-per-section/Markdown fallback. Perubahan ini diperlukan agar published precedence deterministic dan tercakup unit test.
 
-Tidak ada product fact, policy decision, approval/send behavior, atau Tawk behavior yang diubah.
+Tidak ada product fact, policy decision, approval/send behavior, atau live-chat behavior yang diubah.
 
 ## 10. Unresolved Business Decisions
 
@@ -298,7 +298,7 @@ Validator registry memetakan setiap detector ke salah satu:
 `PRODUCT_FACT`, `TECHNICAL_OUTPUT`, atau `RUNTIME_CONTEXT`.
 
 Production default tetap `LEGACY`. Contract ini tidak mengubah product facts,
-policy outcome, approval/send, complaint routing, Tawk, model ORM, atau schema
+policy outcome, approval/send, complaint routing, live chat, model ORM, atau schema
 database.
 
 Detail parity dan safety coverage:
@@ -364,7 +364,7 @@ LEGACY and SHADOW preserve prompt/validator output. FSM adds
 `canonical_process_state` to structured runtime context and continuity
 validation only. It does not enter persona playbooks and cannot override
 backend security, product facts, policy, reviewer, approval/send, complaint,
-or Tawk authority. See
+or live-chat authority. See
 `docs/architecture/CLARA_PROCESS_STATE_FSM_CONTRACT.md`.
 
 ## 19. Stage 8/8.1 Service Routing Contract
@@ -374,7 +374,7 @@ Stage 8 adds `CLARA_SERVICE_ROUTING_MODE` with safe default `LEGACY`.
 L0/L1 and contextual complaints from sales generation; complaints reuse the
 Stage 5 handoff and create an idempotent case ledger. Missing CS knowledge
 fails to human handoff. Other defaults, facts, process state, policy,
-approval/send, and Tawk behavior remain unchanged.
+approval/send, and live-chat behavior remain unchanged.
 
 Stage 8.1 stabilizes this as routing contract `1.1`: complete typed decisions,
 structured credential-safe complaint intake, bounded incident identity,

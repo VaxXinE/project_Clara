@@ -76,7 +76,9 @@ WHATSAPP_META_VERIFY_TOKEN=replace_with_meta_verify_token
 WHATSAPP_META_APP_SECRET=replace_with_meta_app_secret
 WHATSAPP_META_DEFAULT_ORGANIZATION_SLUG=clara-local
 WHATSAPP_META_DEFAULT_SALES_USER_EMAIL=owner@clara.local
-TAWK_WEBHOOK_SECRET_KEY=replace_with_tawk_webhook_secret_key
+LIVE_CHAT_SITE_CONFIGS={"website-main":{"webhook_secret":"replace-with-at-least-32-random-characters","organization_slug":"clara-local","sales_user_email":"owner@clara.local"}}
+LIVE_CHAT_SIGNATURE_TOLERANCE_SECONDS=300
+LIVE_CHAT_RATE_LIMIT_PER_MINUTE=120
 
 CONVERSATION_AUTO_ARCHIVE_DAYS=7
 ```

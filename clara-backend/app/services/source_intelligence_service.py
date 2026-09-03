@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 MANUAL_PROVIDER_KEYS = {"manual_upload", "manual", "manual_import"}
-OFFICIAL_API_PROVIDER_KEYS = {"meta", "official_api"}
+OFFICIAL_API_PROVIDER_KEYS = {"meta", "official_api", "website"}
 
 
 CHANNEL_REGISTRY: dict[str, dict[str, object]] = {
@@ -34,6 +34,18 @@ CHANNEL_REGISTRY: dict[str, dict[str, object]] = {
         "supported_sources": ["telegram_txt", "telegram_extension", "telegram_manual"],
         "sample_hint": "[18.05.2026 09:12] Customer: Halo kak",
     },
+    "live_chat": {
+        "key": "live_chat",
+        "label": "Website Live Chat",
+        "description": "Percakapan live chat yang diterima langsung dari backend website.",
+        "supports_file_upload": False,
+        "supports_text_paste": False,
+        "supports_live_sync": True,
+        "file_endpoint": None,
+        "text_endpoint": None,
+        "supported_sources": ["website_live_chat"],
+        "sample_hint": "Dikirim server-to-server melalui API live chat.",
+    },
 }
 
 
@@ -55,8 +67,8 @@ def normalize_source_channel(source: str | None) -> str:
         return "instagram"
     if source_key.startswith("tiktok") or source_key.startswith("tt_"):
         return "tiktok"
-    if source_key.startswith("tawk") or "live_chat" in source_key:
-        return "other"
+    if "live_chat" in source_key:
+        return "live_chat"
     if source_key.startswith("email"):
         return "email"
     if "import" in source_key or source_key.startswith("csv"):
@@ -93,10 +105,9 @@ def build_source_label(source: str | None) -> str:
         "telegram_manual": "Telegram Manual",
         "instagram_extension": "Instagram Extension",
         "tiktok_extension": "TikTok Extension",
-        "tawk_extension": "Tawk Extension",
         "instagram_dm": "Instagram DM",
         "instagram_comment": "Instagram Comment",
-        "tawk_webhook": "Tawk Webhook",
+        "website_live_chat": "Website Live Chat",
         "email_inbox": "Email Inbox",
         "csv_import": "CSV Import",
         "unknown": "Unknown Source",

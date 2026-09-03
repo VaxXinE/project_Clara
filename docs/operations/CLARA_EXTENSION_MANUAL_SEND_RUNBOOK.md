@@ -36,4 +36,4 @@ tokens into tickets or logs. Use authorization ID, reason codes, and timestamps.
 3. Confirm `/extension/config` reports `delivery_mode=LEGACY`.
 4. Record why rollback was needed and preserve authorization/event history.
 5. Do not change persona, semantic, policy, facts, process-state, routing, or
-   Tawk configuration as part of the rollback.
+   live-chat configuration as part of the rollback.

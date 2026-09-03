@@ -99,14 +99,13 @@ class Settings(BaseSettings):
     whatsapp_meta_app_secret: str | None = None
     whatsapp_meta_default_organization_slug: str | None = None
     whatsapp_meta_default_sales_user_email: str | None = None
-    tawk_webhook_secret_key: str | None = None
-    tawk_property_organization_map: dict[str, str] = Field(default_factory=dict)
-    tawk_property_default_sales_user_map: dict[str, str] = Field(default_factory=dict)
+    live_chat_site_configs: dict[str, dict[str, str]] = Field(default_factory=dict)
+    live_chat_signature_tolerance_seconds: int = Field(default=300, ge=30, le=3600)
+    live_chat_rate_limit_per_minute: int = Field(default=120, ge=1, le=10_000)
     conversation_auto_archive_days: int = 7
     extension_whatsapp_enabled: bool = True
     extension_instagram_enabled: bool = False
     extension_tiktok_enabled: bool = False
-    extension_tawk_enabled: bool = False
     extension_distribution_dir: str = "./storage/extension-builds"
 
     model_config = SettingsConfigDict(

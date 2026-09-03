@@ -11,7 +11,6 @@
 | Uncertain delivery | Sync error after possible customer delivery | `UNKNOWN → RECONCILIATION_REQUIRED`; retry blocked |
 | Content messaging | `{type, text}` | Claim reference, user-action marker, and expected hashes |
 | Token storage | None | Raw token returned once; only SHA-256 stored |
-| Tawk | Read-only extension plus webhook compatibility | Unchanged |
 
 Migration `fa0b1c2d3e4f` adds three nullable generation fingerprints and a version
 to `reply_suggestions`, makes the existing sent-suggestion index unique, and

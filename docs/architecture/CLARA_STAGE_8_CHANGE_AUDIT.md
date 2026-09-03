@@ -45,7 +45,7 @@ Stage 8.1 additionally adds the incident-identity migration, four missing contra
 - `clara-backend/app/api/routes_reply.py`
 - `clara-backend/app/api/routes_sales_structure.py`
 - `clara-backend/app/api/routes_sent_messages.py`
-- `clara-backend/app/api/routes_tawk_webhooks.py`
+- `clara-backend/app/api/routes_live_chat_webhooks.py`
 - `clara-backend/app/api/routes_upload.py`
 - `clara-backend/app/api/routes_webhooks.py`
 - `clara-backend/app/core/logging.py`
@@ -101,7 +101,7 @@ Stage 8.1 additionally adds the incident-identity migration, four missing contra
 - `clara-backend/app/services/product_knowledge_service.py`
 - `clara-backend/app/services/sales_structure_service.py`
 - `clara-backend/app/services/sgcc_integration_service.py`
-- `clara-backend/app/services/tawk_webhook_service.py`
+- `clara-backend/app/services/live_chat_ingest_service.py`
 - `clara-backend/app/services/whatsapp_webhook_service.py`
 
 ## UNRELATED_SEMANTIC_CHANGE
@@ -114,4 +114,4 @@ None.
 
 ## Boundary decision
 
-The restoration deliberately returns Tawk webhook/owner resolution, WhatsApp ingestion, SGCC integration, dashboards, hierarchy, authentication, product facts, process-state logic, policy engine, approval, and send services to byte-equivalent Stage 7 behavior. Only the centralized reply orchestration hook remains because it is required for opt-in Stage 8 routing. Production default remains `LEGACY`.
+The restoration deliberately returns live-chat owner resolution, WhatsApp ingestion, SGCC integration, dashboards, hierarchy, authentication, product facts, process-state logic, policy engine, approval, and send services to byte-equivalent Stage 7 behavior. Only the centralized reply orchestration hook remains because it is required for opt-in Stage 8 routing. Production default remains `LEGACY`.

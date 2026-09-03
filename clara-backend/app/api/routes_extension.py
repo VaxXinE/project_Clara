@@ -54,7 +54,7 @@ from app.services.clara_extension_delivery_service import (
 
 router = APIRouter(prefix="/extension", tags=["extension"])
 
-ALLOWED_EXTENSION_CHANNELS = {"whatsapp", "instagram", "tiktok", "tawk"}
+ALLOWED_EXTENSION_CHANNELS = {"whatsapp", "instagram", "tiktok"}
 
 
 def _build_unsupported_channel_detail(channel: str) -> dict[str, str]:
@@ -69,7 +69,6 @@ def _build_feature_disabled_detail(channel: str) -> dict[str, str]:
         "whatsapp": "WhatsApp",
         "instagram": "Instagram DM",
         "tiktok": "TikTok DM",
-        "tawk": "Tawk.to Live Chat",
     }.get(channel, channel)
     return {
         "code": "FEATURE_DISABLED",
@@ -94,7 +93,6 @@ def _is_extension_channel_enabled(channel: str) -> bool:
         "whatsapp": settings.extension_whatsapp_enabled,
         "instagram": settings.extension_instagram_enabled,
         "tiktok": settings.extension_tiktok_enabled,
-        "tawk": settings.extension_tawk_enabled,
     }[channel]
 
 
@@ -169,14 +167,6 @@ def _send_extension_reply_suggestion(
 ) -> ExtensionSendReplyResponse:
     normalized_channel = _normalize_extension_channel_or_raise(channel)
     _require_enabled_extension_channel(normalized_channel)
-    if normalized_channel == "tawk":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "code": "TAWK_REPLY_ACTION_NOT_AVAILABLE",
-                "message": "Aksi balasan Tawk tersedia pada TAWK-03.",
-            },
-        )
     if (
         normalize_extension_delivery_mode(settings.clara_extension_delivery_mode).mode
         == ExtensionDeliveryMode.GOVERNED
@@ -405,11 +395,7 @@ def get_extension_config(
                 "enabled": settings.extension_tiktok_enabled,
                 "provider": "extension",
             },
-            "tawk": {
-                "enabled": settings.extension_tawk_enabled,
-                "provider": "extension",
-            },
-        }
+        },
     )
 
 
@@ -430,11 +416,6 @@ def authorize_extension_reply_delivery_endpoint(
 ):
     normalized_channel = _normalize_extension_channel_or_raise(channel)
     _require_enabled_extension_channel(normalized_channel)
-    if normalized_channel == "tawk":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"code": "TAWK_REPLY_ACTION_NOT_AVAILABLE"},
-        )
     try:
         suggestion = get_accessible_reply_suggestion_or_raise(
             db=db,

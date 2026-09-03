@@ -13,7 +13,7 @@ export interface WhatsAppMessage {
 
 export interface WhatsAppChatSnapshot {
   capturedAt: string
-  channel?: "whatsapp" | "instagram" | "tiktok" | "tawk"
+  channel?: "whatsapp" | "instagram" | "tiktok"
   chatTitle: string
   chatSubtitle: string
   externalThreadId?: string

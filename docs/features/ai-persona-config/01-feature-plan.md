@@ -98,7 +98,7 @@ UI merender prompt sebagai plain text. Tidak memakai `dangerouslySetInnerHTML`.
 5. `feature/ai-persona-config-qa`
    - Integration test, security regression, dan runbook.
 
-Setiap branch dibuat dari `tawk-integration` terbaru dan di-merge kembali
+Setiap branch dibuat dari branch integrasi terbaru dan di-merge kembali
 sebelum tahap berikutnya dimulai.
 
 ## Definition of Done
