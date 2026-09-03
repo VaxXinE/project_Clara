@@ -79,9 +79,33 @@ WHATSAPP_META_DEFAULT_SALES_USER_EMAIL=owner@clara.local
 LIVE_CHAT_SITE_CONFIGS={"website-main":{"webhook_secret":"replace-with-at-least-32-random-characters","organization_slug":"clara-local","sales_user_email":"owner@clara.local"}}
 LIVE_CHAT_SIGNATURE_TOLERANCE_SECONDS=300
 LIVE_CHAT_RATE_LIMIT_PER_MINUTE=120
+SSO_ISSUER=http://127.0.0.1:8000
+SSO_LOGIN_URL=http://localhost:3000/login
+SSO_CLIENT_ID=live-chat-dashboard
+SSO_CLIENT_SECRET=replace_with_at_least_32_random_characters
+SSO_REDIRECT_URIS=https://live-chat.example.com/auth/clara/callback
+SSO_SIGNING_SECRET=replace_with_a_different_32_character_secret
+SSO_CODE_EXPIRE_SECONDS=120
+SSO_ACCESS_TOKEN_EXPIRE_MINUTES=5
+SSO_ALLOWED_ROLES=sales,manager,head,superadmin
+SSO_RATE_LIMIT_PER_MINUTE=60
 
 CONVERSATION_AUTO_ARCHIVE_DAYS=7
 ```
+
+Endpoint SSO Live Chat:
+
+```text
+GET  /.well-known/openid-configuration
+GET  /oauth/authorize
+POST /oauth/token
+GET  /oauth/userinfo
+POST /oauth/introspect
+```
+
+Gunakan secret berbeda untuk `JWT_SECRET_KEY`, `SSO_CLIENT_SECRET`, dan
+`SSO_SIGNING_SECRET`. Authorization code wajib ditukar dengan PKCE `S256` dan
+redirect URI harus sama persis dengan allowlist `SSO_REDIRECT_URIS`.
 
 ## Bootstrap superadmin
 

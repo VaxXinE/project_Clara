@@ -47,6 +47,7 @@ from app.models.sales_team import SalesTeam
 from app.models.sales_performance_snapshot import SalesPerformanceSnapshot
 from app.models.sales_unit import SalesUnit
 from app.models.sent_message import SentMessage
+from app.models.sso_authorization_code import SSOAuthorizationCode
 from app.models.support_knowledge_article import SupportKnowledgeArticle
 from app.models.team_performance_snapshot import TeamPerformanceSnapshot
 from app.models.user import User
@@ -97,6 +98,7 @@ __all__ = [
     "SalesTeam",
     "SalesUnit",
     "SentMessage",
+    "SSOAuthorizationCode",
     "SupportKnowledgeArticle",
     "TeamPerformanceSnapshot",
     "User",

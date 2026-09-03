@@ -1,12 +1,15 @@
 # Kebutuhan API Live Chat dan SSO Dashboard untuk Integrasi Clara
 
-**Versi:** v1.1  
+**Versi:** v1.2
 **Status:** Draft untuk disepakati bersama Tim Live Chat  
 **Konsumen API:** Clara Backend  
 **Penyedia API:** Backend Live Chat  
 **Metode sinkronisasi conversation:** `GET` saja  
 **Sumber akun dashboard:** Clara  
 **Channel internal Clara:** `live_chat`
+
+Panduan implementasi dan pengujian SSO tersedia di
+[`02-sso-integration-guide.md`](./02-sso-integration-guide.md).
 
 ## 1. Tujuan
 
@@ -130,12 +133,13 @@ Protokol yang direkomendasikan adalah OAuth 2.0 Authorization Code Flow dengan P
 Contoh alur:
 
 ```http
-GET <CLARA_SSO_BASE_URL>/authorize
+GET <CLARA_SSO_BASE_URL>/oauth/authorize
     ?client_id=live-chat-dashboard
     &redirect_uri=<LIVE_CHAT_CALLBACK_URL>
     &response_type=code
     &scope=openid%20profile%20email
     &state=<RANDOM_STATE>
+    &nonce=<RANDOM_NONCE>
     &code_challenge=<PKCE_CHALLENGE>
     &code_challenge_method=S256
 ```
@@ -160,9 +164,61 @@ Ketentuan SSO:
 - Tim Live Chat membuat session dashboard sendiri setelah identitas berhasil diverifikasi.
 - Logout Live Chat minimal menghapus session Live Chat; mekanisme single logout dapat disepakati terpisah.
 
-> Catatan: endpoint SSO di atas adalah kontrak target. Clara saat ini memiliki login JWT internal, tetapi belum bertindak sebagai OAuth/OIDC provider. Endpoint authorization-code SSO perlu disediakan oleh Tim Clara sebelum integrasi SSO diuji.
+> Catatan: Clara tetap memakai login JWT internal untuk dashboard, sedangkan endpoint di bawah menyediakan authorization-code SSO khusus untuk integrasi Live Chat.
 
-### 4A.1 Identitas User dari Clara
+### 4A.1 Endpoint SSO yang Disediakan Clara
+
+Clara menyediakan Authorization Code Flow dengan PKCE melalui endpoint berikut:
+
+```http
+GET  /.well-known/openid-configuration
+GET  /oauth/authorize
+POST /oauth/token
+GET  /oauth/userinfo
+POST /oauth/introspect
+```
+
+Ketentuan integrasi:
+
+- `client_id` awal adalah `live-chat-dashboard`.
+- Redirect URI wajib didaftarkan pada `SSO_REDIRECT_URIS` dan dicocokkan secara exact match.
+- Scope yang didukung adalah `openid profile email`.
+- Authorization code berlaku 120 detik, disimpan sebagai hash, dan hanya dapat digunakan sekali.
+- Access token berlaku 5 menit dan hanya digunakan server-to-server atau ke endpoint `userinfo`.
+- ID token menggunakan `HS256` dengan OAuth client secret sebagai symmetric verification key.
+- Live Chat boleh memvalidasi access token melalui endpoint introspection tanpa menerima signing secret internal Clara.
+- Client secret dan token wajib dikirim melalui request body HTTPS atau HTTP Basic Auth, bukan query parameter.
+
+Contoh token exchange:
+
+```http
+POST <CLARA_SSO_BASE_URL>/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code&
+code=<ONE_TIME_CODE>&
+redirect_uri=<LIVE_CHAT_CALLBACK_URL>&
+client_id=live-chat-dashboard&
+client_secret=<LIVE_CHAT_OAUTH_CLIENT_SECRET>&
+code_verifier=<PKCE_VERIFIER>
+```
+
+Live Chat wajib memvalidasi ID token berikut:
+
+```text
+signature
+iss
+aud = live-chat-dashboard
+exp
+nonce
+sub
+isActive = true
+organizationId tidak kosong
+```
+
+> Implementasi endpoint sudah tersedia di Clara Backend. Pengujian end-to-end tetap menunggu base URL production, client secret baru, dan redirect URI final dari Tim Live Chat.
+
+### 4A.2 Identitas User dari Clara
 
 Identitas terverifikasi minimal yang diterima Backend Live Chat:
 

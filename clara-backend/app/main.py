@@ -16,6 +16,7 @@ from app.api.routes_leads import router as leads_router
 from app.api.routes_reply import router as reply_router
 from app.api.routes_sales_structure import router as sales_structure_router
 from app.api.routes_sent_messages import router as sent_messages_router
+from app.api.routes_sso import router as sso_router
 from app.api.routes_live_chat_webhooks import router as live_chat_webhooks_router
 from app.api.routes_upload import router as upload_router
 from app.api.routes_webhooks import router as webhooks_router
@@ -47,6 +48,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(auth_router)
+    app.include_router(sso_router)
     app.include_router(organizations_router)
     app.include_router(sales_structure_router)
     app.include_router(product_knowledge_router)
