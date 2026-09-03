@@ -29,7 +29,7 @@ Strategies are `EXISTING_SALES_GENERATION`, `COMPLIANCE_EDUCATION`, `SUPPORT_KNO
 
 Generic fraud, legal, regulator, risk, or refund-policy education is not a complaint without personal incident evidence. Routine login trouble is CS unless human handling is requested. A status question is `HUMAN_REQUIRED` and cannot confirm process/account state.
 
-Routing consumes enforcement/reviewer decisions but cannot override backend `BLOCK`, product facts, canonical process state, approval/send gates, or Tawk owner resolution. Rollback is setting routing to `LEGACY` and restarting; audit history remains intact.
+Routing consumes enforcement/reviewer decisions but cannot override backend `BLOCK`, product facts, canonical process state, approval/send gates, or live-chat owner resolution. Rollback is setting routing to `LEGACY` and restarting; audit history remains intact.
 
 ## Tahap 6 extension delivery boundary
 

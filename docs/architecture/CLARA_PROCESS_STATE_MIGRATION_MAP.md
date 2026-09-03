@@ -21,7 +21,7 @@ pipeline stage, temperature, account category, or transcript. New profiles
 receive UNKNOWN when linked through the existing identity service.
 
 Upgrade and downgrade do not modify legacy pipeline columns, product facts,
-policy fields, approval/send state, or Tawk data. Downgrade deletes Stage 7
+policy fields, approval/send state, or live-chat data. Downgrade deletes Stage 7
 state/history tables, so runtime rollback should use mode `LEGACY` instead.
 
 ## Future migration boundary

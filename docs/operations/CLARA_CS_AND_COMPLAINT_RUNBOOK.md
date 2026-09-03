@@ -25,4 +25,4 @@
 
 Monitor safe route IDs, decision/intake hashes, missing topics, article IDs/source hashes, and complaint category/severity/status/event counts. Never log messages, article content, case summaries, credentials, secrets, or PII.
 
-Rollback: set `CLARA_SERVICE_ROUTING_MODE=LEGACY` and restart. Do not delete case, event, or support history. Tawk ownership and approval/send configuration are untouched.
+Rollback: set `CLARA_SERVICE_ROUTING_MODE=LEGACY` and restart. Do not delete case, event, or support history. Live-chat ownership and approval/send configuration are untouched.

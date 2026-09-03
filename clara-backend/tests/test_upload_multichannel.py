@@ -156,10 +156,13 @@ def test_list_upload_channels_returns_registry(
     payload = response.json()
 
     channel_keys = {item["key"] for item in payload}
-    assert {"whatsapp", "telegram"} <= channel_keys
+    assert {"whatsapp", "telegram", "live_chat"} <= channel_keys
     whatsapp = next(item for item in payload if item["key"] == "whatsapp")
     assert whatsapp["supports_live_sync"] is True
     assert whatsapp["text_endpoint"] == "/upload/whatsapp-text"
+    live_chat = next(item for item in payload if item["key"] == "live_chat")
+    assert live_chat["supports_live_sync"] is True
+    assert live_chat["file_endpoint"] is None
 
 
 def test_detect_upload_channel_prefers_telegram_for_telegram_text(
@@ -200,4 +203,4 @@ def test_dashboard_channel_overview_returns_counts(
     payload = response.json()
     assert payload["scope_type"] == "organization"
     channel_keys = {item["key"] for item in payload["items"]}
-    assert {"whatsapp", "telegram"} <= channel_keys
+    assert {"whatsapp", "telegram", "live_chat"} <= channel_keys

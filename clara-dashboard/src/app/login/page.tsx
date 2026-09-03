@@ -35,6 +35,27 @@ function getDashboardPathForRole(role: string): string {
   }
 }
 
+function getSafeSsoReturnUrl(): string | null {
+  const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+  const issuer = process.env.NEXT_PUBLIC_SSO_ISSUER;
+
+  if (!returnTo || !issuer) {
+    return null;
+  }
+
+  try {
+    const target = new URL(returnTo);
+    const allowedIssuer = new URL(issuer);
+    const authorizePath = `${allowedIssuer.pathname.replace(/\/$/, "")}/oauth/authorize`;
+
+    return target.origin === allowedIssuer.origin && target.pathname === authorizePath
+      ? target.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const superadminTapCountRef = useRef(0);
@@ -194,7 +215,12 @@ export default function LoginPage() {
         },
       });
 
-      router.push(getDashboardPathForRole(response.user.role));
+      const ssoReturnUrl = getSafeSsoReturnUrl();
+      if (ssoReturnUrl) {
+        window.location.assign(ssoReturnUrl);
+      } else {
+        router.push(getDashboardPathForRole(response.user.role));
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Login gagal.");
     } finally {

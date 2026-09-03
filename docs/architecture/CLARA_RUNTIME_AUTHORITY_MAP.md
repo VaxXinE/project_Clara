@@ -23,7 +23,7 @@ Dokumen ini memetakan perilaku yang **benar-benar dilewati runtime**. Isi Markdo
 > Tahap 6 extension-first adaptation: browser delivery authority now belongs to
 > the extension delivery contract. In `GOVERNED`, backend authorization and an
 > atomic claim precede DOM send; the human click remains the only send trigger.
-> Default remains `LEGACY`, and Tawk webhook ownership is unchanged.
+> Default remains `LEGACY`, and native live-chat ownership is unchanged.
 
 ## A. Executive Summary
 
@@ -39,7 +39,7 @@ Output dipengaruhi oleh lima lapisan:
 
 Authority paling besar bukan file persona, melainkan `reply_suggestion_service.py`. System prompt Python diletakkan sebelum effective persona. Karena itu versi persona database yang published menggantikan fallback Markdown untuk section yang sama, tetapi tidak menggantikan aturan Python. Supporting playbook juga tetap berasal dari Markdown.
 
-Boundary yang dijamin kode antara lain schema output, panjang/jumlah bubble sesuai profile, akses conversation, status suggestion sebelum mark-sent dashboard, signature webhook Tawk, dan satu versi persona published per variant/section. Sebaliknya, banyak aturan sales/compliance—termasuk persona mode, anti-regression state, complaint handling, freshness knowledge, dan arti `human_approval_required`—masih prompt-only atau mixed.
+Boundary yang dijamin kode antara lain schema output, panjang/jumlah bubble sesuai profile, akses conversation, status suggestion sebelum mark-sent dashboard, signature webhook live chat, dan satu versi persona published per variant/section. Sebaliknya, banyak aturan sales/compliance—termasuk persona mode, anti-regression state, complaint handling, freshness knowledge, dan arti `human_approval_required`—masih prompt-only atau mixed.
 
 ## B. End-to-End Runtime Flow
 
@@ -51,7 +51,7 @@ Status:
 - **UNCLEAR**: memerlukan keputusan owner atau bukti operasional.
 - **DOCUMENTED_ONLY**: tertulis, tetapi tidak dijamin backend.
 
-1. **Incoming message — CONFIRMED/CONDITIONAL.** Upload/manual, extension snapshot, dan webhook Tawk membentuk/memperbarui `Conversation` dan `Message`. Tawk memvalidasi signature serta memetakan transcript pada `ingest_tawk_webhook()` (`clara-backend/app/services/tawk_webhook_service.py:184-547`). Extension hanya menyinkronkan active conversation (`clara-backend/app/services/extension_ingest_service.py:809-979`).
+1. **Incoming message — CONFIRMED/CONDITIONAL.** Upload/manual, extension snapshot, dan API live chat membentuk/memperbarui `Conversation` dan `Message`. Native live chat memvalidasi HMAC serta memetakan snapshot pada `ingest_live_chat_event()` (`clara-backend/app/services/live_chat_ingest_service.py`). Extension hanya menyinkronkan active conversation.
 2. **Identity/context retrieval — CONFIRMED/INCOMPLETE.** Conversation menyimpan organization, owner, lead, channel/provider, stage, dan temperature (`clara-backend/app/models/conversation.py:10-105`). Reply context dipotong menurut latency profile (`reply_suggestion_service.py:2507-2562`). Identity juga diekstrak heuristik dari pesan dan dimasukkan ke prompt (`reply_suggestion_service.py:1160-1206,1293-1304,1665-1711`); tidak ada state machine identitas tunggal.
 3. **Intent/state analysis — CONFIRMED/MIXED.** Extraction model menghasilkan schema terstruktur (`ai_extraction_service.py:75-140,264-405`). Saat reply, intent dihitung ulang dengan regex dan urutan prioritas (`reply_suggestion_service.py:825-914`), sedangkan process milestone juga dihitung ulang dari teks (`reply_suggestion_service.py:1155-1304`).
 4. **Policy decision — CONFIRMED/INCOMPLETE.** `decide_reply_action()` mengembalikan `escalate_to_human`, `human_approval_required`, atau `auto_draft_only` (`policy_engine.py:12-46`). Nilai disimpan sebagai metadata, tetapi tidak menghentikan generation (`reply_suggestion_service.py:4304-4494`).
@@ -62,7 +62,7 @@ Status:
 9. **Validation — INCOMPLETE.** Schema/Pydantic selalu dicek. Semantic validators dijalankan pada reply pertama tertentu dan dapat memicu satu retry (`reply_suggestion_service.py:3880-4202`). Output retry hanya melewati schema/Pydantic; semantic suite tidak dijalankan ulang (`reply_suggestion_service.py:4239-4288`).
 10. **Suggestion persistence — CONFIRMED.** Suggestion disimpan `pending` bersama action mode dan metadata (`reply_suggestion_service.py:4304-4494`; `models/reply_suggestion.py:11-45`).
 11. **Human review — CONDITIONAL/INCOMPLETE.** Endpoint approve/reject tersedia untuk user yang lolos access scope (`routes_reply.py:124-207`). Approval service memerlukan status pending, tetapi tidak memeriksa `action_mode`; `reviewer_name` berasal dari payload sementara user autentik hanya masuk metadata audit (`reply_suggestion_service.py:4510-4571`; `models/approval_log.py:10-31`).
-12. **Send/manual action — CONDITIONAL.** Dashboard `mark_reply_suggestion_as_sent()` hanya menerima suggestion approved dan mencatat `manual_simulation` (`sent_message_service.py:165-237`). Extension send merupakan klik eksplisit, tetapi pending suggestion dapat di-auto-approve saat konfirmasi send (`extension_ingest_service.py:1126-1255`; `routes_extension.py:135-190`). Tawk adapter bersifat read-only (`clara-extension/utils/channel-adapters/tawk-adapter.ts:657-678`).
+12. **Send/manual action — CONDITIONAL.** Dashboard `mark_reply_suggestion_as_sent()` hanya menerima suggestion approved dan mencatat `manual_simulation` (`sent_message_service.py:165-237`). Extension send merupakan klik eksplisit, tetapi pending suggestion dapat di-auto-approve saat konfirmasi send (`extension_ingest_service.py:1126-1255`; `routes_extension.py:135-190`). Native live-chat interface saat ini inbound-only.
 13. **State/CRM write-back — CONFIRMED/INCOMPLETE.** Analysis dan sent-message menulis stage/temperature ke conversation/lead (`ai_extraction_service.py:330-405`; `lead_service.py:187-277`; `sent_message_service.py:165-237`). Nilai dapat ditimpa extraction berikutnya tanpa transition table anti-regression.
 
 ## C. Authority Matrix
@@ -89,7 +89,7 @@ Status:
 | Complaint handling | Tidak ada dedicated backend classifier; knowledge/manual examples | Model/regex general path | Complaint tidak dijamin menghentikan sales generation | UNKNOWN | Critical | Complaint policy service | Tidak ada match complaint di `infer_latest_customer_intent()` (`reply_suggestion_service.py:825-859`); generation tetap pada `4304-4494` |
 | Human approval | Policy metadata; approve/reject routes; dashboard/extension send | Dashboard butuh approved untuk mark-sent; extension dapat auto-approve pending | Policy tidak menentukan permission transition | MIXED | Critical | Backend approval state machine | `routes_reply.py:124-207`; `sent_message_service.py:165-237`; `extension_ingest_service.py:1126-1255` |
 | Customer memory | Conversation/lead/customer profile/extraction; message history | Latest writes dan aggregation | Tidak ada anti-regression/fact provenance tunggal | BACKEND_ENFORCED | High | Customer state store | `ai_extraction_service.py:330-405`; `lead_service.py:187-277`; `models/conversation.py:10-105` |
-| Tawk owner assignment | webhook sender match + env default mapping | Sender id/email/name, lalu property default; existing owner dapat ditulis ulang | Ownership transcript terakhir dapat mengubah owner | BACKEND_ENFORCED | High | Tawk integration ownership policy | `tawk_webhook_service.py:56-163,233-285,483-547` |
+| Live-chat owner assignment | `site_id` + server-side default mapping | Active sales user from the mapped organization | Payload cannot select another tenant or owner | BACKEND_ENFORCED | High | Native live-chat ownership policy | `live_chat_ingest_service.py` |
 | Knowledge freshness | `is_active`, `updated_at`, ordering; official fetch cache | Active newest first; tidak ada expiry/effective date | “Official/latest” dapat stale | MIXED | Critical | Versioned knowledge publication | `product_knowledge.py:24-43`; `product_knowledge_service.py:199-238`; `official_source_service.py:39-55` |
 
 ## D. Collision Register
@@ -139,7 +139,7 @@ Knowledge import menyalin Markdown menjadi `ProductKnowledge` dengan `source_typ
 | GAP-07 | Approved prompt override fallback | UI menampilkan source database dan publish | Python prompt tetap precedes DB persona; supporting Markdown tetap ditambahkan (`reply_suggestion_service.py:2377-2504`; `clara_playbook_service.py:376-396`) | Published persona bukan authority penuh |
 | GAP-08 | Guardrails tetap berlaku setelah retry | Semantic validators mendeteksi banyak violation | Retry tidak menjalankan ulang semantic validators (`reply_suggestion_service.py:4171-4288`) | Output retry dapat lolos hanya karena schema valid |
 | GAP-09 | Reviewer identity auditable | Endpoint membutuhkan authenticated user | `ApprovalLog.reviewer_name` diisi dari client payload (`reply_suggestion_service.py:4510-4571`; `approval_log.py:10-31`) | Display reviewer dapat berbeda dari actor autentik |
-| GAP-10 | Tawk owner stabil | Tawk property/agent mapping menentukan owner | Existing conversation owner ditulis berdasarkan transcript terbaru (`tawk_webhook_service.py:233-266`) | Tidak ada documented lock/transfer policy |
+| GAP-10 | Live-chat owner stabil | Site mapping menentukan owner | Existing conversation owner mengikuti server-side site configuration | Transfer policy masih perlu didokumentasikan bila assignment menjadi dinamis |
 
 ## Evidence Scope
 
@@ -169,7 +169,7 @@ Bagian A–F di atas adalah **Stage 0 finding** dan dipertahankan sebagai catata
 - explicit `DELAY → canonical UNKNOWN` sambil mempertahankan legacy signal;
 - exclusion lima system Markdown files dari supporting-playbook layer.
 
-Stage 1 belum menyelesaikan enforcement gaps GAP-01 sampai GAP-10. Policy, approval/send, complaint routing, process-state persistence, product facts, validator retry, dan Tawk ownership tetap seperti Stage 0.
+Stage 1 belum menyelesaikan enforcement gaps GAP-01 sampai GAP-10. Policy, approval/send, complaint routing, process-state persistence, product facts, validator retry, dan live-chat ownership tetap seperti Stage 0.
 
 Kontrak lengkap: `docs/architecture/CLARA_RUNTIME_CONTRACT_V1.md`.
 
@@ -193,7 +193,7 @@ Boundary Stage 2:
 4. product/legal/variant facts tetap di `LEGACY_PRODUCT_FACT_INJECTION` dan knowledge path lama;
 5. supporting knowledge/examples tetap lebih rendah dari five system playbooks;
 6. full prompt dan customer message tidak masuk debug metadata;
-7. endpoint, database schema, approval/send, dan Tawk flow tidak diubah.
+7. endpoint, database schema, approval/send, dan live-chat flow tidak diubah.
 
 Remaining gap: production default tetap `LEGACY`, sehingga legacy user-prompt helpers masih efektif. `HYBRID` dan `PERSONA` adalah opt-in configuration untuk validation sebelum Stage 3.
 
@@ -244,7 +244,7 @@ or `BLOCK`, disables extension auto-approval for pending suggestions, and
 checks reviewer roles in the shared backend gate.
 
 Complaint classification requires personal/contextual evidence. Safe handoff
-is deterministic and bypasses normal sales generation. No Tawk ownership,
+is deterministic and bypasses normal sales generation. No live-chat ownership,
 product fact, persona default, process heuristic, ORM model, or migration is
 changed.
 
@@ -257,7 +257,7 @@ composed reply path and injects only fresh, effective, conflict-free `ACTIVE`
 facts through `clara_product_fact_service.py`.
 
 Persona playbooks do not store new facts. Backend safety, policy decisions,
-approval/send gates, runtime context, and Tawk remain separate authorities.
+approval/send gates, runtime context, and live chat remain separate authorities.
 Contract: `docs/architecture/CLARA_PRODUCT_FACT_REGISTRY_CONTRACT.md`.
 
 ## M. Stage 7 Process-State Authority Update
@@ -272,7 +272,7 @@ observations without changing current state or customer behavior. `FSM`
 applies evidence-governed forward transitions, rejects regression, reconciles
 profile merges, and injects only structured canonical state into runtime
 context. State never grants account access or overrides policy, product facts,
-approval/send, complaints, security, or Tawk.
+approval/send, complaints, security, or live chat.
 
 Contract: `docs/architecture/CLARA_PROCESS_STATE_FSM_CONTRACT.md`.
 
@@ -281,7 +281,7 @@ Contract: `docs/architecture/CLARA_PROCESS_STATE_FSM_CONTRACT.md`.
 Stage 8 adds a deterministic service lane below backend security/policy and
 above domain knowledge selection. Opt-in `ROUTED` uses governed CS knowledge
 or the existing complaint handoff plus a case ledger. Persona, facts, process
-state, approval/send, and Tawk remain separate. Default remains `LEGACY`.
+state, approval/send, and live chat remain separate. Default remains `LEGACY`.
 
 Stage 8.1 completes safe routing metadata and complaint/support governance but
 does not promote routing above policy enforcement or change any production

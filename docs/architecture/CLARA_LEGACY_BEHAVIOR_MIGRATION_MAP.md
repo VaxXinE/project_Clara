@@ -127,7 +127,7 @@ verification-access enforcement, process-state FSM, dan product-fact freshness.
 - Tujuh critical safety validators bersifat observation-only dan tidak menjadi
   alasan baru untuk mengubah output production.
 - Legacy product facts, process heuristics, policy, approval/send, complaint
-  routing, dan Tawk tidak dipindahkan atau diubah.
+  routing, dan native live chat tidak dipindahkan atau diubah.
 
 Remaining: implied claims, comprehensive invented-fact detection, output PII,
 complaint-to-closing detection, retry enforcement, FSM, dan fact freshness.

@@ -165,7 +165,6 @@ const normalizeExtensionChannel = (channel?: string | null): Channel => {
 
   if (
     normalized === "instagram" ||
-    normalized === "tawk" ||
     normalized === "tiktok" ||
     normalized === "whatsapp"
   ) {

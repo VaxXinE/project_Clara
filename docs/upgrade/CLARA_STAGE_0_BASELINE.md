@@ -8,7 +8,7 @@ Scope: baseline, runtime authority mapping, dan golden-test foundation saja.
 
 | Item | Result |
 |---|---|
-| Base branch | `tawk-integration` |
+| Base branch | integration baseline |
 | Working branch | `audit/clara-stage-0-baseline` |
 | Base/current commit before Stage 0 changes | `9ae6fee910bb6415552716e19b93a33564a7c296` |
 | Working tree before changes | Clean |
@@ -63,7 +63,7 @@ Hasil: 7 passed, 2 skipped. Dua test skip karena local environment menyediakan `
 
 ### Existing failure
 
-**CONFIRMED:** `tests/test_extension_snapshot_sync.py::test_extension_config_reports_channel_flags` gagal di line 172. Test mengharapkan `payload["channels"]["tawk"]["enabled"] is False`, sedangkan local settings mengaktifkan Tawk sehingga nilai aktual `True`. Failure terjadi sebelum Stage 0 mengubah file apa pun dan bergantung environment/config. Stage 0 tidak mengubah runtime atau test tersebut.
+**CONFIRMED:** baseline pernah memiliki satu kegagalan konfigurasi extension lokal sebelum Stage 0 mengubah file apa pun. Failure tersebut bergantung environment/config, bukan perubahan runtime Stage 0.
 
 ### Test totals
 
@@ -112,7 +112,7 @@ Detail dan evidence lengkap: `docs/architecture/CLARA_RUNTIME_AUTHORITY_MAP.md`.
 6. **OPEN QUESTION:** Apa canonical process states dan transition yang tidak boleh mundur?
 7. **OPEN QUESTION:** Siapa approver dan masa berlaku tiap fakta produk/legal/compliance?
 8. **OPEN QUESTION:** Apakah angka modal Mini dan ringkasan legal saat ini sudah mendapat approval compliance yang masih berlaku?
-9. **OPEN QUESTION:** Apakah ownership Tawk boleh berubah mengikuti agent terakhir pada transcript, atau harus lock/explicit transfer?
+9. **OPEN QUESTION:** Apakah ownership live chat boleh berubah dinamis, atau harus lock/explicit transfer?
 10. **OPEN QUESTION:** Apakah published persona harus menggantikan seluruh prompt, atau hanya lima section yang memang dimaksud sekarang?
 
 ## 7. Highest-Authority and Highest-Risk Files
@@ -177,7 +177,7 @@ Validator `clara-backend/tests/test_clara_golden_schema.py` memakai Python stdli
 
 - **CONFIRMED:** sandbox default tidak mengizinkan uv cache home dan worker build yang bind local port. Retry memakai temp cache atau approved unrestricted execution tanpa mengubah source.
 - **CONFIRMED:** dua security tests sengaja skip bila environment memiliki OpenAI key non-placeholder agar secret tidak diinspeksi/dicetak.
-- **CONFIRMED:** satu backend test bergantung nilai feature flag Tawk lokal.
+- **CONFIRMED:** satu backend test pernah bergantung nilai feature flag provider lokal.
 - **OPEN QUESTION:** CI canonical seharusnya mengunci environment flags apa untuk test extension config?
 
 Tidak ada shared/production database yang di-bootstrap atau dimodifikasi. Tidak ada deployment. Tidak ada external AI call untuk golden test.

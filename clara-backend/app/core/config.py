@@ -85,6 +85,17 @@ class Settings(BaseSettings):
     auth_cookie_domain: str | None = None
     auth_cookie_samesite: str | None = None
 
+    sso_issuer: str = "http://127.0.0.1:8000"
+    sso_login_url: str = "http://localhost:3000/login"
+    sso_client_id: str | None = None
+    sso_client_secret: str | None = None
+    sso_redirect_uris: str = ""
+    sso_signing_secret: str | None = None
+    sso_code_expire_seconds: int = Field(default=120, ge=30, le=600)
+    sso_access_token_expire_minutes: int = Field(default=5, ge=1, le=60)
+    sso_allowed_roles: str = "sales,manager,head,superadmin"
+    sso_rate_limit_per_minute: int = Field(default=60, ge=1, le=1000)
+
     allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     login_rate_limit_per_minute: int = 5
 
@@ -99,14 +110,13 @@ class Settings(BaseSettings):
     whatsapp_meta_app_secret: str | None = None
     whatsapp_meta_default_organization_slug: str | None = None
     whatsapp_meta_default_sales_user_email: str | None = None
-    tawk_webhook_secret_key: str | None = None
-    tawk_property_organization_map: dict[str, str] = Field(default_factory=dict)
-    tawk_property_default_sales_user_map: dict[str, str] = Field(default_factory=dict)
+    live_chat_site_configs: dict[str, dict[str, str]] = Field(default_factory=dict)
+    live_chat_signature_tolerance_seconds: int = Field(default=300, ge=30, le=3600)
+    live_chat_rate_limit_per_minute: int = Field(default=120, ge=1, le=10_000)
     conversation_auto_archive_days: int = 7
     extension_whatsapp_enabled: bool = True
     extension_instagram_enabled: bool = False
     extension_tiktok_enabled: bool = False
-    extension_tawk_enabled: bool = False
     extension_distribution_dir: str = "./storage/extension-builds"
 
     model_config = SettingsConfigDict(
@@ -161,6 +171,37 @@ class Settings(BaseSettings):
                 "OPENAI_API_KEY tidak boleh kosong saat APP_ENV=production."
             )
 
+        if self.sso_client_id and (
+            len((self.sso_client_secret or "").strip()) < 32
+            or len((self.sso_signing_secret or "").strip()) < 32
+            or not self.sso_redirect_uris_list
+        ):
+            raise ValueError(
+                "Konfigurasi SSO membutuhkan client secret, signing secret, dan redirect URI yang valid."
+            )
+
+        if self.app_env.lower() == "production" and self.sso_client_id:
+            if (
+                not self.sso_issuer_normalized.startswith("https://")
+                or not self.sso_login_url.startswith("https://")
+                or any(
+                    not uri.startswith("https://")
+                    for uri in self.sso_redirect_uris_list
+                )
+            ):
+                raise ValueError(
+                    "Issuer, login URL, dan redirect URI SSO production wajib HTTPS."
+                )
+            configured_secrets = {
+                self.jwt_secret_key,
+                (self.sso_client_secret or "").strip(),
+                (self.sso_signing_secret or "").strip(),
+            }
+            if len(configured_secrets) != 3:
+                raise ValueError(
+                    "Secret JWT, OAuth client, dan SSO signing harus berbeda."
+                )
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [
@@ -181,6 +222,29 @@ class Settings(BaseSettings):
                 return normalized
 
         return "none" if self.auth_cookie_secure else "lax"
+
+    @property
+    def sso_issuer_normalized(self) -> str:
+        return self.sso_issuer.rstrip("/")
+
+    @property
+    def sso_redirect_uris_list(self) -> list[str]:
+        return [uri.strip() for uri in self.sso_redirect_uris.split(",") if uri.strip()]
+
+    @property
+    def sso_allowed_roles_set(self) -> set[str]:
+        return {
+            role.strip().lower()
+            for role in self.sso_allowed_roles.split(",")
+            if role.strip()
+        }
+
+    @property
+    def sso_signing_secret_value(self) -> str:
+        value = (self.sso_signing_secret or "").strip()
+        if len(value) < 32:
+            raise ValueError("SSO signing secret belum dikonfigurasi.")
+        return value
 
 
 settings = Settings()

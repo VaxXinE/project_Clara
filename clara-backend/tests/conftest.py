@@ -85,6 +85,7 @@ from app.models.sales_performance_snapshot import SalesPerformanceSnapshot
 from app.models.sales_team import SalesTeam
 from app.models.sales_unit import SalesUnit
 from app.models.sent_message import SentMessage
+from app.models.sso_authorization_code import SSOAuthorizationCode
 from app.models.support_knowledge_article import SupportKnowledgeArticle
 from app.models.team_performance_snapshot import TeamPerformanceSnapshot
 from app.models.user import User
@@ -97,7 +98,9 @@ def compile_jsonb_sqlite(_type, _compiler, **_kwargs):
 
 
 @pytest.fixture()
-def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmaker, None, None]:
+def db_session_factory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Generator[sessionmaker, None, None]:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -157,6 +160,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             ChatReviewCase.__table__,
             ChatReviewNote.__table__,
             SentMessage.__table__,
+            SSOAuthorizationCode.__table__,
             ProductKnowledge.__table__,
             ProductFact.__table__,
             KnowledgeUpdateProposal.__table__,
@@ -164,8 +168,12 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
     )
 
     monkeypatch.setattr(routes_auth, "create_audit_log", lambda *args, **kwargs: None)
-    monkeypatch.setattr(routes_extension, "create_audit_log", lambda *args, **kwargs: None)
-    monkeypatch.setattr(routes_dashboard, "create_audit_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        routes_extension, "create_audit_log", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        routes_dashboard, "create_audit_log", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(
         routes_product_knowledge,
         "create_audit_log",
@@ -196,6 +204,7 @@ def db_session_factory(monkeypatch: pytest.MonkeyPatch) -> Generator[sessionmake
             ProductKnowledge.__table__,
             ProductFact.__table__,
             SentMessage.__table__,
+            SSOAuthorizationCode.__table__,
             AuditLog.__table__,
             ChatReviewNote.__table__,
             ChatReviewCase.__table__,
@@ -268,7 +277,9 @@ def client(app: FastAPI) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture()
-def seeded_data(db_session_factory: sessionmaker) -> Generator[dict[str, object], None, None]:
+def seeded_data(
+    db_session_factory: sessionmaker,
+) -> Generator[dict[str, object], None, None]:
     db = db_session_factory()
 
     org_a = Organization(name="Org Alpha", slug="org-alpha")

@@ -4,6 +4,10 @@
 /docs/
 !/docs/
 /docs/*
+!/docs/features/
+/docs/features/*
+!/docs/features/native-live-chat-api/
+!/docs/features/native-live-chat-api/01-api-contract.md
 !/docs/architecture/
 /docs/architecture/*
 !/docs/architecture/CLARA_SERVICE_ROUTING_CONTRACT.md

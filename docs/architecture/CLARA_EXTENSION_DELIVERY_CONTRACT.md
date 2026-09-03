@@ -11,9 +11,8 @@ background task, generation response, or webhook may initiate delivery.
 
 Authority order remains backend security, policy/critical validation, reviewer
 requirement, product facts, process state, service routing, then extension
-delivery. Delivery consumes these decisions and cannot change them. Tawk webhook
-ownership and signature verification are unchanged; Tawk extension reply stays
-read-only.
+delivery. Delivery consumes these decisions and cannot change them. Native
+live-chat ingestion and signature verification remain isolated from extension delivery.
 
 ## Modes
 
@@ -105,5 +104,4 @@ rules. Shadow suggestions are never persisted for delivery. A paused, stopped,
 rolled-back, stale, or hash-mismatched candidate is rejected even if the
 process-wide extension mode is `LEGACY`. Wrong active-chat attempts,
 non-human candidate send attempts, blocked-policy delivery attempts, and
-conflicting confirmations can hard-stop the plan. Tawk ownership and adapter
-behavior are unchanged.
+conflicting confirmations can hard-stop the plan. Live-chat ownership is unchanged.

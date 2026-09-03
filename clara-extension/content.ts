@@ -2,10 +2,7 @@ import type { PlasmoCSConfig } from "plasmo"
 
 import type { LegacyRuntimeMessage } from "~/types/channel"
 import type { ExtensionBrowserSendResult } from "~/types/channel"
-import {
-  getActiveAdapter,
-  getAdapterByChannel
-} from "~/utils/channel-adapters/adapter-registry"
+import { getActiveAdapter } from "~/utils/channel-adapters/adapter-registry"
 import {
   buildDeliveryIdentity,
   sha256Hex
@@ -15,8 +12,7 @@ export const config: PlasmoCSConfig = {
   matches: [
     "https://web.whatsapp.com/*",
     "https://www.instagram.com/direct/*",
-    "https://www.tiktok.com/messages*",
-    "https://dashboard.tawk.to/*"
+    "https://www.tiktok.com/messages*"
   ]
 }
 
@@ -62,11 +58,7 @@ const handleRuntimeMessage = (
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response?: unknown) => void
 ) => {
-  const activeAdapter =
-    getActiveAdapter() ||
-    (window.location.hostname === "dashboard.tawk.to"
-      ? getAdapterByChannel("tawk")
-      : null)
+  const activeAdapter = getActiveAdapter()
 
   if (message?.type === "READ_WHATSAPP_CHAT") {
     if (!activeAdapter) {

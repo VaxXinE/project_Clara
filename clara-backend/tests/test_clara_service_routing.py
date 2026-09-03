@@ -343,7 +343,7 @@ def _case_context(db):
         sales_user_id=sales.id,
         lead_id=lead.id,
         title="Governed complaint",
-        channel="tawk",
+        channel="live_chat",
         provider="extension",
         source="extension",
     )
@@ -362,7 +362,7 @@ def test_sensitive_intake_retains_only_safe_labels() -> None:
     )
     message = "Kemarin login saya bermasalah. password: SecretPass! OTP 123456 PIN 1234 api key sk-abcdefghijklmnop kartu 1234567890123456. Tolong petugas investigasi."
     result = build_complaint_intake(
-        message=message, category=SafeHandoffCategory.PERSONAL_COMPLAINT, channel="tawk"
+        message=message, category=SafeHandoffCategory.PERSONAL_COMPLAINT, channel="live_chat"
     )
     assert result.sensitive_information_detected is True
     assert {"PASSWORD", "OTP", "PIN", "API_KEY", "CARD_OR_BANK_CREDENTIAL"} <= set(

@@ -55,7 +55,7 @@ notes. Historical events are not edited or deleted through application APIs.
 2. Restart backend instances.
 3. Verify generation logs show `process_state_mode=LEGACY`.
 4. Confirm pipeline extraction, approval, send, product-fact, policy, persona,
-   and Tawk paths are unchanged.
+   and live-chat paths are unchanged.
 
 Do not downgrade the migration merely to disable FSM. Downgrade removes the
 Stage 7 state/history tables and should be reserved for a coordinated database
