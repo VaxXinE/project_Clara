@@ -757,6 +757,7 @@ def _seed_product_fact_drafts(
                 created_by_user_id=created_by_user_id,
             )
         )
+        db.flush()
         results.append(f"created product fact draft: {fact_key}")
 
     return results
