@@ -447,6 +447,14 @@ const getPrimaryTitleCandidate = (root: ParentNode = document) =>
   getExplicitTitleCandidate(root) || getTopRightTextCandidates(root)[0] || null
 
 const getConversationPane = () => {
+  const businessChat = document.querySelector<HTMLElement>(
+    '[data-vmok-remote="messages-vmok/page"] [data-e2e="dm-new-chatbox"]'
+  )
+
+  if (businessChat && isVisibleElement(businessChat)) {
+    return businessChat
+  }
+
   const root = getRoot()
   const composeBox = findComposeBox(root)
   const titleCandidate = getPrimaryTitleCandidate(root)
@@ -478,6 +486,14 @@ const getConversationPane = () => {
 
 const getMessageViewport = () => {
   const pane = getConversationPane()
+  const businessMessages = pane.querySelector<HTMLElement>(
+    '[data-e2e="dm-new-message-list"]'
+  )
+
+  if (businessMessages && isVisibleElement(businessMessages)) {
+    return businessMessages
+  }
+
   const composeBox = findComposeBox(pane)
   const titleCandidate = getPrimaryTitleCandidate(pane)
   const composeRect = composeBox?.getBoundingClientRect()
@@ -572,12 +588,15 @@ const hasActiveConversationOpen = () => {
   const composeBox = findComposeBox(pane) || findComposeBox(getRoot())
   const title = getActiveConversationTitle()
 
+  if (pane.matches('[data-e2e="dm-new-chatbox"]')) {
+    return Boolean(
+      composeBox &&
+        title &&
+        pane.querySelector('[data-e2e="dm-new-message-list"]')
+    )
+  }
+
   if (!composeBox || !title) {
-    console.debug("[ClaraTikTokDebug] hasActiveConversationOpen: missing", {
-      composeBoxFound: Boolean(composeBox),
-      pane,
-      titleFound: Boolean(title)
-    })
     return false
   }
 
@@ -591,15 +610,6 @@ const hasActiveConversationOpen = () => {
     paneWidthOk: paneRect.width >= composeRect.width * 0.85
   }
   const result = Object.values(checks).every(Boolean)
-
-  console.debug("[ClaraTikTokDebug] hasActiveConversationOpen: geometry", {
-    checks,
-    composeRect: composeRect.toJSON(),
-    pane,
-    paneRect: paneRect.toJSON(),
-    result,
-    title
-  })
 
   return result
 }
@@ -657,6 +667,19 @@ const isUsefulMessageText = (text: string, chatTitle: string) => {
 const readMessageCandidates = (): TextCandidate[] => {
   const bounds = getConversationBounds()
   const root = bounds.root
+  if (root.matches('[data-e2e="dm-new-message-list"]')) {
+    return Array.from(
+      root.querySelectorAll<HTMLElement>(
+        '[data-e2e="dm-new-chat-item"] [data-e2e="dm-new-message-text"]'
+      )
+    )
+      .filter(isVisibleElement)
+      .map((node) => ({
+        rect: node.getBoundingClientRect(),
+        text: safeText(node)
+      }))
+  }
+
   const composeBox = findComposeBox(getConversationPane())
   const composeRect = composeBox?.getBoundingClientRect()
   const titleCandidate = getPrimaryTitleCandidate(root)
@@ -980,13 +1003,6 @@ const buildSnapshot = (): ChannelChatSnapshot => {
   const composeBox = findComposeBox(pane) || findComposeBox(getRoot())
   const chatTitle = getActiveConversationTitle()
   const conversationOpen = hasActiveConversationOpen()
-
-  console.debug("[ClaraTikTokDebug] buildSnapshot: entry", {
-    chatTitle,
-    composeBoxFound: Boolean(composeBox),
-    conversationOpen,
-    pane
-  })
 
   if (!composeBox || !conversationOpen) {
     throw new Error("TIKTOK_ACTIVE_CONVERSATION_NOT_OPEN")
