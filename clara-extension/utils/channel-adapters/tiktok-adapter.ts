@@ -115,10 +115,25 @@ const isVisibleElement = (node: HTMLElement) => {
   )
 }
 
-const getRoot = () =>
-  document.querySelector<HTMLElement>('main[role="main"]') ||
-  document.querySelector<HTMLElement>("main") ||
-  document.body
+const getRoot = () => {
+  // TikTok Business Suite Messages renders its DM widget as a separate
+  // micro-frontend (`data-vmok-remote="messages-vmok/page"`) that can sit
+  // outside the app's <main> landmark. Trust <main> only if it actually
+  // contains the compose box; otherwise fall back to document.body so the
+  // widget's markup is still reachable.
+  const composeAnchor = document.querySelector<HTMLElement>(
+    '[data-e2e="dm-new-input-editor"]'
+  )
+  const mainRoot =
+    document.querySelector<HTMLElement>('main[role="main"]') ||
+    document.querySelector<HTMLElement>("main")
+
+  if (mainRoot && (!composeAnchor || mainRoot.contains(composeAnchor))) {
+    return mainRoot
+  }
+
+  return document.body
+}
 
 const IGNORED_TEXT = new Set([
   "tiktok",
@@ -149,7 +164,8 @@ const META_TEXT_PATTERNS = [
 
 const isTikTokMessagesPage = () =>
   window.location.hostname === "www.tiktok.com" &&
-  window.location.pathname.startsWith("/messages")
+  (window.location.pathname.startsWith("/messages") ||
+    window.location.pathname.startsWith("/business-suite/messages"))
 
 const findDraftJsComposeBox = (root: ParentNode = document) =>
   root.querySelector<HTMLElement>(
@@ -332,6 +348,31 @@ type TextCandidate = {
   text: string
 }
 
+const EXPLICIT_TITLE_SELECTOR = '[data-e2e="dm-new-chat-nickname"]'
+
+const getExplicitTitleCandidate = (
+  root: ParentNode = document
+): TopRightTextCandidate | null => {
+  const node = root.querySelector<HTMLElement>(EXPLICIT_TITLE_SELECTOR)
+
+  if (!node || !isVisibleElement(node)) {
+    return null
+  }
+
+  const text = safeText(node)
+
+  if (!text) {
+    return null
+  }
+
+  return {
+    element: node,
+    fontSize: Number.parseFloat(window.getComputedStyle(node).fontSize || "0"),
+    rect: node.getBoundingClientRect(),
+    text
+  }
+}
+
 const getTopRightTextCandidates = (
   root: ParentNode = document
 ): TopRightTextCandidate[] => {
@@ -403,7 +444,7 @@ const getTopRightTextCandidates = (
 }
 
 const getPrimaryTitleCandidate = (root: ParentNode = document) =>
-  getTopRightTextCandidates(root)[0] || null
+  getExplicitTitleCandidate(root) || getTopRightTextCandidates(root)[0] || null
 
 const getConversationPane = () => {
   const root = getRoot()
@@ -532,19 +573,35 @@ const hasActiveConversationOpen = () => {
   const title = getActiveConversationTitle()
 
   if (!composeBox || !title) {
+    console.debug("[ClaraTikTokDebug] hasActiveConversationOpen: missing", {
+      composeBoxFound: Boolean(composeBox),
+      pane,
+      titleFound: Boolean(title)
+    })
     return false
   }
 
   const composeRect = composeBox.getBoundingClientRect()
   const paneRect = pane.getBoundingClientRect()
+  const checks = {
+    composeHeightOk: composeRect.height >= 18,
+    composeWidthOk: composeRect.width >= 160,
+    paneLeftOk: paneRect.left <= composeRect.left + 48,
+    paneRightOk: paneRect.right >= composeRect.right - 48,
+    paneWidthOk: paneRect.width >= composeRect.width * 0.85
+  }
+  const result = Object.values(checks).every(Boolean)
 
-  return (
-    composeRect.width >= 160 &&
-    composeRect.height >= 18 &&
-    paneRect.width >= composeRect.width * 0.85 &&
-    paneRect.left <= composeRect.left + 48 &&
-    paneRect.right >= composeRect.right - 48
-  )
+  console.debug("[ClaraTikTokDebug] hasActiveConversationOpen: geometry", {
+    checks,
+    composeRect: composeRect.toJSON(),
+    pane,
+    paneRect: paneRect.toJSON(),
+    result,
+    title
+  })
+
+  return result
 }
 
 const getTitle = () => getActiveConversationTitle() || "TikTok DM"
@@ -922,8 +979,16 @@ const buildSnapshot = (): ChannelChatSnapshot => {
   const pane = getConversationPane()
   const composeBox = findComposeBox(pane) || findComposeBox(getRoot())
   const chatTitle = getActiveConversationTitle()
+  const conversationOpen = hasActiveConversationOpen()
 
-  if (!composeBox || !hasActiveConversationOpen()) {
+  console.debug("[ClaraTikTokDebug] buildSnapshot: entry", {
+    chatTitle,
+    composeBoxFound: Boolean(composeBox),
+    conversationOpen,
+    pane
+  })
+
+  if (!composeBox || !conversationOpen) {
     throw new Error("TIKTOK_ACTIVE_CONVERSATION_NOT_OPEN")
   }
 

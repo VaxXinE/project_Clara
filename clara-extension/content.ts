@@ -12,9 +12,19 @@ export const config: PlasmoCSConfig = {
   matches: [
     "https://web.whatsapp.com/*",
     "https://www.instagram.com/direct/*",
-    "https://www.tiktok.com/messages*"
+    "https://www.tiktok.com/messages*",
+    "https://www.tiktok.com/business-suite/messages*"
   ]
 }
+
+// TEMP debug marker — remove once the TikTok Business Suite adapter issue is
+// confirmed fixed. Fires unconditionally on injection so it's easy to check
+// whether the currently loaded extension build is actually this one.
+console.log(
+  "%c[ClaraTikTokDebug] content script loaded — build 2026-09-18-debug1 — url: " +
+    window.location.href,
+  "background:#e60023;color:#fff;font-size:14px;padding:2px 6px"
+)
 
 const MESSAGE_HANDLER_KEY = "__sgExtensionWhatsAppHandler__"
 const MANUAL_SEND_LOCK_KEY = "__sgExtensionManualSendLock__"

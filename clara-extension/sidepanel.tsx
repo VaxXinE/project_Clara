@@ -1702,7 +1702,10 @@ const isInstagramDmTabUrl = (url: string | undefined) =>
   Boolean(url?.startsWith("https://www.instagram.com/direct/"))
 
 const isTikTokMessagesTabUrl = (url: string | undefined) =>
-  Boolean(url?.startsWith("https://www.tiktok.com/messages"))
+  Boolean(
+    url?.startsWith("https://www.tiktok.com/messages") ||
+      url?.startsWith("https://www.tiktok.com/business-suite/messages")
+  )
 
 const isSupportedLiveSyncTabUrl = (url: string | undefined) =>
   isWhatsAppTabUrl(url) ||
