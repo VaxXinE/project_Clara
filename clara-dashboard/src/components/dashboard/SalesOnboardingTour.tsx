@@ -147,25 +147,25 @@ const TOUR_ROUTES: TourRoute[] = [
         id: "sales-followup-focus",
         title: "Fokus tindak lanjut",
         description:
-          "Kartu ini memberi tahu beban kerja follow-up hari ini, jadi kamu bisa mulai dari item yang paling telat atau paling siap dikirim.",
+          "Kalimat ini merangkum beban tindak lanjut hari ini, jadi kamu tahu harus mulai dari mana.",
       },
       {
         id: "sales-followup-filters",
         title: "Filter pekerjaan follow-up",
         description:
-          "Gunakan pencarian dan prioritas untuk menyaring worklist supaya kamu tidak tenggelam di semua task sekaligus.",
+          "Cari nama customer atau pilih kelompok (misalnya Hari ini) supaya daftarnya tidak terlalu panjang.",
       },
       {
         id: "sales-followup-list",
         title: "Daftar kerja yang harus dibereskan",
         description:
-          "Bagian ini adalah eksekusi hariannya. Kerjakan item satu per satu, lalu tandai selesai atau sembunyikan kalau sudah aman.",
+          "Kerjakan dari atas ke bawah. Klik Buka chat untuk menghubungi, lalu buka Catat hasilnya untuk menandai selesai.",
       },
       {
         id: "sales-followup-upcoming",
         title: "Follow-up berikutnya",
         description:
-          "Bagian bawah ini berisi item yang belum perlu dikerjakan sekarang. Gunanya untuk melihat beban kerja berikutnya tanpa mencampur dengan prioritas hari ini.",
+          "Bagian ini berisi tindak lanjut yang belum perlu dikerjakan sekarang, supaya tidak tercampur dengan yang mendesak.",
       },
     ],
   },

@@ -4,14 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
+import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
+import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, getLeadBadgeClass, formatStatusLabel } from "@/lib/format";
+import { formatRelativeTime } from "@/lib/format";
 import {
   canAccessQueueAndActionCenter,
   normalizeWorkspaceRole,
 } from "@/lib/roles";
+import { FOLLOW_UP_RESULTS, STAGE, TEMPERATURE, plainJargon } from "@/lib/vocab";
 import type {
   CurrentUser,
   LeadQueueActionRequest,
@@ -23,16 +26,6 @@ function getWorklistItemKey(item: SalesWorklistItem): string {
   return `${item.lead_id}:${item.task_type}:${item.task_id ?? "derived"}`;
 }
 
-const ACTION_BUCKET_OPTIONS = [
-  { value: "all", label: "Semua prioritas" },
-  { value: "critical", label: "Kritis" },
-  { value: "due_today", label: "Hari ini" },
-  { value: "ready_to_send", label: "Siap kirim" },
-  { value: "needs_analysis", label: "Perlu analisis" },
-  { value: "hot_lead", label: "Hot lead" },
-  { value: "other", label: "Lainnya" },
-] as const;
-
 type ActionBucketKey =
   | "critical"
   | "due_today"
@@ -40,6 +33,42 @@ type ActionBucketKey =
   | "needs_analysis"
   | "hot_lead"
   | "other";
+
+const BUCKET_ORDER: ActionBucketKey[] = [
+  "critical",
+  "due_today",
+  "ready_to_send",
+  "needs_analysis",
+  "hot_lead",
+  "other",
+];
+
+const BUCKETS: Record<ActionBucketKey, { label: string; description: string }> = {
+  critical: {
+    label: "Sudah lama terlambat",
+    description: "Terlambat lebih dari sehari. Hubungi lebih dulu supaya customer tidak merasa ditinggal.",
+  },
+  due_today: {
+    label: "Hari ini",
+    description: "Jatuh tempo hari ini atau baru lewat sedikit.",
+  },
+  ready_to_send: {
+    label: "Siap dikirim",
+    description: "Jawabannya sudah siap. Cek sekali lagi, kirim, lalu tandai selesai.",
+  },
+  needs_analysis: {
+    label: "Perlu dibaca Clara",
+    description: "Minta Clara membaca chat-nya dulu sebelum kamu menindaklanjuti.",
+  },
+  hot_lead: {
+    label: "Customer panas",
+    description: "Customer yang sedang tertarik. Jaga supaya komunikasinya tidak putus.",
+  },
+  other: {
+    label: "Lainnya",
+    description: "Masih aktif, tapi tidak semendesak yang di atas.",
+  },
+};
 
 function getTimeLabel(value: string | null): string {
   if (!value) {
@@ -50,25 +79,18 @@ function getTimeLabel(value: string | null): string {
   const diffMinutes = Math.round((target - Date.now()) / (1000 * 60));
 
   if (Math.abs(diffMinutes) < 60) {
-    if (diffMinutes < 0) {
-      return `Telat ${Math.abs(diffMinutes)}m`;
-    }
-    return `Jatuh tempo ${diffMinutes}m lagi`;
+    return diffMinutes < 0
+      ? `Terlambat ${Math.abs(diffMinutes)} menit`
+      : `${diffMinutes} menit lagi`;
   }
 
   const diffHours = Math.round(diffMinutes / 60);
   if (Math.abs(diffHours) < 24) {
-    if (diffHours < 0) {
-      return `Telat ${Math.abs(diffHours)} jam`;
-    }
-    return `Jatuh tempo ${diffHours} jam lagi`;
+    return diffHours < 0 ? `Terlambat ${Math.abs(diffHours)} jam` : `${diffHours} jam lagi`;
   }
 
   const diffDays = Math.round(diffHours / 24);
-  if (diffDays < 0) {
-    return `Telat ${Math.abs(diffDays)} hari`;
-  }
-  return `Jatuh tempo ${diffDays} hari lagi`;
+  return diffDays < 0 ? `Terlambat ${Math.abs(diffDays)} hari` : `${diffDays} hari lagi`;
 }
 
 function isOverdue(item: SalesWorklistItem): boolean {
@@ -109,41 +131,6 @@ function getActionBucket(item: SalesWorklistItem): ActionBucketKey {
   return "other";
 }
 
-function getActionBucketConfig(bucket: ActionBucketKey) {
-  switch (bucket) {
-    case "critical":
-      return {
-        label: "Kritis",
-        description: "Item yang sudah telat berat atau perlu intervensi cepat sebelum makin stale.",
-      };
-    case "due_today":
-      return {
-        label: "Hari Ini",
-        description: "Item yang jatuh tempo hari ini atau baru lewat sedikit dan harus dibersihkan di sesi kerja sekarang.",
-      };
-    case "ready_to_send":
-      return {
-        label: "Siap Kirim",
-        description: "Item yang paling dekat ke aksi kirim atau follow-up final dan tidak butuh banyak prep lagi.",
-      };
-    case "needs_analysis":
-      return {
-        label: "Perlu Analisis",
-        description: "Item yang masih butuh pembacaan AI atau konteks tambahan sebelum aman ditindak.",
-      };
-    case "hot_lead":
-      return {
-        label: "Hot Lead",
-        description: "Lead dengan temperatur tinggi yang harus dijaga momentum komunikasinya.",
-      };
-    default:
-      return {
-        label: "Lainnya",
-        description: "Item yang tetap aktif, tapi urgensinya di bawah kelompok prioritas utama.",
-      };
-  }
-}
-
 export default function FollowUpPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -151,9 +138,10 @@ export default function FollowUpPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [actionError, setActionError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [hiddenItemKeys, setHiddenItemKeys] = useState<string[]>([]);
-  const [actionBucketFilter, setActionBucketFilter] = useState("all");
+  const [bucketFilter, setBucketFilter] = useState<"all" | ActionBucketKey>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const workspaceRole = currentUser ? normalizeWorkspaceRole(currentUser.role) : null;
   const isSalesWorkspace = workspaceRole === "sales";
@@ -174,9 +162,10 @@ export default function FollowUpPage() {
 
       const data = await apiFetch<SalesWorklistResponse>("/dashboard/sales/worklist");
       setWorklist(data);
+      setErrorMessage("");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat worklist follow-up."
+        error instanceof Error ? error.message : "Daftar tindak lanjut belum bisa dimuat.",
       );
     } finally {
       setIsLoading(false);
@@ -185,24 +174,15 @@ export default function FollowUpPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void (async () => {
-        try {
-          await loadWorklist();
-        } catch {
-          // loadWorklist already mengatur error state.
-        }
-      })();
+      void loadWorklist();
     }, 0);
 
     return () => clearTimeout(timer);
   }, [loadWorklist]);
 
-  async function handleTaskAction(
-    item: SalesWorklistItem,
-    payload: LeadQueueActionRequest
-  ) {
+  async function handleTaskAction(item: SalesWorklistItem, payload: LeadQueueActionRequest) {
     setUpdatingTaskId(item.task_id ?? item.lead_id);
-    setErrorMessage("");
+    setActionError("");
     setSuccessMessage("");
 
     try {
@@ -213,39 +193,49 @@ export default function FollowUpPage() {
       if (payload.action === "done" || payload.action === "dismiss") {
         setHiddenItemKeys((currentKeys) => {
           const nextKey = getWorklistItemKey(item);
-          if (currentKeys.includes(nextKey)) {
-            return currentKeys;
-          }
-          return [...currentKeys, nextKey];
+          return currentKeys.includes(nextKey) ? currentKeys : [...currentKeys, nextKey];
         });
       }
       setSuccessMessage(
         payload.action === "done"
-          ? `Item ${item.lead_name} ditandai selesai.`
+          ? `${item.lead_name} ditandai selesai.`
           : payload.action === "dismiss"
-            ? `Item ${item.lead_name} disembunyikan dari action center saat ini.`
-            : "Task berhasil diperbarui."
+            ? `${item.lead_name} disembunyikan dari daftar ini.`
+            : "Tindak lanjut diperbarui.",
       );
       await loadWorklist();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memperbarui task."
+      setActionError(
+        error instanceof Error ? error.message : "Tindak lanjut belum bisa diperbarui. Coba lagi.",
       );
     } finally {
       setUpdatingTaskId(null);
     }
   }
 
-  const visibleItems = (worklist?.items ?? []).filter(
-    (item) => !hiddenItemKeys.includes(getWorklistItemKey(item))
+  const visibleItems = useMemo(
+    () => (worklist?.items ?? []).filter((item) => !hiddenItemKeys.includes(getWorklistItemKey(item))),
+    [hiddenItemKeys, worklist],
   );
   const visibleUpcomingItems = (worklist?.upcoming_items ?? []).filter(
-    (item) => !hiddenItemKeys.includes(getWorklistItemKey(item))
+    (item) => !hiddenItemKeys.includes(getWorklistItemKey(item)),
   );
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+  const bucketCounts = useMemo(() => {
+    const counts: Partial<Record<ActionBucketKey, number>> = {};
+
+    for (const item of visibleItems) {
+      const bucket = getActionBucket(item);
+      counts[bucket] = (counts[bucket] ?? 0) + 1;
+    }
+
+    return counts;
+  }, [visibleItems]);
+
   const filteredVisibleItems = useMemo(() => {
     return visibleItems.filter((item) => {
-      if (actionBucketFilter !== "all" && getActionBucket(item) !== actionBucketFilter) {
+      if (bucketFilter !== "all" && getActionBucket(item) !== bucketFilter) {
         return false;
       }
 
@@ -253,552 +243,407 @@ export default function FollowUpPage() {
         return true;
       }
 
-      return [
-        item.lead_name,
-        item.task_label,
-        item.reason,
-        item.recommended_action,
-        item.assigned_user_name ?? "",
-      ]
+      return [item.lead_name, item.task_label, item.reason, item.recommended_action, item.assigned_user_name ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearchQuery);
     });
-  }, [actionBucketFilter, normalizedSearchQuery, visibleItems]);
-  const todaySections = useMemo(() => {
-    const orderedBuckets: ActionBucketKey[] = [
-      "critical",
-      "due_today",
-      "ready_to_send",
-      "needs_analysis",
-      "hot_lead",
-      "other",
-    ];
+  }, [bucketFilter, normalizedSearchQuery, visibleItems]);
 
-    return orderedBuckets
-      .map((bucket) => ({
+  const sections = useMemo(
+    () =>
+      BUCKET_ORDER.map((bucket) => ({
         bucket,
-        config: getActionBucketConfig(bucket),
         items: filteredVisibleItems.filter((item) => getActionBucket(item) === bucket),
-      }))
-      .filter((section) => section.items.length > 0);
-  }, [filteredVisibleItems]);
-  const salesActionSummary = useMemo(() => {
+      })).filter((section) => section.items.length > 0),
+    [filteredVisibleItems],
+  );
+
+  const summary = useMemo(() => {
     if (!worklist) {
-      return {
-        focusLabel: "Belum ada data tindak lanjut.",
-        focusHelper: "Muat data dulu untuk melihat pekerjaan yang perlu dikerjakan sekarang.",
-      };
+      return { title: "", helper: "" };
     }
 
     if (worklist.overdue_24h_count > 0) {
       return {
-        focusLabel: `${worklist.overdue_24h_count} follow-up sudah telat berat.`,
-        focusHelper: "Mulai dari item kritis supaya lead tidak makin dingin dan customer tidak merasa ditinggal.",
+        title: `${worklist.overdue_24h_count} tindak lanjut sudah terlambat lebih dari sehari`,
+        helper: "Mulai dari yang paling atas supaya customer tidak merasa ditinggal.",
       };
     }
 
     if (worklist.due_today_count > 0) {
       return {
-        focusLabel: `${worklist.due_today_count} follow-up harus dibereskan hari ini.`,
-        focusHelper: "Kerjakan item yang sudah jatuh tempo dulu, lalu lanjut ke item siap kirim.",
+        title: `${worklist.due_today_count} tindak lanjut harus selesai hari ini`,
+        helper: "Kerjakan yang jatuh tempo dulu, lalu lanjut ke yang siap dikirim.",
       };
     }
 
-    if (worklist.ready_to_send_count > 0) {
+    if (visibleItems.length > 0) {
       return {
-        focusLabel: `${worklist.ready_to_send_count} lead sudah dekat ke aksi kirim.`,
-        focusHelper: "Tinggal cek konteks terakhir, kirim pesan, lalu tandai tugasnya selesai.",
+        title: `${visibleItems.length} tindak lanjut menunggu kamu`,
+        helper: "Tidak ada yang mendesak. Kerjakan dari atas ke bawah.",
       };
     }
 
     return {
-      focusLabel: "Antrean tindak lanjut sedang relatif aman.",
-      focusHelper: "Pakai halaman ini untuk cek item berikutnya dan menjaga ritme follow-up tetap rapi.",
+      title: "Tidak ada tindak lanjut yang menunggu",
+      helper: "Semua sudah beres. Cek Chat Masuk kalau ada customer yang perlu dibalas.",
     };
-  }, [worklist]);
+  }, [visibleItems.length, worklist]);
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.daily}
       title={PAGE_NAMES.followUp}
       description={
         isSalesWorkspace
-          ? "Pilih lead, kerjakan aksi berikutnya, lalu tandai selesai."
-          : "Lihat pekerjaan yang perlu dikerjakan sekarang, alasannya, dan aksi berikutnya."
+          ? "Customer yang perlu kamu hubungi lagi. Kerjakan dari atas ke bawah, lalu tandai selesai."
+          : "Pekerjaan tindak lanjut yang perlu dikerjakan sekarang, lengkap dengan alasannya."
       }
       backHref="/dashboard"
       backLabel="Kembali ke beranda"
       actions={
-        <>
-          {!isSalesWorkspace ? (
-            <Link
-              href="/dashboard/notifications"
-              className="clara-button clara-button-ghost"
-            >
-              Alert
-            </Link>
-          ) : null}
-          <Link
-            href="/dashboard/sales"
-            className="clara-button clara-button-ghost"
-          >
-            Buka Chat Masuk
+        !isSalesWorkspace ? (
+          <Link href="/notifications" className="clara-button clara-button-ghost">
+            Lihat Alert
           </Link>
-          <Link
-            href="/dashboard/crm"
-            className="clara-button clara-button-ghost"
-          >
-            Buka Lead
-          </Link>
-        </>
+        ) : undefined
       }
     >
-      <div className="space-y-6">
-        {isLoading && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="clara-empty-state text-sm clara-text-secondary"
-          >
-            Memuat daftar tindak lanjut...
-          </div>
-        )}
+      <div className="space-y-5">
+        {isLoading ? <LoadingState message="Memuat daftar tindak lanjut..." /> : null}
 
-        {errorMessage && (
+        {!isLoading && errorMessage ? (
+          <ErrorState
+            message={errorMessage}
+            onRetry={() => {
+              setIsLoading(true);
+              void loadWorklist();
+            }}
+          />
+        ) : null}
+
+        {actionError ? (
           <div role="alert" className="clara-alert clara-alert-danger">
-            {errorMessage}
+            {actionError}
           </div>
-        )}
+        ) : null}
 
-        {successMessage && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="clara-alert clara-alert-success"
-          >
+        {successMessage ? (
+          <div role="status" aria-live="polite" className="clara-alert clara-alert-success">
             {successMessage}
           </div>
-        )}
+        ) : null}
 
-        {!isLoading && worklist && (
+        {!isLoading && worklist ? (
           <>
             <section
               data-onboarding-id="sales-followup-focus"
-              className="grid gap-4 xl:grid-cols-[1.4fr_1fr]"
+              aria-labelledby="followup-summary"
+              className="clara-card p-5 sm:p-6"
             >
-              <article className="clara-card p-5 sm:p-6">
-                <p className="clara-kicker text-xs">
-                  Fokus kerja sekarang
-                </p>
-                <h2 className="mt-2 text-xl font-bold tracking-tight clara-text-primary sm:text-2xl">
-                  {salesActionSummary.focusLabel}
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 clara-text-secondary">
-                  {salesActionSummary.focusHelper}
-                </p>
-
-                <p className="mt-4 text-sm clara-text-muted">
-                  {filteredVisibleItems.length} prioritas hari ini ·{" "}
-                  {visibleUpcomingItems.length} berikutnya ·{" "}
-                  {worklist.completed_today_count} selesai hari ini
-                </p>
-              </article>
-
-              <div
+              <h2 id="followup-summary" className="text-xl font-bold clara-text-primary sm:text-2xl">
+                {summary.title}
+              </h2>
+              <p className="mt-1 text-sm leading-6 clara-text-secondary">{summary.helper}</p>
+              <p
                 data-onboarding-id="sales-followup-metrics"
-                className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1"
+                className="mt-3 text-sm clara-text-muted"
               >
-                <MetricCard label="Telat berat" value={String(worklist.overdue_24h_count)} />
-                <MetricCard label="Harus hari ini" value={String(worklist.due_today_count)} />
-                <MetricCard label="Siap dikirim" value={String(worklist.ready_to_send_count)} />
-              </div>
+                Selesai hari ini: {worklist.completed_today_count} · Dijadwalkan nanti:{" "}
+                {visibleUpcomingItems.length}
+              </p>
             </section>
 
-            <section
-              data-onboarding-id="sales-followup-filters"
-              className="clara-card p-4 sm:p-5"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-semibold clara-text-primary">
-                  Cari dan filter
-                </h2>
-                <p className="text-sm clara-text-secondary">
-                  {filteredVisibleItems.length} dari {visibleItems.length} aktif
-                </p>
-              </div>
+            {visibleItems.length > 0 ? (
+              <section
+                data-onboarding-id="sales-followup-filters"
+                aria-label="Cari dan saring tindak lanjut"
+                className="clara-card space-y-4 p-4 sm:p-5"
+              >
+                <div>
+                  <label htmlFor="followup-search" className="clara-label">
+                    Cari tindak lanjut
+                  </label>
+                  <input
+                    id="followup-search"
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Nama customer atau alasannya"
+                    className="clara-input mt-2 w-full"
+                  />
+                </div>
 
-                <div className="mt-4 grid gap-3 xl:grid-cols-[1.2fr_0.8fr]">
-                  <div>
-                    <label htmlFor="followup-search" className="clara-label">
-                      Cari lead atau alasan follow-up
-                    </label>
-                    <input
-                      id="followup-search"
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      placeholder="Cari nama lead, alasan, atau aksi berikutnya..."
-                      className="clara-input mt-2 w-full"
+                <div role="group" aria-label="Kelompok tindak lanjut" className="flex flex-wrap gap-2">
+                  <FilterChip
+                    active={bucketFilter === "all"}
+                    onClick={() => setBucketFilter("all")}
+                    label={`Semua (${visibleItems.length})`}
+                  />
+                  {BUCKET_ORDER.filter(
+                    (bucket) => (bucketCounts[bucket] ?? 0) > 0 || bucket === bucketFilter,
+                  ).map((bucket) => (
+                    <FilterChip
+                      key={bucket}
+                      active={bucketFilter === bucket}
+                      onClick={() => setBucketFilter(bucket)}
+                      label={`${BUCKETS[bucket].label} (${bucketCounts[bucket] ?? 0})`}
                     />
-                  </div>
-
-                  <div>
-                    <label htmlFor="followup-priority" className="clara-label">
-                      Pilih prioritas
-                    </label>
-                    <select
-                      id="followup-priority"
-                      value={actionBucketFilter}
-                      onChange={(event) => setActionBucketFilter(event.target.value)}
-                      className="clara-select mt-2 w-full"
-                    >
-                      {ACTION_BUCKET_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  ))}
                 </div>
-            </section>
 
-            <section className="clara-card p-4 sm:p-5">
-              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold clara-text-primary">
-                    Kerjakan sekarang
-                  </p>
-                  <h2 className="mt-1 text-xl font-bold clara-text-primary">
-                    {filteredVisibleItems.length} follow-up siap dibereskan
-                  </h2>
-                </div>
-                <p className="text-sm clara-text-secondary">
-                  Urutkan dari yang paling butuh tindakan dulu, lalu tandai selesai satu per satu.
+                <p role="status" aria-live="polite" className="text-sm clara-text-secondary">
+                  {filteredVisibleItems.length === visibleItems.length
+                    ? `${visibleItems.length} tindak lanjut`
+                    : `${filteredVisibleItems.length} dari ${visibleItems.length} tindak lanjut`}
                 </p>
-              </div>
+              </section>
+            ) : null}
 
-              <div className="mt-5 space-y-5">
-                {filteredVisibleItems.length === 0 ? (
-                  <div className="clara-empty-state text-sm text-clara-ink-3">
-                    Belum ada tindak lanjut prioritas hari ini. Kamu bisa lanjut ke Chat Masuk atau cek lead yang aktif.
+            {filteredVisibleItems.length === 0 ? (
+              <EmptyState
+                title={
+                  visibleItems.length === 0
+                    ? "Belum ada tindak lanjut"
+                    : "Tidak ada tindak lanjut yang cocok"
+                }
+                description={
+                  visibleItems.length === 0
+                    ? "Saat ada customer yang perlu dihubungi lagi, daftarnya muncul di sini. Sementara itu kamu bisa membalas chat yang masuk."
+                    : "Ubah kata pencarian atau pilih kelompok lain."
+                }
+                actionHref={visibleItems.length === 0 ? "/sales" : undefined}
+                actionLabel={visibleItems.length === 0 ? "Buka Chat Masuk" : undefined}
+              />
+            ) : (
+              sections.map((section, sectionIndex) => (
+                <section
+                  key={section.bucket}
+                  aria-labelledby={`bucket-${section.bucket}`}
+                  data-onboarding-id={sectionIndex === 0 ? "sales-followup-list" : undefined}
+                  className="space-y-3"
+                >
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                    <h2 id={`bucket-${section.bucket}`} className="text-base font-semibold clara-text-primary">
+                      {BUCKETS[section.bucket].label}{" "}
+                      <span className="font-normal clara-text-muted">({section.items.length})</span>
+                    </h2>
+                    <p className="text-sm clara-text-secondary">{BUCKETS[section.bucket].description}</p>
                   </div>
-                ) : (
-                  todaySections.map((section, sectionIndex) => (
-                    <div key={section.bucket} className="space-y-4">
-                      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                        <div>
-                          <p className="text-sm font-semibold clara-text-primary">
-                            {section.config.label}
-                          </p>
-                          <h3 className="mt-1 text-lg font-bold clara-text-primary">
-                            {section.items.length} item
-                          </h3>
-                        </div>
-                        <p className="max-w-2xl text-sm leading-6 clara-text-secondary">
-                          {section.config.description}
-                        </p>
-                      </div>
 
-                      {section.items.map((item, index) => (
-                        <WorklistRow
-                          key={`${item.lead_id}-${item.task_type}-${item.task_id ?? "derived"}`}
-                          item={item}
-                          index={index}
-                          bucket={section.bucket}
-                          onboardingTargetId={
-                            sectionIndex === 0 && index === 0
-                              ? "sales-followup-list"
-                              : undefined
-                          }
-                          isUpdating={
-                            updatingTaskId === (item.task_id ?? item.lead_id)
-                          }
-                          onTaskAction={handleTaskAction}
-                        />
-                      ))}
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
+                  <ul className="space-y-3">
+                    {section.items.map((item, index) => (
+                      <WorklistRow
+                        key={`${item.lead_id}-${item.task_type}-${item.task_id ?? "derived"}`}
+                        item={item}
+                        index={index}
+                        showOwner={!isSalesWorkspace}
+                        isUpdating={updatingTaskId === (item.task_id ?? item.lead_id)}
+                        onTaskAction={handleTaskAction}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ))
+            )}
 
-            <section
-              data-onboarding-id="sales-followup-upcoming"
-              className="clara-card-outline p-4 opacity-90 sm:p-5"
-            >
-              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <p className="text-sm font-semibold clara-text-primary">
-                    Simpan untuk berikutnya
-                  </p>
-                  <h2 className="mt-1 text-xl font-bold clara-text-primary">
-                    {visibleUpcomingItems.length} follow-up belum perlu dikerjakan hari ini
-                  </h2>
-                </div>
-                <p className="text-sm clara-text-secondary">
-                  Item ini tetap aktif, tapi belum jadi fokus sesi kerja sekarang.
+            {visibleUpcomingItems.length > 0 ? (
+              <details
+                data-onboarding-id="sales-followup-upcoming"
+                className="clara-card-outline group p-4 sm:p-5"
+              >
+                <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-base font-semibold clara-text-primary">
+                  <span>
+                    Dijadwalkan nanti{" "}
+                    <span className="font-normal clara-text-muted">({visibleUpcomingItems.length})</span>
+                  </span>
+                  <span className="text-sm font-normal clara-text-secondary group-open:hidden">Tampilkan</span>
+                  <span className="hidden text-sm font-normal clara-text-secondary group-open:inline">
+                    Sembunyikan
+                  </span>
+                </summary>
+                <p className="mt-1 text-sm clara-text-secondary">
+                  Belum perlu dikerjakan sekarang, tapi tetap aktif.
                 </p>
-              </div>
-
-              <div className="mt-5 space-y-4">
-                {visibleUpcomingItems.length === 0 ? (
-                  <div className="clara-empty-state text-sm text-clara-ink-3">
-                    Belum ada tindak lanjut terjadwal berikutnya. Semua tindak lanjut aktif sudah masuk prioritas hari ini, atau belum diberi jadwal.
-                  </div>
-                ) : (
-                  visibleUpcomingItems.map((item, index) => (
+                <ul className="mt-4 space-y-3">
+                  {visibleUpcomingItems.map((item, index) => (
                     <WorklistRow
                       key={`${item.lead_id}-${item.task_type}-${item.task_id ?? "derived"}-upcoming`}
                       item={item}
                       index={index}
-                      bucket={getActionBucket(item)}
-                      isUpdating={
-                        updatingTaskId === (item.task_id ?? item.lead_id)
-                      }
+                      showOwner={!isSalesWorkspace}
+                      isUpdating={updatingTaskId === (item.task_id ?? item.lead_id)}
                       onTaskAction={handleTaskAction}
                     />
-                  ))
-                )}
-              </div>
-            </section>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
           </>
-        )}
+        ) : null}
       </div>
     </WorkspaceShell>
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function FilterChip({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <article className="clara-card-soft p-4">
-      <p className="text-sm clara-text-secondary">{label}</p>
-      <p className="mt-1 text-2xl font-bold tracking-tight clara-text-primary">
-        {value}
-      </p>
-    </article>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
+        active
+          ? "border-clara-gold bg-clara-gold text-clara-deep"
+          : "border-clara-line bg-clara-sunken text-clara-ink-2 hover:border-clara-gold hover:text-clara-ink"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
 function WorklistRow({
   item,
   index,
-  bucket,
-  onboardingTargetId,
+  showOwner,
   isUpdating,
   onTaskAction,
 }: {
   item: SalesWorklistItem;
   index: number;
-  bucket: ActionBucketKey;
-  onboardingTargetId?: string;
+  showOwner: boolean;
   isUpdating: boolean;
-  onTaskAction: (
-    item: SalesWorklistItem,
-    payload: LeadQueueActionRequest
-  ) => Promise<void>;
+  onTaskAction: (item: SalesWorklistItem, payload: LeadQueueActionRequest) => Promise<void>;
 }) {
   const [reasonTag, setReasonTag] = useState("follow_up_executed");
   const [reasonNote, setReasonNote] = useState("");
 
-  function buildPayload(
-    action: LeadQueueActionRequest["action"],
-    duration?: LeadQueueActionRequest["duration"]
-  ): LeadQueueActionRequest {
+  function buildPayload(action: LeadQueueActionRequest["action"]): LeadQueueActionRequest {
     return {
       action,
-      duration: duration ?? null,
+      duration: null,
       reason_tag: reasonTag,
       reason_note: reasonNote.trim() || null,
     };
   }
 
-  const bucketConfig = getActionBucketConfig(bucket);
-  const slaLabel = getTimeLabel(item.next_follow_up_at);
-  const isItemOverdue = isOverdue(item);
+  const overdue = isOverdue(item);
   const fieldId = `${item.task_id ?? item.lead_id}-${index}`;
 
   return (
-    <article
-      data-onboarding-id={onboardingTargetId}
-      className="clara-card-outline p-4 sm:p-5"
-    >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <li className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-2.5 py-1 text-xs font-semibold text-[#140f08]">
-              #{index + 1}
-            </span>
-            <h3 className="min-w-0 break-words text-lg font-semibold clara-text-primary">{item.lead_name}</h3>
-            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-              {bucketConfig.label}
-            </span>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                item.lead_temperature
-              )}`}
-            >
-              {item.lead_temperature.toUpperCase()}
-            </span>
-            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-              {formatStatusLabel(item.current_stage)}
-            </span>
-            {item.task_status ? (
-              <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                Task: {formatStatusLabel(item.task_status)}
-              </span>
+          <h3 className="break-words text-base font-semibold clara-text-primary">{item.lead_name}</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Tag tone={overdue ? "danger" : "neutral"}>{getTimeLabel(item.next_follow_up_at)}</Tag>
+            {item.lead_temperature !== "unknown" ? (
+              <ValueTag table={TEMPERATURE} value={item.lead_temperature} />
             ) : null}
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                isItemOverdue
-                  ? "border border-[#f0cb73]/20 bg-[#4a3112] text-[#f0cb73]"
-                  : "border border-[#f0cb73]/18 bg-[#f0cb73]/10 text-[#f0cb73]"
-              }`}
-            >
-              {slaLabel}
-            </span>
-          </div>
-
-          <p className="mt-3 text-sm font-semibold clara-text-primary">{item.task_label}</p>
-          <p className="mt-2 text-sm leading-6 text-clara-ink-2">{item.reason}</p>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <div className="clara-card-soft rounded-2xl p-4">
-              <p className="clara-kicker text-xs">Aksi yang disarankan</p>
-              <p className="mt-2 text-sm leading-6 text-clara-ink-2">
-                {item.recommended_action}
-              </p>
-            </div>
-
-            <div className="clara-card-soft rounded-2xl p-4 text-sm text-clara-ink-2">
-              <p>Kontak terakhir: {formatDateTime(item.last_contact_at)}</p>
-              <p className="mt-2">
-                Follow-up berikutnya: {formatDateTime(item.next_follow_up_at)}
-              </p>
-              <p className="mt-2">PIC: {item.assigned_user_name ?? "Belum ada"}</p>
-              <p className="mt-2">Skor prioritas: {item.priority_score}</p>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
-            <div>
-              <label htmlFor={`result-${fieldId}`} className="clara-label">
-                Hasil aksi
-              </label>
-              <select
-                id={`result-${fieldId}`}
-                value={reasonTag}
-                onChange={(event) => setReasonTag(event.target.value)}
-                className="clara-select mt-2"
-                disabled={isUpdating}
-              >
-                <option value="follow_up_executed">follow_up_executed</option>
-                <option value="waiting_customer">waiting_customer</option>
-                <option value="needs_more_context">needs_more_context</option>
-                <option value="not_priority_now">not_priority_now</option>
-                <option value="duplicate_or_noise">duplicate_or_noise</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor={`note-${fieldId}`} className="clara-label">
-                Catatan opsional
-              </label>
-              <input
-                id={`note-${fieldId}`}
-                value={reasonNote}
-                onChange={(event) => setReasonNote(event.target.value)}
-                className="clara-input mt-2"
-                placeholder="Isi kalau perlu catatan tambahan"
-                disabled={isUpdating}
-              />
-            </div>
+            {item.current_stage !== "unknown" ? <ValueTag table={STAGE} value={item.current_stage} /> : null}
           </div>
         </div>
 
-        <div className="flex w-full flex-col gap-2 lg:w-60">
-          {item.conversation_id && (
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {item.conversation_id ? (
             <Link
-              href={`/dashboard/sales/conversations/${item.conversation_id}`}
+              href={`/sales/conversations/${item.conversation_id}`}
               className="clara-button clara-button-primary"
             >
-              Buka Percakapan
+              Buka chat
+            </Link>
+          ) : (
+            <Link href={`/crm/${item.lead_id}`} className="clara-button clara-button-primary">
+              Buka lead
             </Link>
           )}
-          <Link
-            href={`/dashboard/crm/${item.lead_id}`}
-            className="clara-button clara-button-ghost"
-          >
-            Buka Lead
-          </Link>
-          <button
-            type="button"
-            disabled={isUpdating}
-            onClick={() => {
-              void onTaskAction(item, buildPayload("done"));
-            }}
-            className="clara-button clara-button-secondary"
-          >
-            {isUpdating ? "Memproses..." : "Tandai Selesai"}
-          </button>
-          {/* Snooze UI disembunyikan sementara, backend state tetap dipertahankan untuk kompatibilitas data lama.
-          {item.task_status === "snoozed" ? (
-            <button
-              type="button"
-              disabled={isUpdating}
-              onClick={() => {
-                void onTaskAction(item, buildPayload("reopen"));
-              }}
-              className="clara-button clara-button-ghost"
-            >
-              Reopen
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                disabled={isUpdating}
-                onClick={() => {
-                  void onTaskAction(item, buildPayload("snooze", "30m"));
-                }}
-                className="clara-button border border-clara-line bg-clara-tint text-clara-gold"
-              >
-                Snooze 30m
-              </button>
-              <button
-                type="button"
-                disabled={isUpdating}
-                onClick={() => {
-                  void onTaskAction(item, buildPayload("snooze", "2h"));
-                }}
-                className="clara-button border border-clara-line bg-clara-tint text-clara-gold"
-              >
-                Snooze 2h
-              </button>
-              <button
-                type="button"
-                disabled={isUpdating}
-                onClick={() => {
-                  void onTaskAction(item, buildPayload("snooze", "tomorrow"));
-                }}
-                className="clara-button border border-clara-line bg-clara-tint text-clara-gold"
-              >
-                Snooze Besok
-              </button>
-            </>
-          )} */}
-          <button
-            type="button"
-            disabled={isUpdating}
-            onClick={() => {
-              void onTaskAction(item, buildPayload("dismiss"));
-            }}
-            className="clara-button clara-button-ghost"
-          >
-            Sembunyikan
-          </button>
         </div>
       </div>
-    </article>
+
+      <p className="mt-3 text-sm font-semibold clara-text-primary">{plainJargon(item.task_label)}</p>
+      <p className="mt-1 text-sm leading-6 clara-text-secondary">{plainJargon(item.reason)}</p>
+      <p className="mt-2 text-sm leading-6 clara-text-secondary">
+        <span className="font-semibold clara-text-primary">Yang perlu dilakukan: </span>
+        {plainJargon(item.recommended_action)}
+      </p>
+
+      <p className="mt-3 text-xs clara-text-muted">
+        Kontak terakhir {formatRelativeTime(item.last_contact_at)}
+        {showOwner ? ` · Penanggung jawab: ${item.assigned_user_name ?? "belum ada"}` : ""}
+      </p>
+
+      <details className="mt-4 border-t border-clara-line-subtle pt-3">
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-clara-gold">
+          Sudah selesai? Catat hasilnya
+        </summary>
+        <div className="mt-3 grid gap-3 md:grid-cols-[220px_minmax(0,1fr)]">
+          <div>
+            <label htmlFor={`result-${fieldId}`} className="clara-label">
+              Hasilnya
+            </label>
+            <select
+              id={`result-${fieldId}`}
+              value={reasonTag}
+              onChange={(event) => setReasonTag(event.target.value)}
+              className="clara-select mt-2 w-full"
+              disabled={isUpdating}
+            >
+              {FOLLOW_UP_RESULTS.map((result) => (
+                <option key={result.value} value={result.value}>
+                  {result.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor={`note-${fieldId}`} className="clara-label">
+              Catatan (boleh dikosongkan)
+            </label>
+            <input
+              id={`note-${fieldId}`}
+              value={reasonNote}
+              onChange={(event) => setReasonNote(event.target.value)}
+              className="clara-input mt-2 w-full"
+              placeholder="Contoh: sudah janji telepon besok pagi"
+              disabled={isUpdating}
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={() => void onTaskAction(item, buildPayload("done"))}
+            className="clara-button clara-button-secondary"
+          >
+            {isUpdating ? "Menyimpan..." : "Tandai selesai"}
+          </button>
+          <button
+            type="button"
+            disabled={isUpdating}
+            onClick={() => void onTaskAction(item, buildPayload("dismiss"))}
+            className="clara-button clara-button-ghost"
+            title="Hilangkan dari daftar ini tanpa menandainya selesai"
+          >
+            Sembunyikan dari daftar
+          </button>
+          {item.conversation_id ? (
+            <Link href={`/crm/${item.lead_id}`} className="clara-button clara-button-ghost">
+              Buka lead
+            </Link>
+          ) : null}
+        </div>
+      </details>
+    </li>
   );
 }

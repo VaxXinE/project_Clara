@@ -132,3 +132,36 @@ export function describe(table: VocabTable, value: string | null | undefined): V
 export function labelOf(table: VocabTable, value: string | null | undefined): string {
   return describe(table, value).label;
 }
+
+const JARGON_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/discipline log/gi, "catatan aktivitas harian"],
+  [/next follow-up/gi, "follow-up berikutnya"],
+  [/bottleneck/gi, "hambatan"],
+];
+
+/**
+ * Teks bebas dari backend kadang memakai istilah internal ("Discipline log belum diisi").
+ * Ganti dengan istilah yang dipakai di layar, tanpa mengubah huruf kapital di awal kata.
+ */
+export function plainJargon(text: string | null | undefined): string {
+  let result = text ?? "";
+
+  for (const [pattern, replacement] of JARGON_REPLACEMENTS) {
+    result = result.replace(pattern, (match) =>
+      match[0] === match[0].toUpperCase()
+        ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
+        : replacement,
+    );
+  }
+
+  return result;
+}
+
+/** Hasil sebuah tindak lanjut, dipilih Sales saat menandai selesai. */
+export const FOLLOW_UP_RESULTS: Array<{ value: string; label: string }> = [
+  { value: "follow_up_executed", label: "Sudah saya hubungi" },
+  { value: "waiting_customer", label: "Menunggu balasan customer" },
+  { value: "needs_more_context", label: "Perlu informasi tambahan" },
+  { value: "not_priority_now", label: "Belum jadi prioritas" },
+  { value: "duplicate_or_noise", label: "Duplikat atau tidak relevan" },
+];
