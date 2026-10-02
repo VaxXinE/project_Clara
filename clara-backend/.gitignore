@@ -62,3 +62,8 @@ yarn-error.log*
 next-env.d.ts
 
 .env
+
+# runtime artifacts
+uvicorn.*.log
+*.log
+/storage/extension-builds/
