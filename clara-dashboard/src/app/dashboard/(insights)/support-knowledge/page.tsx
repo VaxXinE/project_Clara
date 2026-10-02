@@ -17,6 +17,15 @@ import { useEffect, useMemo, useState } from "react";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
+import {
+  ARTICLE_LIFECYCLE,
+  SUPPORT_LEVEL,
+  SUPPORT_RISK,
+  SUPPORT_TOPIC,
+  describe,
+  describeKnowledgeSource,
+  describeSupportTopic,
+} from "@/lib/vocab";
 import type { CurrentUser } from "@/types/dashboard";
 import { useConfirm } from "@/components/dashboard/ConfirmDialog";
 
@@ -129,7 +138,7 @@ export default function SupportKnowledgePage() {
         await load();
       } catch (reason) {
         setError(
-          reason instanceof Error ? reason.message : "Gagal memuat knowledge.",
+          reason instanceof Error ? reason.message : "Pengetahuan belum bisa dimuat.",
         );
       }
     }
@@ -176,11 +185,11 @@ export default function SupportKnowledgePage() {
       });
       setForm(EMPTY_FORM);
       setEditorOpen(false);
-      setMessage("Revisi support knowledge berhasil disimpan sebagai draft.");
+      setMessage("Revisi disimpan sebagai draf.");
       await load();
     } catch (reason) {
       setError(
-        reason instanceof Error ? reason.message : "Gagal menyimpan draft.",
+        reason instanceof Error ? reason.message : "Draf belum bisa disimpan. Coba lagi.",
       );
     } finally {
       setBusy("");
@@ -210,12 +219,12 @@ export default function SupportKnowledgePage() {
       });
       setMessage(
         action === "retire"
-          ? "Support knowledge dinonaktifkan."
-          : `Lifecycle berhasil di-${action}.`,
+          ? "Pengetahuan support dinonaktifkan."
+          : `Artikel sudah ${action === "approve" ? "disetujui" : action === "activate" ? "diaktifkan" : "diperbarui"}.`,
       );
       await load();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Lifecycle gagal.");
+      setError(reason instanceof Error ? reason.message : "Aksi belum bisa dijalankan. Coba lagi.");
     } finally {
       setBusy("");
     }
@@ -225,7 +234,7 @@ export default function SupportKnowledgePage() {
     <form onSubmit={submit} className="flex h-full flex-col">
       <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border-subtle)] p-5 sm:p-6">
         <div>
-          <p className="clara-kicker">Support knowledge</p>
+          <p className="clara-kicker">Knowledge Support</p>
           <h2 className="clara-section-title mt-2">Tambah atau buat revisi</h2>
           <p className="clara-helper mt-1">
             Konten disimpan sebagai draft dan harus melalui approval.
@@ -263,13 +272,15 @@ export default function SupportKnowledgePage() {
             }
           >
             {TOPICS.map((value) => (
-              <option key={value}>{value}</option>
+              <option key={value} value={value}>
+                {SUPPORT_TOPIC[value]}
+              </option>
             ))}
           </select>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
-            <span className="clara-label">Support level</span>
+            <span className="clara-label">Siapa yang menjawab</span>
             <select
               className="clara-select mt-2"
               value={form.support_level}
@@ -277,13 +288,13 @@ export default function SupportKnowledgePage() {
                 setForm({ ...form, support_level: event.target.value })
               }
             >
-              <option>LEVEL_0</option>
-              <option>LEVEL_1</option>
-              <option>HUMAN_REQUIRED</option>
+              <option value="LEVEL_0">{SUPPORT_LEVEL.level_0.label}</option>
+              <option value="LEVEL_1">{SUPPORT_LEVEL.level_1.label}</option>
+              <option value="HUMAN_REQUIRED">{SUPPORT_LEVEL.human_required.label}</option>
             </select>
           </label>
           <label>
-            <span className="clara-label">Risk class</span>
+            <span className="clara-label">Tingkat risiko</span>
             <select
               className="clara-select mt-2"
               value={form.risk_class}
@@ -291,9 +302,9 @@ export default function SupportKnowledgePage() {
                 setForm({ ...form, risk_class: event.target.value })
               }
             >
-              <option>LOW</option>
-              <option>MEDIUM</option>
-              <option>HIGH</option>
+              <option value="LOW">{SUPPORT_RISK.low.label}</option>
+              <option value="MEDIUM">{SUPPORT_RISK.medium.label}</option>
+              <option value="HIGH">{SUPPORT_RISK.high.label}</option>
             </select>
           </label>
         </div>
@@ -333,7 +344,7 @@ export default function SupportKnowledgePage() {
             }
           />
           <span className="text-sm font-semibold">
-            Ditinjau sebagai customer-safe
+            Sudah dicek: aman dilihat customer
           </span>
         </label>
       </div>
@@ -349,7 +360,7 @@ export default function SupportKnowledgePage() {
           disabled={busy === "create"}
           className="clara-button clara-button-primary"
         >
-          {busy === "create" ? "Menyimpan..." : "Simpan draft"}
+          {busy === "create" ? "Menyimpan..." : "Simpan draf"}
         </button>
       </div>
     </form>
@@ -360,7 +371,7 @@ export default function SupportKnowledgePage() {
       currentUser={me}
       eyebrow={NAV_GROUP_NAMES.analysis}
       title={PAGE_NAMES.supportKnowledge}
-      description="Kelola jawaban support terverifikasi dengan batas eskalasi dan trust metadata yang jelas."
+      description="Kelola jawaban support terverifikasi dengan jelas siapa yang boleh menjawab, seberapa berisiko, dan dari mana sumbernya."
       backHref="/knowledge"
       backLabel="Knowledge Base"
       actions={
@@ -391,27 +402,29 @@ export default function SupportKnowledgePage() {
                   className="clara-text-muted pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2"
                 />
                 <input
-                  className="clara-input pl-11"
+                  className="clara-input"
+                  style={{ paddingLeft: "2.75rem" }}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Cari judul, topik, atau isi artikel..."
                 />
               </label>
               <label className="relative min-w-[190px]">
-                <span className="sr-only">Filter support level</span>
+                <span className="sr-only">Filter siapa yang menjawab</span>
                 <FontAwesomeIcon
                   icon={faFilter}
                   className="clara-text-muted pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2"
                 />
                 <select
-                  className="clara-select pl-11"
+                  className="clara-select"
+                  style={{ paddingLeft: "2.75rem" }}
                   value={levelFilter}
                   onChange={(event) => setLevelFilter(event.target.value)}
                 >
-                  <option value="ALL">Semua level</option>
-                  <option>LEVEL_0</option>
-                  <option>LEVEL_1</option>
-                  <option>HUMAN_REQUIRED</option>
+                  <option value="ALL">Semua jenis</option>
+                  <option value="LEVEL_0">{SUPPORT_LEVEL.level_0.label}</option>
+                  <option value="LEVEL_1">{SUPPORT_LEVEL.level_1.label}</option>
+                  <option value="HUMAN_REQUIRED">{SUPPORT_LEVEL.human_required.label}</option>
                 </select>
               </label>
             </div>
@@ -431,10 +444,10 @@ export default function SupportKnowledgePage() {
         <div className="grid min-h-[650px] gap-5 lg:grid-cols-[330px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_250px]">
           <section
             className={`clara-card overflow-hidden rounded-2xl ${showDetail ? "hidden lg:block" : "block"}`}
-            aria-label="Pustaka support knowledge"
+            aria-label="Pustaka Knowledge Support"
           >
             <div className="border-b border-[var(--color-border-subtle)] px-5 py-4">
-              <p className="font-semibold">Article library</p>
+              <p className="font-semibold">Daftar artikel</p>
               <p className="clara-helper mt-1 tabular-nums">
                 {filteredItems.length} dari {items.length} artikel
               </p>
@@ -461,14 +474,14 @@ export default function SupportKnowledgePage() {
                       <span
                         className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${statusTone(article.support_level)}`}
                       >
-                        {article.support_level.replace("LEVEL_", "L")}
+                        {describe(SUPPORT_LEVEL, article.support_level).label}
                       </span>
                     </div>
                     <p className="clara-text-secondary mt-2 line-clamp-2 text-sm leading-5">
                       {article.content}
                     </p>
                     <p className="clara-text-muted mt-3 text-xs">
-                      {article.topic} · v
+                      {describeSupportTopic(article.topic)} · versi 
                       <span className="tabular-nums">{article.version}</span>
                     </p>
                   </button>
@@ -494,16 +507,16 @@ export default function SupportKnowledgePage() {
                       onClick={() => setShowDetail(false)}
                     >
                       <FontAwesomeIcon icon={faArrowLeft} className="h-4 w-4" />{" "}
-                      Kembali ke library
+                      Kembali ke daftar
                     </button>
-                    <p className="clara-kicker">{selected.topic}</p>
+                    <p className="clara-kicker">{describeSupportTopic(selected.topic)}</p>
                     <h2 className="mt-2 text-xl font-bold leading-tight sm:text-2xl">
                       {selected.title}
                     </h2>
                     <p className="clara-text-muted mt-2 text-sm">
-                      Version{" "}
+                      Versi{" "}
                       <span className="tabular-nums">{selected.version}</span> ·{" "}
-                      {selected.lifecycle_status}
+                      {describe(ARTICLE_LIFECYCLE, selected.lifecycle_status).label}
                     </p>
                   </div>
                   {canGovern ? (
@@ -525,35 +538,35 @@ export default function SupportKnowledgePage() {
                     <span
                       className={`rounded-full border px-3 py-1.5 text-xs font-bold ${statusTone(selected.support_level)}`}
                     >
-                      {selected.support_level}
+                      {describe(SUPPORT_LEVEL, selected.support_level).label}
                     </span>
                     <span
                       className={`rounded-full border px-3 py-1.5 text-xs font-bold ${statusTone(selected.risk_class)}`}
                     >
-                      Risk {selected.risk_class}
+                      {describe(SUPPORT_RISK, selected.risk_class).label}
                     </span>
                     <span
                       className={`rounded-full border px-3 py-1.5 text-xs font-bold ${selected.customer_safe ? statusTone("ACTIVE") : statusTone("HUMAN_REQUIRED")}`}
                     >
                       {selected.customer_safe
-                        ? "Customer-safe"
-                        : "Review required"}
+                        ? "Aman dilihat customer"
+                        : "Perlu dicek manusia"}
                     </span>
                   </div>
                   <div className="clara-text-secondary whitespace-pre-wrap text-[15px] leading-8">
                     {selected.content}
                   </div>
                   <div className="mt-8 border-t border-[var(--color-border-subtle)] pt-6">
-                    <p className="clara-kicker">Trust metadata</p>
+                    <p className="clara-kicker">Asal informasi</p>
                     <dl className="mt-4 grid gap-4 sm:grid-cols-2">
                       <div className="clara-panel-soft rounded-xl p-4">
-                        <dt className="clara-helper">Source</dt>
+                        <dt className="clara-helper">Sumber</dt>
                         <dd className="mt-1 font-semibold">
-                          {selected.source}
+                          {describeKnowledgeSource(selected.source)}
                         </dd>
                       </div>
                       <div className="clara-panel-soft min-w-0 rounded-xl p-4">
-                        <dt className="clara-helper">Reference</dt>
+                        <dt className="clara-helper">Rujukan</dt>
                         <dd className="mt-1 break-all text-sm">
                           {selected.source_reference}
                         </dd>
@@ -570,8 +583,8 @@ export default function SupportKnowledgePage() {
           </article>
 
           <aside className="clara-card hidden h-fit rounded-2xl p-5 xl:block">
-            <p className="clara-kicker">Governance</p>
-            <h2 className="clara-card-title mt-2">Lifecycle artikel</h2>
+            <p className="clara-kicker">Persetujuan</p>
+            <h2 className="clara-card-title mt-2">Siklus artikel</h2>
             {selected ? (
               <div className="mt-5 space-y-4">
                 <div
@@ -580,7 +593,7 @@ export default function SupportKnowledgePage() {
                   <p className="text-xs font-bold">
                     Status saat ini
                   </p>
-                  <p className="mt-1 font-bold">{selected.lifecycle_status}</p>
+                  <p className="mt-1 font-bold">{describe(ARTICLE_LIFECYCLE, selected.lifecycle_status).label}</p>
                 </div>
                 <div className="rounded-xl border border-[var(--color-border-subtle)] p-4 text-sm">
                   <FontAwesomeIcon
@@ -591,7 +604,7 @@ export default function SupportKnowledgePage() {
                   />
                   {selected.customer_safe
                     ? "Aman untuk customer"
-                    : "Butuh review manusia"}
+                    : "Perlu dicek manusia"}
                 </div>
                 {canGovern ? (
                   <div className="space-y-2 border-t border-[var(--color-border-subtle)] pt-4">
@@ -602,7 +615,7 @@ export default function SupportKnowledgePage() {
                         className="clara-button clara-button-ghost w-full"
                         onClick={() => void transition(selected, "approve")}
                       >
-                        Approve
+                        Setujui
                       </button>
                     ) : null}
                     {selected.lifecycle_status === "APPROVED" ? (
@@ -612,7 +625,7 @@ export default function SupportKnowledgePage() {
                         className="clara-button clara-button-primary w-full"
                         onClick={() => void transition(selected, "activate")}
                       >
-                        Activate
+                        Aktifkan
                       </button>
                     ) : null}
                     {selected.lifecycle_status !== "RETIRED" ? (
@@ -630,7 +643,7 @@ export default function SupportKnowledgePage() {
               </div>
             ) : (
               <p className="clara-helper mt-4">
-                Pilih artikel untuk melihat lifecycle.
+                Pilih artikel untuk melihat tahapnya.
               </p>
             )}
           </aside>
@@ -638,7 +651,7 @@ export default function SupportKnowledgePage() {
 
         {selected && canGovern ? (
           <div className="clara-card rounded-2xl p-4 xl:hidden">
-            <p className="clara-kicker">Lifecycle action</p>
+            <p className="clara-kicker">Aksi</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {selected.lifecycle_status === "DRAFT" ? (
                 <button
@@ -647,7 +660,7 @@ export default function SupportKnowledgePage() {
                   className="clara-button clara-button-ghost"
                   onClick={() => void transition(selected, "approve")}
                 >
-                  Approve
+                  Setujui
                 </button>
               ) : null}
               {selected.lifecycle_status === "APPROVED" ? (
@@ -657,7 +670,7 @@ export default function SupportKnowledgePage() {
                   className="clara-button clara-button-primary"
                   onClick={() => void transition(selected, "activate")}
                 >
-                  Activate
+                  Aktifkan
                 </button>
               ) : null}
               {selected.lifecycle_status !== "RETIRED" ? (
@@ -683,7 +696,7 @@ export default function SupportKnowledgePage() {
           <aside
             role="dialog"
             aria-modal="true"
-            aria-label="Editor support knowledge"
+            aria-label="Editor Knowledge Support"
             className="clara-card absolute inset-y-0 right-0 w-[min(620px,96vw)] overflow-hidden"
             onClick={(event) => event.stopPropagation()}
           >

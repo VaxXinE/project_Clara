@@ -14,6 +14,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { describeKnowledgeScope, describeKnowledgeSource } from "@/lib/vocab";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
@@ -114,14 +115,14 @@ export default function ProductKnowledgePage() {
         proposalResult.status === "rejected"
       ) {
         setErrorMessage(
-          "Sebagian data knowledge gagal dimuat. Data yang berhasil dimuat tetap ditampilkan.",
+          "Sebagian data pengetahuan belum bisa dimuat. Data yang berhasil dimuat tetap ditampilkan.",
         );
       }
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal memuat product knowledge.",
+          : "Pengetahuan produk belum bisa dimuat.",
       );
     } finally {
       setIsLoading(false);
@@ -176,7 +177,7 @@ export default function ProductKnowledgePage() {
   function startEdit(item: ProductKnowledgeItem) {
     if (!canManageKnowledge) {
       setErrorMessage(
-        "Hanya superadmin yang boleh mengubah product knowledge.",
+        "Hanya superadmin yang boleh mengubah pengetahuan produk.",
       );
       return;
     }
@@ -197,7 +198,7 @@ export default function ProductKnowledgePage() {
     event.preventDefault();
     if (!canManageKnowledge) {
       setErrorMessage(
-        "Hanya superadmin yang boleh menambahkan product knowledge.",
+        "Hanya superadmin yang boleh menambah pengetahuan produk.",
       );
       return;
     }
@@ -214,13 +215,13 @@ export default function ProductKnowledgePage() {
             body: form,
           },
         );
-        setSuccessMessage("Knowledge base berhasil diupdate.");
+        setSuccessMessage("Pengetahuan sudah diperbarui.");
       } else {
         await apiFetch<ProductKnowledgeItem>("/product-knowledge", {
           method: "POST",
           body: form,
         });
-        setSuccessMessage("Knowledge base berhasil ditambahkan.");
+        setSuccessMessage("Pengetahuan sudah ditambahkan.");
       }
       setForm(EMPTY_FORM);
       setEditingId(null);
@@ -230,7 +231,7 @@ export default function ProductKnowledgePage() {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal menyimpan product knowledge.",
+          : "Pengetahuan belum bisa disimpan. Coba lagi.",
       );
     } finally {
       setIsSubmitting(false);
@@ -240,7 +241,7 @@ export default function ProductKnowledgePage() {
   async function handleDelete(knowledgeId: string) {
     if (!canManageKnowledge) {
       setErrorMessage(
-        "Hanya superadmin yang boleh menghapus product knowledge.",
+        "Hanya superadmin yang boleh menonaktifkan pengetahuan produk.",
       );
       return;
     }
@@ -252,7 +253,7 @@ export default function ProductKnowledgePage() {
         method: "DELETE",
       });
       setSuccessMessage(
-        "Knowledge entry dinonaktifkan dan tidak lagi dipakai Clara.",
+        "Pengetahuan dinonaktifkan dan tidak lagi dipakai Clara.",
       );
       setConfirmDeactivateId(null);
       await loadKnowledge();
@@ -260,7 +261,7 @@ export default function ProductKnowledgePage() {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal menonaktifkan product knowledge.",
+          : "Pengetahuan belum bisa dinonaktifkan. Coba lagi.",
       );
     } finally {
       setDeletingId(null);
@@ -288,7 +289,7 @@ export default function ProductKnowledgePage() {
   ) {
     if (!canReviewProposals) {
       setErrorMessage(
-        "Hanya superadmin yang boleh approve atau reject proposal knowledge.",
+        "Hanya superadmin yang boleh menyetujui atau menolak usulan pengetahuan.",
       );
       return;
     }
@@ -309,15 +310,15 @@ export default function ProductKnowledgePage() {
       );
       setSuccessMessage(
         status === "approved"
-          ? "Proposal knowledge berhasil di-approve dan dipublish oleh superadmin."
-          : "Proposal knowledge berhasil di-reject.",
+          ? "Usulan disetujui dan langsung dipakai Clara."
+          : "Usulan ditolak.",
       );
       await loadKnowledge();
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal memproses review proposal knowledge.",
+          : "Usulan belum bisa diproses. Coba lagi.",
       );
     } finally {
       setReviewingProposalId(null);
@@ -331,7 +332,7 @@ export default function ProductKnowledgePage() {
       title={PAGE_NAMES.knowledge}
       description="Temukan dan kelola sumber jawaban resmi tanpa memisahkan pencarian dari konteks yang sedang dibaca."
       backHref="/workspace"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
         <div className="flex flex-wrap gap-2">
           <div className="relative">
@@ -350,12 +351,12 @@ export default function ProductKnowledgePage() {
             {sourceMenuOpen ? (
               <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-56 rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-surface-overlay)] p-2 shadow-[var(--shadow-floating)]">
                 {canManageKnowledge ? (
-                  <SourceLink href="/admin/ai-config" label="AI Persona" />
+                  <SourceLink href="/admin/ai-config" label="Persona AI" />
                 ) : null}
-                <SourceLink href="/product-facts" label="Product Facts" />
+                <SourceLink href="/product-facts" label="Fakta Produk" />
                 <SourceLink
                   href="/support-knowledge"
-                  label="Support Knowledge"
+                  label="Knowledge Support"
                 />
               </div>
             ) : null}
@@ -366,7 +367,7 @@ export default function ProductKnowledgePage() {
               className="clara-button clara-button-primary"
               onClick={openCreate}
             >
-              <FontAwesomeIcon icon={faPlus} className="h-4 w-4" /> Tambah entry
+              <FontAwesomeIcon icon={faPlus} className="h-4 w-4" /> Tambah pengetahuan
             </button>
           ) : null}
         </div>
@@ -399,14 +400,14 @@ export default function ProductKnowledgePage() {
           </span>
           <span className="inline-flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[var(--color-success)]" />{" "}
-            Grounding siap
+            Siap dipakai Clara
           </span>
-          <span>{canManageKnowledge ? "Akses kelola" : "Mode baca"}</span>
+          <span>{canManageKnowledge ? "Kamu bisa mengubah" : "Hanya bisa dibaca"}</span>
         </div>
 
         {isLoading ? (
           <div role="status" className="clara-empty-state">
-            Memuat product knowledge...
+            Memuat pengetahuan...
           </div>
         ) : shouldRenderWorkspace ? (
           <section className="clara-card overflow-hidden rounded-2xl">
@@ -415,7 +416,7 @@ export default function ProductKnowledgePage() {
               className="flex flex-col gap-3 border-b border-[var(--color-border-subtle)] p-4 lg:flex-row lg:items-center"
             >
               <label className="relative min-w-0 flex-1">
-                <span className="sr-only">Cari knowledge</span>
+                <span className="sr-only">Cari pengetahuan</span>
                 <FontAwesomeIcon
                   icon={faMagnifyingGlass}
                   className="clara-text-muted pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2"
@@ -428,7 +429,7 @@ export default function ProductKnowledgePage() {
                       q: event.target.value,
                     }))
                   }
-                  className="clara-input pl-11"
+                  className="clara-input" style={{ paddingLeft: "2.75rem" }}
                   placeholder="Cari judul, kategori, atau isi..."
                 />
               </label>
@@ -487,7 +488,7 @@ export default function ProductKnowledgePage() {
                   type="submit"
                   className="clara-button clara-button-primary"
                 >
-                  Terapkan
+                  Cari
                 </button>
                 {hasFilters ? (
                   <button
@@ -539,7 +540,7 @@ export default function ProductKnowledgePage() {
                           <div className="clara-text-muted mt-3 flex items-center justify-between gap-3 text-xs">
                             <span className="truncate">{item.category}</span>
                             <span className="whitespace-nowrap tabular-nums">
-                              {stats.sectionCount} blok
+                              {stats.sectionCount} bagian
                             </span>
                           </div>
                         </button>
@@ -625,7 +626,7 @@ export default function ProductKnowledgePage() {
                       <dl className="clara-text-muted mt-4 flex flex-wrap gap-x-6 gap-y-2 text-xs">
                         <div>
                           <dt className="sr-only">Sumber</dt>
-                          <dd>{selectedKnowledge.source_type}</dd>
+                          <dd>{describeKnowledgeSource(selectedKnowledge.source_type)}</dd>
                         </div>
                         <div>
                           <dt className="sr-only">Pemilik</dt>
@@ -641,14 +642,14 @@ export default function ProductKnowledgePage() {
                           </dd>
                         </div>
                         <div>
-                          <dt className="sr-only">Jumlah blok</dt>
+                          <dt className="sr-only">Jumlah bagian</dt>
                           <dd className="tabular-nums">
-                            {selectedKnowledgeStats?.sectionCount ?? 0} blok
+                            {selectedKnowledgeStats?.sectionCount ?? 0} bagian
                           </dd>
                         </div>
                         <div>
                           <dt className="sr-only">Scope</dt>
-                          <dd>{selectedKnowledge.scope_type}</dd>
+                          <dd>{describeKnowledgeScope(selectedKnowledge.scope_type)}</dd>
                         </div>
                       </dl>
                     </header>
@@ -690,7 +691,7 @@ export default function ProductKnowledgePage() {
 
                     <div className="w-full px-5 py-7 sm:px-8 sm:py-9">
                       <p className="text-sm font-semibold text-[var(--color-accent)]">
-                        Isi knowledge
+                        Isi pengetahuan
                       </p>
                       <div className="mt-5">
                         {renderKnowledgeContent(selectedKnowledge.content)}
@@ -699,7 +700,7 @@ export default function ProductKnowledgePage() {
                   </article>
                 ) : (
                   <div className="clara-empty-state m-5">
-                    Pilih entry untuk membaca detail.
+                    Pilih satu pengetahuan untuk membaca detailnya.
                   </div>
                 )}
               </div>
@@ -716,15 +717,14 @@ export default function ProductKnowledgePage() {
               className="flex min-h-16 w-full items-center justify-between gap-4 px-5 text-left hover:bg-[var(--color-surface-muted)]"
             >
               <div>
-                <p className="font-semibold">Antrean Update Knowledge</p>
+                <p className="font-semibold">Usulan perubahan pengetahuan</p>
                 <p className="clara-helper mt-1">
-                  Usulan dari coaching review yang menunggu keputusan
-                  governance.
+                  Usulan dari hasil review chat yang menunggu keputusan superadmin.
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="clara-chip tabular-nums">
-                  {proposals.length} proposal
+                  {proposals.length} usulan
                 </span>
                 <FontAwesomeIcon
                   icon={faChevronDown}
@@ -752,7 +752,7 @@ export default function ProductKnowledgePage() {
                             </span>
                           </div>
                           <p className="clara-text-secondary mt-2 text-sm">
-                            Conversation: {proposal.conversation_title ?? "-"}
+                            Percakapan: {proposal.conversation_title ?? "-"}
                           </p>
                           <p className="clara-text-secondary mt-3 whitespace-pre-wrap text-sm leading-6">
                             {expandedProposalId === proposal.id
@@ -779,7 +779,7 @@ export default function ProductKnowledgePage() {
                           ) : null}
                           <p className="clara-text-muted mt-3 text-xs">
                             Pengusul: {proposal.proposed_by_user_name ?? "-"} ·{" "}
-                            {proposal.source_type} ·{" "}
+                            {describeKnowledgeSource(proposal.source_type)} ·{" "}
                             <span className="tabular-nums">
                               {formatDateTime(proposal.updated_at)}
                             </span>
@@ -814,7 +814,7 @@ export default function ProductKnowledgePage() {
                             >
                               {reviewingProposalId === proposal.id
                                 ? "Memproses..."
-                                : "Approve & Publish"}
+                                : "Setujui & pakai"}
                             </button>
                           </div>
                         ) : null}
@@ -851,7 +851,7 @@ export default function ProductKnowledgePage() {
                     id="knowledge-editor-title"
                     className="clara-section-title"
                   >
-                    {editingId ? "Edit knowledge" : "Tambah knowledge"}
+                    {editingId ? "Ubah pengetahuan" : "Tambah pengetahuan"}
                   </h2>
                   <p className="clara-helper mt-1">
                     Pastikan faktual dan sumbernya dapat diverifikasi.
@@ -911,7 +911,7 @@ export default function ProductKnowledgePage() {
                   </label>
                 </div>
                 <label className="block">
-                  <span className="clara-label">Isi knowledge</span>
+                  <span className="clara-label">Isi pengetahuan</span>
                   <textarea
                     value={form.content}
                     onChange={(event) =>
@@ -941,7 +941,7 @@ export default function ProductKnowledgePage() {
                     }
                     className="h-5 w-5 accent-[var(--color-accent)]"
                   />
-                  <span>Aktifkan untuk grounding Clara</span>
+                  <span>Pakai sebagai dasar jawaban Clara</span>
                 </label>
               </div>
               <div className="flex flex-col-reverse gap-2 border-t border-[var(--color-border-subtle)] p-5 sm:flex-row sm:justify-end">
@@ -968,7 +968,7 @@ export default function ProductKnowledgePage() {
                     ? "Menyimpan..."
                     : editingId
                       ? "Simpan perubahan"
-                      : "Tambah entry"}
+                      : "Tambah pengetahuan"}
                 </button>
               </div>
             </form>

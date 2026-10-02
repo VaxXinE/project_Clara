@@ -766,3 +766,136 @@ export function describeContentFormat(value: string | null | undefined): string 
 
   return CONTENT_FORMAT[key] ?? plainJargon((value ?? "").replaceAll("_", " "));
 }
+
+const KNOWLEDGE_SOURCE: Record<string, string> = {
+  manual_note: "Catatan manual",
+  coaching_review: "Hasil review chat",
+  imported_document: "Dokumen impor",
+  markdown: "Berkas bawaan",
+  manual: "Input manual",
+  manual_verified: "Dicek manual oleh tim",
+  approved_repository_source: "Sumber resmi perusahaan",
+};
+
+/** Jenis sumber pengetahuan ("manual_note") jadi nama yang bisa dibaca. */
+export function describeKnowledgeSource(value: string | null | undefined): string {
+  const key = (value ?? "").trim();
+
+  return KNOWLEDGE_SOURCE[key] ?? (key.replaceAll("_", " ") || "-");
+}
+
+/** Cakupan data ("global" atau "organization") dalam kata sehari-hari. */
+export function describeKnowledgeScope(value: string | null | undefined): string {
+  return value === "global" ? "Semua organisasi" : value === "organization" ? "Organisasi ini" : (value ?? "-");
+}
+
+export const FACT_KEY_LABEL: Record<string, string> = {
+  "account.minimum_opening_amount": "Setoran minimal buka akun",
+  "account.minimum_lot": "Lot minimal",
+  "account.eligible_products": "Produk yang bisa dipakai",
+  "account.currency": "Mata uang akun",
+  "trading.spread": "Spread",
+  "trading.commission": "Komisi",
+  "trading.margin": "Margin",
+  "trading.swap": "Swap",
+  "trading.rollover": "Rollover",
+  "trading.storage_fee": "Biaya penyimpanan",
+  "trading.overnight_requirement": "Syarat posisi semalam",
+  "trading.instruments": "Instrumen yang tersedia",
+  "company.regulatory_status": "Status pengawasan perusahaan",
+  "company.regulator": "Regulator",
+  "company.license_reference": "Nomor izin",
+  "process.initial_data": "Data awal yang diminta",
+  "process.kyc_requirements": "Syarat verifikasi identitas",
+  "process.verification_steps": "Langkah verifikasi",
+  "process.activation_steps": "Langkah aktivasi akun",
+  "process.funding_steps": "Langkah setor dana",
+  "process.withdrawal_steps": "Langkah tarik dana",
+  "promotion.current_terms": "Syarat promo saat ini",
+};
+
+/** Kunci fakta ("account.minimum_lot") jadi nama yang bisa dibaca. */
+export function describeFactKey(key: string | null | undefined): string {
+  const value = (key ?? "").trim();
+
+  return FACT_KEY_LABEL[value] ?? (value.replaceAll(".", " ").replaceAll("_", " ") || "-");
+}
+
+export const FACT_LIFECYCLE: VocabTable = {
+  draft: { label: "Draf", tone: "neutral", hint: "Belum dipakai Clara." },
+  approved: { label: "Disetujui", tone: "info", hint: "Sudah disetujui, belum diaktifkan." },
+  active: { label: "Dipakai Clara", tone: "good" },
+  expired: { label: "Kedaluwarsa", tone: "warn" },
+  revoked: { label: "Dinonaktifkan", tone: "danger" },
+};
+
+export const FACT_FRESHNESS: VocabTable = {
+  fresh: { label: "Masih baru", tone: "good" },
+  stale: { label: "Perlu dicek ulang", tone: "warn" },
+  unverified: { label: "Belum diverifikasi", tone: "neutral" },
+};
+
+export const FACT_VOLATILITY: Record<string, string> = {
+  HIGH_VOLATILITY: "Sering berubah",
+  MEDIUM_VOLATILITY: "Kadang berubah",
+  LOW_VOLATILITY: "Jarang berubah",
+};
+
+export const FACT_VALUE_TYPE: Record<string, string> = {
+  text: "Teks",
+  integer: "Angka bulat",
+  decimal: "Angka desimal",
+  boolean: "Ya / Tidak",
+  date: "Tanggal",
+  json: "Data terstruktur (JSON)",
+};
+
+export const FACT_SCOPE: Record<string, string> = {
+  global: "Semua jenis akun",
+  mini: "Akun Mini",
+  regular: "Akun Reguler",
+};
+
+export const SUPPORT_TOPIC: Record<string, string> = {
+  GENERAL_NAVIGATION: "Panduan umum",
+  OFFICIAL_CHANNEL: "Kanal resmi",
+  ACCOUNT_ACCESS_GENERAL: "Akses akun",
+  LOGIN_GENERAL: "Masuk (login)",
+  PASSWORD_SAFETY: "Keamanan kata sandi",
+  REGISTRATION_GENERAL: "Pendaftaran",
+  DOCUMENT_PREPARATION_GENERAL: "Menyiapkan dokumen",
+  VERIFICATION_GENERAL: "Verifikasi",
+  ACTIVATION_GENERAL: "Aktivasi akun",
+  FUNDING_GENERAL: "Setor dana",
+  WITHDRAWAL_GENERAL: "Tarik dana",
+  PLATFORM_GENERAL: "Platform trading",
+  ERROR_MESSAGE_GENERAL: "Pesan error",
+  POST_ACTIVATION_GENERAL: "Setelah akun aktif",
+  STATUS_REQUEST: "Tanya status",
+  SECURITY_CONCERN: "Kekhawatiran keamanan",
+};
+
+export function describeSupportTopic(value: string | null | undefined): string {
+  const key = (value ?? "").trim();
+
+  return SUPPORT_TOPIC[key] ?? key.replaceAll("_", " ").toLowerCase();
+}
+
+export const SUPPORT_LEVEL: VocabTable = {
+  level_0: { label: "Clara jawab sendiri", tone: "good", hint: "Aman dijawab Clara tanpa bantuan manusia." },
+  level_1: { label: "Clara jawab, Sales cek", tone: "warn", hint: "Clara menyusun jawaban, Sales yang memastikan." },
+  human_required: { label: "Harus manusia", tone: "danger", hint: "Hanya boleh dijawab manusia." },
+};
+
+export const SUPPORT_RISK: VocabTable = {
+  low: { label: "Risiko rendah", tone: "good" },
+  medium: { label: "Risiko sedang", tone: "warn" },
+  high: { label: "Risiko tinggi", tone: "danger" },
+};
+
+export const ARTICLE_LIFECYCLE: VocabTable = {
+  draft: { label: "Draf", tone: "neutral", hint: "Belum dipakai Clara." },
+  approved: { label: "Disetujui", tone: "info", hint: "Sudah disetujui, belum diaktifkan." },
+  active: { label: "Dipakai Clara", tone: "good" },
+  retired: { label: "Dihentikan", tone: "danger" },
+};

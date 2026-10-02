@@ -19,8 +19,26 @@ import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import {
+  FACT_FRESHNESS,
+  FACT_KEY_LABEL,
+  FACT_LIFECYCLE,
+  FACT_SCOPE,
+  FACT_VALUE_TYPE,
+  FACT_VOLATILITY,
+  describe,
+  describeFactKey,
+  describeKnowledgeSource,
+} from "@/lib/vocab";
 import type { CurrentUser, ProductFactItem } from "@/types/dashboard";
 import { useConfirm } from "@/components/dashboard/ConfirmDialog";
+
+const FACT_ACTION_DONE: Record<string, string> = {
+  approve: "disetujui",
+  activate: "diaktifkan",
+  expire: "ditandai kedaluwarsa",
+  revoke: "dinonaktifkan",
+};
 
 const FACT_KEYS = [
   "account.minimum_opening_amount",
@@ -178,11 +196,11 @@ export default function ProductFactsPage() {
       });
       setForm(EMPTY_FORM);
       setEditorOpen(false);
-      setMessage("Draft fakta berhasil dibuat.");
+      setMessage("Draf fakta sudah dibuat.");
       await load();
     } catch (reason) {
       setError(
-        reason instanceof Error ? reason.message : "Gagal membuat draft.",
+        reason instanceof Error ? reason.message : "Draf belum bisa dibuat. Coba lagi.",
       );
     } finally {
       setBusy("");
@@ -207,7 +225,7 @@ export default function ProductFactsPage() {
       effective_from: "",
       effective_until: "",
     });
-    setMessage(`Fakta ${item.fact_key} disalin sebagai revisi baru.`);
+    setMessage(`Fakta "${describeFactKey(item.fact_key)}" disalin sebagai revisi baru.`);
     setEditorOpen(true);
   }
 
@@ -215,7 +233,7 @@ export default function ProductFactsPage() {
     if (action === "revoke") {
       const accepted = await confirm({
         title: "Nonaktifkan fakta ini?",
-        message: `${item.fact_key} revisi ${item.revision} tidak lagi dipakai Clara untuk menjawab. Histori tetap tersimpan.`,
+        message: `${describeFactKey(item.fact_key)} revisi ${item.revision} tidak lagi dipakai Clara untuk menjawab. Histori tetap tersimpan.`,
         confirmLabel: "Nonaktifkan",
         tone: "danger",
       });
@@ -224,7 +242,7 @@ export default function ProductFactsPage() {
     if (action === "activate") {
       const accepted = await confirm({
         title: "Aktifkan fakta ini?",
-        message: `${item.fact_key} revisi ${item.revision} akan langsung dipakai Clara untuk menjawab customer. Pastikan nilainya sudah diverifikasi.`,
+        message: `${describeFactKey(item.fact_key)} revisi ${item.revision} akan langsung dipakai Clara untuk menjawab customer. Pastikan nilainya sudah diverifikasi.`,
         confirmLabel: "Aktifkan",
       });
       if (!accepted) return;
@@ -239,12 +257,12 @@ export default function ProductFactsPage() {
       setMessage(
         action === "revoke"
           ? "Fakta dinonaktifkan dan tidak lagi dipakai Clara."
-          : `Fakta berhasil di-${action}.`,
+          : `Fakta sudah ${FACT_ACTION_DONE[action] ?? "diperbarui"}.`,
       );
       await load();
     } catch (reason) {
       setError(
-        reason instanceof Error ? reason.message : "Aksi lifecycle gagal.",
+        reason instanceof Error ? reason.message : "Aksi belum bisa dijalankan. Coba lagi.",
       );
     } finally {
       setBusy("");
@@ -255,10 +273,9 @@ export default function ProductFactsPage() {
     <form onSubmit={createDraft} className="flex h-full flex-col">
       <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border-subtle)] p-5 sm:p-6">
         <div>
-          <p className="clara-kicker">Product fact</p>
-          <h2 className="clara-section-title mt-2">Buat revisi draft</h2>
+          <h2 className="clara-section-title">Buat draf revisi</h2>
           <p className="clara-helper mt-1">
-            Perubahan baru aktif setelah melewati approval.
+            Perubahan baru dipakai Clara setelah disetujui dan diaktifkan.
           </p>
         </div>
         <button
@@ -272,7 +289,7 @@ export default function ProductFactsPage() {
       </div>
       <div className="clara-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto p-5 sm:p-6">
         <label className="block">
-          <span className="clara-label">Fact key</span>
+          <span className="clara-label">Jenis fakta</span>
           <select
             className="clara-select mt-2"
             value={form.fact_key}
@@ -284,13 +301,15 @@ export default function ProductFactsPage() {
             }
           >
             {FACT_KEYS.map((key) => (
-              <option key={key}>{key}</option>
+              <option key={key} value={key}>
+                {FACT_KEY_LABEL[key]}
+              </option>
             ))}
           </select>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
-            <span className="clara-label">Scope akun</span>
+            <span className="clara-label">Berlaku untuk</span>
             <select
               className="clara-select mt-2"
               value={form.account_category}
@@ -298,13 +317,13 @@ export default function ProductFactsPage() {
                 setForm({ ...form, account_category: event.target.value })
               }
             >
-              <option value="global">global</option>
-              <option value="mini">mini</option>
-              <option value="regular">regular</option>
+              <option value="global">{FACT_SCOPE.global}</option>
+              <option value="mini">{FACT_SCOPE.mini}</option>
+              <option value="regular">{FACT_SCOPE.regular}</option>
             </select>
           </label>
           <label>
-            <span className="clara-label">Product code</span>
+            <span className="clara-label">Kode produk</span>
             <input
               className="clara-input mt-2"
               value={form.product_code}
@@ -325,23 +344,22 @@ export default function ProductFactsPage() {
                 setForm({ ...form, value_type: event.target.value })
               }
             >
-              <option value="text">text</option>
-              <option value="integer">integer</option>
-              <option value="decimal">decimal</option>
-              <option value="boolean">boolean</option>
-              <option value="date">date</option>
-              <option value="json">json</option>
+              {Object.entries(FACT_VALUE_TYPE).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </select>
           </label>
           <label>
-            <span className="clara-label">Unit</span>
+            <span className="clara-label">Satuan</span>
             <input
               className="clara-input mt-2"
               value={form.unit}
               onChange={(event) =>
                 setForm({ ...form, unit: event.target.value })
               }
-              placeholder="Contoh: USD"
+              placeholder="Contoh: USD atau jam"
             />
           </label>
         </div>
@@ -368,7 +386,7 @@ export default function ProductFactsPage() {
           />
         </label>
         <label className="block">
-          <span className="clara-label">Freshness</span>
+          <span className="clara-label">Seberapa sering berubah</span>
           <select
             className="clara-select mt-2"
             value={form.freshness_class}
@@ -376,9 +394,11 @@ export default function ProductFactsPage() {
               setForm({ ...form, freshness_class: event.target.value })
             }
           >
-            <option>HIGH_VOLATILITY</option>
-            <option>MEDIUM_VOLATILITY</option>
-            <option>LOW_VOLATILITY</option>
+            {Object.entries(FACT_VOLATILITY).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </select>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -418,7 +438,7 @@ export default function ProductFactsPage() {
           disabled={busy === "create"}
           className="clara-button clara-button-primary"
         >
-          {busy === "create" ? "Menyimpan..." : "Simpan draft"}
+          {busy === "create" ? "Menyimpan..." : "Simpan draf"}
         </button>
       </div>
     </form>
@@ -429,7 +449,7 @@ export default function ProductFactsPage() {
       currentUser={me}
       eyebrow={NAV_GROUP_NAMES.analysis}
       title={PAGE_NAMES.productFacts}
-      description="Kelola fakta customer-facing dengan sumber, freshness, dan lifecycle yang bisa diaudit."
+      description="Kelola fakta produk yang dilihat customer: lengkap dengan sumbernya, seberapa baru datanya, dan siapa yang menyetujui."
       backHref="/knowledge"
       backLabel="Knowledge Base"
       actions={
@@ -454,35 +474,37 @@ export default function ProductFactsPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-1 flex-wrap gap-3">
               <label className="relative min-w-[220px] flex-1">
-                <span className="sr-only">Cari product fact</span>
+                <span className="sr-only">Cari fakta produk</span>
                 <FontAwesomeIcon
                   icon={faMagnifyingGlass}
                   className="clara-text-muted pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2"
                 />
                 <input
-                  className="clara-input pl-11"
+                  className="clara-input"
+                  style={{ paddingLeft: "2.75rem" }}
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Cari fact key, product, atau nilai..."
+                  placeholder="Cari nama fakta, produk, atau nilai..."
                 />
               </label>
               <label className="relative min-w-[190px]">
-                <span className="sr-only">Filter status lifecycle</span>
+                <span className="sr-only">Filter status</span>
                 <FontAwesomeIcon
                   icon={faFilter}
                   className="clara-text-muted pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2"
                 />
                 <select
-                  className="clara-select pl-11"
+                  className="clara-select"
+                  style={{ paddingLeft: "2.75rem" }}
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value)}
                 >
                   <option value="ALL">Semua status</option>
-                  <option>DRAFT</option>
-                  <option>APPROVED</option>
-                  <option>ACTIVE</option>
-                  <option>EXPIRED</option>
-                  <option>REVOKED</option>
+                  {Object.entries(FACT_LIFECYCLE).map(([value, entry]) => (
+                    <option key={value} value={value}>
+                      {entry.label}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -492,7 +514,7 @@ export default function ProductFactsPage() {
                 className="clara-button clara-button-primary"
                 onClick={openCreate}
               >
-                <FontAwesomeIcon icon={faPlus} className="h-4 w-4" /> Fact baru
+                <FontAwesomeIcon icon={faPlus} className="h-4 w-4" /> Fakta baru
               </button>
             ) : null}
           </div>
@@ -504,7 +526,7 @@ export default function ProductFactsPage() {
             aria-label="Daftar product fact"
           >
             <div className="border-b border-[var(--color-border-subtle)] px-5 py-4">
-              <p className="font-semibold">Registry</p>
+              <p className="font-semibold">Daftar fakta</p>
               <p className="clara-helper mt-1 tabular-nums">
                 {filteredItems.length} dari {items.length} fakta
               </p>
@@ -524,12 +546,12 @@ export default function ProductFactsPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <p className="min-w-0 break-words text-sm font-semibold">
-                        {item.fact_key}
+                        {describeFactKey(item.fact_key)}
                       </p>
                       <span
                         className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${statusTone(item.lifecycle_status)}`}
                       >
-                        {item.lifecycle_status}
+                        {describe(FACT_LIFECYCLE, item.lifecycle_status).label}
                       </span>
                     </div>
                     <p className="clara-text-secondary mt-2 line-clamp-2 break-words text-sm">
@@ -537,7 +559,7 @@ export default function ProductFactsPage() {
                     </p>
                     <p className="clara-text-muted mt-3 text-xs">
                       {item.account_category}
-                      {item.product_code ? ` · ${item.product_code}` : ""} · rev{" "}
+                      {item.product_code ? ` · ${item.product_code}` : ""} · revisi{" "}
                       <span className="tabular-nums">{item.revision}</span>
                     </p>
                   </button>
@@ -563,18 +585,18 @@ export default function ProductFactsPage() {
                       onClick={() => setShowDetail(false)}
                     >
                       <FontAwesomeIcon icon={faArrowLeft} className="h-4 w-4" />{" "}
-                      Kembali ke registry
+                      Kembali ke daftar
                     </button>
-                    <p className="clara-kicker">Fact detail</p>
+                    <p className="clara-kicker">Detail fakta</p>
                     <h2 className="mt-2 break-words text-xl font-bold sm:text-2xl">
-                      {selected.fact_key}
+                      {describeFactKey(selected.fact_key)}
                     </h2>
                     <p className="clara-text-muted mt-2 text-sm">
                       {selected.account_category}
                       {selected.product_code
                         ? ` · ${selected.product_code}`
                         : ""}{" "}
-                      · revision{" "}
+                      · revisi{" "}
                       <span className="tabular-nums">{selected.revision}</span>
                     </p>
                   </div>
@@ -601,19 +623,19 @@ export default function ProductFactsPage() {
                   </div>
                   <dl className="grid gap-4 sm:grid-cols-2">
                     <div className="clara-panel-soft rounded-xl p-4">
-                      <dt className="clara-helper">Jenis / unit</dt>
+                      <dt className="clara-helper">Jenis nilai</dt>
                       <dd className="mt-1 font-semibold">
-                        {selected.value_type}
+                        {FACT_VALUE_TYPE[selected.value_type] ?? selected.value_type}
                         {selected.unit ? ` · ${selected.unit}` : ""}
                       </dd>
                     </div>
                     <div className="clara-panel-soft rounded-xl p-4">
-                      <dt className="clara-helper">Freshness</dt>
+                      <dt className="clara-helper">Kesegaran data</dt>
                       <dd className="mt-2">
                         <span
                           className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${statusTone(selected.freshness_status)}`}
                         >
-                          {selected.freshness_status}
+                          {describe(FACT_FRESHNESS, selected.freshness_status).label}
                         </span>
                       </dd>
                     </div>
@@ -635,9 +657,9 @@ export default function ProductFactsPage() {
                     </div>
                   </dl>
                   <div>
-                    <p className="clara-kicker">Sumber terverifikasi</p>
+                    <p className="clara-kicker">Sumber data</p>
                     <div className="mt-3 rounded-2xl border border-[var(--color-border-subtle)] p-4">
-                      <p className="font-semibold">{selected.source_type}</p>
+                      <p className="font-semibold">{describeKnowledgeSource(selected.source_type)}</p>
                       <p className="clara-text-secondary mt-2 break-all text-sm">
                         {selected.source_reference}
                       </p>
@@ -670,8 +692,8 @@ export default function ProductFactsPage() {
           </section>
 
           <aside className="clara-card hidden h-fit rounded-2xl p-5 xl:block">
-            <p className="clara-kicker">Lifecycle</p>
-            <h2 className="clara-card-title mt-2">Status governance</h2>
+            <p className="clara-kicker">Siklus fakta</p>
+            <h2 className="clara-card-title mt-2">Status persetujuan</h2>
             {selected ? (
               <div className="mt-5 space-y-4">
                 <div
@@ -680,7 +702,7 @@ export default function ProductFactsPage() {
                   <p className="text-xs font-bold">
                     Status saat ini
                   </p>
-                  <p className="mt-1 font-bold">{selected.lifecycle_status}</p>
+                  <p className="mt-1 font-bold">{describe(FACT_LIFECYCLE, selected.lifecycle_status).label}</p>
                 </div>
                 <div className="space-y-2 text-sm">
                   {selected.lifecycle_status === "DRAFT" ? (
@@ -689,7 +711,7 @@ export default function ProductFactsPage() {
                         icon={faClock}
                         className="mr-2 h-4 w-4"
                       />
-                      Menunggu approval
+                      Menunggu persetujuan
                     </p>
                   ) : (
                     <p>
@@ -697,7 +719,7 @@ export default function ProductFactsPage() {
                         icon={faCircleCheck}
                         className="mr-2 h-4 w-4"
                       />
-                      Tahap draft selesai
+                      Tahap draf selesai
                     </p>
                   )}
                 </div>
@@ -709,7 +731,7 @@ export default function ProductFactsPage() {
                         onClick={() => void transition(selected, "approve")}
                         className="clara-button clara-button-ghost w-full"
                       >
-                        Approve
+                        Setujui
                       </button>
                     ) : null}
                     {selected.lifecycle_status === "APPROVED" ? (
@@ -718,7 +740,7 @@ export default function ProductFactsPage() {
                         onClick={() => void transition(selected, "activate")}
                         className="clara-button clara-button-primary w-full"
                       >
-                        Activate
+                        Aktifkan
                       </button>
                     ) : null}
                     {selected.lifecycle_status === "ACTIVE" ? (
@@ -727,7 +749,7 @@ export default function ProductFactsPage() {
                         onClick={() => void transition(selected, "expire")}
                         className="clara-button clara-button-ghost w-full"
                       >
-                        Expire
+                        Tandai kedaluwarsa
                       </button>
                     ) : null}
                     {!["EXPIRED", "REVOKED"].includes(
@@ -746,7 +768,7 @@ export default function ProductFactsPage() {
               </div>
             ) : (
               <p className="clara-helper mt-4">
-                Pilih fakta untuk melihat lifecycle.
+                Pilih fakta untuk melihat tahapnya.
               </p>
             )}
           </aside>
@@ -754,7 +776,7 @@ export default function ProductFactsPage() {
 
         {selected && canGovern ? (
           <div className="clara-card rounded-2xl p-4 xl:hidden">
-            <p className="clara-kicker">Lifecycle action</p>
+            <p className="clara-kicker">Aksi</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {selected.lifecycle_status === "DRAFT" ? (
                 <button
@@ -762,7 +784,7 @@ export default function ProductFactsPage() {
                   onClick={() => void transition(selected, "approve")}
                   className="clara-button clara-button-ghost"
                 >
-                  Approve
+                  Setujui
                 </button>
               ) : null}
               {selected.lifecycle_status === "APPROVED" ? (
@@ -771,7 +793,7 @@ export default function ProductFactsPage() {
                   onClick={() => void transition(selected, "activate")}
                   className="clara-button clara-button-primary"
                 >
-                  Activate
+                  Aktifkan
                 </button>
               ) : null}
               {selected.lifecycle_status === "ACTIVE" ? (
@@ -780,7 +802,7 @@ export default function ProductFactsPage() {
                   onClick={() => void transition(selected, "expire")}
                   className="clara-button clara-button-ghost"
                 >
-                  Expire
+                  Tandai kedaluwarsa
                 </button>
               ) : null}
               {!["EXPIRED", "REVOKED"].includes(selected.lifecycle_status) ? (
