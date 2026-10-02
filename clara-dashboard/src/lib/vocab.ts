@@ -137,6 +137,11 @@ const JARGON_REPLACEMENTS: Array<[RegExp, string]> = [
   [/discipline log/gi, "catatan aktivitas harian"],
   [/next follow-up/gi, "follow-up berikutnya"],
   [/bottleneck/gi, "hambatan"],
+  [/queue task/gi, "tindak lanjut"],
+  [/action center/gi, "halaman Tindak Lanjut"],
+  [/tahap pipeline/gi, "tahap"],
+  [/stage lead/gi, "tahap lead"],
+  [/conversation/gi, "percakapan"],
 ];
 
 /**
@@ -165,3 +170,123 @@ export const FOLLOW_UP_RESULTS: Array<{ value: string; label: string }> = [
   { value: "not_priority_now", label: "Belum jadi prioritas" },
   { value: "duplicate_or_noise", label: "Duplikat atau tidak relevan" },
 ];
+
+export const DISCIPLINE_ACTIVITY: VocabTable = {
+  follow_up_call: { label: "Telepon customer", tone: "neutral" },
+  follow_up_chat: { label: "Chat dengan customer", tone: "neutral" },
+  site_visit: { label: "Kunjungan", tone: "neutral" },
+  proposal_sent: { label: "Kirim penawaran", tone: "neutral" },
+  closing_push: { label: "Dorongan closing", tone: "neutral" },
+  internal_coordination: { label: "Koordinasi internal", tone: "neutral" },
+};
+
+export const DISCIPLINE_RESULT: VocabTable = {
+  waiting_customer: { label: "Menunggu balasan customer", tone: "neutral" },
+  follow_up_scheduled: { label: "Follow-up dijadwalkan", tone: "info" },
+  needs_escalation: { label: "Perlu eskalasi", tone: "danger" },
+  won_progress: { label: "Mendekati deal", tone: "good" },
+  lost_signal: { label: "Ada tanda-tanda batal", tone: "warn" },
+  no_response: { label: "Customer belum merespons", tone: "warn" },
+};
+
+export const DISCIPLINE_MOOD: VocabTable = {
+  positive: { label: "Positif", tone: "good" },
+  neutral: { label: "Netral", tone: "neutral" },
+  cautious: { label: "Ragu-ragu", tone: "warn" },
+  resistant: { label: "Menolak", tone: "danger" },
+  unresponsive: { label: "Tidak merespons", tone: "warn" },
+};
+
+export const DISCIPLINE_STATUS: VocabTable = {
+  logged_today: { label: "Sudah diisi hari ini", tone: "good" },
+  missing_today_log: { label: "Belum diisi hari ini", tone: "warn" },
+  missing_today: { label: "Belum diisi hari ini", tone: "warn" },
+  stale_log: { label: "Perlu diperbarui", tone: "warn" },
+};
+
+export const TASK_STATUS: VocabTable = {
+  open: { label: "Terbuka", tone: "info" },
+  snoozed: { label: "Ditunda", tone: "neutral" },
+  done: { label: "Selesai", tone: "good" },
+  cancelled: { label: "Dibatalkan", tone: "neutral" },
+};
+
+export const ACTIVITY_EVENT: VocabTable = {
+  lead_created: { label: "Lead dibuat", tone: "neutral" },
+  created: { label: "Dibuat", tone: "neutral" },
+  stage_changed: { label: "Tahap berubah", tone: "info" },
+  temperature_changed: { label: "Suhu berubah", tone: "info" },
+  account_category_changed: { label: "Kategori akun berubah", tone: "neutral" },
+  summary_updated: { label: "Ringkasan diubah", tone: "neutral" },
+  notes_updated: { label: "Catatan diubah", tone: "neutral" },
+  follow_up_updated: { label: "Jadwal follow-up diubah", tone: "info" },
+  rescheduled: { label: "Jadwal dipindah", tone: "info" },
+  status_changed: { label: "Status berubah", tone: "info" },
+  reassigned: { label: "Pemilik diganti", tone: "warn" },
+  assignee_changed: { label: "Pemilik diganti", tone: "warn" },
+  task_event: { label: "Tugas", tone: "neutral" },
+  queue_event: { label: "Tindak lanjut", tone: "neutral" },
+  queue_created: { label: "Tindak lanjut dibuat", tone: "neutral" },
+  system_auto_done_after_send: { label: "Selesai otomatis setelah jawaban dikirim", tone: "good" },
+  system_sync: { label: "Disinkronkan sistem", tone: "neutral" },
+  discipline_log_created: { label: "Catatan aktivitas", tone: "neutral" },
+  discipline_log_updated: { label: "Catatan aktivitas diubah", tone: "neutral" },
+  deal_created: { label: "Deal dibuat", tone: "good" },
+  deal_status_changed: { label: "Status deal berubah", tone: "info" },
+  deal_value_updated: { label: "Nilai deal berubah", tone: "info" },
+  deposit_updated: { label: "Setoran berubah", tone: "info" },
+  customer_profile_autofilled: { label: "Profil customer diisi otomatis", tone: "neutral" },
+  conversation_appended: { label: "Chat ditambahkan", tone: "neutral" },
+  conversation_reopened: { label: "Percakapan dibuka lagi", tone: "warn" },
+  conversation_status_changed: { label: "Status percakapan berubah", tone: "neutral" },
+};
+
+const QUEUE_ACTION_TITLES: Record<string, string> = {
+  done: "Tindak lanjut ditandai selesai",
+  dismiss: "Tindak lanjut disembunyikan",
+  reopen: "Tindak lanjut dibuka lagi",
+  snooze: "Tindak lanjut ditunda",
+};
+
+/** Judul riwayat dari backend ("Queue action: done") jadi kalimat biasa. */
+export function humanizeActivityTitle(title: string): string {
+  const match = /^Queue action:\s*(\w+)/i.exec(title.trim());
+
+  if (match) {
+    return QUEUE_ACTION_TITLES[match[1].toLowerCase()] ?? "Tindak lanjut diperbarui";
+  }
+
+  return plainJargon(title);
+}
+
+/** Deskripsi riwayat seperti "queue_action=done | reason_tag=waiting_customer | reason_note=..." jadi kalimat. */
+export function humanizeActivityDescription(description: string): string {
+  if (!description.includes("queue_action=")) {
+    return plainJargon(description);
+  }
+
+  const fields = Object.fromEntries(
+    description.split("|").map((part) => {
+      const [key, ...rest] = part.trim().split("=");
+      return [key, rest.join("=").trim()];
+    }),
+  ) as Record<string, string>;
+  const result = FOLLOW_UP_RESULTS.find((item) => item.value === fields.reason_tag)?.label;
+  const pieces = [result ? `Hasil: ${result}.` : "", fields.reason_note ? `Catatan: ${fields.reason_note}.` : ""];
+
+  return pieces.filter(Boolean).join(" ") || "Tidak ada catatan tambahan.";
+}
+
+/** Nilai "dari" dan "menjadi" di riwayat: tahap dan suhu ditampilkan dengan kata biasa. */
+export function humanizeActivityValue(eventType: string, value: string | null): string {
+  if (!value) {
+    return "-";
+  }
+
+  if (eventType === "stage_changed") return labelOf(STAGE, value);
+  if (eventType === "temperature_changed") return labelOf(TEMPERATURE, value);
+  if (eventType === "deal_status_changed") return labelOf(DEAL_STATUS, value);
+  if (eventType === "task_event" || eventType === "queue_event") return labelOf(TASK_STATUS, value);
+
+  return value;
+}

@@ -3,24 +3,32 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { ErrorState, LoadingState } from "@/components/dashboard/StateViews";
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
+import { getRoleDisplayLabel, isHeadRole, isManagerRole } from "@/lib/roles";
 import {
-  isHeadRole,
-  isManagerRole,
-  normalizeWorkspaceRole,
-} from "@/lib/roles";
+  ACCOUNT_CATEGORY,
+  ACTIVITY_EVENT,
+  DEAL_STATUS,
+  DISCIPLINE_ACTIVITY,
+  DISCIPLINE_MOOD,
+  DISCIPLINE_RESULT,
+  DISCIPLINE_STATUS,
+  STAGE,
+  TASK_STATUS,
+  TEMPERATURE,
+  humanizeActivityDescription,
+  humanizeActivityTitle,
+  humanizeActivityValue,
+  labelOf,
+  plainJargon,
+  type VocabTable,
+} from "@/lib/vocab";
 import type {
   CurrentUser,
   LeadDealItem,
@@ -92,53 +100,8 @@ function fromDateTimeLocalValue(value: string): string | null {
   return new Date(value).toISOString();
 }
 
-function formatTimelineValue(value: string | null): string {
-  if (!value) {
-    return "-";
-  }
-
-  if (value.includes("T") && (value.endsWith("Z") || value.includes("+"))) {
-    return formatDateTime(value);
-  }
-
-  return value;
-}
-
 function getTodayDateInputValue(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function formatDisciplineStatus(value: string): string {
-  switch (value) {
-    case "logged_today":
-      return "Logged today";
-    case "missing_today_log":
-      return "Missing today log";
-    case "stale_log":
-      return "Stale log";
-    default:
-      return value.replaceAll("_", " ");
-  }
-}
-
-function formatAccountCategory(value: string): string {
-  switch (value) {
-    case "mini":
-      return "Mini";
-    case "reguler":
-      return "Reguler";
-    case "unknown":
-      return "Belum ditentukan";
-    default:
-      return value.replaceAll("_", " ");
-  }
-}
-
-function formatStageLabel(value: string): string {
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function resolveDealStatusInput(
@@ -223,8 +186,6 @@ export default function LeadDetailPage() {
   const [expectedCloseDateInput, setExpectedCloseDateInput] = useState("");
   const [dealClosedAtInput, setDealClosedAtInput] = useState("");
   const [dealNotesInput, setDealNotesInput] = useState("");
-  const workspaceRole = currentUser ? normalizeWorkspaceRole(currentUser.role) : null;
-  const isSalesWorkspace = workspaceRole === "sales";
   const isManagerWorkspace = isManagerRole(currentUser?.role);
   const isHeadWorkspace = isHeadRole(currentUser?.role);
   const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;
@@ -289,7 +250,7 @@ export default function LeadDetailPage() {
     } catch (error) {
       setLead(null);
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat detail lead.",
+        error instanceof Error ? error.message : "Detail lead belum bisa dimuat.",
       );
     } finally {
       setIsLoading(false);
@@ -341,12 +302,12 @@ export default function LeadDetailPage() {
       setExpectedCloseDateInput(updatedDeal.expected_close_date ?? "");
       setDealClosedAtInput(toDateTimeLocalValue(updatedDeal.closed_at ?? null));
       setDealNotesInput(updatedDeal.notes ?? "");
-      setDealSuccessMessage("Deal metrics berhasil diperbarui.");
+      setDealSuccessMessage("Nilai deal tersimpan.");
     } catch (error) {
       setDealErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal menyimpan deal metrics.",
+          : "Nilai deal belum bisa disimpan. Coba lagi.",
       );
     } finally {
       setIsSavingDeal(false);
@@ -368,73 +329,41 @@ export default function LeadDetailPage() {
       ),
     [lead],
   );
-  const timelinePageSize = 2;
+  const timelinePageSize = 5;
   const timelineTotalPages = lead
     ? Math.max(1, Math.ceil(lead.timeline.length / timelinePageSize))
     : 1;
   const effectiveTimelinePage = Math.min(timelinePage, timelineTotalPages);
-  const salesLeadFocus = useMemo(() => {
+  const leadFocus = useMemo(() => {
     if (!lead) {
-      return {
-        headline: "Lead belum dimuat.",
-        helper: "Muat detail lead dulu untuk melihat konteks kerja berikutnya.",
-      };
+      return { headline: "", helper: "" };
     }
 
     if (lead.next_follow_up_at) {
       return {
-        headline: `Follow-up berikutnya ${formatDateTime(lead.next_follow_up_at)}.`,
-        helper: "Pastikan step berikutnya jelas supaya lead tidak berhenti di status saja.",
+        headline: `Follow-up berikutnya ${formatDateTime(lead.next_follow_up_at)}`,
+        helper: isLeadershipWorkspace
+          ? "Cek apakah pemilik dan tahap lead ini sudah sesuai."
+          : "Pastikan langkah berikutnya jelas supaya lead ini tidak terlewat.",
       };
     }
 
     if ((lead.tasks ?? []).some((task) => task.status === "open")) {
       return {
-        headline: "Lead ini masih punya tugas terbuka.",
-        helper: "Bereskan task yang masih aktif atau set jadwal follow-up berikutnya.",
+        headline: "Ada tugas terbuka, tapi belum ada jadwal follow-up",
+        helper: isLeadershipWorkspace
+          ? "Tanyakan ke sales kapan tugas ini akan dikerjakan."
+          : "Selesaikan tugasnya atau atur jadwal follow-up berikutnya.",
       };
     }
 
     return {
-      headline: "Lead ini belum punya jadwal follow-up berikutnya.",
-      helper: "Isi next follow-up supaya alur kerja sales tetap rapi dan lead tidak hilang dari radar.",
+      headline: "Belum ada jadwal follow-up",
+      helper: isLeadershipWorkspace
+        ? "Pastikan ada langkah berikutnya yang terjadwal sebelum lead ini makin tertinggal."
+        : "Atur jadwal follow-up di bawah supaya lead ini tidak terlewat.",
     };
-  }, [lead]);
-  const leadershipLeadFocus = useMemo(() => {
-    if (!lead) {
-      return {
-        headline: "Lead belum dimuat.",
-        helper: isHeadWorkspace
-          ? "Muat detail lead dulu untuk melihat konteks tim, owner, dan keputusan apa yang mungkin perlu diambil."
-          : "Muat detail lead dulu untuk melihat konteks tim dan next action lead ini.",
-      };
-    }
-
-    if (lead.next_follow_up_at) {
-      return {
-        headline: `Lead ini punya next follow-up di ${formatDateTime(lead.next_follow_up_at)}.`,
-        helper: isHeadWorkspace
-          ? "Head cukup cek apakah owner, stage, dan arah follow-up-nya sudah selaras sebelum turun ke bagian detail lain."
-          : "Manager cukup cek apakah owner, stage, dan arah follow-up-nya sudah masuk akal sebelum turun ke detail lain.",
-      };
-    }
-
-    if ((lead.tasks ?? []).some((task) => task.status === "open")) {
-      return {
-        headline: "Lead ini masih punya task terbuka tetapi belum punya jadwal follow-up.",
-        helper: isHeadWorkspace
-          ? "Ini sinyal bahwa ritme tim belum rapi. Head cukup validasi apakah ini perlu arahan, eskalasi, atau cukup dibenahi oleh manager."
-          : "Ini sinyal bahwa eksekusi sales belum rapi. Pastikan task dan jadwal follow-up saling nyambung.",
-      };
-    }
-
-    return {
-      headline: "Lead ini belum punya next follow-up yang jelas.",
-      helper: isHeadWorkspace
-        ? "Head sebaiknya mulai dari sini: cek owner, cek stage, lalu pastikan memang ada next step yang jelas sebelum lead ini makin tertinggal."
-        : "Manager sebaiknya mulai dari sini: cek owner, cek stage, lalu pastikan ada step lanjutan yang benar-benar terjadwal.",
-    };
-  }, [isHeadWorkspace, lead]);
+  }, [isLeadershipWorkspace, lead]);
   const visibleTimeline = useMemo(() => {
     if (!lead) {
       return [];
@@ -487,12 +416,12 @@ export default function LeadDetailPage() {
           updatedLead.deal?.status ?? null,
         ),
       );
-      setSuccessMessage("Lead berhasil diperbarui.");
+      setSuccessMessage("Perubahan tersimpan.");
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal menyimpan perubahan lead.",
+          : "Perubahan belum bisa disimpan. Coba lagi.",
       );
     } finally {
       setIsSaving(false);
@@ -528,7 +457,7 @@ export default function LeadDetailPage() {
       setTaskDueAtInput("");
     } catch (error) {
       setTaskErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat task.",
+        error instanceof Error ? error.message : "Tugas belum bisa dibuat. Coba lagi.",
       );
     } finally {
       setIsCreatingTask(false);
@@ -571,13 +500,13 @@ export default function LeadDetailPage() {
       setDisciplineMoodInput(DISCIPLINE_MOOD_OPTIONS[0]);
       setDisciplineNotesInput("");
       setDisciplineFollowUpInput("");
-      setDisciplineSuccessMessage("Discipline log berhasil disimpan.");
+      setDisciplineSuccessMessage("Catatan tersimpan.");
       setDisciplineSuggestionHint("");
     } catch (error) {
       setDisciplineErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal menyimpan discipline log.",
+          : "Catatan belum bisa disimpan. Coba lagi.",
       );
     } finally {
       setIsCreatingDisciplineLog(false);
@@ -611,15 +540,13 @@ export default function LeadDetailPage() {
         toDateTimeLocalValue(suggestion.next_follow_up_at),
       );
       setDisciplineSuggestionHint(
-        `${suggestion.source_summary} Confidence ${Math.round(
-          suggestion.confidence_score * 100,
-        )}%.`,
+        `${plainJargon(suggestion.source_summary)} Cek dulu isinya sebelum menyimpan.`,
       );
     } catch (error) {
       setDisciplineErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal mengambil prefill discipline log dari Clara.",
+          : "Clara belum bisa mengisi catatan. Isi sendiri atau coba lagi.",
       );
     } finally {
       setIsPrefillingDisciplineLog(false);
@@ -645,7 +572,7 @@ export default function LeadDetailPage() {
       setLead(refreshedLead);
     } catch (error) {
       setTaskErrorMessage(
-        error instanceof Error ? error.message : "Gagal mengubah status task.",
+        error instanceof Error ? error.message : "Status tugas belum bisa diubah. Coba lagi.",
       );
     } finally {
       setUpdatingTaskId(null);
@@ -655,262 +582,152 @@ export default function LeadDetailPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.daily}
-      title={lead?.display_name ?? "Detail Lead"}
+      title={lead?.display_name ?? "Detail lead"}
       description={
-        isSalesWorkspace
-          ? "Halaman ini dipakai untuk melihat status lead, mengatur follow-up berikutnya, dan menyimpan catatan kerja tanpa pindah-pindah halaman."
-          : isHeadWorkspace
-            ? "Halaman head untuk validasi satu lead secara cepat: owner, stage, follow-up, risiko eksekusi, dan apakah perlu arahan atau eskalasi."
-            : isLeadershipWorkspace
-            ? "Halaman manager untuk membaca kondisi satu lead dengan cepat: owner, stage, follow-up, risiko eksekusi, dan keputusan berikutnya."
-            : "Halaman ini dipakai untuk merapikan konteks lead, menyetel follow-up berikutnya, dan membuat task yang benar-benar persisten."
+        isLeadershipWorkspace
+          ? "Cek tahap, pemilik, dan jadwal follow-up lead ini, lalu putuskan apakah perlu arahan."
+          : "Lihat kondisi lead, atur jadwal follow-up, dan catat hasil menghubungi customer."
       }
-      backHref="/dashboard/crm"
+      backHref="/crm"
       backLabel="Kembali ke daftar lead"
       actions={
-        <div className="flex flex-wrap gap-3">
-          {isHeadWorkspace ? (
-            <>
-              <Link
-                href="/dashboard/notifications"
-                className="clara-button clara-button-ghost"
-              >
-                Buka Alert Tim
-              </Link>
-              <Link
-                href="/dashboard/approvals"
-                className="clara-button clara-button-ghost"
-              >
-                Buka Arahan Tim
-              </Link>
-            </>
-          ) : isLeadershipWorkspace ? (
-            <Link
-              href="/dashboard/manager-insights"
-              className="clara-button clara-button-ghost"
-            >
-              Monitor Tim
-            </Link>
-          ) : null}
+        <>
           {lead?.customer_profile_id ? (
-            <Link
-              href={`/dashboard/customers/${lead.customer_profile_id}`}
-              className="clara-button clara-button-ghost"
-            >
-              Buka Profil Customer
+            <Link href={`/customers/${lead.customer_profile_id}`} className="clara-button clara-button-secondary">
+              Profil customer
             </Link>
           ) : null}
           {lead?.latest_conversation_id ? (
             <Link
-              href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
+              href={`/sales/conversations/${lead.latest_conversation_id}`}
               className="clara-button clara-button-primary"
             >
-              Buka Percakapan
+              Buka chat
             </Link>
           ) : null}
-        </div>
+        </>
       }
     >
-      <div className="space-y-6">
-        {isLoading && (
-          <div role="status" aria-live="polite" className="clara-empty-state">
-            Memuat detail lead...
-          </div>
-        )}
+      <div className="space-y-5">
+        {isLoading ? <LoadingState message="Memuat detail lead..." /> : null}
 
-        {errorMessage && (
+        {errorMessage && !lead ? (
+          <ErrorState message={errorMessage} onRetry={() => void loadLeadDetail()} />
+        ) : null}
+
+        {errorMessage && lead ? (
           <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
-        )}
+        ) : null}
 
-        {lead && !isLoading && (
-          <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <section className="space-y-6">
+        {lead && !isLoading ? (
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <div className="min-w-0 space-y-5">
               <section
                 data-onboarding-id="sales-lead-detail-focus"
+                aria-label="Kondisi lead"
                 className="clara-card p-5 sm:p-6"
               >
-                <p className="clara-kicker text-xs">
-                  {isHeadWorkspace
-                    ? "Prioritas head"
-                    : isLeadershipWorkspace
-                      ? "Prioritas manager"
-                      : "Fokus kerja lead ini"}
-                </p>
-                <h2 className="mt-2 break-words text-xl font-bold tracking-tight clara-text-primary sm:text-2xl">
-                  {isLeadershipWorkspace
-                    ? leadershipLeadFocus.headline
-                    : salesLeadFocus.headline}
-                </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
-                  {isLeadershipWorkspace
-                    ? leadershipLeadFocus.helper
-                    : salesLeadFocus.helper}
-                </p>
+                <h2 className="break-words text-xl font-bold clara-text-primary sm:text-2xl">{leadFocus.headline}</h2>
+                <p className="mt-2 text-sm leading-6 clara-text-secondary">{leadFocus.helper}</p>
 
-                <div className="mt-4 flex flex-wrap gap-2 text-sm clara-text-secondary">
-                  <span className="clara-chip">
-                    Stage: <span className="font-semibold clara-text-primary">{formatStageLabel(lead.current_stage)}</span>
-                  </span>
-                  <span className="clara-chip">
-                    Suhu: <span className="font-semibold clara-text-primary">{lead.lead_temperature.toUpperCase()}</span>
-                  </span>
-                  <span className="clara-chip">
-                    Owner: <span className="break-words font-semibold clara-text-primary">{lead.assigned_user_name ?? "Belum ada"}</span>
-                  </span>
-                  {lead.needs_deal_sync ? (
-                    <span className="clara-chip">
-                      Sinkron KPI: <span className="font-semibold clara-text-primary">Perlu dicek</span>
-                    </span>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {lead.current_stage !== "unknown" ? <ValueTag table={STAGE} value={lead.current_stage} /> : null}
+                  {lead.lead_temperature !== "unknown" ? (
+                    <ValueTag table={TEMPERATURE} value={lead.lead_temperature} />
                   ) : null}
-                </div>
-              </section>
-
-              <div
-                data-onboarding-id="sales-lead-detail-snapshot"
-                className="clara-card-outline p-5 sm:p-6"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold text-clara-ink-3">
-                      Snapshot lead
-                    </p>
-                    <h2 className="mt-2 text-xl font-semibold clara-text-primary">
-                      {isHeadWorkspace
-                        ? "Kondisi inti yang perlu dibaca head"
-                        : isLeadershipWorkspace
-                          ? "Kondisi inti yang perlu dibaca manager"
-                        : "Kondisi inti lead ini"}
-                    </h2>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-clara-info-surface px-3 py-1 text-xs font-semibold text-clara-info">
-                      Kategori akun:{" "}
-                      {formatAccountCategory(lead.account_category)}
-                    </span>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                        lead.lead_temperature,
-                      )}`}
-                    >
-                      {lead.lead_temperature.toUpperCase()}
-                    </span>
-                  </div>
+                  {lead.account_category !== "unknown" ? (
+                    <Tag>{labelOf(ACCOUNT_CATEGORY, lead.account_category)}</Tag>
+                  ) : null}
+                  {lead.deal?.status ? <ValueTag table={DEAL_STATUS} value={lead.deal.status} /> : null}
                 </div>
 
-                <dl className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Metric
-                    label="Kategori akun"
-                    value={formatAccountCategory(lead.account_category)}
-                  />
-                  <Metric
-                    label="Kontak terakhir"
-                    value={formatDateTime(lead.last_contact_at)}
-                  />
-                  <Metric
-                    label="Follow-up berikutnya"
-                    value={formatDateTime(lead.next_follow_up_at)}
-                  />
-                  <Metric
-                    label="Jumlah percakapan"
-                    value={String(lead.conversation_count)}
-                  />
-                  <Metric
-                    label="Owner"
-                    value={lead.assigned_user_name ?? "Belum ada"}
-                  />
-                  <Metric
-                    label="Deal status"
-                    value={lead.deal?.status ?? "Belum diisi"}
-                  />
+                <dl
+                  data-onboarding-id="sales-lead-detail-snapshot"
+                  className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4 text-sm lg:grid-cols-4"
+                >
+                  <Fact label="Pemilik" value={lead.assigned_user_name ?? "Belum ada"} />
+                  <Fact label="Terakhir dihubungi" value={formatRelativeTime(lead.last_contact_at)} />
+                  <Fact label="Follow-up berikutnya" value={formatDateTime(lead.next_follow_up_at)} />
+                  <Fact label="Jumlah percakapan" value={String(lead.conversation_count)} />
                 </dl>
-              </div>
+
+                {dealMetricsNeedsSync ? (
+                  <div className="clara-alert clara-alert-warning mt-4">
+                    Tahap lead sudah {labelOf(STAGE, lead.current_stage)}, tapi status deal-nya belum
+                    ikut berubah. Buka Nilai deal di sebelah kanan lalu simpan supaya laporan KPI cocok.
+                  </div>
+                ) : null}
+              </section>
 
               <form
                 data-onboarding-id="sales-lead-detail-context"
                 onSubmit={(event) => void handleSaveLead(event)}
-                className="clara-card p-5 sm:p-6"
+                className="clara-card space-y-5 p-5 sm:p-6"
               >
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-semibold clara-text-primary">
-                      {isSalesWorkspace
-                        ? "Update Status Lead"
-                        : isHeadWorkspace
-                          ? "Validasi Konteks Lead"
-                          : isLeadershipWorkspace
-                          ? "Kontrol Konteks Lead"
-                          : "Lead Context"}
-                    </h2>
-                    <p className="mt-1 text-sm text-clara-ink-2">
-                      {isSalesWorkspace
-                        ? "Rapikan kategori akun, stage, suhu lead, ringkasan, dan jadwal follow-up dari satu form."
-                        : isHeadWorkspace
-                          ? "Head cukup cek field yang memengaruhi keputusan: owner, stage, suhu lead, ringkasan, dan jadwal follow-up."
-                          : isLeadershipWorkspace
-                          ? "Manager cukup cek field penting yang memengaruhi keputusan: stage, suhu lead, owner, summary, dan jadwal follow-up."
-                          : "Update summary, notes, follow-up date, dan ownership lead."}
+                    <h2 className="text-lg font-bold clara-text-primary">Ubah data lead</h2>
+                    <p className="mt-1 text-sm clara-text-secondary">
+                      Perbarui tahap, suhu, dan jadwal follow-up kalau ada perkembangan.
                     </p>
                   </div>
-                  {successMessage && (
+                  {successMessage ? (
                     <span role="status" aria-live="polite" className="clara-alert clara-alert-success">
                       {successMessage}
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
-                <div className="mt-6 grid gap-5 md:grid-cols-2">
-                  <Field label="Kategori akun">
-                    <DetailSelect
-                      value={accountCategoryInput}
-                      onChange={setAccountCategoryInput}
-                      options={ACCOUNT_CATEGORY_OPTIONS}
-                      getOptionLabel={formatAccountCategory}
-                    />
-                  </Field>
-
-                  <Field label="Stage">
-                    <DetailSelect
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Tahap customer">
+                    <LabeledSelect
                       value={stageInput}
                       onChange={setStageInput}
                       options={STAGE_OPTIONS}
-                      getOptionLabel={formatStageLabel}
+                      table={STAGE}
                     />
                   </Field>
 
-                  <Field label="Lead temperature">
-                    <DetailSelect
+                  <Field label="Suhu customer">
+                    <LabeledSelect
                       value={temperatureInput}
                       onChange={setTemperatureInput}
                       options={TEMPERATURE_OPTIONS}
-                      getOptionLabel={(option) => option.toUpperCase()}
+                      table={TEMPERATURE}
                     />
                   </Field>
 
-                  <Field label="Next follow-up">
+                  <Field label="Kategori akun">
+                    <LabeledSelect
+                      value={accountCategoryInput}
+                      onChange={setAccountCategoryInput}
+                      options={ACCOUNT_CATEGORY_OPTIONS}
+                      table={ACCOUNT_CATEGORY}
+                    />
+                  </Field>
+
+                  <Field label="Jadwal follow-up berikutnya">
                     <input
                       type="datetime-local"
                       value={followUpInput}
                       onChange={(event) => setFollowUpInput(event.target.value)}
-                      className="clara-input"
+                      className="clara-input w-full"
                     />
                   </Field>
 
                   {canReassignLead ? (
-                    <Field label="Assigned user">
+                    <Field label="Sales yang menangani">
                       <select
                         value={assignedUserInput}
-                        onChange={(event) =>
-                          setAssignedUserInput(event.target.value)
-                        }
-                        className="clara-select"
+                        onChange={(event) => setAssignedUserInput(event.target.value)}
+                        className="clara-select w-full"
                       >
-                        <option value="">Belum ada assignee</option>
+                        <option value="">Belum ada</option>
                         {users.map((user) => (
                           <option key={user.id} value={user.id}>
-                            {user.name} • {user.role}
+                            {user.name} ({getRoleDisplayLabel(user.role)})
                           </option>
                         ))}
                       </select>
@@ -918,838 +735,560 @@ export default function LeadDetailPage() {
                   ) : null}
                 </div>
 
-                <div className="mt-5 grid gap-5">
-                  <Field label="Lead summary">
-                    <textarea
-                      value={summaryInput}
-                      onChange={(event) => setSummaryInput(event.target.value)}
-                      rows={4}
-                      className="clara-textarea"
-                    />
-                  </Field>
+                <Field label="Ringkasan lead">
+                  <textarea
+                    value={summaryInput}
+                    onChange={(event) => setSummaryInput(event.target.value)}
+                    rows={3}
+                    className="clara-textarea w-full"
+                  />
+                </Field>
 
-                  <Field label="Internal notes">
-                    <textarea
-                      value={notesInput}
-                      onChange={(event) => setNotesInput(event.target.value)}
-                      rows={5}
-                      placeholder={
-                        isSalesWorkspace
-                          ? "Tulis konteks singkat: kebutuhan customer, keberatan utama, dan arah follow-up berikutnya."
-                          : undefined
-                      }
-                      className="clara-textarea"
-                    />
-                  </Field>
-                </div>
+                <Field label="Catatan internal (hanya dilihat tim)">
+                  <textarea
+                    value={notesInput}
+                    onChange={(event) => setNotesInput(event.target.value)}
+                    rows={4}
+                    placeholder="Tulis kebutuhan customer, hal yang membuatnya ragu, dan rencana follow-up."
+                    className="clara-textarea w-full"
+                  />
+                </Field>
 
-                <div className="mt-6 flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="clara-button clara-button-primary disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isSaving ? "Menyimpan..." : "Simpan Update Lead"}
+                <div className="flex justify-end">
+                  <button type="submit" disabled={isSaving} className="clara-button clara-button-primary">
+                    {isSaving ? "Menyimpan..." : "Simpan perubahan"}
                   </button>
                 </div>
               </form>
 
               <section
                 data-onboarding-id="sales-lead-detail-discipline"
-                className="clara-card p-5 sm:p-6"
+                aria-labelledby="activity-log-title"
+                className="clara-card space-y-5 p-5 sm:p-6"
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-semibold clara-text-primary">
-                      {isSalesWorkspace
-                        ? "Catatan Follow-up Harian"
-                        : isHeadWorkspace
-                          ? "Jejak Follow-up Tim"
-                          : isLeadershipWorkspace
-                          ? "Jejak Eksekusi Sales"
-                          : "Daily Discipline Log"}
+                    <h2 id="activity-log-title" className="text-lg font-bold clara-text-primary">
+                      Catat hasil menghubungi customer
                     </h2>
-                    <p className="mt-1 text-sm text-clara-ink-2">
-                      {isSalesWorkspace
-                        ? "Catat hasil follow-up harian supaya lead ini punya jejak kerja yang jelas dan follow-up berikutnya tidak hilang."
-                        : isHeadWorkspace
-                          ? "Bagian ini dipakai head untuk melihat apakah follow-up benar-benar jalan, objection utamanya apa, dan apakah ritme tim perlu diintervensi."
-                          : isLeadershipWorkspace
-                          ? "Bagian ini dipakai manager untuk melihat apakah follow-up sales benar-benar tercatat, apa objection utamanya, dan apakah next step-nya jelas."
-                          : "Catat hasil aktivitas harian sales langsung dari halaman lead supaya manager bisa membaca ritme kerja, objection, dan follow-up tanpa menebak."}
+                    <p className="mt-1 text-sm clara-text-secondary">
+                      Satu catatan per aktivitas supaya perkembangan lead ini mudah dilacak.
                     </p>
                   </div>
-                  {disciplineSuccessMessage ? (
-                    <span role="status" aria-live="polite" className="clara-alert clara-alert-success">
-                      {disciplineSuccessMessage}
-                    </span>
-                  ) : null}
+                  <ValueTag table={DISCIPLINE_STATUS} value={lead.discipline_summary.compliance_status} />
                 </div>
 
+                <p className="text-sm clara-text-muted">
+                  Catatan hari ini: {lead.discipline_summary.logs_today_count} · Total catatan:{" "}
+                  {lead.discipline_summary.log_count}
+                  {lead.discipline_summary.latest_log_date
+                    ? ` · Terakhir ${lead.discipline_summary.latest_log_date}`
+                    : ""}
+                </p>
+
+                {disciplineSuccessMessage ? (
+                  <p role="status" aria-live="polite" className="clara-alert clara-alert-success">
+                    {disciplineSuccessMessage}
+                  </p>
+                ) : null}
+
                 {disciplineSuggestionHint ? (
-                  <div className="mt-4 rounded-2xl border border-clara-info-line bg-clara-info-surface p-4 text-sm text-clara-info">
+                  <div className="rounded-2xl border border-clara-info-line bg-clara-info-surface p-4 text-sm text-clara-info">
                     {disciplineSuggestionHint}
                   </div>
                 ) : null}
 
-                <div className="mt-5 grid gap-4 md:grid-cols-4">
-                  <Metric
-                    label={isSalesWorkspace ? "Status catatan" : "Compliance"}
-                    value={formatDisciplineStatus(
-                      lead.discipline_summary.compliance_status,
-                    )}
-                  />
-                  <Metric
-                    label={isSalesWorkspace ? "Catatan terakhir" : "Latest log"}
-                    value={lead.discipline_summary.latest_log_date ?? "-"}
-                  />
-                  <Metric
-                    label={isSalesWorkspace ? "Catatan hari ini" : "Logs today"}
-                    value={String(lead.discipline_summary.logs_today_count)}
-                  />
-                  <Metric
-                    label={isSalesWorkspace ? "Total catatan" : "Total logs"}
-                    value={String(lead.discipline_summary.log_count)}
-                  />
-                </div>
-
                 {disciplineErrorMessage ? (
-                  <div role="alert" className="clara-alert clara-alert-danger mt-4">
+                  <div role="alert" className="clara-alert clara-alert-danger">
                     {disciplineErrorMessage}
                   </div>
                 ) : null}
 
                 <form
                   onSubmit={(event) => void handleCreateDisciplineLog(event)}
-                  className="mt-6 space-y-5 rounded-2xl border border-clara-line bg-clara-raised p-5"
+                  className="space-y-4 rounded-2xl border border-clara-line-subtle bg-clara-sunken p-4 sm:p-5"
                 >
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <Field label="Log date">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Tanggal">
                       <input
                         type="date"
                         value={disciplineLogDateInput}
-                        onChange={(event) =>
-                          setDisciplineLogDateInput(event.target.value)
-                        }
-                        className="clara-input"
+                        onChange={(event) => setDisciplineLogDateInput(event.target.value)}
+                        className="clara-input w-full"
                       />
                     </Field>
 
-                    <Field label="Activity type">
-                      <select
+                    <Field label="Apa yang kamu lakukan?">
+                      <LabeledSelect
                         value={disciplineActivityTypeInput}
-                        onChange={(event) =>
-                          setDisciplineActivityTypeInput(event.target.value)
-                        }
-                        className="clara-select"
-                      >
-                        {DISCIPLINE_ACTIVITY_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option.replaceAll("_", " ")}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setDisciplineActivityTypeInput}
+                        options={DISCIPLINE_ACTIVITY_OPTIONS}
+                        table={DISCIPLINE_ACTIVITY}
+                      />
                     </Field>
 
-                    <Field label="Result status">
-                      <select
+                    <Field label="Hasilnya">
+                      <LabeledSelect
                         value={disciplineResultStatusInput}
-                        onChange={(event) =>
-                          setDisciplineResultStatusInput(event.target.value)
-                        }
-                        className="clara-select"
-                      >
-                        {DISCIPLINE_RESULT_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option.replaceAll("_", " ")}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setDisciplineResultStatusInput}
+                        options={DISCIPLINE_RESULT_OPTIONS}
+                        table={DISCIPLINE_RESULT}
+                      />
                     </Field>
 
-                    <Field label="Customer mood">
-                      <select
+                    <Field label="Suasana hati customer">
+                      <LabeledSelect
                         value={disciplineMoodInput}
-                        onChange={(event) =>
-                          setDisciplineMoodInput(event.target.value)
-                        }
-                        className="clara-select"
-                      >
-                        {DISCIPLINE_MOOD_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option.replaceAll("_", " ")}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={setDisciplineMoodInput}
+                        options={DISCIPLINE_MOOD_OPTIONS}
+                        table={DISCIPLINE_MOOD}
+                      />
                     </Field>
-                  </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Main objection">
+                    <Field label="Hal yang membuat customer ragu">
                       <input
                         value={disciplineObjectionInput}
-                        onChange={(event) =>
-                          setDisciplineObjectionInput(event.target.value)
-                        }
-                        placeholder="Contoh: legalitas, harga, trust"
-                        className="clara-input"
+                        onChange={(event) => setDisciplineObjectionInput(event.target.value)}
+                        placeholder="Contoh: legalitas, harga, kepercayaan"
+                        className="clara-input w-full"
                       />
                     </Field>
 
-                    <Field label="Next follow-up">
+                    <Field label="Jadwal follow-up berikutnya">
                       <input
                         type="datetime-local"
                         value={disciplineFollowUpInput}
-                        onChange={(event) =>
-                          setDisciplineFollowUpInput(event.target.value)
-                        }
-                        className="clara-input"
+                        onChange={(event) => setDisciplineFollowUpInput(event.target.value)}
+                        className="clara-input w-full"
                       />
                     </Field>
                   </div>
 
-                  <Field label="Notes">
+                  <Field label="Catatan">
                     <textarea
                       value={disciplineNotesInput}
-                      onChange={(event) =>
-                        setDisciplineNotesInput(event.target.value)
-                      }
-                      rows={4}
-                      placeholder="Tulis hasil follow-up hari ini, sinyal customer, dan langkah berikutnya."
-                      className="clara-textarea"
+                      onChange={(event) => setDisciplineNotesInput(event.target.value)}
+                      rows={3}
+                      placeholder="Tulis hasilnya, tanggapan customer, dan langkah berikutnya."
+                      className="clara-textarea w-full"
                     />
                   </Field>
 
-                  <div className="flex justify-end">
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => void handlePrefillDisciplineLog()}
-                        disabled={isPrefillingDisciplineLog}
-                        className="clara-button clara-button-secondary disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {isPrefillingDisciplineLog
-                          ? "Clara sedang mengisi..."
-                          : "Isi dengan bantuan Clara"}
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isCreatingDisciplineLog}
-                        className="clara-button clara-button-primary disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {isCreatingDisciplineLog
-                          ? "Menyimpan log..."
-                          : "Simpan Catatan"}
-                      </button>
-                    </div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => void handlePrefillDisciplineLog()}
+                      disabled={isPrefillingDisciplineLog}
+                      className="clara-button clara-button-secondary"
+                    >
+                      {isPrefillingDisciplineLog ? "Clara sedang mengisi..." : "Isikan dengan bantuan Clara"}
+                    </button>
+                    <button type="submit" disabled={isCreatingDisciplineLog} className="clara-button clara-button-primary">
+                      {isCreatingDisciplineLog ? "Menyimpan..." : "Simpan catatan"}
+                    </button>
                   </div>
                 </form>
 
-                <div className="mt-6 space-y-3">
-                  {lead.discipline_logs.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-3">
-                      Belum ada discipline log untuk lead ini.
-                    </div>
-                  ) : (
-                    lead.discipline_logs.slice(0, 5).map((log) => (
-                      <article
-                        key={log.id}
-                        className="rounded-2xl border border-clara-line bg-clara-raised p-4"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-3">
+                {lead.discipline_logs.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-clara-dashed p-4 text-sm clara-text-secondary">
+                    Belum ada catatan untuk lead ini. Catatan pertama akan muncul di sini.
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {lead.discipline_logs.slice(0, 5).map((log) => (
+                      <li key={log.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
                             <h3 className="text-sm font-semibold clara-text-primary">
-                              {log.activity_type.replaceAll("_", " ")} ·{" "}
-                              {log.result_status.replaceAll("_", " ")}
+                              {labelOf(DISCIPLINE_ACTIVITY, log.activity_type)}
                             </h3>
-                            <p className="mt-1 text-xs text-clara-ink-3">
-                              {log.actor_user_name ?? "System"} · {log.log_date}
+                            <p className="mt-0.5 text-xs clara-text-muted">
+                              {log.actor_user_name ?? "Sistem"} · {log.log_date}
                             </p>
                           </div>
-                          <span className="rounded-full bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-2">
-                            {log.customer_mood?.replaceAll("_", " ") ??
-                              "no mood"}
-                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            <ValueTag table={DISCIPLINE_RESULT} value={log.result_status} />
+                            {log.customer_mood ? <ValueTag table={DISCIPLINE_MOOD} value={log.customer_mood} /> : null}
+                          </div>
                         </div>
-
-                        <div className="mt-3 grid gap-3 md:grid-cols-2">
-                          <Metric
-                            label="Main objection"
-                            value={log.main_objection ?? "-"}
-                          />
-                          <Metric
-                            label="Next follow-up"
-                            value={formatDateTime(log.next_follow_up_at)}
-                          />
-                        </div>
-
-                        {log.notes ? (
-                          <p className="mt-3 text-sm leading-6 text-clara-ink-2">
-                            {log.notes}
+                        {log.main_objection ? (
+                          <p className="mt-2 text-sm clara-text-secondary">
+                            <span className="font-semibold clara-text-primary">Keberatan: </span>
+                            {log.main_objection}
                           </p>
                         ) : null}
-                      </article>
-                    ))
-                  )}
-                </div>
+                        {log.notes ? <p className="mt-2 text-sm leading-6 clara-text-secondary">{log.notes}</p> : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </section>
-            </section>
+            </div>
 
-            <aside className="space-y-6">
+            <aside className="min-w-0 space-y-5">
               <section
                 data-onboarding-id="sales-lead-detail-timeline"
+                aria-labelledby="related-customer-title"
                 className="clara-card p-5 sm:p-6"
               >
-                  <div>
-                    <h2 className="text-xl font-semibold clara-text-primary">
-                      {isSalesWorkspace
-                        ? "Profil Customer Terkait"
-                        : isHeadWorkspace
-                          ? "Customer dan Lead Terkait"
-                          : isLeadershipWorkspace
-                          ? "Customer yang Terkait dengan Lead Ini"
-                          : "Unified Customer Identity"}
-                    </h2>
-                    <p className="mt-1 text-sm text-clara-ink-2">
-                      {isSalesWorkspace
-                        ? "Kalau customer ini pernah muncul di channel atau lead lain, Clara akan tampilkan keterkaitannya di sini."
-                        : isHeadWorkspace
-                          ? "Head bisa cek apakah lead ini berdiri sendiri atau sebenarnya bagian dari konteks customer yang lebih besar di tim lain atau channel lain."
-                          : isLeadershipWorkspace
-                          ? "Manager bisa cek apakah lead ini berdiri sendiri atau ternyata terkait ke lead dan percakapan lain dari customer yang sama."
-                          : "Clara sekarang mengikat banyak lead lintas channel ke satu profil customer agar konteks tidak pecah antara WhatsApp dan Telegram."}
-                    </p>
-                  </div>
+                <h2 id="related-customer-title" className="text-lg font-bold clara-text-primary">
+                  Customer ini
+                </h2>
+                <p className="mt-1 text-sm clara-text-secondary">
+                  Kalau customer yang sama pernah muncul di channel lain, semuanya digabung di sini.
+                </p>
 
                 {lead.customer_profile ? (
-                  <div className="mt-5 space-y-4">
-                    <div className="rounded-2xl border border-clara-line bg-clara-raised p-4">
+                  <div className="mt-4 space-y-4">
+                    <div className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-lg font-semibold clara-text-primary">
+                        <div className="min-w-0">
+                          <h3 className="break-words text-base font-semibold clara-text-primary">
                             {lead.customer_profile.display_name}
                           </h3>
-                          <p className="mt-1 text-sm text-clara-ink-3">
-                            PIC customer:{" "}
-                            {lead.customer_profile.assigned_user_name ??
-                              "Belum ada"}
+                          <p className="mt-0.5 text-xs clara-text-muted">
+                            Penanggung jawab: {lead.customer_profile.assigned_user_name ?? "belum ada"}
                           </p>
                         </div>
                         <Link
-                          href={`/dashboard/customers/${lead.customer_profile.id}`}
-                          className="clara-button clara-button-ghost px-3 py-2 text-xs"
+                          href={`/customers/${lead.customer_profile.id}`}
+                          className="clara-button clara-button-ghost"
                         >
-                          Detail Profil
+                          Lihat profil
                         </Link>
                       </div>
 
-                      <div className="mt-4 grid gap-3 md:grid-cols-3">
-                        <Metric
-                          label="Total lead"
-                          value={String(lead.customer_profile.lead_count)}
-                        />
-                        <Metric
-                          label="Total percakapan"
-                          value={String(
-                            lead.customer_profile.conversation_count,
-                          )}
-                        />
-                        <Metric
-                          label="Kontak terakhir"
-                          value={formatDateTime(
-                            lead.customer_profile.last_contact_at,
-                          )}
-                        />
-                      </div>
+                      <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                        <Fact label="Lead" value={String(lead.customer_profile.lead_count)} />
+                        <Fact label="Percakapan" value={String(lead.customer_profile.conversation_count)} />
+                        <Fact label="Terakhir dihubungi" value={formatRelativeTime(lead.customer_profile.last_contact_at)} />
+                      </dl>
 
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {lead.customer_profile.source_labels.map((label) => (
-                          <span
-                            key={label}
-                            className="rounded-full bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-2"
-                          >
-                            {label}
-                          </span>
-                        ))}
-                      </div>
+                      {lead.customer_profile.source_labels.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {lead.customer_profile.source_labels.map((label) => (
+                            <Tag key={label}>{label}</Tag>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
 
-                    <div className="space-y-3">
-                      {lead.customer_profile.related_leads.map(
-                        (relatedLead) => (
-                          <article
-                            key={relatedLead.id}
-                            className="rounded-2xl border border-clara-line bg-clara-raised p-4"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-sm font-semibold clara-text-primary">
-                                {relatedLead.display_name}
-                              </h3>
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                                  relatedLead.lead_temperature,
-                                )}`}
-                              >
-                                {relatedLead.lead_temperature.toUpperCase()}
-                              </span>
-                              <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
-                                {relatedLead.source_label}
-                              </span>
-                            </div>
-                            <div className="mt-3 grid gap-3 md:grid-cols-2">
-                              <Metric
-                                label="Stage"
-                                value={relatedLead.current_stage.replaceAll(
-                                  "_",
-                                  " ",
-                                )}
-                              />
-                              <Metric
-                                label="Kontak terakhir"
-                                value={formatDateTime(
-                                  relatedLead.last_contact_at,
-                                )}
-                              />
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <Link
-                                href={`/dashboard/crm/${relatedLead.id}`}
-                                className="clara-button clara-button-secondary"
-                              >
-                                Buka Lead
-                              </Link>
-                              {relatedLead.latest_conversation_id ? (
-                                <Link
-                                  href={`/dashboard/sales/conversations/${relatedLead.latest_conversation_id}`}
-                                  className="clara-button clara-button-primary"
-                                >
-                                  Buka Conversation
+                    {lead.customer_profile.related_leads.length > 1 ? (
+                      <ul className="space-y-3">
+                        {lead.customer_profile.related_leads
+                          .filter((relatedLead) => relatedLead.id !== lead.id)
+                          .map((relatedLead) => (
+                            <li
+                              key={relatedLead.id}
+                              className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4"
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-sm font-semibold clara-text-primary">{relatedLead.display_name}</h3>
+                                {relatedLead.lead_temperature !== "unknown" ? (
+                                  <ValueTag table={TEMPERATURE} value={relatedLead.lead_temperature} />
+                                ) : null}
+                                <Tag>{relatedLead.source_label}</Tag>
+                              </div>
+                              <p className="mt-2 text-xs clara-text-muted">
+                                Tahap {labelOf(STAGE, relatedLead.current_stage)} · terakhir dihubungi{" "}
+                                {formatRelativeTime(relatedLead.last_contact_at)}
+                              </p>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <Link href={`/crm/${relatedLead.id}`} className="clara-button clara-button-secondary">
+                                  Buka lead
                                 </Link>
-                              ) : null}
-                            </div>
-                          </article>
-                        ),
-                      )}
-                    </div>
+                                {relatedLead.latest_conversation_id ? (
+                                  <Link
+                                    href={`/sales/conversations/${relatedLead.latest_conversation_id}`}
+                                    className="clara-button clara-button-ghost"
+                                  >
+                                    Buka chat
+                                  </Link>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))}
+                      </ul>
+                    ) : null}
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-3">
-                    Lead ini belum punya customer profile terpadu.
-                  </div>
+                  <p className="mt-4 rounded-2xl border border-dashed border-clara-dashed p-4 text-sm clara-text-secondary">
+                    Lead ini belum punya profil customer. Profilnya dibuat otomatis saat ada chat baru dari customer.
+                  </p>
                 )}
               </section>
 
-              <section className="clara-card p-5 sm:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-semibold clara-text-primary">
-                      {isSalesWorkspace
-                        ? "Nilai Deal"
-                        : isHeadWorkspace
-                          ? "Sinkron KPI dan Nilai Deal"
-                          : isLeadershipWorkspace
-                          ? "KPI dan Nilai Deal"
-                          : "Deal Metrics"}
-                    </h2>
-                    <p className="mt-1 text-sm text-clara-ink-2">
-                      {isSalesWorkspace
-                        ? "Isi nilai bisnis lead ini supaya progressnya bukan cuma status, tapi juga punya gambaran potensi deal."
-                        : isHeadWorkspace
-                          ? "Head bisa pakai bagian ini untuk memastikan stage, status deal, dan angka KPI utama tidak saling bertabrakan."
-                          : isLeadershipWorkspace
-                          ? "Manager bisa pakai bagian ini untuk memastikan stage lead sudah sinkron dengan status deal dan angka KPI utamanya."
-                          : "Isi angka bisnis lead ini supaya KPI owner tidak cuma berhenti di pipeline health."}
-                    </p>
-                  </div>
-                  {dealSuccessMessage && (
-                    <span role="status" aria-live="polite" className="clara-alert clara-alert-success">
-                      {dealSuccessMessage}
-                    </span>
-                  )}
-                </div>
+              <details open={dealMetricsNeedsSync} className="clara-card group p-5 sm:p-6">
+                <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-lg font-bold clara-text-primary">
+                  Nilai deal
+                  <span className="text-sm font-normal clara-text-secondary group-open:hidden">Tampilkan</span>
+                </summary>
+                <p className="mt-1 text-sm clara-text-secondary">
+                  Isi perkiraan nilai dan status deal supaya laporan KPI akurat.
+                </p>
 
-                {dealErrorMessage && (
-                  <div role="alert" className="clara-alert clara-alert-danger mt-4">
+                {dealSuccessMessage ? (
+                  <p role="status" aria-live="polite" className="clara-alert clara-alert-success mt-3">
+                    {dealSuccessMessage}
+                  </p>
+                ) : null}
+                {dealErrorMessage ? (
+                  <div role="alert" className="clara-alert clara-alert-danger mt-3">
                     {dealErrorMessage}
                   </div>
-                )}
+                ) : null}
 
-                {dealMetricsNeedsSync && (
-                  <div className="mt-4 rounded-2xl border border-clara-line bg-clara-tint p-4 text-sm text-clara-gold">
-                    Stage lead ini sudah{" "}
-                    <span className="font-semibold uppercase">
-                      {lead.current_stage}
-                    </span>{" "}
-                    tetapi deal status di KPI masih{" "}
-                    <span className="font-semibold uppercase">
-                      {lead.deal?.status ?? "belum diisi"}
-                    </span>
-                    . Klik{" "}
-                    <span className="font-semibold">Simpan Deal Metrics</span>{" "}
-                    supaya KPI dan nilai deal ikut sinkron.
-                  </div>
-                )}
-
-                <form
-                  onSubmit={(event) => void handleSaveDeal(event)}
-                  className="mt-5 space-y-4"
-                >
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Field label="Deal status">
-                      <select
+                <form onSubmit={(event) => void handleSaveDeal(event)} className="mt-4 space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="Status deal">
+                      <LabeledSelect
                         value={dealStatusInput}
-                        onChange={(event) =>
-                          setDealStatusInput(event.target.value)
-                        }
-                        className="clara-select"
-                      >
-                        {DEAL_STATUS_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option.toUpperCase()}
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-
-                    <Field label="Currency">
-                      <input
-                        value={dealCurrencyInput}
-                        onChange={(event) =>
-                          setDealCurrencyInput(event.target.value.toUpperCase())
-                        }
-                        className="clara-input"
+                        onChange={setDealStatusInput}
+                        options={DEAL_STATUS_OPTIONS}
+                        table={DEAL_STATUS}
                       />
                     </Field>
 
-                    <Field label="Expected value">
+                    <Field label="Mata uang">
+                      <input
+                        value={dealCurrencyInput}
+                        onChange={(event) => setDealCurrencyInput(event.target.value.toUpperCase())}
+                        className="clara-input w-full"
+                      />
+                    </Field>
+
+                    <Field label="Perkiraan nilai deal">
                       <input
                         type="number"
                         min="0"
                         step="1000"
                         value={expectedValueInput}
-                        onChange={(event) =>
-                          setExpectedValueInput(event.target.value)
-                        }
-                        className="clara-input"
+                        onChange={(event) => setExpectedValueInput(event.target.value)}
+                        className="clara-input w-full"
                       />
                     </Field>
 
-                    <Field label="Deposit amount">
+                    <Field label="Setoran awal">
                       <input
                         type="number"
                         min="0"
                         step="1000"
                         value={depositAmountInput}
-                        onChange={(event) =>
-                          setDepositAmountInput(event.target.value)
-                        }
-                        className="clara-input"
+                        onChange={(event) => setDepositAmountInput(event.target.value)}
+                        className="clara-input w-full"
                       />
                     </Field>
 
-                    <Field label="Expected close date">
+                    <Field label="Perkiraan tanggal closing">
                       <input
                         type="date"
                         value={expectedCloseDateInput}
-                        onChange={(event) =>
-                          setExpectedCloseDateInput(event.target.value)
-                        }
-                        className="clara-input"
+                        onChange={(event) => setExpectedCloseDateInput(event.target.value)}
+                        className="clara-input w-full"
                       />
                     </Field>
 
-                    <Field label="Closed at">
+                    <Field label="Waktu closing sebenarnya">
                       <input
                         type="datetime-local"
                         value={dealClosedAtInput}
-                        onChange={(event) =>
-                          setDealClosedAtInput(event.target.value)
-                        }
-                        className="clara-input"
+                        onChange={(event) => setDealClosedAtInput(event.target.value)}
+                        className="clara-input w-full"
                       />
                     </Field>
                   </div>
 
-                  <Field label="Deal notes">
+                  <Field label="Catatan deal">
                     <textarea
                       value={dealNotesInput}
-                      onChange={(event) =>
-                        setDealNotesInput(event.target.value)
-                      }
+                      onChange={(event) => setDealNotesInput(event.target.value)}
                       rows={3}
-                      className="clara-textarea"
+                      className="clara-textarea w-full"
                     />
                   </Field>
 
-                  <div className="rounded-2xl bg-clara-raised p-4">
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <Metric
-                        label="Expected value"
-                        value={`${dealCurrencyInput} ${Number(expectedValueInput || 0).toLocaleString("id-ID")}`}
-                      />
-                      <Metric
-                        label="Deposit"
-                        value={`${dealCurrencyInput} ${Number(depositAmountInput || 0).toLocaleString("id-ID")}`}
-                      />
-                      <Metric
-                        label="Deal status"
-                        value={dealStatusInput.toUpperCase()}
-                      />
-                    </div>
-                  </div>
-
                   <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={isSavingDeal}
-                    className="clara-button clara-button-primary disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isSavingDeal
-                      ? "Menyimpan deal..."
-                      : "Simpan Nilai Deal"}
-                  </button>
-                </div>
-              </form>
-              </section>
-
-              <section className="clara-card p-5 sm:p-6">
-                <div>
-                    <h2 className="text-xl font-semibold clara-text-primary">
-                      {isSalesWorkspace
-                        ? "Tugas Follow-up"
-                        : isHeadWorkspace
-                          ? "Task Aktif pada Lead Ini"
-                          : isLeadershipWorkspace
-                          ? "Task yang Masih Berjalan"
-                          : "Follow-up Tasks"}
-                    </h2>
-                    <p className="mt-1 text-sm text-clara-ink-2">
-                      {isSalesWorkspace
-                        ? "Simpan tugas yang benar-benar perlu dikerjakan supaya follow-up tidak hanya bergantung ke ingatan."
-                        : isHeadWorkspace
-                          ? "Head bisa cek apakah task yang aktif memang mendorong lead maju atau justru hanya menumpuk tanpa owner yang jelas."
-                          : isLeadershipWorkspace
-                          ? "Manager bisa cek task yang masih aktif dan menilai apakah pekerjaan sales benar-benar bergerak atau cuma berhenti di status."
-                          : "Task disimpan permanen, jadi worklist sales sekarang tidak hanya derived dari conversation."}
-                    </p>
+                    <button type="submit" disabled={isSavingDeal} className="clara-button clara-button-primary">
+                      {isSavingDeal ? "Menyimpan..." : "Simpan nilai deal"}
+                    </button>
                   </div>
+                </form>
+              </details>
 
-                {taskErrorMessage && (
-                  <div role="alert" className="clara-alert clara-alert-danger mt-4">
+              <section aria-labelledby="tasks-title" className="clara-card p-5 sm:p-6">
+                <h2 id="tasks-title" className="text-lg font-bold clara-text-primary">
+                  Tugas follow-up
+                </h2>
+                <p className="mt-1 text-sm clara-text-secondary">
+                  Catat hal yang harus dikerjakan supaya tidak hanya mengandalkan ingatan.
+                </p>
+
+                {taskErrorMessage ? (
+                  <div role="alert" className="clara-alert clara-alert-danger mt-3">
                     {taskErrorMessage}
                   </div>
-                )}
+                ) : null}
 
-                <div className="mt-5 space-y-3">
-                  {openTasks.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-3">
-                      Belum ada tugas terbuka untuk lead ini.
-                    </div>
-                  ) : (
-                    openTasks.map((task) => (
-                      <article
-                        key={task.id}
-                        className="rounded-2xl border border-clara-line bg-clara-raised p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="text-sm font-semibold clara-text-primary">
-                              {task.title}
-                            </h3>
-                            <p className="mt-1 text-xs text-clara-ink-3">
-                              Jatuh tempo: {formatDateTime(task.due_at)}
-                            </p>
+                {openTasks.length === 0 ? (
+                  <p className="mt-4 rounded-2xl border border-dashed border-clara-dashed p-4 text-sm clara-text-secondary">
+                    Belum ada tugas yang terbuka untuk lead ini.
+                  </p>
+                ) : (
+                  <ul className="mt-4 space-y-3">
+                    {openTasks.map((task) => (
+                      <li key={task.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="break-words text-sm font-semibold clara-text-primary">{task.title}</h3>
+                            <p className="mt-0.5 text-xs clara-text-muted">Jatuh tempo: {formatDateTime(task.due_at)}</p>
                           </div>
                           <select
                             aria-label={`Status tugas ${task.title}`}
                             value={task.status}
                             disabled={updatingTaskId === task.id}
-                            onChange={(event) =>
-                              void handleTaskStatusChange(
-                                task.id,
-                                event.target.value,
-                              )
-                            }
-                            className="clara-select w-auto text-xs"
+                            onChange={(event) => void handleTaskStatusChange(task.id, event.target.value)}
+                            className="clara-select w-auto"
                           >
-                            <option value="open">Open</option>
-                            <option value="snoozed">Snoozed</option>
-                            <option value="done">Done</option>
-                            <option value="cancelled">Cancelled</option>
+                            {Object.keys(TASK_STATUS).map((status) => (
+                              <option key={status} value={status}>
+                                {labelOf(TASK_STATUS, status)}
+                              </option>
+                            ))}
                           </select>
                         </div>
-                        {task.description && (
-                          <p className="mt-3 text-sm leading-6 text-clara-ink-2">
-                            {task.description}
-                          </p>
-                        )}
-                      </article>
-                    ))
-                  )}
-                </div>
+                        {task.description ? (
+                          <p className="mt-2 text-sm leading-6 clara-text-secondary">{task.description}</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
-                <form
-                  onSubmit={(event) => void handleCreateTask(event)}
-                  className="mt-6 space-y-4 rounded-2xl border border-clara-line bg-clara-raised p-4"
-                >
-                  <Field label="Task title">
-                    <input
-                      value={taskTitleInput}
-                      onChange={(event) =>
-                        setTaskTitleInput(event.target.value)
-                      }
-                      placeholder="Contoh: Follow up soal legalitas"
-                      className="clara-input"
-                    />
-                  </Field>
+                <details className="mt-4 border-t border-clara-line-subtle pt-3">
+                  <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-clara-gold">
+                    Tambah tugas baru
+                  </summary>
+                  <form onSubmit={(event) => void handleCreateTask(event)} className="mt-3 space-y-4">
+                    <Field label="Judul tugas">
+                      <input
+                        value={taskTitleInput}
+                        onChange={(event) => setTaskTitleInput(event.target.value)}
+                        placeholder="Contoh: Jelaskan soal legalitas"
+                        className="clara-input w-full"
+                      />
+                    </Field>
 
-                  <Field label="Task description">
-                    <textarea
-                      value={taskDescriptionInput}
-                      onChange={(event) =>
-                        setTaskDescriptionInput(event.target.value)
-                      }
-                      rows={3}
-                      placeholder="Tulis konteks singkat supaya sales berikutnya tidak kehilangan arah."
-                      className="clara-textarea"
-                    />
-                  </Field>
+                    <Field label="Keterangan (boleh dikosongkan)">
+                      <textarea
+                        value={taskDescriptionInput}
+                        onChange={(event) => setTaskDescriptionInput(event.target.value)}
+                        rows={3}
+                        className="clara-textarea w-full"
+                      />
+                    </Field>
 
-                  <Field label="Due at">
-                    <input
-                      type="datetime-local"
-                      value={taskDueAtInput}
-                      onChange={(event) =>
-                        setTaskDueAtInput(event.target.value)
-                      }
-                      className="clara-input"
-                    />
-                  </Field>
+                    <Field label="Tenggat">
+                      <input
+                        type="datetime-local"
+                        value={taskDueAtInput}
+                        onChange={(event) => setTaskDueAtInput(event.target.value)}
+                        className="clara-input w-full"
+                      />
+                    </Field>
 
-                  <button
-                    type="submit"
-                    disabled={isCreatingTask}
-                    className="clara-button clara-button-primary disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isCreatingTask ? "Membuat tugas..." : "Tambah Tugas"}
-                  </button>
-                </form>
+                    <button
+                      type="submit"
+                      disabled={isCreatingTask || taskTitleInput.trim().length === 0}
+                      className="clara-button clara-button-primary"
+                    >
+                      {isCreatingTask ? "Menyimpan..." : "Tambah tugas"}
+                    </button>
+                  </form>
+                </details>
               </section>
 
-              <section className="clara-card-outline p-5 sm:p-6">
-                <div>
-                  <h2 className="text-xl font-semibold clara-text-primary">
-                    {isSalesWorkspace
-                      ? "Riwayat Aktivitas"
-                      : isHeadWorkspace
-                        ? "Riwayat Lead dan Keputusan"
-                        : isLeadershipWorkspace
-                        ? "Riwayat Perubahan Lead"
-                        : "Activity Timeline"}
-                  </h2>
-                  <p className="mt-1 text-sm text-clara-ink-2">
-                    {isSalesWorkspace
-                      ? "Semua perubahan penting di lead ini dicatat di sini supaya sales bisa cepat lihat histori kerja dan perubahan status."
-                      : isHeadWorkspace
-                        ? "Timeline ini dipakai head untuk audit cepat: stage berubah kapan, follow-up diisi siapa, task dibuat kapan, dan apakah arah lead butuh keputusan tambahan."
-                        : isLeadershipWorkspace
-                        ? "Timeline ini dipakai manager untuk audit cepat: stage berubah kapan, follow-up diisi siapa, task dibuat kapan, dan arah lead bergerak ke mana."
-                        : "Semua perubahan penting di lead ini dicatat supaya perpindahan stage, follow-up, task, dan deal bisa diaudit dengan enak."}
-                  </p>
-                </div>
+              <section aria-labelledby="history-title" className="clara-card-outline p-5 sm:p-6">
+                <h2 id="history-title" className="text-lg font-bold clara-text-primary">
+                  Riwayat lead
+                </h2>
+                <p className="mt-1 text-sm clara-text-secondary">
+                  Semua perubahan penting pada lead ini, dari yang terbaru.
+                </p>
 
-                <div className="mt-5 space-y-4">
-                  {lead.timeline.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-3">
-                      Belum ada aktivitas yang tercatat untuk lead ini.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-4">
-                        {visibleTimeline.map((event) => (
-                          <article
-                            key={event.id}
-                            className="rounded-2xl border border-clara-line bg-clara-raised p-4"
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <h3 className="text-sm font-semibold clara-text-primary">
-                                  {event.title}
+                {lead.timeline.length === 0 ? (
+                  <p className="mt-4 rounded-2xl border border-dashed border-clara-dashed p-4 text-sm clara-text-secondary">
+                    Belum ada riwayat untuk lead ini.
+                  </p>
+                ) : (
+                  <>
+                    <ul className="mt-4 space-y-3">
+                      {visibleTimeline.map((event) => {
+                        const description = event.description ? humanizeActivityDescription(event.description) : "";
+
+                        return (
+                          <li key={event.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <h3 className="break-words text-sm font-semibold clara-text-primary">
+                                  {humanizeActivityTitle(event.title)}
                                 </h3>
-                                <p className="mt-1 text-xs text-clara-ink-3">
-                                  {event.actor_user_name ?? "System"} ·{" "}
-                                  {formatDateTime(event.created_at)}
+                                <p className="mt-0.5 text-xs clara-text-muted">
+                                  {event.actor_user_name ?? "Sistem"} · {formatRelativeTime(event.created_at)}
                                 </p>
                               </div>
-                              <span className="rounded-full bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-3">
-                                {event.event_type.replaceAll("_", " ")}
-                              </span>
+                              <ValueTag table={ACTIVITY_EVENT} value={event.event_type} />
                             </div>
 
-                            {event.description && (
-                              <p className="mt-3 text-sm leading-6 text-clara-ink-2">
-                                {event.description}
+                            {description ? (
+                              <p className="mt-2 break-words text-sm leading-6 clara-text-secondary">{description}</p>
+                            ) : null}
+
+                            {event.from_value || event.to_value ? (
+                              <p className="mt-2 text-sm clara-text-secondary">
+                                {humanizeActivityValue(event.event_type, event.from_value)}
+                                <span aria-hidden="true"> → </span>
+                                <span className="sr-only"> menjadi </span>
+                                <span className="font-semibold clara-text-primary">
+                                  {humanizeActivityValue(event.event_type, event.to_value)}
+                                </span>
                               </p>
-                            )}
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
 
-                            {(event.from_value || event.to_value) && (
-                              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                <Metric
-                                  label="Dari"
-                                  value={formatTimelineValue(event.from_value)}
-                                />
-                                <Metric
-                                  label="Menjadi"
-                                  value={formatTimelineValue(event.to_value)}
-                                />
-                              </div>
-                            )}
-                          </article>
-                        ))}
-                      </div>
-
-                      {lead.timeline.length > timelinePageSize ? (
-                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-clara-line bg-clara-raised p-4">
-                          <p className="text-sm text-clara-ink-2">
-                            Halaman {effectiveTimelinePage} dari {timelineTotalPages} ·
-                            menampilkan {visibleTimeline.length} dari{" "}
-                            {lead.timeline.length} aktivitas.
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setTimelinePage((current) =>
-                                  Math.max(1, current - 1),
-                                )
-                              }
-                              disabled={effectiveTimelinePage === 1}
-                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Sebelumnya
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setTimelinePage((current) =>
-                                  Math.min(timelineTotalPages, current + 1),
-                                )
-                              }
-                              disabled={effectiveTimelinePage === timelineTotalPages}
-                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Berikutnya
-                            </button>
-                          </div>
+                    {lead.timeline.length > timelinePageSize ? (
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm clara-text-secondary">
+                          Menampilkan {visibleTimeline.length} dari {lead.timeline.length}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setTimelinePage((current) => Math.max(1, current - 1))}
+                            disabled={effectiveTimelinePage === 1}
+                            className="clara-button clara-button-ghost"
+                          >
+                            Sebelumnya
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTimelinePage((current) => Math.min(timelineTotalPages, current + 1))}
+                            disabled={effectiveTimelinePage === timelineTotalPages}
+                            className="clara-button clara-button-ghost"
+                          >
+                            Berikutnya
+                          </button>
                         </div>
-                      ) : null}
-                    </>
-                  )}
-                </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </section>
             </aside>
           </div>
-        )}
+        ) : null}
       </div>
     </WorkspaceShell>
   );
@@ -1757,141 +1296,41 @@ export default function LeadDetailPage() {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block">
-      <span className="clara-label mb-2 block">
-        {label}
-      </span>
+    <label className="block min-w-0">
+      <span className="clara-label mb-2 block">{label}</span>
       {children}
     </label>
   );
 }
 
-function DetailSelect({
+/** Pilihan dengan label Indonesia dari kamus; nilai yang dikirim ke backend tetap kode aslinya. */
+function LabeledSelect({
   value,
   onChange,
   options,
-  getOptionLabel,
-  disabled = false,
+  table,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: readonly string[];
-  getOptionLabel: (value: string) => string;
-  disabled?: boolean;
+  table: VocabTable;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const isDropdownOpen = !disabled && isOpen;
-
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
-
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        aria-expanded={isDropdownOpen}
-        aria-haspopup="listbox"
-        disabled={disabled}
-        onClick={() => setIsOpen((previous) => !previous)}
-        className="flex w-full items-center justify-between rounded-2xl border border-clara-line bg-clara-raised px-4 py-3 text-left text-sm font-medium clara-text-primary transition hover:border-clara-line disabled:cursor-not-allowed disabled:bg-clara-raised disabled:text-clara-ink-3"
-      >
-        <span>{getOptionLabel(value)}</span>
-        <span
-          aria-hidden="true"
-          className={`text-clara-ink-3 transition-transform ${
-            isDropdownOpen ? "rotate-180" : ""
-          }`}
-        >
-          <svg
-            viewBox="0 0 12 12"
-            className="h-3 w-3"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M2.25 4.5L6 8.25L9.75 4.5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-      </button>
-
-      {isDropdownOpen ? (
-        <div className="absolute inset-x-0 z-10 mt-2 rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(29,21,15,0.99)_0%,rgba(17,12,9,0.99)_100%)] p-2 shadow-[0_18px_36px_rgba(0,0,0,0.28)]">
-          <ul
-            role="listbox"
-            aria-label="Select option"
-            className="clara-scrollbar max-h-72 space-y-1 overflow-y-auto pr-1"
-          >
-            {options.map((option) => {
-              const isSelected = option === value;
-
-              return (
-                <li key={option}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    onClick={() => {
-                      setIsOpen(false);
-                      if (option !== value) {
-                        onChange(option);
-                      }
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                      isSelected
-                        ? "bg-[#f0cb73] text-[#1a120b]"
-                        : "text-[#fff0c9] hover:bg-[#2b2013] hover:text-[#fff8de]"
-                    }`}
-                  >
-                    <span className="capitalize">{getOptionLabel(option)}</span>
-                    {isSelected ? (
-                      <span className="text-xs font-semibold text-[#5a3e16]">
-                        Aktif
-                      </span>
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
-    </div>
+    <select value={value} onChange={(event) => onChange(event.target.value)} className="clara-select w-full">
+      {options.map((option) => (
+        <option key={option} value={option}>
+          {labelOf(table, option)}
+        </option>
+      ))}
+    </select>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="clara-card-soft min-w-0 p-4">
-      <p className="text-xs font-semibold clara-text-muted">{label}</p>
-      <p className="mt-2 break-words text-sm font-semibold clara-text-primary">{value}</p>
+    <div className="min-w-0">
+      <dt className="text-xs clara-text-muted">{label}</dt>
+      <dd className="mt-1 break-words font-semibold clara-text-primary">{value}</dd>
     </div>
   );
 }
