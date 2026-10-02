@@ -335,3 +335,45 @@ export const TRUST_LEVEL: VocabTable = {
   high: { label: "Tinggi", tone: "good" },
   authoritative: { label: "Pasti", tone: "good" },
 };
+
+/** Kelompok antrean review untuk manager dan head. */
+export const REVIEW_BUCKET: VocabTable = {
+  needs_analysis: { label: "Belum dibaca Clara", tone: "warn", hint: "Chat belum dianalisis, jadi belum ada yang bisa direview." },
+  needs_reply_suggestion: { label: "Belum ada draft jawaban", tone: "warn" },
+  pending_approval: { label: "Menunggu keputusan", tone: "gold", hint: "Draft jawaban menunggu persetujuan." },
+  draft_review: { label: "Draft siap ditinjau", tone: "gold" },
+  human_escalation: { label: "Perlu keputusan manusia", tone: "danger", hint: "Topiknya terlalu sensitif untuk dilepas sendiri." },
+  ready_to_send: { label: "Siap dikirim", tone: "good" },
+  needs_rework: { label: "Perlu diperbaiki", tone: "warn", hint: "Draft sebelumnya kurang kuat dan perlu disusun ulang." },
+};
+
+export const REVIEW_NEXT_STEP: Record<string, { sales: string; head: string }> = {
+  needs_analysis: {
+    sales: "Minta Clara membaca chat ini dulu.",
+    head: "Biarkan Clara membaca chat ini dulu sebelum diputuskan.",
+  },
+  needs_reply_suggestion: {
+    sales: "Minta Clara menyusun draft jawaban, lalu tinjau hasilnya.",
+    head: "Draft belum ada. Biasanya cukup diserahkan ke manager.",
+  },
+  needs_rework: {
+    sales: "Susun ulang draft-nya, lalu tinjau lagi.",
+    head: "Draft sebelumnya kurang kuat. Tanyakan ke manager apakah perlu dibantu.",
+  },
+  pending_approval: {
+    sales: "Buka chat, cek apakah jawabannya aman dan tepat, lalu putuskan.",
+    head: "Pastikan arah jawabannya aman dan konsisten sebelum diteruskan.",
+  },
+  draft_review: {
+    sales: "Buka chat dan tinjau draft jawabannya.",
+    head: "Draft sudah ada. Nilai apakah mutunya cukup untuk dilanjutkan.",
+  },
+  human_escalation: {
+    sales: "Buka chat dan putuskan arahan untuk Sales ini.",
+    head: "Buka kasusnya dan putuskan: cukup diarahkan ke manager atau perlu langkah lebih tegas.",
+  },
+  ready_to_send: {
+    sales: "Sudah aman. Cukup validasi akhir kalau mau menjaga kualitas.",
+    head: "Relatif aman. Pastikan tidak ada pola risiko yang terlewat.",
+  },
+};

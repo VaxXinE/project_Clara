@@ -1,169 +1,99 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
+import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
+import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import {
-  formatChannelLabel,
-  formatDateTime,
-  formatStatusLabel,
-  getChannelBadgeClass,
-  getLeadBadgeClass,
-  getRiskBadgeClass,
-  isExperimentalChannel,
-} from "@/lib/format";
-import {
-  canAccessQueueAndActionCenter,
-  normalizeWorkspaceRole,
-} from "@/lib/roles";
-import type {
-  ChatReviewCenterResponse,
-  ChatReviewQueueItem,
-  CurrentUser,
-} from "@/types/dashboard";
+import { formatChannelLabel, formatRelativeTime, isExperimentalChannel } from "@/lib/format";
+import { canAccessQueueAndActionCenter, normalizeWorkspaceRole } from "@/lib/roles";
+import { AGE, REVIEW_BUCKET, REVIEW_NEXT_STEP, STAGE, TEMPERATURE, labelOf } from "@/lib/vocab";
+import type { ChatReviewCenterResponse, ChatReviewQueueItem, CurrentUser } from "@/types/dashboard";
 
-function formatAccountCategory(value: string): string {
-  switch (value) {
-    case "mini":
-      return "Mini";
-    case "reguler":
-      return "Reguler";
-    case "unknown":
-      return "Belum ditentukan";
-    default:
-      return value.replaceAll("_", " ");
-  }
-}
+type Filters = { reviewBucket: string; riskLevel: string; ageBucket: string; sourceChannel: string };
 
-function getAccountCategoryBadgeClass(value: string): string {
-  switch (value) {
-    case "mini":
-      return "bg-clara-success-surface text-clara-success";
-    case "reguler":
-      return "bg-clara-tint text-clara-gold";
-    default:
-      return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
-  }
+const NO_FILTERS: Filters = { reviewBucket: "all", riskLevel: "all", ageBucket: "all", sourceChannel: "all" };
+
+const BUCKET_CHIPS = [
+  "human_escalation",
+  "pending_approval",
+  "draft_review",
+  "needs_rework",
+  "needs_reply_suggestion",
+  "needs_analysis",
+  "ready_to_send",
+] as const;
+
+function buildQueuePath(filters: Filters) {
+  const query = new URLSearchParams();
+  if (filters.reviewBucket !== "all") query.set("review_bucket", filters.reviewBucket);
+  if (filters.riskLevel !== "all") query.set("risk_level", filters.riskLevel);
+  if (filters.ageBucket !== "all") query.set("age_bucket", filters.ageBucket);
+  if (filters.sourceChannel !== "all") query.set("source_channel", filters.sourceChannel);
+
+  return query.size
+    ? `/dashboard/sales/chat-review-center?${query.toString()}`
+    : "/dashboard/sales/chat-review-center";
 }
 
 export default function ChatReviewCenterPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [queue, setQueue] = useState<ChatReviewCenterResponse | null>(null);
-  const [reviewBucketFilter, setReviewBucketFilter] = useState("all");
-  const [riskLevelFilter, setRiskLevelFilter] = useState("all");
-  const [ageBucketFilter, setAgeBucketFilter] = useState("all");
-  const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [isLoading, setIsLoading] = useState(true);
   const [actionKey, setActionKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [actionError, setActionError] = useState("");
 
-  function buildQueuePath(filters?: {
-    reviewBucket?: string;
-    riskLevel?: string;
-    ageBucket?: string;
-    sourceChannel?: string;
-  }) {
-    const resolvedFilters = {
-      reviewBucket: filters?.reviewBucket ?? reviewBucketFilter,
-      riskLevel: filters?.riskLevel ?? riskLevelFilter,
-      ageBucket: filters?.ageBucket ?? ageBucketFilter,
-      sourceChannel: filters?.sourceChannel ?? sourceChannelFilter,
-    };
-
-    const query = new URLSearchParams();
-    if (resolvedFilters.reviewBucket !== "all") {
-      query.set("review_bucket", resolvedFilters.reviewBucket);
-    }
-    if (resolvedFilters.riskLevel !== "all") {
-      query.set("risk_level", resolvedFilters.riskLevel);
-    }
-    if (resolvedFilters.ageBucket !== "all") {
-      query.set("age_bucket", resolvedFilters.ageBucket);
-    }
-    if (resolvedFilters.sourceChannel !== "all") {
-      query.set("source_channel", resolvedFilters.sourceChannel);
-    }
-
-    return query.size
-      ? `/dashboard/sales/chat-review-center?${query.toString()}`
-      : "/dashboard/sales/chat-review-center";
-  }
-
-  async function loadQueue(filters?: {
-    reviewBucket?: string;
-    riskLevel?: string;
-    ageBucket?: string;
-    sourceChannel?: string;
-  }) {
+  const loadQueue = useCallback(async (next: Filters) => {
     setIsLoading(true);
     setErrorMessage("");
 
     try {
       const [me, data] = await Promise.all([
         apiFetch<CurrentUser>("/auth/me"),
-        apiFetch<ChatReviewCenterResponse>(buildQueuePath(filters)),
+        apiFetch<ChatReviewCenterResponse>(buildQueuePath(next)),
       ]);
-
       setCurrentUser(me);
       setQueue(data);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal memuat review sales.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Antrean review belum bisa dimuat.");
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void loadQueue();
+      void loadQueue(NO_FILTERS);
     }, 0);
 
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadQueue]);
 
-  async function handleAnalyze(conversationId: string) {
-    const nextActionKey = `${conversationId}:analyze`;
-    setActionKey(nextActionKey);
-    setErrorMessage("");
-
-    try {
-      await apiFetch(`/conversations/${conversationId}/analyze`, {
-        method: "POST",
-      });
-      await loadQueue();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal menjalankan AI analysis.",
-      );
-    } finally {
-      setActionKey(null);
-    }
+  function updateFilters(patch: Partial<Filters>) {
+    const next = { ...filters, ...patch };
+    setFilters(next);
+    void loadQueue(next);
   }
 
-  async function handleGenerateReply(conversationId: string) {
-    const nextActionKey = `${conversationId}:reply`;
-    setActionKey(nextActionKey);
-    setErrorMessage("");
+  async function runAction(conversationId: string, kind: "analyze" | "reply") {
+    setActionKey(`${conversationId}:${kind}`);
+    setActionError("");
 
     try {
-      await apiFetch(`/conversations/${conversationId}/reply-suggestions`, {
-        method: "POST",
-      });
-      await loadQueue();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal membuat draft balasan.",
+      await apiFetch(
+        kind === "analyze"
+          ? `/conversations/${conversationId}/analyze`
+          : `/conversations/${conversationId}/reply-suggestions`,
+        { method: "POST" },
       );
+      await loadQueue(filters);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Permintaan ke Clara belum berhasil. Coba lagi.");
     } finally {
       setActionKey(null);
     }
@@ -172,739 +102,299 @@ export default function ChatReviewCenterPage() {
   const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
   const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
   const isHeadView = normalizedRole === "head";
-  const isManagerView = normalizedRole === "manager";
-  const fallbackHref = canAccessQueue
-    ? "/dashboard/sales"
-    : isHeadView
-      ? "/dashboard/notifications"
-      : "/dashboard/manager-insights";
-  const reviewItems = queue?.items ?? [];
-  const decisionCount = reviewItems.filter((item) =>
-    ["pending_approval", "draft_review"].includes(item.review_bucket),
-  ).length;
-  const draftPrepCount = reviewItems.filter((item) =>
-    ["needs_analysis", "needs_reply_suggestion", "needs_rework"].includes(
-      item.review_bucket,
-    ),
-  ).length;
-  const escalationCount = reviewItems.filter(
-    (item) => item.review_bucket === "human_escalation",
-  ).length;
-  const readyToSendCount = reviewItems.filter(
-    (item) => item.review_bucket === "ready_to_send",
-  ).length;
-  const topPriorityItem = [...reviewItems].sort(
-    (left, right) => right.priority_score - left.priority_score,
-  )[0] ?? null;
-  const reviewDailySummary = isLoading
-    ? "Clara sedang menyiapkan antrian review tim."
-    : isHeadView
-      ? decisionCount > 0 || escalationCount > 0
-        ? `Ada ${decisionCount} item yang perlu keputusan Head dan ${escalationCount} item yang sudah naik eskalasi.`
-        : "Antrian arahan tim relatif aman. Kalau perlu, lanjut cek Monitor Tim atau Lead Tim yang mulai melambat."
-      : decisionCount > 0 || draftPrepCount > 0
-        ? `Saat ini ada ${decisionCount} item yang butuh keputusan manager dan ${draftPrepCount} item yang masih butuh dipersiapkan dulu.`
-        : "Antrian review sales relatif aman. Anda bisa cek item stale atau item yang siap dikirim."
-  const activeFilterSummary = [
-    reviewBucketFilter !== "all" ? `Bucket: ${formatStatusLabel(reviewBucketFilter)}` : null,
-    riskLevelFilter !== "all" ? `Risk: ${riskLevelFilter}` : null,
-    ageBucketFilter !== "all" ? `Age: ${formatStatusLabel(ageBucketFilter)}` : null,
-    sourceChannelFilter !== "all"
-      ? `Channel: ${sourceChannelFilter}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" • ");
-  const reviewNextAction = topPriorityItem
-    ? {
-        title: isHeadView
-          ? `${topPriorityItem.lead_name} paling layak diputuskan lebih dulu`
-          : `${topPriorityItem.lead_name} paling layak dibuka dulu`,
-        description:
-          topPriorityItem.recommended_action ||
-          (isHeadView
-            ? "Mulai dari skor prioritas tertinggi supaya keputusan Head langsung kena ke bottleneck paling besar."
-            : "Mulai dari item dengan skor prioritas tertinggi supaya review manager tidak keburu melebar."),
-        href: `/dashboard/sales/conversations/${topPriorityItem.conversation_id}`,
-        label: isHeadView ? "Buka Kasus Prioritas" : "Buka Review Utama",
-      }
-        : {
-            title: "Belum ada item review yang menonjol",
-            description:
-              "Kalau daftar kosong, berarti belum ada percakapan yang butuh analisis, draft, atau keputusan tambahan.",
-            href: fallbackHref,
-            label: "Kembali ke Halaman Sebelumnya",
-          };
+  const fallbackHref = canAccessQueue ? "/sales" : isHeadView ? "/notifications" : "/manager-insights";
+  const items = queue?.items ?? [];
+  const hasFilters = Object.values(filters).some((value) => value !== "all");
+
+  const summaryTitle = !queue
+    ? ""
+    : queue.escalation_count > 0
+      ? `${queue.escalation_count} kasus perlu keputusan manusia`
+      : queue.pending_approval_count > 0
+        ? `${queue.pending_approval_count} draft menunggu keputusan`
+        : queue.total_items > 0
+          ? `${queue.total_items} kasus perlu dilihat`
+          : "Tidak ada kasus yang menunggu";
+  const summaryHelper = !queue
+    ? ""
+    : queue.stale_count > 0
+      ? `${queue.stale_count} di antaranya sudah menunggu lebih dari 3 hari.`
+      : queue.total_items > 0
+        ? "Mulai dari yang paling atas, daftarnya sudah diurutkan dari yang paling mendesak."
+        : isHeadView
+          ? "Antrean arahan tim aman. Cek Monitor Tim kalau ingin melihat pola hambatan."
+          : "Antrean review aman. Cek Monitor Tim untuk melihat progres Sales.";
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.daily}
       title={isHeadView ? PAGE_NAMES.teamDirection : PAGE_NAMES.reviewSales}
       description={
         isHeadView
-          ? "Kasus yang perlu keputusan Head dan arahan yang bisa kamu turunkan ke tim."
-          : isManagerView
-            ? "Balasan Sales yang perlu keputusan, revisi, atau eskalasi."
-            : "Balasan Sales yang perlu dicek ulang, dibuat ulang, atau diputuskan."
+          ? "Kasus yang perlu keputusanmu dan arahan yang bisa diturunkan ke tim."
+          : "Balasan Sales yang perlu kamu putuskan, perbaiki, atau eskalasikan."
       }
       backHref={fallbackHref}
-      backLabel={
-        canAccessQueue
-          ? "Kembali ke Chat Masuk"
-          : isHeadView
-            ? "Kembali ke Alert Tim"
-            : "Kembali ke Monitor Tim"
-      }
+      backLabel={canAccessQueue ? "Kembali ke Chat Masuk" : isHeadView ? "Kembali ke Alert Tim" : "Kembali ke Monitor Tim"}
       actions={
         <Link
-          href={
-            canAccessQueue
-              ? "/dashboard/follow-up"
-              : isHeadView
-                ? "/dashboard/crm"
-                : "/dashboard/manager-insights"
-          }
-          className="clara-button clara-button-primary"
+          href={canAccessQueue ? "/follow-up" : isHeadView ? "/crm" : "/manager-insights"}
+          className="clara-button clara-button-secondary"
         >
-          {canAccessQueue
-            ? "Buka Tindak Lanjut"
-            : isHeadView
-              ? "Buka Lead Tim"
-              : "Buka Monitor Tim"}
+          {canAccessQueue ? "Lihat Tindak Lanjut" : isHeadView ? "Lihat Lead Tim" : "Lihat Monitor Tim"}
         </Link>
       }
     >
-      <div className="space-y-6">
-        {isLoading && (
-          <div role="status" className="clara-empty-state text-sm text-[#d6bb84]">
-            Memuat review sales...
-          </div>
-        )}
+      <div className="space-y-5">
+        {isLoading && !queue ? <LoadingState message="Memuat antrean review..." /> : null}
 
-        {errorMessage && (
+        {!isLoading && errorMessage && !queue ? (
+          <ErrorState message={errorMessage} onRetry={() => void loadQueue(filters)} />
+        ) : null}
+
+        {actionError ? (
           <div role="alert" className="clara-alert clara-alert-danger">
-            {errorMessage}
+            {actionError}
           </div>
-        )}
+        ) : null}
 
-        {queue && !isLoading && (
+        {queue ? (
           <>
             <section
               data-onboarding-id="manager-approvals-summary"
-              className="clara-card rounded-3xl p-6"
+              aria-labelledby="review-summary"
+              className="clara-card p-5 sm:p-6"
             >
-              <p className="clara-kicker text-xs">
-                {isHeadView ? "Ringkasan arahan" : "Ringkasan review"}
-              </p>
-              <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-3xl">
-                  <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
-                    {isHeadView
-                      ? "Mulai dari kasus tim yang paling butuh keputusan Head"
-                      : "Mulai dari balasan sales yang paling butuh keputusan"}
-                  </h2>
-                  <p className="mt-2 text-sm leading-7 text-clara-ink-2">
-                    {reviewDailySummary}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <Link
-                    href={reviewNextAction.href}
-                    className="clara-button clara-button-primary justify-center"
-                  >
-                    {reviewNextAction.label}
-                  </Link>
-                  <Link
-                    href={isHeadView ? "/dashboard/manager-insights" : "/dashboard/crm"}
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    {isHeadView ? "Buka Monitor Tim" : "Buka Lead Tim"}
-                  </Link>
-                </div>
-              </div>
+              <h2 id="review-summary" className="text-xl font-bold clara-text-primary sm:text-2xl">
+                {summaryTitle}
+              </h2>
+              <p className="mt-1 text-sm leading-6 clara-text-secondary">{summaryHelper}</p>
             </section>
 
             <section
-              data-onboarding-id="manager-approvals-metrics"
-              className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+              data-onboarding-id="manager-approvals-filters"
+              aria-label="Saring antrean review"
+              className="clara-card space-y-4 p-4 sm:p-5"
             >
-              <QueueMetric
-                label={isHeadView ? "Perlu Keputusan Head" : "Butuh Keputusan"}
-                value={String(decisionCount)}
-                hint={
-                  isHeadView
-                    ? "Kasus yang sudah tidak cukup selesai di level manager."
-                    : "Item yang perlu arahan, revisi, atau keputusan reviewer."
-                }
-              />
-              <QueueMetric
-                label={isHeadView ? "Masih perlu disiapkan" : "Butuh Persiapan"}
-                value={String(draftPrepCount)}
-                hint={
-                  isHeadView
-                    ? "Kasus yang belum cukup matang untuk diputuskan sekarang."
-                    : "Item yang masih perlu analysis AI, draft, atau rework."
-                }
-              />
-              <QueueMetric
-                label="Eskalasi"
-                value={String(escalationCount)}
-                hint={
-                  isHeadView
-                    ? "Kasus yang sudah naik level dan perlu perhatian lebih tegas."
-                    : "Item yang sudah terlalu sensitif untuk dibiarkan jalan sendiri."
-                }
-              />
-              <QueueMetric
-                label="Stale"
-                value={String(queue.stale_count)}
-                hint="Item yang sudah terlalu lama menunggu dan rawan makin melebar."
-              />
-            </section>
+              <div data-onboarding-id="manager-approvals-metrics" role="group" aria-label="Kelompok kasus" className="flex flex-wrap gap-2">
+                <FilterChip
+                  active={filters.reviewBucket === "all"}
+                  onClick={() => updateFilters({ reviewBucket: "all" })}
+                  label="Semua"
+                />
+                {BUCKET_CHIPS.map((bucket) => (
+                  <FilterChip
+                    key={bucket}
+                    active={filters.reviewBucket === bucket}
+                    onClick={() => updateFilters({ reviewBucket: bucket })}
+                    label={labelOf(REVIEW_BUCKET, bucket)}
+                  />
+                ))}
+              </div>
 
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_320px]">
-              <div
-                data-onboarding-id="manager-approvals-filters"
-                className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
-              >
-                <div>
-                  <p className="text-xs font-semibold text-[#f0cb73]">
-                    {isHeadView ? "Saring daftar arahan" : "Saring daftar review"}
-                  </p>
-                  <p className="mt-2 max-w-3xl text-sm leading-7 text-[#d6bb84]">
-                    {isHeadView
-                      ? "Kalau kasus mulai banyak, Head cukup mulai dari eskalasi, stale, atau risk tinggi dulu."
-                      : "Pakai filter kalau item review sudah mulai banyak. Kalau belum, mulai saja dari item prioritas tertinggi di daftar bawah."}
-                  </p>
-                </div>
-                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#f0cb73]/12 bg-[#1b140e] px-4 py-3">
-                  <span className="text-sm text-[#d8bc84]">
-                    Menampilkan{" "}
-                    <span className="font-semibold text-[#f0cb73]">
-                      {queue.items.length}
-                    </span>{" "}
-                    item review
-                  </span>
-                  <span className="hidden h-4 w-px bg-[#f0cb73]/12 md:block" />
-                  <span className="text-sm text-[#bfa36c]">
-                    {activeFilterSummary || "Belum ada filter aktif"}
-                  </span>
-                </div>
-                <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Filter bucket</span>
+              <details className="group">
+                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-clara-gold">
+                  Saring lebih lanjut (risiko, lama menunggu, channel)
+                </summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <label htmlFor="review-risk" className="clara-label">
+                      Tingkat risiko
+                    </label>
                     <select
-                      value={reviewBucketFilter}
-                      onChange={(event) => setReviewBucketFilter(event.target.value)}
-                      className="clara-select"
+                      id="review-risk"
+                      value={filters.riskLevel}
+                      onChange={(event) => updateFilters({ riskLevel: event.target.value })}
+                      className="clara-select mt-2 w-full"
                     >
-                      <option value="all">Semua bucket</option>
-                      <option value="needs_analysis">Butuh AI analysis</option>
-                      <option value="needs_reply_suggestion">Butuh draft baru</option>
-                      <option value="pending_approval">Pending approval</option>
-                      <option value="draft_review">Draft siap direview</option>
-                      <option value="human_escalation">Human escalation</option>
-                      <option value="ready_to_send">Siap dikirim</option>
-                      <option value="needs_rework">Perlu rework</option>
+                      <option value="all">Semua</option>
+                      <option value="high">Tinggi</option>
+                      <option value="medium">Sedang</option>
+                      <option value="low">Rendah</option>
                     </select>
-                  </label>
-
-                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Filter risk</span>
+                  </div>
+                  <div>
+                    <label htmlFor="review-age" className="clara-label">
+                      Lama menunggu
+                    </label>
                     <select
-                      value={riskLevelFilter}
-                      onChange={(event) => setRiskLevelFilter(event.target.value)}
-                      className="clara-select"
+                      id="review-age"
+                      value={filters.ageBucket}
+                      onChange={(event) => updateFilters({ ageBucket: event.target.value })}
+                      className="clara-select mt-2 w-full"
                     >
-                      <option value="all">Semua risk</option>
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
+                      <option value="all">Semua</option>
+                      <option value="fresh">Baru (kurang dari 1 hari)</option>
+                      <option value="aging">Mulai lama (1 sampai 3 hari)</option>
+                      <option value="stale">Terlalu lama (lebih dari 3 hari)</option>
                     </select>
-                  </label>
-
-                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Filter age</span>
+                  </div>
+                  <div>
+                    <label htmlFor="review-channel" className="clara-label">
+                      Channel
+                    </label>
                     <select
-                      value={ageBucketFilter}
-                      onChange={(event) => setAgeBucketFilter(event.target.value)}
-                      className="clara-select"
+                      id="review-channel"
+                      value={filters.sourceChannel}
+                      onChange={(event) => updateFilters({ sourceChannel: event.target.value })}
+                      className="clara-select mt-2 w-full"
                     >
-                      <option value="all">Semua age</option>
-                      <option value="fresh">Fresh (&lt;24 jam)</option>
-                      <option value="aging">Aging (24-72 jam)</option>
-                      <option value="stale">Stale (&gt;72 jam)</option>
-                    </select>
-                  </label>
-
-                  <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                    <span>Filter channel</span>
-                    <select
-                      value={sourceChannelFilter}
-                      onChange={(event) => setSourceChannelFilter(event.target.value)}
-                      className="clara-select"
-                    >
-                      <option value="all">Semua channel</option>
+                      <option value="all">Semua</option>
                       <option value="whatsapp">WhatsApp</option>
                       <option value="telegram">Telegram</option>
-                      <option value="instagram">Instagram</option>
-                      <option value="tiktok">TikTok</option>
+                      <option value="instagram">Instagram DM</option>
+                      <option value="tiktok">TikTok DM</option>
                       <option value="email">Email</option>
-                      <option value="import">Import</option>
-                      <option value="unknown">Unknown</option>
+                      <option value="import">Impor</option>
                     </select>
-                  </label>
+                  </div>
                 </div>
+              </details>
 
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void loadQueue()}
-                    className="clara-button clara-button-primary min-h-0 px-5 py-3"
-                  >
-                    Terapkan Filter
-                  </button>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p role="status" aria-live="polite" className="text-sm clara-text-secondary">
+                  {isLoading ? "Memuat..." : `${items.length} kasus`}
+                </p>
+                {hasFilters ? (
                   <button
                     type="button"
                     onClick={() => {
-                      setReviewBucketFilter("all");
-                      setRiskLevelFilter("all");
-                      setAgeBucketFilter("all");
-                      setSourceChannelFilter("all");
-                      void loadQueue({
-                        reviewBucket: "all",
-                        riskLevel: "all",
-                        ageBucket: "all",
-                        sourceChannel: "all",
-                      });
+                      setFilters(NO_FILTERS);
+                      void loadQueue(NO_FILTERS);
                     }}
-                    className="clara-button clara-button-ghost min-h-0 px-5 py-3"
+                    className="clara-button clara-button-ghost"
                   >
-                    Reset
+                    Hapus filter
                   </button>
-                </div>
+                ) : null}
               </div>
-
-            <section
-              data-onboarding-id="manager-approvals-guide"
-              className="clara-card rounded-3xl p-5"
-            >
-                <p className="clara-kicker text-xs">Urutan kerja cepat</p>
-                <div className="mt-4 space-y-3">
-                  <StepHint
-                    number="1"
-                    title={isHeadView ? "Buka kasus prioritas tertinggi" : "Buka item paling prioritas"}
-                    description={
-                      isHeadView
-                        ? "Mulai dari eskalasi, stale, atau skor tertinggi dulu."
-                        : "Mulai dari skor tertinggi atau item yang sudah masuk bucket keputusan."
-                    }
-                  />
-                  <StepHint
-                    number="2"
-                    title={isHeadView ? "Baca konteks dan dampaknya" : "Baca konteks singkat"}
-                    description={
-                      isHeadView
-                        ? "Cek preview pesan, status draft, dan rekomendasi Clara."
-                        : "Cek preview pesan customer dan tindakan yang direkomendasikan Clara."
-                    }
-                  />
-                  <StepHint
-                    number="3"
-                    title={isHeadView ? "Turunkan keputusan yang jelas" : "Putuskan jalur berikutnya"}
-                    description={
-                      isHeadView
-                        ? "Putuskan: cukup diarahkan ke manager, buka detail, atau naikkan lagi."
-                        : "Lanjut analisis, bikin draft, buka conversation, atau turun ke lead."
-                    }
-                  />
-                </div>
-                <div className="mt-4 rounded-2xl border border-clara-line bg-clara-raised px-4 py-3 text-sm text-clara-ink-2">
-                  {isHeadView ? "Sudah relatif aman:" : "Siap dikirim:"}
-                  <span className="ml-2 font-semibold clara-text-primary">
-                    {readyToSendCount} item
-                  </span>
-                </div>
-              </section>
             </section>
 
-            <section className="space-y-4">
-              {queue.items.length === 0 ? (
-                <div className="clara-empty-state text-sm text-[#d6bb84]">
-                  Tidak ada item review yang cocok dengan filter ini. Halaman ini hanya memuat chat yang perlu dibaca ulang, dibuatkan draft, disetujui, dieskalasi, atau sudah lama tidak diperbarui.
-                </div>
-              ) : (
-                queue.items.map((item, index) => (
-                  <ReviewCard
+            {items.length === 0 ? (
+              <EmptyState
+                title={hasFilters ? "Tidak ada kasus yang cocok" : "Tidak ada kasus yang menunggu"}
+                description={
+                  hasFilters
+                    ? "Hapus filter atau pilih kelompok lain."
+                    : "Halaman ini hanya berisi chat yang perlu dibaca ulang, disusun drafnya, diputuskan, atau sudah lama menunggu."
+                }
+              />
+            ) : (
+              <ul data-onboarding-id="manager-approvals-queue" className="space-y-3">
+                {items.map((item) => (
+                  <ReviewRow
                     key={item.conversation_id}
                     item={item}
                     isHeadView={isHeadView}
                     actionKey={actionKey}
-                    onboardingTargetId={
-                      index === 0 ? "manager-approvals-queue" : undefined
-                    }
-                    onAnalyze={handleAnalyze}
-                    onGenerateReply={handleGenerateReply}
+                    onAnalyze={() => void runAction(item.conversation_id, "analyze")}
+                    onGenerateReply={() => void runAction(item.conversation_id, "reply")}
                   />
-                ))
-              )}
-            </section>
+                ))}
+              </ul>
+            )}
           </>
-        )}
+        ) : null}
       </div>
     </WorkspaceShell>
   );
 }
 
-function ReviewCard({
+function FilterChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
+        active
+          ? "border-clara-gold bg-clara-gold text-clara-deep"
+          : "border-clara-line bg-clara-sunken text-clara-ink-2 hover:border-clara-gold hover:text-clara-ink"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ReviewRow({
   item,
   isHeadView,
   actionKey,
-  onboardingTargetId,
   onAnalyze,
   onGenerateReply,
 }: {
   item: ChatReviewQueueItem;
   isHeadView: boolean;
   actionKey: string | null;
-  onboardingTargetId?: string;
-  onAnalyze: (conversationId: string) => Promise<void>;
-  onGenerateReply: (conversationId: string) => Promise<void>;
+  onAnalyze: () => void;
+  onGenerateReply: () => void;
 }) {
   const isAnalyzing = actionKey === `${item.conversation_id}:analyze`;
-  const isGeneratingReply = actionKey === `${item.conversation_id}:reply`;
-  const showAnalyzeAction = item.review_bucket === "needs_analysis";
-  const showGenerateReplyAction =
-    item.review_bucket === "needs_reply_suggestion" ||
-    item.review_bucket === "needs_rework";
-  const reviewerFocus =
-    item.review_bucket === "pending_approval"
-        ? isHeadView
-        ? "Draft ini sudah sampai ke keputusan akhir. Head cukup memastikan arah jawaban aman, konsisten, dan layak diteruskan."
-        : "Draft ini sudah masuk tahap keputusan. Manager cukup cek apakah arah jawabannya aman, tepat, dan siap lanjut."
-      : item.review_bucket === "draft_review"
-        ? isHeadView
-          ? "Draft sudah ada. Head tinggal menilai apakah mutu dan arahnya cukup kuat untuk dilanjutkan."
-          : "Draft sudah tersedia, tapi masih perlu review manager sebelum dianggap layak jalan."
-        : item.review_bucket === "human_escalation"
-          ? isHeadView
-            ? "Percakapan ini sudah masuk area sensitif. Head perlu memutuskan apakah cukup diarahkan ke manager atau butuh keputusan yang lebih tegas."
-            : "Percakapan ini sudah terlalu sensitif untuk dibiarkan auto-flow. Butuh keputusan manusia."
-          : item.review_bucket === "needs_rework"
-            ? isHeadView
-              ? "Draft sebelumnya belum cukup kuat. Head cukup menilai apakah ini masalah kualitas jawaban atau konteks customer yang naik level."
-              : "Draft sebelumnya belum cukup kuat. Manager perlu cek apakah konteks customer berubah atau jawaban perlu diperjelas."
-            : item.review_bucket === "needs_reply_suggestion"
-              ? isHeadView
-                ? "Draft final belum siap. Biasanya Head tidak perlu turun detail, kecuali kasus ini memang menahan proses tim."
-                : "AI belum menyiapkan draft final. Ini cocok untuk dibantu generate ulang atau diturunkan ke review percakapan."
-              : item.review_bucket === "ready_to_send"
-                ? isHeadView
-                  ? "Item ini relatif aman. Head cukup memastikan tidak ada pola risiko yang lolos."
-                  : "Item ini relatif aman. Manager hanya perlu validasi akhir kalau mau jaga kualitas tim."
-                : isHeadView
-                  ? "Percakapan ini masih butuh AI analysis sebelum Head punya konteks cukup untuk ikut memutuskan."
-                  : "Percakapan ini masih butuh AI analysis sebelum manager bisa mengambil keputusan yang cukup aman.";
-  const nextDecision =
-    showAnalyzeAction
-      ? isHeadView
-        ? "Lengkapi dulu konteks AI sebelum Head ikut turun."
-        : "Jalankan AI analysis dulu."
-      : showGenerateReplyAction
-        ? isHeadView
-          ? "Perkuat draft dulu, lalu cek lagi kalau kasusnya masih tertahan."
-          : "Generate draft baru lalu review hasilnya."
-        : item.latest_reply_suggestion?.approval_status === "approved"
-          ? isHeadView
-            ? "Buka conversation kalau perlu validasi akhir atau cek apakah kasus ini sudah aman diturunkan."
-            : "Buka conversation untuk validasi akhir atau kirim."
-          : item.review_bucket === "human_escalation"
-            ? isHeadView
-              ? "Buka conversation dan putuskan arah manual yang paling aman."
-              : "Buka conversation dan putuskan arahan manual."
-            : isHeadView
-              ? "Buka conversation kalau perlu konteks penuh sebelum memberi arah."
-              : "Buka conversation untuk review detail.";
+  const isGenerating = actionKey === `${item.conversation_id}:reply`;
+  const showAnalyze = item.review_bucket === "needs_analysis";
+  const showGenerate = item.review_bucket === "needs_reply_suggestion" || item.review_bucket === "needs_rework";
+  const detailHref = `/sales/conversations/${item.conversation_id}`;
+  const nextStep = REVIEW_NEXT_STEP[item.review_bucket]?.[isHeadView ? "head" : "sales"] ?? "Buka chat untuk melihat detailnya.";
 
   return (
-    <article
-      data-onboarding-id={onboardingTargetId}
-      className="clara-card rounded-3xl p-6"
-    >
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold clara-text-primary">
-              {item.lead_name}
-            </h2>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                item.lead_temperature,
-              )}`}
-            >
-              {item.lead_temperature.toUpperCase()}
-            </span>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
-                item.account_category,
-              )}`}
-            >
-              {formatAccountCategory(item.account_category)}
-            </span>
-            {item.risk_level && (
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
-                  item.risk_level,
-                )}`}
-              >
-                Risk {item.risk_level}
-              </span>
-            )}
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getReviewBucketBadgeClass(
-                item.review_bucket,
-              )}`}
-            >
-              {item.review_label}
-            </span>
-            <span
-              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAgeBucketBadgeClass(
-                item.age_bucket,
-              )}`}
-            >
-              {formatStatusLabel(item.age_bucket)}
-            </span>
-            <span
-              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getChannelBadgeClass(
-                item.source_channel,
-              )}`}
-            >
-              {formatChannelLabel(item.source_channel)}
-            </span>
-            {isExperimentalChannel(item.source_channel) ? (
-              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-clara-gold">
-                Experimental
-              </span>
-            ) : null}
-          </div>
-
-          <p className="mt-2 text-sm text-[#d6bb84]">
-            {item.conversation_title} &bull; {formatStatusLabel(item.current_stage)}{" "}
-            &bull; {item.source_label}
-          </p>
-          <p className="mt-2 text-xs text-[#b89a62]">
-            Owner: {item.sales_owner_name ?? "-"} &bull; Di antrean sejak:{" "}
-            {formatDateTime(item.queue_since_at)}
+    <li className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="break-words text-base font-semibold clara-text-primary">{item.lead_name}</h3>
+          <p className="mt-0.5 text-xs clara-text-muted">
+            Sales: {item.sales_owner_name ?? "belum ada"} · {formatChannelLabel(item.source_channel)} · menunggu{" "}
+            {formatRelativeTime(item.queue_since_at).replace(" lalu", "")}
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {item.latest_reply_suggestion && (
-            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-              {formatStatusLabel(item.latest_reply_suggestion.approval_status)}
-            </span>
-          )}
-          {item.latest_reply_suggestion && (
-            <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-              {formatStatusLabel(item.latest_reply_suggestion.action_mode)}
-            </span>
-          )}
-          <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-            Score {item.priority_score}
-          </span>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="clara-card-soft rounded-2xl p-4">
-          <p className="clara-kicker text-xs">Konteks terakhir</p>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#fff0c9]">
-            {item.latest_message_preview ?? "Belum ada preview pesan terbaru."}
-          </p>
-          <p className="mt-3 text-xs text-[#b89a62]">
-            Last message: {formatDateTime(item.latest_message_at)}
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(34,25,18,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-            <p className="clara-kicker text-xs">{isHeadView ? "Fokus Head" : "Fokus Manager"}</p>
-            <p className="mt-3 text-sm leading-7 text-[#fff0c9]">
-              {reviewerFocus}
-            </p>
-            <div className="mt-3 rounded-2xl border border-[#f0cb73]/12 bg-[#1c150f] px-3 py-3">
-              <p className="text-xs font-semibold text-[#b9924b]">
-                Langkah berikutnya
-              </p>
-              <p className="mt-2 text-sm font-medium leading-6 text-[#f3d89a]">
-                {nextDecision}
-              </p>
-            </div>
-          </div>
-
-          <div className="clara-card-soft rounded-2xl p-4">
-            <p className="clara-kicker text-xs">Arah yang disarankan Clara</p>
-            <p className="mt-3 text-sm leading-7 text-[#fff0c9]">
-              {item.recommended_action}
-            </p>
-          </div>
-
-          {item.active_review_case_id ? (
-            <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
-              <p className="clara-kicker text-xs text-[#f0cb73]">
-                Active Coaching Case
-              </p>
-              <p className="mt-3 text-sm font-semibold text-[#fff0c9]">
-                {formatStatusLabel(item.active_review_status ?? "draft")} ·{" "}
-                {(item.active_review_label ?? "unik").replaceAll("_", " ")}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
-                Reviewer: {item.active_review_reviewer_name ?? "Belum ditunjuk"}
-              </p>
-            </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {showAnalyze ? (
+            <button type="button" onClick={onAnalyze} disabled={isAnalyzing} className="clara-button clara-button-primary">
+              {isAnalyzing ? "Clara sedang membaca..." : "Baca dengan Clara"}
+            </button>
+          ) : showGenerate ? (
+            <button type="button" onClick={onGenerateReply} disabled={isGenerating} className="clara-button clara-button-primary">
+              {isGenerating ? "Menyusun draft..." : "Susun draft jawaban"}
+            </button>
           ) : null}
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <MetaCard
-              label="AI Status"
-              value={item.latest_ai_extraction ? "Ready" : "Pending"}
-            />
-            <MetaCard
-              label="Draft Status"
-              value={
-                item.latest_reply_suggestion
-                  ? formatStatusLabel(item.latest_reply_suggestion.approval_status)
-                  : "Belum ada"
-              }
-            />
-            <MetaCard
-              label="Sent Status"
-              value={item.latest_sent_message ? "Sent" : "Belum terkirim"}
-            />
-          </div>
+          <Link href={detailHref} className={`clara-button ${showAnalyze || showGenerate ? "clara-button-secondary" : "clara-button-primary"}`}>
+            Buka chat
+          </Link>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-3">
-        {showAnalyzeAction && (
-          <button
-            type="button"
-            onClick={() => void onAnalyze(item.conversation_id)}
-            disabled={isAnalyzing}
-            className="clara-button clara-button-primary"
-          >
-            {isAnalyzing ? "Analyzing..." : "Jalankan AI Analysis"}
-          </button>
-        )}
-
-        {showGenerateReplyAction && (
-          <button
-            type="button"
-            onClick={() => void onGenerateReply(item.conversation_id)}
-            disabled={isGeneratingReply}
-            className="clara-button clara-button-primary"
-          >
-            {isGeneratingReply ? "Generating..." : "Generate Draft Baru"}
-          </button>
-        )}
-
-        <Link
-          href={`/dashboard/sales/conversations/${item.conversation_id}`}
-          className="clara-button clara-button-ghost"
-        >
-          {isHeadView ? "Buka Kasus Lengkap" : "Buka Conversation"}
-        </Link>
-
-        {item.lead_id && (
-          <Link
-            href={`/dashboard/crm/${item.lead_id}`}
-            className="clara-button clara-button-ghost"
-          >
-            Buka Lead
-          </Link>
-        )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <ValueTag table={REVIEW_BUCKET} value={item.review_bucket} />
+        {item.risk_level === "high" ? <Tag tone="danger">Risiko tinggi</Tag> : null}
+        {item.risk_level === "medium" ? <Tag tone="warn">Risiko sedang</Tag> : null}
+        {item.lead_temperature !== "unknown" ? <ValueTag table={TEMPERATURE} value={item.lead_temperature} /> : null}
+        {item.current_stage !== "unknown" ? <ValueTag table={STAGE} value={item.current_stage} /> : null}
+        {item.age_bucket !== "fresh" ? <ValueTag table={AGE} value={item.age_bucket} /> : null}
+        {isExperimentalChannel(item.source_channel) ? <Tag tone="warn">Eksperimental</Tag> : null}
       </div>
-    </article>
+
+      <p className="mt-3 line-clamp-2 whitespace-pre-wrap text-sm leading-6 clara-text-secondary">
+        {item.latest_message_preview ?? "Belum ada pesan."}
+      </p>
+
+      <p className="mt-2 text-sm leading-6 clara-text-secondary">
+        <span className="font-semibold clara-text-primary">Yang perlu kamu lakukan: </span>
+        {nextStep}
+      </p>
+
+      {item.recommended_action ? (
+        <p className="mt-1 text-sm leading-6 clara-text-secondary">
+          <span className="font-semibold clara-text-primary">Saran Clara: </span>
+          {item.recommended_action}
+        </p>
+      ) : null}
+
+      {item.active_review_case_id ? (
+        <p className="mt-2 text-xs clara-text-muted">
+          Sedang dibina oleh {item.active_review_reviewer_name ?? "reviewer yang belum ditunjuk"}.
+        </p>
+      ) : null}
+    </li>
   );
-}
-
-function QueueMetric({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <article className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
-      <p className="text-xs font-semibold text-[#140f08]">{label}</p>
-      <p className="mt-3 text-3xl font-bold text-[#140f08]">{value}</p>
-      <p className="mt-2 text-sm text-[#2f210f]">{hint}</p>
-    </article>
-  );
-}
-
-function MetaCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-      <p className="clara-kicker text-xs">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
-    </div>
-  );
-}
-
-function StepHint({
-  number,
-  title,
-  description,
-}: {
-  number: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="clara-card-soft flex gap-3 rounded-2xl px-4 py-4">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-clara-deep text-xs font-bold text-clara-cream">
-        {number}
-      </div>
-      <div>
-        <p className="text-sm font-semibold clara-text-primary">{title}</p>
-        <p className="mt-1 text-sm leading-6 text-clara-ink-2">{description}</p>
-      </div>
-    </div>
-  );
-}
-
-function getReviewBucketBadgeClass(reviewBucket: string) {
-  switch (reviewBucket) {
-    case "human_escalation":
-      return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
-    case "pending_approval":
-    case "draft_review":
-      return "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]";
-    case "needs_analysis":
-      return "border border-[#f0cb73]/18 bg-[#241a10] text-[#f0cb73]";
-    case "needs_reply_suggestion":
-    case "needs_rework":
-      return "border border-[#f0cb73]/18 bg-[#2b2013] text-[#f0cb73]";
-    case "ready_to_send":
-      return "border border-[#f0cb73]/18 bg-[#1f170f] text-[#f0cb73]";
-    default:
-      return "border border-[#f0cb73]/18 bg-[#1d150d] text-[#f0cb73]";
-  }
-}
-
-function getAgeBucketBadgeClass(ageBucket: string) {
-  switch (ageBucket) {
-    case "stale":
-      return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
-    case "aging":
-      return "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]";
-    default:
-      return "border border-[#f0cb73]/18 bg-[#1d150d] text-[#f0cb73]";
-  }
 }

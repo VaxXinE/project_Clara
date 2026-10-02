@@ -346,33 +346,27 @@ const MANAGER_TOUR_ROUTES: TourRoute[] = [
     steps: [
       {
         id: "manager-approvals-summary",
-        title: "Ringkasan review sales",
+        title: "Ringkasan",
         description:
-          "Bagian atas ini dipakai untuk membaca antrean review hari ini dan menentukan kasus mana yang perlu keputusan lebih dulu.",
+          "Kalimat ini menyebut kasus mana yang paling perlu keputusan lebih dulu. Daftar di bawahnya sudah diurutkan dari yang paling mendesak.",
       },
       {
         id: "manager-approvals-metrics",
-        title: "Kartu tekanan review",
+        title: "Kelompok kasus",
         description:
-          "Angka ini menunjukkan beban keputusan, persiapan, eskalasi, dan item stale yang perlu dijaga manager.",
+          "Pilih satu kelompok untuk mempersempit daftar, misalnya Perlu keputusan manusia. Daftar langsung berubah.",
       },
       {
         id: "manager-approvals-filters",
-        title: "Filter antrean review",
+        title: "Saring lebih lanjut",
         description:
-          "Filter ini membantu manager memotong antrean berdasarkan bucket, risk, age, dan channel agar fokusnya tidak melebar.",
-      },
-      {
-        id: "manager-approvals-guide",
-        title: "Urutan kerja review",
-        description:
-          "Bagian ini memberi panduan ringkas cara membaca antrean review dengan urutan yang aman dan cepat.",
+          "Buka bagian ini untuk menyaring berdasarkan tingkat risiko, lama menunggu, atau channel.",
       },
       {
         id: "manager-approvals-queue",
-        title: "Daftar case review",
+        title: "Daftar kasus",
         description:
-          "Di sinilah manager membaca case satu per satu, melihat konteks singkat, lalu memutuskan jalur berikutnya.",
+          "Tiap kasus menjelaskan apa yang perlu kamu lakukan. Klik Buka chat untuk melihat chat lengkap dan memutuskan.",
       },
     ],
   },
@@ -643,33 +637,27 @@ const HEAD_TOUR_ROUTES: TourRoute[] = [
     steps: [
       {
         id: "manager-approvals-summary",
-        title: "Ringkasan arahan tim",
+        title: "Ringkasan",
         description:
-          "Bagian atas ini dipakai head untuk melihat antrean keputusan yang benar-benar perlu intervensi level lebih tinggi.",
+          "Kalimat ini menyebut kasus mana yang paling perlu keputusan lebih dulu. Daftar di bawahnya sudah diurutkan dari yang paling mendesak.",
       },
       {
         id: "manager-approvals-metrics",
-        title: "Kartu tekanan arahan",
+        title: "Kelompok kasus",
         description:
-          "Angka ini memberi pembacaan cepat jumlah item yang perlu diputuskan, disiapkan, atau sudah naik eskalasi.",
+          "Pilih satu kelompok untuk mempersempit daftar, misalnya Perlu keputusan manusia. Daftar langsung berubah.",
       },
       {
         id: "manager-approvals-filters",
-        title: "Filter arahan tim",
+        title: "Saring lebih lanjut",
         description:
-          "Gunakan filter ini untuk menyaring kasus berdasarkan bucket, risk, age, dan channel supaya keputusan head tetap fokus.",
-      },
-      {
-        id: "manager-approvals-guide",
-        title: "Urutan kerja arahan",
-        description:
-          "Bagian ini merangkum urutan kerja yang paling aman saat membaca antrean arahan tim.",
+          "Buka bagian ini untuk menyaring berdasarkan tingkat risiko, lama menunggu, atau channel.",
       },
       {
         id: "manager-approvals-queue",
-        title: "Daftar kasus arahan",
+        title: "Daftar kasus",
         description:
-          "Di sinilah head membaca case, melihat konteks singkat, lalu memutuskan jalur keputusan berikutnya.",
+          "Tiap kasus menjelaskan apa yang perlu kamu lakukan. Klik Buka chat untuk melihat chat lengkap dan memutuskan.",
       },
     ],
   },
