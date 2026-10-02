@@ -21,11 +21,6 @@ from app.schemas.extension_schema import (
     ExtensionDeliveryDecisionResponse,
     ExtensionDeliveryResultRequest,
     ExtensionDeliveryResultResponse,
-    WhatsAppExtensionSendReplyRequest,
-    WhatsAppExtensionSendReplyResponse,
-    WhatsAppExtensionReplySuggestionsResponse,
-    WhatsAppExtensionSnapshotSyncRequest,
-    WhatsAppExtensionSnapshotSyncResponse,
 )
 from app.services.access_control_service import (
     AccessDeniedError,
@@ -624,6 +619,8 @@ def reconcile_extension_reply_delivery_endpoint(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+# Path WhatsApp lama (/extension/whatsapp/...) dilayani route generik /{channel}/... di bawah,
+# dengan bentuk request/response yang sama.
 @router.post(
     "/{channel}/snapshots",
     response_model=ExtensionSnapshotSyncResponse,
@@ -689,80 +686,6 @@ def generate_extension_reply_suggestions_endpoint(
     return _generate_extension_reply_suggestions(
         channel=channel,
         payload=payload,
-        request=request,
-        db=db,
-        current_user=current_user,
-    )
-
-
-@router.post(
-    "/whatsapp/snapshots",
-    response_model=WhatsAppExtensionSnapshotSyncResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def sync_whatsapp_snapshot_endpoint(
-    payload: WhatsAppExtensionSnapshotSyncRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
-):
-    return _sync_extension_snapshot(
-        channel="whatsapp",
-        payload=ExtensionSnapshotSyncRequest.model_validate(
-            payload.model_dump(by_alias=True)
-        ),
-        request=request,
-        db=db,
-        current_user=current_user,
-    )
-
-
-@router.post(
-    "/whatsapp/reply-suggestions/{reply_suggestion_id}/send",
-    response_model=WhatsAppExtensionSendReplyResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def send_whatsapp_reply_suggestion_endpoint(
-    reply_suggestion_id: UUID,
-    payload: WhatsAppExtensionSendReplyRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
-):
-    return _send_extension_reply_suggestion(
-        channel="whatsapp",
-        reply_suggestion_id=reply_suggestion_id,
-        payload=ExtensionSendReplyRequest.model_validate(
-            payload.model_dump(by_alias=True)
-        ),
-        request=request,
-        db=db,
-        current_user=current_user,
-    )
-
-
-@router.post(
-    "/whatsapp/reply-suggestions",
-    response_model=WhatsAppExtensionReplySuggestionsResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def generate_whatsapp_reply_suggestions_endpoint(
-    payload: WhatsAppExtensionSnapshotSyncRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(
-        require_roles("sales", "manager", "head", "superadmin")
-    ),
-):
-    return _generate_extension_reply_suggestions(
-        channel="whatsapp",
-        payload=ExtensionSnapshotSyncRequest.model_validate(
-            payload.model_dump(by_alias=True)
-        ),
         request=request,
         db=db,
         current_user=current_user,
