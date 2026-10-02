@@ -13,9 +13,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
+import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { Tag } from "@/components/dashboard/Tag";
 import { canAccessAdminPages } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
 import { useConfirm } from "@/components/dashboard/ConfirmDialog";
@@ -55,28 +56,28 @@ const SECTIONS: {
 }[] = [
   {
     key: "guardrail",
-    label: "Guardrail",
-    description: "Batas keamanan, compliance, dan larangan.",
+    label: "Batasan & larangan",
+    description: "Hal yang tidak boleh dilakukan Clara, dan aturan keamanan.",
   },
   {
     key: "instruction",
-    label: "Instruction",
-    description: "Tujuan utama dan aturan kerja Clara.",
+    label: "Tugas & aturan kerja",
+    description: "Tujuan utama Clara dan cara kerjanya.",
   },
   {
     key: "flow",
-    label: "Conversation Flow",
+    label: "Alur percakapan",
     description: "Urutan Clara memahami dan membalas chat.",
   },
   {
     key: "personality_mode",
-    label: "Personality",
+    label: "Gaya bicara",
     description: "Nada bicara dan karakter Clara.",
   },
   {
     key: "auto_adapt",
-    label: "Auto Adapt",
-    description: "Cara Clara menyesuaikan respons dengan customer.",
+    label: "Penyesuaian ke customer",
+    description: "Cara Clara menyesuaikan balasan dengan tiap customer.",
   },
 ];
 
@@ -134,7 +135,7 @@ export default function AiPersonaConfigPage() {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal memuat konfigurasi AI Clara.",
+          : "Pengaturan Clara belum bisa dimuat.",
       );
     } finally {
       setIsLoading(false);
@@ -155,7 +156,7 @@ export default function AiPersonaConfigPage() {
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : "Gagal memuat halaman admin.",
+            : "Halaman belum bisa dimuat.",
         );
         setIsLoading(false);
       }
@@ -197,13 +198,13 @@ export default function AiPersonaConfigPage() {
   async function publishContent(contentToPublish = content) {
     const cleanedContent = contentToPublish.trim();
     if (!cleanedContent) {
-      setErrorMessage("Isi persona tidak boleh kosong.");
+      setErrorMessage("Isi pedoman tidak boleh kosong.");
       return;
     }
     const accepted = await confirm({
       title: "Gunakan perubahan ini untuk balasan AI?",
       message:
-        "Isi ini langsung dipakai Clara pada balasan berikutnya untuk semua pengguna. Kamu bisa kembali ke versi sebelumnya lewat riwayat versi.",
+        "Isi ini langsung dipakai Clara pada balasan berikutnya untuk semua pengguna. Kamu bisa kembali ke versi sebelumnya lewat Riwayat versi.",
       confirmLabel: "Simpan dan gunakan",
     });
     if (!accepted) return;
@@ -223,7 +224,7 @@ export default function AiPersonaConfigPage() {
       await loadPersona(variant);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal menyimpan perubahan.",
+        error instanceof Error ? error.message : "Perubahan belum bisa disimpan. Coba lagi.",
       );
     } finally {
       setIsSubmitting(false);
@@ -232,9 +233,9 @@ export default function AiPersonaConfigPage() {
 
   async function rollbackVersion(version: PersonaVersion) {
     const accepted = await confirm({
-      title: "Kembalikan ke versi lama?",
-      message: `${selectedSection.label} v${version.version_number} akan dipublikasikan lagi sebagai versi baru dan langsung dipakai Clara.`,
-      confirmLabel: "Kembalikan versi",
+      title: "Pakai lagi versi lama?",
+      message: `${selectedSection.label} versi ${version.version_number} akan dipakai lagi dan langsung berlaku untuk balasan berikutnya.`,
+      confirmLabel: "Pakai versi ini",
     });
     if (!accepted) return;
     setIsSubmitting(true);
@@ -249,13 +250,13 @@ export default function AiPersonaConfigPage() {
         },
       );
       setSuccessMessage(
-        `Rollback dari versi ${version.version_number} berhasil.`,
+        `Versi ${version.version_number} sudah dipakai lagi.`,
       );
       setHistoryOpen(false);
       await loadPersona(variant);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal melakukan rollback.",
+        error instanceof Error ? error.message : "Versi lama belum bisa dikembalikan. Coba lagi.",
       );
     } finally {
       setIsSubmitting(false);
@@ -274,7 +275,7 @@ export default function AiPersonaConfigPage() {
             Riwayat versi
           </h2>
           <p className="clara-helper mt-1">
-            Publikasikan kembali versi lama tanpa menghapus histori.
+            Pakai lagi versi lama. Riwayat tidak dihapus.
           </p>
         </div>
         <button
@@ -289,7 +290,7 @@ export default function AiPersonaConfigPage() {
       <div className="clara-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
         {sectionVersions.length === 0 ? (
           <div className="clara-empty-state text-sm">
-            Belum ada versi database. Clara memakai file bawaan.
+            Belum ada versi yang kamu simpan. Clara memakai pedoman bawaan.
           </div>
         ) : (
           sectionVersions.map((version) => (
@@ -302,9 +303,9 @@ export default function AiPersonaConfigPage() {
                   Versi{" "}
                   <span className="tabular-nums">{version.version_number}</span>
                 </p>
-                <span className="clara-chip clara-chip-neutral">
-                  {version.status}
-                </span>
+                <Tag tone={version.status === "published" ? "good" : "neutral"}>
+                  {version.status === "published" ? "Sedang dipakai" : version.status === "draft" ? "Draf" : "Versi lama"}
+                </Tag>
               </div>
               <p className="clara-text-muted mt-2 text-xs tabular-nums">
                 {formatDateTime(version.created_at)}
@@ -323,7 +324,7 @@ export default function AiPersonaConfigPage() {
                     icon={faArrowRotateLeft}
                     className="h-4 w-4"
                   />{" "}
-                  Publikasikan kembali
+                  Pakai lagi versi ini
                 </button>
               ) : null}
             </article>
@@ -336,14 +337,13 @@ export default function AiPersonaConfigPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.admin}
       title={`${PAGE_NAMES.persona} Clara`}
-      description="Kendalikan instruction, guardrail, flow, dan gaya komunikasi Clara dalam satu workspace."
+      description="Atur tugas, batasan, alur, dan gaya bicara Clara saat membalas customer. Perubahan langsung dipakai semua pengguna."
       backHref="/knowledge"
-      backLabel="Knowledge Base"
+      backLabel="Kembali ke Knowledge Base"
       actions={
         <Link className="clara-button clara-button-ghost" href="/knowledge">
-          Semua Knowledge
+          Buka Knowledge Base
         </Link>
       }
     >
@@ -354,15 +354,15 @@ export default function AiPersonaConfigPage() {
               <FontAwesomeIcon icon={faShieldHalved} className="h-4 w-4" />
             </span>
             <div>
-              <p className="font-semibold">Varian account</p>
+              <p className="font-semibold">Jenis akun</p>
               <p className="clara-helper mt-0.5">
-                Setiap varian memiliki aturan terpisah.
+                Mini dan Reguler punya pedoman yang terpisah.
               </p>
             </div>
           </div>
           <div
             className="flex rounded-xl border border-[var(--color-border-default)] bg-[var(--color-surface-base)] p-1"
-            aria-label="Pilih varian account"
+            aria-label="Pilih jenis akun"
           >
             {(["mini", "reguler"] as PersonaVariant[]).map((item) => (
               <button
@@ -391,15 +391,15 @@ export default function AiPersonaConfigPage() {
 
         {isLoading ? (
           <div role="status" className="clara-empty-state">
-            Memuat konfigurasi persona...
+            Memuat pedoman Clara...
           </div>
         ) : (
           <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_310px]">
             <nav
               className="clara-card h-fit rounded-2xl p-3"
-              aria-label="Bagian prompt"
+              aria-label="Bagian pedoman"
             >
-              <p className="clara-kicker px-3 pb-3 pt-2">Bagian prompt</p>
+              <p className="clara-kicker px-3 pb-3 pt-2">Bagian pedoman</p>
               <div className="space-y-1">
                 {SECTIONS.map((section) => (
                   <button
@@ -431,10 +431,10 @@ export default function AiPersonaConfigPage() {
                     {selectedSection.label}
                   </h2>
                   <p className="clara-helper mt-1">
-                    Aktif dari{" "}
+                    Yang dipakai sekarang:{" "}
                     {effectiveSection?.source === "database"
-                      ? `database v${effectiveSection.version_number}`
-                      : "file Markdown bawaan"}
+                      ? `versi ${effectiveSection.version_number} yang kamu simpan`
+                      : "pedoman bawaan Clara"}
                     .
                   </p>
                 </div>
@@ -461,7 +461,7 @@ export default function AiPersonaConfigPage() {
               </div>
               <div className="p-5">
                 <label htmlFor="persona-content" className="clara-label">
-                  Isi {selectedSection.label.toLowerCase()}
+                  Isi pedoman: {selectedSection.label.toLowerCase()}
                 </label>
                 <textarea
                   id="persona-content"
@@ -489,7 +489,7 @@ export default function AiPersonaConfigPage() {
                         icon={faArrowRotateLeft}
                         className="h-4 w-4"
                       />{" "}
-                      Reset
+                      Kembalikan ke yang tersimpan
                     </button>
                     <button
                       type="button"
