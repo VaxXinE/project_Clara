@@ -1,94 +1,68 @@
 "use client";
 
-import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
-import {
-  faArrowDownWideShort,
-  faLayerGroup,
-  faTrophy,
-  faUsers,
-} from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
+import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
+import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
-import {
-  canAccessQueueAndActionCenter,
-  isHeadRole,
-  isManagerRole,
-} from "@/lib/roles";
-import type {
-  CurrentUser,
-  LeadListItem,
-  LeadUpdateRequest,
-} from "@/types/dashboard";
+import { formatChannelLabel, formatRelativeTime } from "@/lib/format";
+import { isHeadRole, isManagerRole } from "@/lib/roles";
+import { ACCOUNT_CATEGORY, STAGE, TEMPERATURE, labelOf } from "@/lib/vocab";
+import type { CurrentUser, LeadListItem, LeadUpdateRequest } from "@/types/dashboard";
 
 const SOURCE_CHANNEL_OPTIONS = [
-  { value: "all", label: "Semua Channel" },
+  { value: "all", label: "Semua channel" },
   { value: "whatsapp", label: "WhatsApp" },
   { value: "telegram", label: "Telegram" },
 ] as const;
 
-const QUICK_FILTER_OPTIONS = [
+type QuickFilter = "all" | "today" | "overdue" | "hot" | "need_sync" | "need_discipline" | "won";
+
+const QUICK_FILTER_OPTIONS: Array<{ value: QuickFilter; label: string }> = [
   { value: "all", label: "Semua" },
-  { value: "today", label: "Hari ini" },
-  { value: "overdue", label: "Overdue" },
-  { value: "hot", label: "Hot" },
-  { value: "need_sync", label: "Need sync" },
-  { value: "need_discipline", label: "Need discipline" },
-  { value: "won", label: "Won" },
-] as const;
+  { value: "today", label: "Perlu tindakan hari ini" },
+  { value: "overdue", label: "Terlambat" },
+  { value: "hot", label: "Customer panas" },
+  { value: "need_sync", label: "Data deal belum sinkron" },
+  { value: "need_discipline", label: "Catatan aktivitas belum diisi" },
+  { value: "won", label: "Deal berhasil" },
+];
 
 const SORT_OPTIONS = [
-  { value: "created_at", label: "Terbaru" },
-  { value: "priority", label: "Priority" },
-  { value: "last_contact", label: "Last contact" },
-  { value: "next_follow_up", label: "Next follow-up" },
-  { value: "updated_at", label: "Updated terbaru" },
+  { value: "created_at", label: "Terbaru masuk" },
+  { value: "priority", label: "Paling mendesak" },
+  { value: "last_contact", label: "Terakhir dihubungi" },
+  { value: "next_follow_up", label: "Jadwal follow-up terdekat" },
+  { value: "updated_at", label: "Terakhir diubah" },
 ] as const;
 
-const BUCKET_OPTIONS = [
-  { value: "all", label: "Semua bucket" },
-  { value: "action", label: "Perlu tindakan" },
-  { value: "waiting", label: "Waiting" },
-  { value: "won", label: "Won" },
-  { value: "archived", label: "Archived" },
-] as const;
+type BucketKey = "action" | "waiting" | "won" | "archived";
 
-const BUCKET_SECTION_COPY = {
+const BUCKET_ORDER: BucketKey[] = ["action", "waiting", "won", "archived"];
+
+const BUCKETS: Record<BucketKey, { title: string; description: string }> = {
   action: {
     title: "Perlu tindakan",
-    description:
-      "Lead yang masih butuh aksi hari ini, overdue, atau butuh sinkronisasi CRM.",
+    description: "Ada yang harus kamu lakukan: follow-up, merapikan data, atau mengisi catatan.",
   },
   waiting: {
-    title: "Waiting",
-    description:
-      "Lead yang sudah cukup aman untuk sekarang dan tinggal menunggu momen follow-up berikutnya.",
+    title: "Menunggu",
+    description: "Sudah aman untuk sekarang. Tinggal tunggu jadwal follow-up berikutnya.",
   },
   won: {
-    title: "Won",
-    description:
-      "Lead yang sudah closing dan relatif aman, cocok untuk cek kelengkapan KPI atau deal metrics.",
+    title: "Deal berhasil",
+    description: "Sudah closing. Pastikan data deal-nya lengkap.",
   },
   archived: {
-    title: "Archived",
-    description:
-      "Lead yang sudah dingin atau lost, disimpan terpisah supaya list aktif tetap bersih.",
+    title: "Lead lama (arsip)",
+    description: "Sudah lama tidak aktif atau batal. Disimpan terpisah supaya daftar utama tetap bersih.",
   },
-} as const;
+};
 
-const STAGE_ORDER = [
+const STAGE_OPTIONS = [
   "new_lead",
   "qualification",
   "education",
@@ -99,25 +73,7 @@ const STAGE_ORDER = [
   "lost",
 ] as const;
 
-const STAGE_LABELS: Record<string, string> = {
-  new_lead: "New Lead",
-  qualification: "Qualification",
-  education: "Education",
-  objection: "Objection",
-  negotiation: "Negotiation",
-  closing: "Closing",
-  won: "Won",
-  lost: "Lost",
-  unknown: "Unknown",
-};
-
-const DISCIPLINE_LABELS: Record<string, string> = {
-  logged_today: "Discipline ok",
-  missing_today_log: "Need discipline",
-  stale_log: "Discipline stale",
-};
-
-const LEADS_PAGE_SIZE = 8;
+const VISIBLE_STEP = 8;
 
 function toDate(value: string | null) {
   return value ? new Date(value) : null;
@@ -134,9 +90,7 @@ function needsActionToday(lead: LeadListItem) {
     isOverdueLead(lead) ||
     lead.needs_deal_sync ||
     lead.discipline_compliance_status !== "logged_today" ||
-    ["new_lead", "qualification", "objection", "closing"].includes(
-      lead.current_stage,
-    )
+    ["new_lead", "qualification", "objection", "closing"].includes(lead.current_stage)
   );
 }
 
@@ -160,59 +114,26 @@ function isLeadArchived(lead: LeadListItem) {
 
   const lastContact = toDate(lead.last_contact_at);
   const hasNoActiveSchedule = !lead.next_follow_up_at;
-  const isDormant =
-    lastContact &&
-    Date.now() - lastContact.getTime() > 14 * 24 * 60 * 60 * 1000;
+  const isDormant = lastContact && Date.now() - lastContact.getTime() > 14 * 24 * 60 * 60 * 1000;
 
-  return (
-    Boolean(isDormant) &&
-    hasNoActiveSchedule &&
-    !lead.needs_deal_sync &&
-    lead.current_stage !== "won"
-  );
+  return Boolean(isDormant) && hasNoActiveSchedule && !lead.needs_deal_sync && lead.current_stage !== "won";
 }
 
-function getLeadBucket(lead: LeadListItem) {
+function getLeadBucket(lead: LeadListItem): BucketKey {
   if (isLeadArchived(lead)) return "archived";
-  if (
-    lead.current_stage === "won" &&
-    !lead.needs_deal_sync &&
-    !isOverdueLead(lead)
-  ) {
+  if (lead.current_stage === "won" && !lead.needs_deal_sync && !isOverdueLead(lead)) {
     return "won";
   }
   if (needsActionToday(lead)) return "action";
   return "waiting";
 }
 
-function getSourceLabelBadgeClass(sourceLabel: string) {
-  const normalizedSourceLabel = sourceLabel.trim().toLowerCase();
-
-  if (normalizedSourceLabel.includes("telegram extension")) {
-    return "border-blue-500/20 bg-blue-500/10 text-blue-500";
+function matchesQuickFilter(lead: LeadListItem, quickFilter: QuickFilter) {
+  // Lead arsip hanya muncul di kelompoknya sendiri, jadi tidak ikut dihitung sebagai "perlu tindakan".
+  if (quickFilter !== "all" && isLeadArchived(lead)) {
+    return false;
   }
 
-  if (normalizedSourceLabel.includes("whatsapp extension")) {
-    return "border-green-500/20 bg-green-500/10 text-green-500";
-  }
-
-  if (normalizedSourceLabel.includes("instagram")) {
-    return "border-pink-500/20 bg-pink-500/10 text-pink-500";
-  }
-
-  if (normalizedSourceLabel.includes("facebook")) {
-    return "border-indigo-500/20 bg-indigo-500/10 text-indigo-500";
-  }
-
-  return "border-[#f0cb73]/20 bg-[#f0cb73]/10 text-[#f0cb73]";
-}
-
-function matchesBucketFilter(lead: LeadListItem, bucketFilter: string) {
-  if (bucketFilter === "all") return true;
-  return getLeadBucket(lead) === bucketFilter;
-}
-
-function matchesQuickFilter(lead: LeadListItem, quickFilter: string) {
   switch (quickFilter) {
     case "today":
       return needsActionToday(lead);
@@ -231,39 +152,38 @@ function matchesQuickFilter(lead: LeadListItem, quickFilter: string) {
   }
 }
 
-function getLeadPriorityTone(priorityScore: number) {
-  if (priorityScore >= 70) {
-    return {
-      label: "Urgent",
-      className: "border-[#ffb37a]/22 bg-[#4a2413] text-[#ffd7aa]",
-    };
+/** Satu kalimat langkah berikutnya untuk sebuah lead, dari kondisi yang paling mendesak. */
+function getNextStep(lead: LeadListItem): string {
+  if (lead.needs_deal_sync) {
+    return "Rapikan data deal-nya supaya laporan KPI cocok.";
   }
 
-  if (priorityScore >= 35) {
-    return {
-      label: "Perlu dicek",
-      className: "border-[#f0cb73]/18 bg-[#3a2a17] text-[#f0cb73]",
-    };
+  if (isOverdueLead(lead)) {
+    return "Jadwal follow-up sudah lewat. Hubungi customer atau jadwalkan ulang.";
   }
 
-  return {
-    label: "Stabil",
-    className: "border-[#dcc086]/14 bg-[#22190f] text-[#d7c18e]",
-  };
+  if (lead.discipline_compliance_status !== "logged_today") {
+    return "Isi catatan aktivitas hari ini setelah menghubungi customer.";
+  }
+
+  if (lead.current_stage === "closing") {
+    return "Sudah dekat closing. Jaga komunikasinya sampai selesai.";
+  }
+
+  return "Tidak ada yang mendesak. Cukup dipantau.";
 }
 
 export default function CrmPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [leads, setLeads] = useState<LeadListItem[]>([]);
-  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
-  const [quickFilter, setQuickFilter] = useState("all");
-  const [bucketFilter, setBucketFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("created_at");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const [sortBy, setSortBy] = useState("priority");
   const [searchQuery, setSearchQuery] = useState("");
-  const [leadPage, setLeadPage] = useState(1);
+  const [visibleCounts, setVisibleCounts] = useState<Partial<Record<BucketKey, number>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [actionError, setActionError] = useState("");
   const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
 
   const loadCrmBoard = useCallback(async () => {
@@ -279,19 +199,9 @@ export default function CrmPage() {
       ]);
       setCurrentUser(me);
       setLeads(leadItems);
-      setSelectedLeadId((previous) => {
-        if (previous && leadItems.some((lead) => lead.id === previous)) {
-          return previous;
-        }
-        return leadItems[0]?.id ?? null;
-      });
       setErrorMessage("");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal memuat daftar leads.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Daftar lead belum bisa dimuat.");
     } finally {
       setIsLoading(false);
     }
@@ -304,6 +214,20 @@ export default function CrmPage() {
 
     return () => clearTimeout(timer);
   }, [loadCrmBoard]);
+
+  const isManagerWorkspace = isManagerRole(currentUser?.role);
+  const isHeadWorkspace = isHeadRole(currentUser?.role);
+  const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;
+
+  const quickCounts = useMemo(() => {
+    const counts = {} as Record<QuickFilter, number>;
+
+    for (const option of QUICK_FILTER_OPTIONS) {
+      counts[option.value] = leads.filter((lead) => matchesQuickFilter(lead, option.value)).length;
+    }
+
+    return counts;
+  }, [leads]);
 
   const filteredLeads = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -319,1094 +243,388 @@ export default function CrmPage() {
           lead.customer_profile_name ?? "",
           lead.assigned_user_name ?? "",
           lead.source_label,
-          lead.account_category,
         ]
           .join(" ")
           .toLowerCase()
           .includes(normalizedQuery);
       });
 
+    const time = (value: string | null, fallback = 0) => toDate(value)?.getTime() ?? fallback;
+
     return [...result].sort((left, right) => {
-      if (sortBy === "created_at") {
-        const leftTime = toDate(left.created_at)?.getTime() ?? 0;
-        const rightTime = toDate(right.created_at)?.getTime() ?? 0;
-        return rightTime - leftTime;
-      }
-
-      if (sortBy === "last_contact") {
-        const leftTime = toDate(left.last_contact_at)?.getTime() ?? 0;
-        const rightTime = toDate(right.last_contact_at)?.getTime() ?? 0;
-        return rightTime - leftTime;
-      }
-
+      if (sortBy === "created_at") return time(right.created_at) - time(left.created_at);
+      if (sortBy === "last_contact") return time(right.last_contact_at) - time(left.last_contact_at);
       if (sortBy === "next_follow_up") {
-        const leftTime =
-          toDate(left.next_follow_up_at)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-        const rightTime =
-          toDate(right.next_follow_up_at)?.getTime() ?? Number.MAX_SAFE_INTEGER;
-        return leftTime - rightTime;
+        return (
+          time(left.next_follow_up_at, Number.MAX_SAFE_INTEGER) -
+          time(right.next_follow_up_at, Number.MAX_SAFE_INTEGER)
+        );
       }
-
-      if (sortBy === "updated_at") {
-        const leftTime = toDate(left.updated_at)?.getTime() ?? 0;
-        const rightTime = toDate(right.updated_at)?.getTime() ?? 0;
-        return rightTime - leftTime;
-      }
+      if (sortBy === "updated_at") return time(right.updated_at) - time(left.updated_at);
 
       return calculateLeadPriority(right) - calculateLeadPriority(left);
     });
   }, [leads, quickFilter, searchQuery, sortBy]);
 
-  const visibleLeads = useMemo(() => {
-    return filteredLeads.filter((lead) =>
-      matchesBucketFilter(lead, bucketFilter),
-    );
-  }, [filteredLeads, bucketFilter]);
-
-  const totalLeadPages = Math.max(
-    1,
-    Math.ceil(visibleLeads.length / LEADS_PAGE_SIZE),
+  const sections = useMemo(
+    () =>
+      BUCKET_ORDER.map((bucket) => ({
+        bucket,
+        leads: filteredLeads.filter((lead) => getLeadBucket(lead) === bucket),
+      })).filter((section) => section.leads.length > 0),
+    [filteredLeads],
   );
-  const effectiveLeadPage = Math.min(leadPage, totalLeadPages);
-  const paginatedVisibleLeads = useMemo(() => {
-    const startIndex = (effectiveLeadPage - 1) * LEADS_PAGE_SIZE;
-    return visibleLeads.slice(startIndex, startIndex + LEADS_PAGE_SIZE);
-  }, [effectiveLeadPage, visibleLeads]);
 
-  const bucketedLeads = useMemo(() => {
-    return {
-      action: paginatedVisibleLeads.filter(
-        (lead) => getLeadBucket(lead) === "action",
-      ),
-      waiting: paginatedVisibleLeads.filter(
-        (lead) => getLeadBucket(lead) === "waiting",
-      ),
-      won: paginatedVisibleLeads.filter(
-        (lead) => getLeadBucket(lead) === "won",
-      ),
-      archived: paginatedVisibleLeads.filter(
-        (lead) => getLeadBucket(lead) === "archived",
-      ),
-    };
-  }, [paginatedVisibleLeads]);
+  const needsActionCount = quickCounts.today;
+  const overdueCount = quickCounts.overdue;
+  const summaryText =
+    leads.length === 0
+      ? ""
+      : needsActionCount > 0
+        ? `${needsActionCount} lead perlu tindakan${overdueCount > 0 ? `, ${overdueCount} di antaranya terlambat` : ""}.`
+        : "Semua lead aman untuk sekarang.";
 
-  const renderedBucketSections = useMemo(() => {
-    if (bucketFilter === "all") {
-      return [
-        { ...BUCKET_SECTION_COPY.action, leads: bucketedLeads.action },
-        { ...BUCKET_SECTION_COPY.waiting, leads: bucketedLeads.waiting },
-        { ...BUCKET_SECTION_COPY.won, leads: bucketedLeads.won },
-        { ...BUCKET_SECTION_COPY.archived, leads: bucketedLeads.archived },
-      ];
-    }
-
-    const selectedBucketCopy =
-      BUCKET_SECTION_COPY[bucketFilter as keyof typeof BUCKET_SECTION_COPY];
-
-    if (!selectedBucketCopy) {
-      return [];
-    }
-
-    return [
-      {
-        ...selectedBucketCopy,
-        leads: paginatedVisibleLeads,
-      },
-    ];
-  }, [bucketFilter, bucketedLeads, paginatedVisibleLeads]);
-
-  const summary = useMemo(() => {
-    return {
-      needsAction: leads.filter((lead) => needsActionToday(lead)).length,
-      overdue: leads.filter((lead) => isOverdueLead(lead)).length,
-      needsSync: leads.filter((lead) => lead.needs_deal_sync).length,
-      hot: leads.filter((lead) => lead.lead_temperature === "hot").length,
-      won: leads.filter((lead) => lead.current_stage === "won").length,
-    };
-  }, [leads]);
-  const isManagerWorkspace = isManagerRole(currentUser?.role);
-  const isHeadWorkspace = isHeadRole(currentUser?.role);
-  const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;
-  const topPriorityLead = useMemo(() => {
-    if (!filteredLeads.length) return null;
-    return [...filteredLeads].sort(
-      (left, right) => calculateLeadPriority(right) - calculateLeadPriority(left),
-    )[0] ?? null;
-  }, [filteredLeads]);
-  const salesLeadSummary =
-    summary.needsAction > 0
-      ? `Ada ${summary.needsAction} lead yang masih perlu tindakan, termasuk ${summary.overdue} yang sudah overdue.`
-      : summary.hot > 0
-        ? `Tidak ada tekanan follow-up besar, tapi masih ada ${summary.hot} lead hot yang perlu dijaga ritmenya.`
-        : "Lead aktif relatif aman. Kamu bisa fokus rapikan follow-up dan update stage.";
-  const leadershipLeadSummary = isHeadWorkspace
-    ? summary.needsAction > 0
-      ? `Head cukup mulai dari ${summary.needsAction} lead yang mulai butuh perhatian. Fokus utamanya ${summary.overdue} overdue, ${summary.needsSync} perlu sync, dan lead hot yang paling dekat ke keputusan tim.`
-      : summary.won > 0
-        ? "Lead aktif relatif aman. Pakai halaman ini untuk audit owner, kualitas update stage, dan ritme follow-up lintas tim."
-        : "Belum ada tekanan besar. Head bisa pakai halaman ini untuk membaca ritme tim tanpa turun terlalu detail."
-    : summary.needsAction > 0
-      ? `Manager cukup mulai dari ${summary.needsAction} lead yang masih perlu tindakan. Prioritas utamanya ${summary.overdue} overdue, ${summary.needsSync} perlu sync, dan lead hot yang paling dekat ke closing.`
-      : summary.won > 0
-        ? "Lead aktif relatif aman. Pakai halaman ini untuk cek lead won, kualitas update stage, dan ritme follow-up tim."
-        : "Belum ada tekanan besar. Manager bisa pakai halaman ini untuk audit ritme kerja tim dan melihat lead yang mulai naik prioritasnya.";
-  const pageTitle =
-    isHeadWorkspace || isManagerWorkspace
-      ? PAGE_NAMES.leadsTeam
-      : PAGE_NAMES.leads;
-  const pageDescription = isHeadWorkspace
-    ? "Lead semua tim yang mulai berisiko. Cek owner dan stage, lalu buka detail hanya saat perlu keputusan."
-    : isManagerWorkspace
-      ? "Lead timmu yang paling butuh perhatian. Buka detail lead atau percakapan saat perlu."
-      : "Lead yang masih perlu kamu hubungi. Update stage, lalu lanjut ke percakapan.";
-  const heroTitle = isHeadWorkspace
-    ? "Mulai dari lead tim yang paling dekat ke risiko, eskalasi, atau keputusan"
-    : isManagerWorkspace
-      ? "Mulai dari lead tim yang paling dekat ke risiko atau aksi"
-      : "Fokus ke lead yang paling dekat ke aksi berikutnya";
-  const heroSummary = isLeadershipWorkspace
-    ? leadershipLeadSummary
-    : salesLeadSummary;
-  const leadListTitle = isHeadWorkspace
-    ? "Daftar lead tim yang perlu dibaca cepat"
-    : isManagerWorkspace
-      ? "Daftar prioritas lead tim"
-      : "Daftar lead yang sedang kamu pegang";
-  const leadListDescription = isHeadWorkspace
-    ? "Head tidak perlu baca semua lead satu per satu. Pilih dulu lead yang paling butuh keputusan, overdue, atau sinkronisasi tim."
-    : isManagerWorkspace
-      ? "Manager tidak perlu baca semua lead sekaligus. Pilih dulu lead yang paling butuh keputusan, overdue, atau sinkronisasi."
-      : "Pilih lead yang paling perlu diproses, lalu lanjut ke detail atau percakapan.";
-  const previewTitle = isLeadershipWorkspace
-    ? "Lead preview"
-    : "Ringkasan lead";
-  const previewEmpty = isLeadershipWorkspace
-    ? "Pilih satu lead dari panel kiri untuk melihat ringkasan cepat sebelum turun ke detail penuh."
-    : "Pilih satu lead dari panel kiri untuk melihat preview cepatnya.";
-
-  const effectiveSelectedLeadId =
-    selectedLeadId && paginatedVisibleLeads.some((lead) => lead.id === selectedLeadId)
-      ? selectedLeadId
-      : paginatedVisibleLeads[0]?.id ?? null;
-  const selectedLead =
-    paginatedVisibleLeads.find((lead) => lead.id === effectiveSelectedLeadId) ?? null;
-  const selectedLeadPriorityScore = selectedLead
-    ? calculateLeadPriority(selectedLead)
-    : 0;
-  const selectedLeadPriorityTone = getLeadPriorityTone(
-    selectedLeadPriorityScore,
-  );
-  const selectedLeadLeadershipFocus = selectedLead
-    ? selectedLead.needs_deal_sync
-      ? isHeadWorkspace
-        ? "Deal di lead ini belum sinkron. Head perlu memastikan pembacaan KPI, status deal, dan arah next step tim tetap selaras sebelum issue ini melebar."
-        : "Deal di lead ini belum sinkron. Manager sebaiknya cek data KPI dan pastikan status deal-nya tidak tertinggal."
-      : isOverdueLead(selectedLead)
-        ? isHeadWorkspace
-          ? "Lead ini sudah lewat jadwal follow-up. Head cukup cek apakah bottleneck-nya ada di owner, ritme tim, atau butuh arahan lintas tim."
-          : "Lead ini sudah lewat jadwal follow-up. Cek apakah sales sudah bergerak dan apakah perlu arahan cepat."
-        : selectedLead.discipline_compliance_status !== "logged_today"
-          ? isHeadWorkspace
-            ? "Log follow-up hari ini belum rapi. Head bisa pakai sinyal ini untuk melihat apakah masalahnya ada di disiplin eksekusi atau hanya keterlambatan pencatatan."
-            : "Catatan follow-up hari ini belum rapi. Cek apakah eksekusi sales sudah jalan tapi belum tercatat."
-          : selectedLead.current_stage === "closing"
-            ? isHeadWorkspace
-              ? "Lead ini sudah dekat closing. Head cukup menjaga supaya owner, stage, dan dukungan tim tetap rapi tanpa turun terlalu detail."
-              : "Lead ini sudah dekat ke tahap closing. Manager cukup jaga ritme follow-up dan pastikan tidak ada blocker."
-            : isHeadWorkspace
-              ? "Lead ini relatif aman. Pakai preview ini untuk validasi owner, stage, dan apakah perlu intervensi head sebelum membuka detail penuh."
-              : "Lead ini relatif aman. Pakai preview ini untuk validasi owner, stage, dan langkah berikutnya sebelum membuka detail."
-    : "";
-  const selectedLeadNextAction = selectedLead
-    ? selectedLead.needs_deal_sync
-      ? isHeadWorkspace
-        ? "Buka detail lead lalu pastikan stage, owner, dan KPI/deal sync sudah satu bacaan."
-        : "Buka detail lead lalu rapikan KPI/deal sync."
-      : isOverdueLead(selectedLead)
-        ? isHeadWorkspace
-          ? "Cek detail lead untuk memastikan apakah cukup diarahkan ke manager/sales atau perlu eskalasi lebih lanjut."
-          : "Buka percakapan atau follow-up untuk cek tindakan terbaru sales."
-        : selectedLead.discipline_compliance_status !== "logged_today"
-          ? isHeadWorkspace
-            ? "Validasi dulu apakah ini masalah disiplin tim atau hanya keterlambatan update log."
-            : "Minta sales rapikan log follow-up hari ini."
-          : selectedLead.current_stage === "closing"
-            ? isHeadWorkspace
-              ? "Pantau ritme closing dan cek apakah ada keputusan Head yang perlu diberikan."
-              : "Pantau ritme closing dan cek kebutuhan eskalasi."
-            : isHeadWorkspace
-              ? "Belum ada intervensi besar. Cukup monitor owner, stage, dan suhu lead."
-              : "Tidak ada tindakan mendesak. Cukup monitor ritmenya."
-    : "";
-
-  function resetFilters() {
-    setSearchQuery("");
-    setSortBy("created_at");
-    setSourceChannelFilter("all");
-    setQuickFilter("all");
-    setBucketFilter("all");
-    setLeadPage(1);
-  }
-
-  async function handleStageChange(leadId: string, currentStage: string) {
+  async function handleStageChange(leadId: string, stage: string) {
     setUpdatingLeadId(leadId);
+    setActionError("");
 
     try {
-      const payload: LeadUpdateRequest = { current_stage: currentStage };
+      const payload: LeadUpdateRequest = { current_stage: stage };
       const updatedLead = await apiFetch<LeadListItem>(`/leads/${leadId}`, {
         method: "PATCH",
         body: payload,
       });
 
-      setLeads((previous) =>
-        previous.map((lead) => (lead.id === leadId ? updatedLead : lead)),
-      );
+      setLeads((previous) => previous.map((lead) => (lead.id === leadId ? updatedLead : lead)));
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal mengubah stage lead.",
-      );
+      setActionError(error instanceof Error ? error.message : "Tahap lead belum bisa diubah. Coba lagi.");
     } finally {
       setUpdatingLeadId(null);
     }
   }
 
   const hasUsableLeadData = leads.length > 0;
-  const shouldRenderLeadWorkspace =
-    !isLoading && (!errorMessage || hasUsableLeadData);
+  const shouldRenderLeadWorkspace = !isLoading && (!errorMessage || hasUsableLeadData);
+  const pageTitle = isLeadershipWorkspace ? PAGE_NAMES.leadsTeam : PAGE_NAMES.leads;
+  const pageDescription = isHeadWorkspace
+    ? "Lead dari semua tim. Lihat siapa pemiliknya dan di tahap mana, lalu buka detail kalau perlu keputusan."
+    : isManagerWorkspace
+      ? "Lead dari timmu yang paling butuh perhatian. Buka detail atau chat saat perlu."
+      : "Prospect yang sedang kamu tangani. Ubah tahapnya kalau ada kemajuan, lalu lanjutkan lewat chat.";
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.daily}
       title={pageTitle}
       description={pageDescription}
       backHref="/dashboard"
       backLabel="Kembali ke beranda"
       actions={
-        <>
-          {isHeadWorkspace ? (
-            <Link
-              href="/dashboard/notifications"
-              className="clara-button clara-button-ghost"
-            >
-              Buka Alert Tim
-            </Link>
-          ) : isManagerWorkspace ? (
-            <Link
-              href="/dashboard/manager-insights"
-              className="clara-button clara-button-ghost"
-            >
-              Monitor Tim
-            </Link>
-          ) : currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
-            <Link
-              href="/dashboard/sales"
-              className="clara-button clara-button-ghost"
-            >
-              Chat Masuk
-            </Link>
-          ) : (
-            <Link
-              href="/dashboard/approvals"
-              className="clara-button clara-button-ghost"
-            >
-              Review Sales
-            </Link>
-          )}
-          <Link
-            href={
-              isHeadWorkspace
-                ? "/dashboard/approvals"
-                : "/dashboard/upload"
-            }
-            className="clara-button clara-button-primary"
-          >
-            {isHeadWorkspace ? "Buka Arahan Tim" : "Input Chat"}
+        !isHeadWorkspace ? (
+          <Link href="/upload" className="clara-button clara-button-primary">
+            {PAGE_NAMES.intake}
           </Link>
-        </>
+        ) : undefined
       }
     >
-      <div className="space-y-6">
-        {isLoading && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="clara-empty-state p-8 text-sm"
-          >
-            Memuat daftar lead...
-          </div>
-        )}
+      <div className="space-y-5">
+        {isLoading ? <LoadingState message="Memuat daftar lead..." /> : null}
 
-        {errorMessage && (
+        {!isLoading && errorMessage ? (
+          <ErrorState message={errorMessage} onRetry={() => void loadCrmBoard()} />
+        ) : null}
+
+        {actionError ? (
           <div role="alert" className="clara-alert clara-alert-danger">
-            {errorMessage}
+            {actionError}
           </div>
-        )}
+        ) : null}
 
-        {shouldRenderLeadWorkspace && (
+        {shouldRenderLeadWorkspace ? (
           <>
-            <section
-              data-onboarding-id="sales-crm-hero"
-              className="clara-card p-5 sm:p-6"
-            >
-              <p className="clara-kicker text-xs">Ringkasan leads</p>
-              <h2 className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl">
-                {heroTitle}
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
-                {heroSummary}
-              </p>
-              {isLeadershipWorkspace && topPriorityLead ? (
-                <p className="mt-3 break-words text-sm font-medium clara-text-primary">
-                  Prioritas sekarang: {topPriorityLead.display_name} ·{" "}
-                  {STAGE_LABELS[topPriorityLead.current_stage] ??
-                    topPriorityLead.current_stage}
-                </p>
-              ) : null}
-            </section>
-
-            <section
-              data-onboarding-id="sales-crm-metrics"
-              className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-            >
-              <BoardMetric
-                label={isLeadershipWorkspace ? "Butuh perhatian" : "Perlu tindakan"}
-                value={String(summary.needsAction)}
-              />
-              <BoardMetric
-                label="Overdue"
-                value={String(summary.overdue)}
-              />
-              <BoardMetric
-                label="Hot"
-                value={String(summary.hot)}
-              />
-              <BoardMetric
-                label="Perlu sync"
-                value={String(summary.needsSync)}
-              />
-            </section>
-
-            <section
-              data-onboarding-id="sales-crm-filters"
-              className="clara-card p-4 sm:p-5"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-semibold clara-text-primary">
-                  Cari dan filter lead
-                </h2>
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="clara-button clara-button-ghost"
+            {hasUsableLeadData ? (
+              <>
+                <section
+                  data-onboarding-id="sales-crm-hero"
+                  className="clara-card space-y-4 p-4 sm:p-5"
+                  aria-label="Cari dan saring lead"
                 >
-                  Reset
-                </button>
-              </div>
-
-              <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_repeat(4,minmax(0,1fr))]">
-                <div>
-                  <label htmlFor="crm-search" className="clara-label">
-                    Cari lead
-                  </label>
-                  <input
-                    id="crm-search"
-                    value={searchQuery}
-                    onChange={(event) => {
-                      setSearchQuery(event.target.value);
-                      setLeadPage(1);
-                    }}
-                    placeholder="Cari nama lead atau summary..."
-                    className="clara-input mt-2"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="crm-bucket" className="clara-label">Bucket</label>
-                  <select
-                    id="crm-bucket"
-                    value={bucketFilter}
-                    onChange={(event) => {
-                      setBucketFilter(event.target.value);
-                      setLeadPage(1);
-                    }}
-                    className="clara-select mt-2"
+                  <p
+                    data-onboarding-id="sales-crm-metrics"
+                    role="status"
+                    aria-live="polite"
+                    className="text-base font-semibold clara-text-primary"
                   >
-                    {BUCKET_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="crm-quick-filter" className="clara-label">Prioritas</label>
-                  <select
-                    id="crm-quick-filter"
-                    value={quickFilter}
-                    onChange={(event) => {
-                      setQuickFilter(event.target.value);
-                      setLeadPage(1);
-                    }}
-                    className="clara-select mt-2"
-                  >
-                    {QUICK_FILTER_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="crm-channel" className="clara-label">Channel</label>
-                  <select
-                    id="crm-channel"
-                    value={sourceChannelFilter}
-                    onChange={(event) => {
-                      setSourceChannelFilter(event.target.value);
-                      setLeadPage(1);
-                    }}
-                    className="clara-select mt-2"
-                  >
-                    {SOURCE_CHANNEL_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="crm-sort" className="clara-label">Urutkan</label>
-                  <select
-                    id="crm-sort"
-                    value={sortBy}
-                    onChange={(event) => {
-                      setSortBy(event.target.value);
-                      setLeadPage(1);
-                    }}
-                    className="clara-select mt-2"
-                  >
-                    {SORT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </section>
-
-
-            <section className="clara-card p-4 sm:p-5">
-              <div className="flex flex-col gap-2 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="clara-kicker text-xs">Daftar lead</p>
-                  <h2 className="mt-2 text-xl font-bold tracking-tight clara-text-primary">
-                    {leadListTitle}
-                  </h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
-                    {leadListDescription}
+                    {summaryText}
                   </p>
-                </div>
-                <p className="text-sm clara-text-secondary">
-                  {paginatedVisibleLeads.length} / {visibleLeads.length} lead
-                  tampil di halaman ini
-                </p>
-              </div>
 
-              <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.88fr)]">
-                {paginatedVisibleLeads.length === 0 ? (
-                  <div className="clara-empty-state p-6 text-sm text-[#d6bb84]">
-                    Tidak ada lead yang cocok dengan filter ini. Ubah pencarian atau filter untuk melihat lead lain.
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex min-h-0 flex-col gap-4 xl:max-h-[780px]">
-                      <div className="clara-scrollbar min-h-0 flex-1 space-y-3 xl:overflow-y-auto">
-                        {renderedBucketSections.map((section, index) => (
-                          <Fragment key={section.title}>
-                            {renderBucketSection({
-                              title: section.title,
-                              description: section.description,
-                              leads: section.leads,
-                              selectedLeadId: effectiveSelectedLeadId,
-                              setSelectedLeadId,
-                              onboardingTargetId:
-                                index === 0 ? "sales-crm-list" : undefined,
-                            })}
-                          </Fragment>
+                  <div
+                    data-onboarding-id="sales-crm-filters"
+                    className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                  >
+                    <div className="col-span-2 md:col-span-1">
+                      <label htmlFor="lead-search" className="clara-label">
+                        Cari lead
+                      </label>
+                      <input
+                        id="lead-search"
+                        type="search"
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        placeholder="Nama customer atau ringkasan"
+                        className="clara-input mt-2 w-full"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="lead-sort" className="clara-label">
+                        Urutkan
+                      </label>
+                      <select
+                        id="lead-sort"
+                        value={sortBy}
+                        onChange={(event) => setSortBy(event.target.value)}
+                        className="clara-select mt-2 w-full"
+                      >
+                        {SORT_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
                         ))}
-                      </div>
-
-                      {totalLeadPages > 1 ? (
-                        <div className="clara-card-soft flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-                          <p className="text-sm clara-text-secondary">
-                            Halaman {effectiveLeadPage} dari {totalLeadPages}
-                          </p>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              disabled={effectiveLeadPage === 1}
-                              onClick={() =>
-                                setLeadPage((current) =>
-                                  Math.max(1, current - 1),
-                                )
-                              }
-                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Sebelumnya
-                            </button>
-                            <button
-                              type="button"
-                              disabled={effectiveLeadPage === totalLeadPages}
-                              onClick={() =>
-                                setLeadPage((current) =>
-                                  Math.min(totalLeadPages, current + 1),
-                                )
-                              }
-                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Berikutnya
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
+                      </select>
                     </div>
-
-                    <div data-onboarding-id="sales-crm-preview">
-                      {selectedLead ? (
-                        <>
-                          <div className="border-b border-[#f0cb73]/12 pb-4">
-                            <p className="text-xs font-semibold text-[#f0cb73]">
-                              {previewTitle}
-                            </p>
-                            <div className="mt-3 flex flex-wrap items-center gap-2">
-                              <h3 className="text-xl font-bold tracking-tight clara-text-primary">
-                                {selectedLead.display_name}
-                              </h3>
-                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                                {STAGE_LABELS[selectedLead.current_stage] ??
-                                  selectedLead.current_stage}
-                              </span>
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                                  selectedLead.lead_temperature,
-                                )}`}
-                              >
-                                {selectedLead.lead_temperature.toUpperCase()}
-                              </span>
-                              <span
-                                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getSourceLabelBadgeClass(
-                                  selectedLead.source_label,
-                                )}`}
-                              >
-                                {selectedLead.source_label}
-                              </span>
-                              <span
-                                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${selectedLeadPriorityTone.className}`}
-                              >
-                                {selectedLeadPriorityTone.label} • skor{" "}
-                                {selectedLeadPriorityScore}
-                              </span>
-                            </div>
-                            <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
-                              {selectedLead.summary ??
-                                "Belum ada ringkasan untuk lead ini. Buka detail lead untuk menambah konteks atau minta Clara membacanya."}
-                            </p>
-                          </div>
-
-                          <div className="mt-4 space-y-4">
-                            {isLeadershipWorkspace ? (
-                              <section className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(34,25,18,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                                <p className="text-xs font-semibold text-[#f0cb73]">
-                                  {isHeadWorkspace
-                                    ? "Fokus head"
-                                    : "Fokus manager"}
-                                </p>
-                                <p className="mt-3 text-sm leading-6 text-[#fff0c9]">
-                                  {selectedLeadLeadershipFocus}
-                                </p>
-                                <div className="mt-3 rounded-2xl border border-[#f0cb73]/12 bg-[#1e160f] px-3 py-3">
-                                  <p className="text-xs font-semibold text-[#b9924b]">
-                                    Langkah berikutnya
-                                  </p>
-                                  <p className="mt-2 text-sm font-medium leading-6 text-[#f3d89a]">
-                                    {selectedLeadNextAction}
-                                  </p>
-                                </div>
-                              </section>
-                            ) : null}
-
-                            <section className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                              <p className="text-xs font-semibold text-[#f0cb73]">
-                                Sync Health
-                              </p>
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-                                  {selectedLead.needs_deal_sync
-                                    ? "Need deal sync"
-                                    : "CRM sync ok"}
-                                </span>
-                                {isOverdueLead(selectedLead) && (
-                                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-                                    Follow-up overdue
-                                  </span>
-                                )}
-                                {selectedLead.discipline_compliance_status !==
-                                "logged_today" ? (
-                                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-                                    {DISCIPLINE_LABELS[
-                                      selectedLead.discipline_compliance_status
-                                    ] ??
-                                      selectedLead.discipline_compliance_status}
-                                  </span>
-                                ) : (
-                                  <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-                                    Discipline ok
-                                  </span>
-                                )}
-                              </div>
-                            </section>
-
-                            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-2">
-                              <PreviewStat
-                                label="Owner"
-                                value={
-                                  selectedLead.assigned_user_name ??
-                                  "Belum ada owner"
-                                }
-                              />
-                              <PreviewStat
-                                label="Customer profile"
-                                value={
-                                  selectedLead.customer_profile_name ??
-                                  "Belum terhubung"
-                                }
-                              />
-                              <PreviewStat
-                                label="Last contact"
-                                value={formatDateTime(
-                                  selectedLead.last_contact_at,
-                                )}
-                              />
-                              <PreviewStat
-                                label="Next follow-up"
-                                value={formatDateTime(
-                                  selectedLead.next_follow_up_at,
-                                )}
-                              />
-                              <PreviewStat
-                                label="Deal status"
-                                value={
-                                  selectedLead.deal_status ?? "Belum diisi"
-                                }
-                              />
-                              <PreviewStat
-                                label="Source"
-                                value={selectedLead.source_label}
-                              />
-                            </section>
-
-                            <section className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                              <label className="text-xs font-semibold text-[#f0cb73]">
-                                {isHeadWorkspace
-                                  ? "Kontrol cepat head"
-                                  : isManagerWorkspace
-                                    ? "Kontrol cepat manager"
-                                  : "Update stage cepat"}
-                              </label>
-                              {isLeadershipWorkspace ? (
-                                <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
-                                  {isHeadWorkspace
-                                    ? "Head cukup cek owner, stage, dan suhu lead di sini sebelum memutuskan perlu turun ke detail atau cukup memberi arahan."
-                                    : "Manager bisa cek stage terakhir di sini sebelum membuka detail lead atau percakapan."}
-                                </p>
-                              ) : null}
-                              <StageQuickSelect
-                                value={selectedLead.current_stage}
-                                disabled={updatingLeadId === selectedLead.id}
-                                onChange={(stage) => {
-                                  void handleStageChange(
-                                    selectedLead.id,
-                                    stage,
-                                  );
-                                }}
-                              />
-
-                              <div className="mt-4 flex flex-wrap gap-2">
-                                <Link
-                                  href={`/dashboard/crm/${selectedLead.id}`}
-                                  className="clara-button clara-button-primary px-3 py-2 text-xs"
-                                >
-                                  Detail Lead
-                                </Link>
-                                {selectedLead.latest_conversation_id && (
-                                  <Link
-                                    href={`/dashboard/sales/conversations/${selectedLead.latest_conversation_id}`}
-                                    className="clara-button clara-button-ghost px-3 py-2 text-xs"
-                                  >
-                                    Buka Conversation
-                                  </Link>
-                                )}
-                              </div>
-                            </section>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="clara-empty-state p-6 text-sm text-[#d6bb84]">
-                          {previewEmpty}
-                        </div>
-                      )}
+                    <div>
+                      <label htmlFor="lead-channel" className="clara-label">
+                        Channel
+                      </label>
+                      <select
+                        id="lead-channel"
+                        value={sourceChannelFilter}
+                        onChange={(event) => setSourceChannelFilter(event.target.value)}
+                        className="clara-select mt-2 w-full"
+                      >
+                        {SOURCE_CHANNEL_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  </>
+                  </div>
+
+                  <div role="group" aria-label="Kelompok lead" className="flex flex-wrap gap-2">
+                    {QUICK_FILTER_OPTIONS.filter(
+                      (option) =>
+                        option.value === "all" ||
+                        quickCounts[option.value] > 0 ||
+                        option.value === quickFilter,
+                    ).map((option) => (
+                      <FilterChip
+                        key={option.value}
+                        active={quickFilter === option.value}
+                        onClick={() => setQuickFilter(option.value)}
+                        label={`${option.label} (${option.value === "all" ? leads.length : quickCounts[option.value]})`}
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                {filteredLeads.length === 0 ? (
+                  <EmptyState
+                    title="Tidak ada lead yang cocok"
+                    description="Ubah kata pencarian atau pilih kelompok lain."
+                  />
+                ) : (
+                  sections.map((section, sectionIndex) => {
+                    const visible = visibleCounts[section.bucket] ?? VISIBLE_STEP;
+                    const shown = section.leads.slice(0, visible);
+                    const hiddenCount = section.leads.length - shown.length;
+
+                    return (
+                      <section
+                        key={section.bucket}
+                        aria-labelledby={`lead-bucket-${section.bucket}`}
+                        data-onboarding-id={sectionIndex === 0 ? "sales-crm-list" : undefined}
+                        className="space-y-3"
+                      >
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                          <h2
+                            id={`lead-bucket-${section.bucket}`}
+                            className="text-base font-semibold clara-text-primary"
+                          >
+                            {BUCKETS[section.bucket].title}{" "}
+                            <span className="font-normal clara-text-muted">({section.leads.length})</span>
+                          </h2>
+                          <p className="text-sm clara-text-secondary">{BUCKETS[section.bucket].description}</p>
+                        </div>
+
+                        <ul className="space-y-3">
+                          {shown.map((lead) => (
+                            <LeadRow
+                              key={lead.id}
+                              lead={lead}
+                              showOwner={isLeadershipWorkspace}
+                              canChangeStage={!isHeadWorkspace}
+                              isUpdating={updatingLeadId === lead.id}
+                              onStageChange={(stage) => void handleStageChange(lead.id, stage)}
+                            />
+                          ))}
+                        </ul>
+
+                        {hiddenCount > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setVisibleCounts((current) => ({
+                                ...current,
+                                [section.bucket]: visible + VISIBLE_STEP,
+                              }))
+                            }
+                            className="clara-button clara-button-ghost"
+                          >
+                            Tampilkan {Math.min(hiddenCount, VISIBLE_STEP)} lead lagi ({hiddenCount} tersisa)
+                          </button>
+                        ) : null}
+                      </section>
+                    );
+                  })
                 )}
-              </div>
-            </section>
+              </>
+            ) : (
+              <EmptyState
+                title="Belum ada lead"
+                description="Lead dibuat otomatis saat sebuah chat masuk ke Clara. Masukkan chat pertama untuk memulai."
+                actionHref={!isHeadWorkspace ? "/upload" : undefined}
+                actionLabel={!isHeadWorkspace ? "Masukkan chat pertama" : undefined}
+              />
+            )}
           </>
-        )}
+        ) : null}
       </div>
     </WorkspaceShell>
   );
 }
 
-function renderBucketSection({
-  title,
-  description,
-  leads,
-  selectedLeadId,
-  setSelectedLeadId,
-  onboardingTargetId,
+function FilterChip({
+  active,
+  label,
+  onClick,
 }: {
-  title: string;
-  description: string;
-  leads: LeadListItem[];
-  selectedLeadId: string | null;
-  setSelectedLeadId: (leadId: string) => void;
-  onboardingTargetId?: string;
+  active: boolean;
+  label: string;
+  onClick: () => void;
 }) {
-  if (!leads.length) return null;
-
-  return (
-    <section className="space-y-3">
-      <div className="px-1">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold clara-text-primary">
-            {title}
-          </h3>
-          <span className="clara-chip">
-            {leads.length} lead
-          </span>
-        </div>
-        <p className="mt-2 text-sm leading-6 clara-text-secondary">{description}</p>
-      </div>
-
-      <div className="space-y-3">
-        {leads.map((lead, index) => (
-          <LeadListRow
-            key={lead.id}
-            lead={lead}
-            isSelected={selectedLeadId === lead.id}
-            onboardingTargetId={index === 0 ? onboardingTargetId : undefined}
-            onSelect={() => setSelectedLeadId(lead.id)}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function LeadListRow({
-  lead,
-  isSelected,
-  onboardingTargetId,
-  onSelect,
-}: {
-  lead: LeadListItem;
-  isSelected: boolean;
-  onboardingTargetId?: string;
-  onSelect: () => void;
-}) {
-  const isOverdue = isOverdueLead(lead);
-  const priorityScore = calculateLeadPriority(lead);
-  const priorityTone = getLeadPriorityTone(priorityScore);
-  const nextStepLabel = lead.needs_deal_sync
-    ? "Rapikan sync"
-    : isOverdue
-      ? "Cek follow-up"
-      : lead.discipline_compliance_status !== "logged_today"
-        ? "Cek log sales"
-        : lead.current_stage === "closing"
-          ? "Jaga closing"
-          : "Monitor";
-
   return (
     <button
       type="button"
-      data-onboarding-id={onboardingTargetId}
-      onClick={onSelect}
-      className={`block w-full rounded-2xl border p-4 text-left transition ${
-        isSelected
-          ? "border-[var(--color-accent)] bg-[var(--color-surface-muted)]"
-          : "border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] hover:border-[var(--color-border-default)]"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
+        active
+          ? "border-clara-gold bg-clara-gold text-clara-deep"
+          : "border-clara-line bg-clara-sunken text-clara-ink-2 hover:border-clara-gold hover:text-clara-ink"
       }`}
     >
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h4 className="min-w-0 break-words text-base font-semibold clara-text-primary">
-                {lead.display_name}
-              </h4>
-              <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                {STAGE_LABELS[lead.current_stage] ?? lead.current_stage}
-              </span>
-              <span
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                  lead.lead_temperature,
-                )}`}
-              >
-                {lead.lead_temperature.toUpperCase()}
-              </span>
-              {lead.account_category !== "unknown" && (
-                <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                  {lead.account_category}
-                </span>
-              )}
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span
-                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${priorityTone.className}`}
-              >
-                {priorityTone.label} • {priorityScore}
-              </span>
-              {isOverdue && (
-                <span className="rounded-full border border-[#f0cb73]/18 bg-[#4a3112] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                  Overdue
-                </span>
-              )}
-              {lead.needs_deal_sync && (
-                <span className="rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                  Need sync
-                </span>
-              )}
-              {lead.discipline_compliance_status !== "logged_today" && (
-                <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                  {DISCIPLINE_LABELS[lead.discipline_compliance_status] ??
-                    lead.discipline_compliance_status}
-                </span>
-              )}
-              <div
-                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getSourceLabelBadgeClass(
-                  lead.source_label,
-                )}`}
-              >
-                {lead.source_label}
-              </div>
-            </div>
-          </div>
-
-          <div className="clara-card-soft min-w-32 p-3 text-left sm:text-right">
-            <p className="text-xs font-semibold clara-text-muted">
-              Next step
-            </p>
-            <p className="mt-1 text-sm font-semibold clara-text-primary">
-              {nextStepLabel}
-            </p>
-          </div>
-        </div>
-
-        <p className="mt-3 line-clamp-2 break-words text-sm leading-6 clara-text-secondary">
-          {lead.summary ??
-            "Belum ada ringkasan lead. Minta Clara membaca percakapannya dulu."}
-        </p>
-
-        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-2">
-          <LeadMetaPill
-            label="Owner"
-            value={lead.assigned_user_name ?? "Belum ada owner"}
-            icon={faUsers}
-          />
-          <LeadMetaPill
-            label="Last contact"
-            value={formatDateTime(lead.last_contact_at)}
-            icon={faArrowDownWideShort}
-          />
-          <LeadMetaPill
-            label="Next follow-up"
-            value={formatDateTime(lead.next_follow_up_at)}
-            icon={faLayerGroup}
-          />
-          <LeadMetaPill
-            label="Deal status"
-            value={lead.deal_status ?? "Belum diisi"}
-            icon={faTrophy}
-          />
-        </div>
-      </div>
+      {label}
     </button>
   );
 }
 
-function LeadMetaPill({
-  label,
-  value,
-  icon,
+function LeadRow({
+  lead,
+  showOwner,
+  canChangeStage,
+  isUpdating,
+  onStageChange,
 }: {
-  label: string;
-  value: string;
-  icon: IconDefinition;
+  lead: LeadListItem;
+  showOwner: boolean;
+  canChangeStage: boolean;
+  isUpdating: boolean;
+  onStageChange: (stage: string) => void;
 }) {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(32,24,17,0.92)_0%,rgba(20,15,11,0.96)_100%)] px-3.5 py-2 shadow-[inset_0_1px_0_rgba(255,232,182,0.04)]">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f0cb73]/10 text-[#d6a74e]">
-        <FontAwesomeIcon icon={icon} className="h-3 w-3" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-xs font-semibold text-[#9f7a38]">
-          {label}
-        </span>
-        <span className="block truncate text-sm font-semibold text-[#f0cb73]">
-          {value}
-        </span>
-      </span>
-    </div>
-  );
-}
+  const priorityScore = calculateLeadPriority(lead);
+  const overdue = isOverdueLead(lead);
+  const category =
+    lead.account_category && lead.account_category !== "unknown"
+      ? labelOf(ACCOUNT_CATEGORY, lead.account_category)
+      : null;
 
-function PreviewStat({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
-      <p className="text-xs font-semibold text-[#f0cb73]">
-        {label}
+    <li className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="break-words text-base font-semibold clara-text-primary">{lead.display_name}</h3>
+          <p className="mt-0.5 text-xs clara-text-muted">
+            {formatChannelLabel(lead.source_channel)} · terakhir dihubungi {formatRelativeTime(lead.last_contact_at)}
+            {showOwner ? ` · Sales: ${lead.assigned_user_name ?? "belum ada"}` : ""}
+          </p>
+        </div>
+
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link href={`/crm/${lead.id}`} className="clara-button clara-button-primary">
+            Buka lead
+          </Link>
+          {lead.latest_conversation_id ? (
+            <Link
+              href={`/sales/conversations/${lead.latest_conversation_id}`}
+              className="clara-button clara-button-secondary"
+            >
+              Buka chat
+            </Link>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {lead.current_stage !== "unknown" ? <ValueTag table={STAGE} value={lead.current_stage} /> : null}
+        {lead.lead_temperature !== "unknown" ? (
+          <ValueTag table={TEMPERATURE} value={lead.lead_temperature} />
+        ) : null}
+        {priorityScore >= 70 ? (
+          <Tag tone="danger">Mendesak</Tag>
+        ) : priorityScore >= 35 ? (
+          <Tag tone="warn">Perlu dicek</Tag>
+        ) : null}
+        {overdue ? <Tag tone="danger">Follow-up terlambat</Tag> : null}
+        {lead.needs_deal_sync ? <Tag tone="warn">Data deal belum sinkron</Tag> : null}
+        {category ? <Tag>{category}</Tag> : null}
+      </div>
+
+      <p className="mt-3 line-clamp-2 break-words text-sm leading-6 clara-text-secondary">
+        {lead.summary ?? "Belum ada ringkasan. Buka chat-nya lalu minta Clara membacanya."}
       </p>
-      <p className="mt-2 text-sm font-semibold leading-6 text-[#fff0c9]">
-        {value}
+
+      <p className="mt-2 text-sm leading-6 clara-text-secondary">
+        <span className="font-semibold clara-text-primary">Langkah berikutnya: </span>
+        {getNextStep(lead)}
       </p>
-    </article>
-  );
-}
 
-function StageQuickSelect({
-  value,
-  disabled,
-  onChange,
-}: {
-  value: string;
-  disabled: boolean;
-  onChange: (stage: string) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const isDropdownOpen = !disabled && isOpen;
-
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
-
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
-
-  return (
-    <div ref={containerRef} className="relative mt-2">
-      <button
-        type="button"
-        aria-expanded={isDropdownOpen}
-        aria-haspopup="listbox"
-        disabled={disabled}
-        onClick={() => setIsOpen((previous) => !previous)}
-        className="flex w-full items-center justify-between rounded-xl border border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(24,18,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] px-4 py-3 text-left text-sm font-semibold text-[#fff8de] shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition hover:border-[#f0cb73]/40 hover:text-[#fffdf5] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <span>{STAGE_LABELS[value] ?? value}</span>
-        <span
-          aria-hidden="true"
-          className={`text-[#f0cb73] transition-transform ${
-            isDropdownOpen ? "rotate-180" : ""
-          }`}
-        >
-          ▾
-        </span>
-      </button>
-
-      {isDropdownOpen ? (
-        <div className="absolute inset-x-0 z-30 mt-2 rounded-xl border border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(28,20,15,0.99)_0%,rgba(17,12,9,0.99)_100%)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.42)]">
-          <ul
-            role="listbox"
-            aria-label="Stage lead"
-            className="max-h-72 space-y-1 overflow-y-auto pr-1 clara-scrollbar"
+      {canChangeStage ? (
+        <div className="mt-4 flex flex-col gap-2 border-t border-clara-line-subtle pt-3 sm:flex-row sm:items-center">
+          <label htmlFor={`stage-${lead.id}`} className="shrink-0 whitespace-nowrap text-sm font-semibold clara-text-primary">
+            Tahap customer
+          </label>
+          <select
+            id={`stage-${lead.id}`}
+            value={lead.current_stage}
+            disabled={isUpdating}
+            onChange={(event) => onStageChange(event.target.value)}
+            className="clara-select w-full sm:max-w-xs"
           >
-            {STAGE_ORDER.map((stage) => {
-              const isSelected = stage === value;
-
-              return (
-                <li key={stage}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    onClick={() => {
-                      setIsOpen(false);
-                      if (stage !== value) {
-                        onChange(stage);
-                      }
-                    }}
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
-                      isSelected
-                        ? "bg-[#f0cb73] text-[#130d07]"
-                        : "text-[#fff2cf] hover:bg-[#3a2917] hover:text-[#fffdf5]"
-                    }`}
-                  >
-                    <span>{STAGE_LABELS[stage]}</span>
-                    {isSelected ? (
-                      <span className="text-xs font-bold text-[#2a1c0e]">
-                        Aktif
-                      </span>
-                    ) : null}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+            {lead.current_stage === "unknown" ? <option value="unknown">Belum ditentukan</option> : null}
+            {STAGE_OPTIONS.map((stage) => (
+              <option key={stage} value={stage}>
+                {labelOf(STAGE, stage)}
+              </option>
+            ))}
+          </select>
+          {isUpdating ? (
+            <span role="status" className="text-sm clara-text-secondary">
+              Menyimpan...
+            </span>
+          ) : null}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function BoardMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <article className="clara-card-soft p-4">
-      <p className="text-sm clara-text-secondary">{label}</p>
-      <p className="mt-1 text-2xl font-bold tracking-tight clara-text-primary">
-        {value}
-      </p>
-    </article>
+    </li>
   );
 }

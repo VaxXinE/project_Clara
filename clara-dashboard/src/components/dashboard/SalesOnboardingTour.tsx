@@ -87,31 +87,19 @@ const TOUR_ROUTES: TourRoute[] = [
         id: "sales-crm-hero",
         title: "Ringkasan lead",
         description:
-          "Bagian atas halaman lead membantu kamu tahu mana lead yang paling dekat ke aksi berikutnya atau mulai overdue.",
-      },
-      {
-        id: "sales-crm-metrics",
-        title: "Angka tekanan lead",
-        description:
-          "Kartu angka ini dipakai untuk membaca tekanan kerja di CRM dengan cepat: mana yang perlu tindakan, mana yang overdue, mana yang hot, dan mana yang belum sinkron.",
+          "Kalimat ini merangkum berapa lead yang perlu tindakan dan berapa yang terlambat.",
       },
       {
         id: "sales-crm-filters",
-        title: "Filter dan pencarian lead",
+        title: "Cari dan saring lead",
         description:
-          "Pakai filter ini untuk cari lead yang benar-benar perlu disentuh, misalnya yang overdue, hot, atau perlu sync.",
+          "Cari nama customer, ubah urutan, atau pilih kelompok seperti Terlambat atau Customer panas.",
       },
       {
         id: "sales-crm-list",
-        title: "Daftar lead kerja",
+        title: "Daftar lead",
         description:
-          "Daftar ini adalah tempat memilih lead yang mau kamu baca lebih dulu sebelum turun ke preview atau detail penuh.",
-      },
-      {
-        id: "sales-crm-preview",
-        title: "Preview lead terpilih",
-        description:
-          "Panel kanan ini dipakai untuk cek konteks cepat lead yang sedang dipilih: owner, stage, kesehatan sync, dan langkah berikutnya sebelum kamu masuk ke detail lead atau conversation.",
+          "Tiap lead punya langkah berikutnya yang jelas. Klik Buka lead untuk detail atau Buka chat untuk menghubungi customer.",
       },
     ],
   },
@@ -340,33 +328,21 @@ const MANAGER_TOUR_ROUTES: TourRoute[] = [
     steps: [
       {
         id: "sales-crm-hero",
-        title: "Ringkasan lead tim",
+        title: "Ringkasan lead",
         description:
-          "Bagian atas ini membantu manager tahu lead tim mana yang paling dekat ke risiko, overdue, atau butuh arahan cepat.",
-      },
-      {
-        id: "sales-crm-metrics",
-        title: "Angka tekanan lead tim",
-        description:
-          "Kartu ini memberi pembacaan cepat kondisi lead tim: perlu tindakan, overdue, hot, dan sinkronisasi yang tertinggal.",
+          "Kalimat ini merangkum berapa lead yang perlu tindakan dan berapa yang terlambat.",
       },
       {
         id: "sales-crm-filters",
-        title: "Filter lead tim",
+        title: "Cari dan saring lead",
         description:
-          "Gunakan filter ini untuk menyaring lead yang benar-benar layak dibaca manager lebih dulu.",
+          "Cari nama customer, ubah urutan, atau pilih kelompok seperti Terlambat atau Customer panas.",
       },
       {
         id: "sales-crm-list",
-        title: "Daftar lead prioritas",
+        title: "Daftar lead",
         description:
-          "Bagian kiri ini adalah daftar lead yang perlu dipilih dulu sebelum manager turun ke preview atau detail penuh.",
-      },
-      {
-        id: "sales-crm-preview",
-        title: "Preview keputusan cepat",
-        description:
-          "Panel kanan membantu manager cek owner, stage, sync health, dan next action tanpa harus selalu masuk ke detail lead.",
+          "Tiap lead punya langkah berikutnya yang jelas. Klik Buka lead untuk detail atau Buka chat untuk menghubungi customer.",
       },
     ],
   },
@@ -709,33 +685,21 @@ const HEAD_TOUR_ROUTES: TourRoute[] = [
     steps: [
       {
         id: "sales-crm-hero",
-        title: "Ringkasan lead lintas tim",
+        title: "Ringkasan lead",
         description:
-          "Bagian atas ini membantu head melihat lead tim mana yang paling dekat ke risiko atau butuh keputusan lintas tim.",
-      },
-      {
-        id: "sales-crm-metrics",
-        title: "Angka tekanan lead lintas tim",
-        description:
-          "Kartu angka ini memberi pembacaan cepat kondisi lead lintas tim: overdue, hot, dan sinkronisasi yang tertinggal.",
+          "Kalimat ini merangkum berapa lead yang perlu tindakan dan berapa yang terlambat.",
       },
       {
         id: "sales-crm-filters",
-        title: "Filter lead lintas tim",
+        title: "Cari dan saring lead",
         description:
-          "Filter ini dipakai head untuk menyaring lead yang memang layak dibaca sebelum turun ke detail.",
+          "Cari nama customer, ubah urutan, atau pilih kelompok seperti Terlambat atau Customer panas.",
       },
       {
         id: "sales-crm-list",
-        title: "Daftar lead tim",
+        title: "Daftar lead",
         description:
-          "Panel kiri ini adalah daftar lead prioritas yang perlu dipilih dulu sebelum membaca preview atau detail penuh.",
-      },
-      {
-        id: "sales-crm-preview",
-        title: "Preview keputusan head",
-        description:
-          "Panel kanan membantu head membaca owner, stage, sync health, dan next action tanpa harus selalu turun ke detail lead.",
+          "Tiap lead punya langkah berikutnya yang jelas. Klik Buka lead untuk detail atau Buka chat untuk menghubungi customer.",
       },
     ],
   },
