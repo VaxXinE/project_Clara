@@ -291,28 +291,16 @@ const MANAGER_TOUR_ROUTES: TourRoute[] = [
           "Sidebar ini adalah jalur kerja manager. Fokus utamanya pindah cepat antara Beranda, Lead Tim, Review Sales, dan Monitor Tim.",
       },
       {
-        id: "manager-home-summary",
-        title: "Ringkasan bottleneck hari ini",
-        description:
-          "Bagian atas ini dipakai untuk tahu tekanan utama tim hari ini sebelum Anda turun ke case atau lead tertentu.",
-      },
-      {
         id: "manager-home-next-action",
-        title: "Aksi manager berikutnya",
+        title: "Mulai dari sini",
         description:
-          "Panel ini menunjukkan pekerjaan paling bernilai untuk dibuka lebih dulu, jadi Anda tidak perlu membaca semua data tim sekaligus.",
-      },
-      {
-        id: "manager-home-health",
-        title: "Kondisi tim singkat",
-        description:
-          "Blok ini merangkum kesehatan ritme tim: kepatuhan follow-up, lead yang mulai macet, dan jumlah catatan yang belum rapi.",
+          "Kartu ini menunjuk hal yang paling perlu kamu kerjakan lebih dulu. Klik tombolnya untuk langsung ke sana.",
       },
       {
         id: "manager-home-metrics",
-        title: "Angka penting manager",
+        title: "Ringkasan angka",
         description:
-          "Kartu angka ini dipakai untuk pembacaan cepat kondisi tim tanpa perlu buka laporan monitor penuh.",
+          "Empat angka ini bisa diklik. Pilih salah satu untuk langsung ke halaman yang membahasnya.",
       },
     ],
   },
@@ -523,15 +511,15 @@ const HEAD_TOUR_ROUTES: TourRoute[] = [
       },
       {
         id: "head-home-next-action",
-        title: "Aksi head berikutnya",
+        title: "Mulai dari sini",
         description:
-          "Panel utama ini menunjukkan area lintas tim yang paling layak dibaca dulu sebelum head turun ke detail yang lebih spesifik.",
+          "Kartu ini menunjuk hal yang paling perlu keputusanmu. Klik tombolnya untuk langsung ke sana.",
       },
       {
-        id: "head-home-health",
-        title: "Ringkasan lintas tim",
+        id: "head-home-metrics",
+        title: "Ringkasan angka",
         description:
-          "Bagian ini dipakai untuk melihat kesehatan follow-up lintas tim secara cepat tanpa membuka halaman monitor penuh.",
+          "Empat angka ini bisa diklik. Pilih salah satu untuk langsung ke halaman yang membahasnya.",
       },
     ],
   },

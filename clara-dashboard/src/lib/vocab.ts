@@ -152,7 +152,8 @@ const JARGON_REPLACEMENTS: Array<[RegExp, string]> = [
   [/score turun/gi, "nilai kinerja turun"],
   [/\bcrm\b/gi, "data lead"],
   [/approval queue/gi, "Chat perlu keputusan"],
-  [/\bstale\b/gi, "sudah lama"],
+  [/sudah stale/gi, "sudah lama"],
+  [/\bstale\b/gi, "lama"],
   [/\blog\b/gi, "catatan"],
   [/boundary alert/gi, "peringatan tim"],
 ];
