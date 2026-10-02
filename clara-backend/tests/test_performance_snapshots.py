@@ -394,3 +394,41 @@ def test_duplicate_snapshot_generation_does_not_duplicate_rows(
     assert len(sales_rows) == 4
     assert len(team_rows) == 4
     db.close()
+
+
+def test_snapshot_generation_retries_once_when_a_concurrent_request_wins(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    from app.services import dashboard_service
+
+    prepare_snapshot_scope_data(
+        db_session_factory=db_session_factory,
+        seeded_data=seeded_data,
+    )
+    real_impl = dashboard_service._ensure_weekly_performance_snapshots
+    calls = {"count": 0}
+
+    def flaky_impl(*args, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise IntegrityError("INSERT", {}, Exception("uq_sales_performance_snapshots_scope"))
+        return real_impl(*args, **kwargs)
+
+    monkeypatch.setattr(dashboard_service, "_ensure_weekly_performance_snapshots", flaky_impl)
+    login(client, email=seeded_data["manager_a"].email, password="ManagerPass123!")
+
+    response = client.post(
+        "/dashboard/performance-snapshots/generate?weeks=4",
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 200, response.text
+    assert calls["count"] == 2
+    db = db_session_factory()
+    assert len(db.scalars(select(SalesPerformanceSnapshot)).all()) == 4
+    db.close()

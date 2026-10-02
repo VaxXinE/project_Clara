@@ -7,6 +7,7 @@ from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy import desc, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
@@ -3244,6 +3245,36 @@ def _load_team_snapshot_history_map(
 
 
 def ensure_weekly_performance_snapshots(
+    db: Session,
+    *,
+    organization_id: UUID,
+    sales_user_ids: set[UUID] | None = None,
+    team_ids: set[UUID] | None = None,
+    weeks: int = 4,
+) -> PerformanceSnapshotGenerationResponse:
+    # Dua request bersamaan bisa sama-sama menyisipkan snapshot mingguan yang sama.
+    # Fungsi ini idempoten, jadi cukup ulangi sekali: percobaan kedua menemukan baris
+    # milik request yang menang.
+    try:
+        return _ensure_weekly_performance_snapshots(
+            db,
+            organization_id=organization_id,
+            sales_user_ids=sales_user_ids,
+            team_ids=team_ids,
+            weeks=weeks,
+        )
+    except IntegrityError:
+        db.rollback()
+        return _ensure_weekly_performance_snapshots(
+            db,
+            organization_id=organization_id,
+            sales_user_ids=sales_user_ids,
+            team_ids=team_ids,
+            weeks=weeks,
+        )
+
+
+def _ensure_weekly_performance_snapshots(
     db: Session,
     *,
     organization_id: UUID,
