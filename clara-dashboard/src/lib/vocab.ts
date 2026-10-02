@@ -547,3 +547,161 @@ export const ALERT_STATUS: VocabTable = {
   resolved: { label: "Selesai", tone: "good" },
   ignored: { label: "Diabaikan", tone: "neutral" },
 };
+
+export const TABLE_COUNT_LABEL: Record<string, string> = {
+  organizations: "Organisasi",
+  users: "Pengguna",
+  conversations: "Percakapan",
+  ai_extractions: "Hasil baca Clara",
+  reply_suggestions: "Saran balasan",
+  sent_messages: "Balasan terkirim",
+  product_knowledge: "Pengetahuan produk",
+  audit_logs: "Catatan aktivitas",
+  marketing_snapshots: "Catatan insight pasar",
+};
+
+const AUDIT_RESOURCE: Record<string, string> = {
+  auth: "akun",
+  user: "pengguna",
+  conversation: "percakapan",
+  ops_notification: "alert",
+  kpi_alert: "alert KPI",
+  kpi_command_center: "Dashboard Operasional",
+  reply_suggestion: "saran balasan",
+  organization: "organisasi",
+  customer_profile: "profil customer",
+  customer_process_state: "tahap customer",
+  chat_review_case: "kasus review",
+  product_knowledge: "pengetahuan produk",
+  product_fact: "fakta produk",
+  marketing_execution_item: "kegiatan pemasaran",
+  marketing_insight_snapshot: "insight pasar",
+  ai_persona_bundle: "persona AI",
+  ai_persona_config: "persona AI",
+  extension: "ekstensi",
+  extension_build: "berkas ekstensi",
+  sales_structure: "struktur tim",
+  integration: "integrasi",
+  webhook: "chat masuk otomatis",
+};
+
+const AUDIT_ACTION_TEXT: Record<string, string> = {
+  "auth.login": "Masuk ke Clara",
+  "auth.access_token.issue": "Ekstensi diberi akses sementara",
+  "auth.user.create": "Menambah pengguna",
+  "auth.user.update": "Mengubah data pengguna",
+  "auth.user.activate": "Mengaktifkan pengguna",
+  "auth.user.deactivate": "Menonaktifkan pengguna",
+  "auth.user.delete": "Menghapus pengguna",
+  "auth.user.reset_password": "Mengatur ulang kata sandi pengguna",
+  "auth.user.change_password_self": "Mengganti kata sandi sendiri",
+  "auth.user.update_self": "Mengubah profil sendiri",
+  "ops_notification.acknowledge": "Menandai alert sudah dibaca",
+  "ops_notification.resolve": "Menandai alert selesai",
+  "ops_notification.ignore": "Mengabaikan alert",
+  "ops_notification.reopen": "Membuka lagi alert",
+  "ops_notification.escalate": "Menaikkan alert ke atasan",
+  "kpi_alert.acknowledge": "Menandai alert KPI sudah dibaca",
+  "kpi_alert.resolve": "Menandai alert KPI selesai",
+  "kpi_alert.reopen": "Membuka lagi alert KPI",
+  "kpi_command_center.refresh": "Memperbarui data Dashboard Operasional",
+  "conversation.upload_whatsapp_text": "Menambah chat WhatsApp (tempel teks)",
+  "conversation.upload_whatsapp_txt": "Menambah chat WhatsApp (berkas)",
+  "conversation.upload_telegram_text": "Menambah chat Telegram (tempel teks)",
+  "conversation.upload_telegram_txt": "Menambah chat Telegram (berkas)",
+  "reply_suggestion.generate": "Meminta Clara menyusun saran balasan",
+  "reply_suggestion.generate_failed": "Saran balasan gagal disusun",
+  "reply_suggestion.approve": "Menyetujui saran balasan",
+  "reply_suggestion.reject": "Menolak saran balasan",
+  "reply_suggestion.mark_sent": "Menandai balasan sudah terkirim",
+  "extension.reply.inserted": "Balasan dimasukkan ke kolom chat",
+  "extension.manual_reply.sent_synced": "Balasan manual tersinkron dari ekstensi",
+  "extension_build.upload": "Mengunggah berkas ekstensi baru",
+  "extension_build.download": "Mengunduh berkas ekstensi",
+  "customer_profile.update": "Mengubah profil customer",
+  "customer_profile.merge": "Menggabungkan profil customer",
+  "customer_process_state.transition": "Memindahkan tahap customer",
+  "chat_review_case.upsert": "Menyimpan keputusan review",
+  "chat_review_case.note.create": "Menambah catatan review",
+  "product_knowledge.create": "Menambah pengetahuan produk",
+  "product_knowledge.update": "Mengubah pengetahuan produk",
+  "product_knowledge.deactivate": "Menonaktifkan pengetahuan produk",
+  "organization.create": "Menambah organisasi",
+  "organization.update": "Mengubah organisasi",
+  "marketing_insight_snapshot.generate": "Memperbarui insight pasar",
+  "ai_persona_bundle.publish": "Menerbitkan persona AI",
+  "ai_persona_bundle.rollback": "Mengembalikan persona AI ke versi sebelumnya",
+  "ai_persona_config.publish": "Menerbitkan persona AI",
+  "ai_persona_config.rollback": "Mengembalikan persona AI ke versi sebelumnya",
+};
+
+const AUDIT_VERB: Record<string, string> = {
+  create: "Menambah",
+  update: "Mengubah",
+  delete: "Menghapus",
+  upsert: "Menyimpan",
+  publish: "Menerbitkan",
+  rollback: "Mengembalikan",
+  approve: "Menyetujui",
+  reject: "Menolak",
+  generate: "Menyusun",
+  ingest: "Menerima",
+  validate: "Memeriksa",
+};
+
+/** Kode aksi audit ("ops_notification.resolve") jadi kalimat yang bisa dibaca. */
+export function describeAuditAction(action: string | null | undefined): string {
+  const key = (action ?? "").trim();
+
+  if (!key) {
+    return "Aktivitas tidak dikenal";
+  }
+  if (AUDIT_ACTION_TEXT[key]) {
+    return AUDIT_ACTION_TEXT[key];
+  }
+
+  const [resource, ...rest] = key.split(".");
+  const verb = AUDIT_VERB[rest[rest.length - 1] ?? ""];
+  const noun = AUDIT_RESOURCE[resource];
+
+  if (verb && noun) {
+    return `${verb} ${noun}`;
+  }
+
+  return noun ? `Aktivitas pada ${noun}` : "Aktivitas sistem";
+}
+
+export const SNAPSHOT_SCOPE: VocabTable = {
+  global: { label: "Semua organisasi", tone: "neutral" },
+  organization: { label: "Satu organisasi", tone: "neutral" },
+};
+
+const SOURCE_LABEL: Record<string, string> = {
+  whatsapp_extension: "Ekstensi WhatsApp",
+  whatsapp_webhook: "WhatsApp otomatis",
+  whatsapp_txt: "Berkas chat WhatsApp",
+  telegram_txt: "Berkas chat Telegram",
+  telegram_extension: "Ekstensi Telegram",
+  telegram_manual: "Input manual Telegram",
+  instagram_extension: "Ekstensi Instagram DM",
+  instagram_dm: "Instagram DM",
+  instagram_comment: "Komentar Instagram",
+  tiktok_extension: "Ekstensi TikTok DM",
+  website_live_chat: "Live chat website",
+  email_inbox: "Email masuk",
+  csv_import: "Impor berkas CSV",
+  unknown: "Sumber tidak diketahui",
+};
+
+/** Kunci sumber dari backend ("whatsapp_txt") jadi nama yang dipakai user. */
+export function describeSource(key: string | null | undefined, fallback?: string | null): string {
+  const normalized = (key ?? "").trim().toLowerCase().replace(/ /g, "_");
+
+  return SOURCE_LABEL[normalized] ?? (fallback?.trim() || normalized.replaceAll("_", " ") || "Sumber tidak diketahui");
+}
+
+export const CHANNEL_DESCRIPTION: Record<string, string> = {
+  whatsapp: "Chat WhatsApp masuk lewat Ekstensi Clara, berkas chat, atau tempel teks.",
+  telegram: "Chat Telegram masuk lewat berkas chat atau tempel teks.",
+  live_chat: "Percakapan live chat dari website kamu, diterima otomatis.",
+};

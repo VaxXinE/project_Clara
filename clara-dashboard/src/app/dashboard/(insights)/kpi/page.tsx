@@ -11,7 +11,7 @@ import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { PAGE_NAMES } from "@/lib/labels";
 import { canAccessStrategicInsights, getRoleDisplayLabel } from "@/lib/roles";
-import { ALERT_SEVERITY, ALERT_STATUS, plainJargon } from "@/lib/vocab";
+import { ALERT_SEVERITY, ALERT_STATUS, describeSource, plainJargon } from "@/lib/vocab";
 import type {
   CurrentUser,
   KpiAlertHistoryResponse,
@@ -396,7 +396,7 @@ export default function KpiCommandCenterPage() {
                 <ul className="space-y-3">
                   {sources.slice(0, 6).map((row) => (
                     <li key={row.source_key} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
-                      <h3 className="break-words text-base font-semibold clara-text-primary">{row.source_label}</h3>
+                      <h3 className="break-words text-base font-semibold clara-text-primary">{describeSource(row.source_key, row.source_label)}</h3>
                       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
                         <Stat label="Lead" value={String(row.lead_count)} />
                         <Stat label="Lead panas" value={String(row.hot_leads)} />

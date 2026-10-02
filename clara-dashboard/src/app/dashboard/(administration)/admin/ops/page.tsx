@@ -4,12 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, formatStatusLabel } from "@/lib/format";
-import { canAccessAdminPages } from "@/lib/roles";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
+import { PAGE_NAMES } from "@/lib/labels";
+import { canAccessAdminPages, getRoleDisplayLabel } from "@/lib/roles";
+import { CONVERSATION_STATUS, SNAPSHOT_SCOPE, TABLE_COUNT_LABEL, describeAuditAction } from "@/lib/vocab";
 import type { CurrentUser, OpsDatabaseOverview } from "@/types/dashboard";
+
+const LOG_STEP = 10;
 
 export default function AdminOpsPage() {
   const router = useRouter();
@@ -17,377 +22,189 @@ export default function AdminOpsPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [logVisible, setLogVisible] = useState(LOG_STEP);
+
+  async function loadOverview() {
+    setErrorMessage("");
+
+    try {
+      const me = await apiFetch<CurrentUser>("/auth/me");
+      setCurrentUser(me);
+
+      if (!canAccessAdminPages(me.role)) {
+        router.replace("/workspace");
+        return;
+      }
+
+      setOverview(await apiFetch<OpsDatabaseOverview>("/dashboard/admin/ops-overview"));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Status sistem belum bisa dimuat.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadOverview() {
-      try {
-        const me = await apiFetch<CurrentUser>("/auth/me");
-        setCurrentUser(me);
+    const timer = setTimeout(() => {
+      void loadOverview();
+    }, 0);
 
-        if (!canAccessAdminPages(me.role)) {
-          router.replace("/workspace");
-          return;
-        }
-
-        const overviewData = await apiFetch<OpsDatabaseOverview>(
-          "/dashboard/admin/ops-overview",
-        );
-        setOverview(overviewData);
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Gagal memuat admin ops overview.",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadOverview();
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  const logs = overview?.recent_audit_logs ?? [];
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.admin}
       title={PAGE_NAMES.audit}
-      description="Pantau jejak audit dan status sistem. Halaman ini hanya untuk dibaca."
+      description="Siapa melakukan apa di Clara, dan seberapa banyak data yang tersimpan. Halaman ini hanya untuk dibaca."
       backHref="/dashboard"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
-        <Link
-          href="/admin/access"
-          className="clara-button clara-button-ghost"
-        >
-          Pengguna & Akses
+        <Link href="/admin/access" className="clara-button clara-button-secondary">
+          Buka Pengguna &amp; Akses
         </Link>
       }
     >
-      <div className="mx-auto space-y-6">
-        <section className="grid gap-4 md:grid-cols-3">
-          <InfoCard
-            label="Akses"
-            value={currentUser ? formatStatusLabel(currentUser.role) : "..."}
-            description={
-              currentUser
-                ? `Login sebagai ${currentUser.email}`
-                : "Memuat profil operator."
-            }
-          />
-          <InfoCard
-            label="Scope Data"
-            value={overview ? formatStatusLabel(overview.scope_type) : "..."}
-            description="Batas data yang sedang ditampilkan pada overview ini."
-          />
-          <InfoCard
-            label="Mode"
-            value="Read Only"
-            description="Halaman ini hanya untuk observasi dan tidak menampilkan data sensitif mentah."
-          />
-        </section>
+      <div className="space-y-6">
+        {isLoading ? <LoadingState message="Memuat status sistem..." /> : null}
 
-        {isLoading && (
-          <div role="status" className="clara-empty-state text-sm text-clara-ink-2">
-            Memuat status sistem...
-          </div>
-        )}
+        {!isLoading && errorMessage ? <ErrorState message={errorMessage} onRetry={() => void loadOverview()} /> : null}
 
-        {errorMessage && (
-          <div role="alert" className="clara-alert clara-alert-danger">
-            {errorMessage}
-          </div>
-        )}
-
-        {overview && !isLoading && (
+        {overview && !isLoading ? (
           <>
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {overview.table_counts.map((item) => (
-                <MetricCard
-                  key={item.label}
-                  label={item.label}
-                  value={String(item.count)}
-                />
+            <section aria-labelledby="ops-counts" className="clara-card p-5 sm:p-6">
+              <h2 id="ops-counts" className="text-lg font-bold clara-text-primary">
+                Isi sistem saat ini
+              </h2>
+              <p className="mt-1 text-sm clara-text-secondary">
+                Jumlah data yang tersimpan untuk {overview.scope_type === "global" ? "semua organisasi" : "organisasimu"}.
+                Pesan chat mentah tidak ditampilkan di sini.
+              </p>
+              <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                {overview.table_counts.map((item) => (
+                  <div key={item.label} className="clara-card-soft min-w-0 p-3">
+                    <dt className="text-xs clara-text-muted">{TABLE_COUNT_LABEL[item.label] ?? item.label.replaceAll("_", " ")}</dt>
+                    <dd className="mt-1 text-2xl font-bold clara-text-primary">{item.count}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section aria-labelledby="ops-log" className="space-y-3">
+              <h2 id="ops-log" className="text-lg font-bold clara-text-primary">
+                Aktivitas terbaru
+              </h2>
+              {logs.length === 0 ? (
+                <EmptyState title="Belum ada aktivitas tercatat" description="Setiap login dan perubahan penting akan muncul di sini." />
+              ) : (
+                <ul className="space-y-2">
+                  {logs.slice(0, logVisible).map((log) => (
+                    <li key={log.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="break-words text-sm font-semibold clara-text-primary">{describeAuditAction(log.action)}</p>
+                        {log.actor_role ? <Tag>{getRoleDisplayLabel(log.actor_role)}</Tag> : null}
+                      </div>
+                      <p className="mt-1 break-words text-xs clara-text-muted">
+                        {log.actor_email ?? "Sistem"}
+                        {log.organization_name ? ` · ${log.organization_name}` : ""} · {formatRelativeTime(log.created_at)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {logs.length > logVisible ? (
+                <button type="button" onClick={() => setLogVisible((count) => count + LOG_STEP)} className="clara-button clara-button-ghost">
+                  Tampilkan {Math.min(logs.length - logVisible, LOG_STEP)} aktivitas lagi ({logs.length - logVisible} tersisa)
+                </button>
+              ) : null}
+            </section>
+
+            <Section title="Pengguna terbaru" count={overview.recent_users.length} empty="Belum ada pengguna.">
+              {overview.recent_users.map((user) => (
+                <li key={user.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="break-words text-sm font-semibold clara-text-primary">{user.name}</p>
+                    <Tag>{getRoleDisplayLabel(user.role)}</Tag>
+                  </div>
+                  <p className="mt-1 break-words text-xs clara-text-muted">
+                    {user.email} · dibuat {formatDateTime(user.created_at)}
+                    {user.created_by_user_name ? ` oleh ${user.created_by_user_name}` : ""}
+                  </p>
+                </li>
               ))}
-            </section>
+            </Section>
 
-            <section className="grid gap-6 xl:grid-cols-2">
-              <Panel
-                title="Recent Users"
-                description="User terbaru berikut role dan organization_id."
-              >
-                {overview.recent_users.length === 0 ? (
-                  <EmptyText text="Belum ada user yang bisa ditampilkan." />
-                ) : (
-                  <div className="space-y-3">
-                    {overview.recent_users.map((user) => (
-                      <div
-                        key={user.id}
-                        className="rounded-xl border border-clara-line p-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold clara-text-primary">
-                            {user.email}
-                          </p>
-                          <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
-                            {formatStatusLabel(user.role)}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm text-clara-ink-2">
-                          {user.name}
-                        </p>
-                        <p className="mt-2 text-xs text-clara-ink-3">
-                          org: {user.organization_id ?? "-"}
-                        </p>
-                        <p className="mt-1 text-xs text-clara-ink-3">
-                          created by: {user.created_by_user_name ?? "-"}
-                        </p>
-                        <p className="mt-1 text-xs text-clara-ink-3">
-                          created: {formatDateTime(user.created_at)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Panel>
+            <Section title="Organisasi terbaru" count={overview.recent_organizations.length} empty="Belum ada organisasi.">
+              {overview.recent_organizations.map((organization) => (
+                <li key={organization.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                  <p className="break-words text-sm font-semibold clara-text-primary">{organization.name}</p>
+                  <p className="mt-1 text-xs clara-text-muted">Dibuat {formatDateTime(organization.created_at)}</p>
+                </li>
+              ))}
+            </Section>
 
-              <Panel
-                title="Recent Organizations"
-                description="Daftar organization terbaru yang ada di sistem."
-              >
-                {overview.recent_organizations.length === 0 ? (
-                  <EmptyText text="Belum ada organization." />
-                ) : (
-                  <div className="space-y-3">
-                    {overview.recent_organizations.map((organization) => (
-                      <div
-                        key={organization.id}
-                        className="rounded-xl border border-clara-line p-4"
-                      >
-                        <p className="text-sm font-semibold clara-text-primary">
-                          {organization.name}
-                        </p>
-                        <p className="mt-1 text-xs text-clara-ink-3">
-                          slug: {organization.slug}
-                        </p>
-                        <p className="mt-1 text-xs text-clara-ink-3">
-                          created: {formatDateTime(organization.created_at)}
-                        </p>
-                      </div>
-                    ))}
+            <Section title="Percakapan terbaru" count={overview.recent_conversations.length} empty="Belum ada percakapan.">
+              {overview.recent_conversations.map((conversation) => (
+                <li key={conversation.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="break-words text-sm font-semibold clara-text-primary">{conversation.title}</p>
+                    <ValueTag table={CONVERSATION_STATUS} value={conversation.status} />
                   </div>
-                )}
-              </Panel>
-            </section>
+                  <p className="mt-1 break-words text-xs clara-text-muted">
+                    {conversation.organization_name ?? "Tanpa organisasi"}
+                    {conversation.sales_owner_name ? ` · Sales: ${conversation.sales_owner_name}` : ""}
+                    {conversation.last_message_at ? ` · pesan terakhir ${formatRelativeTime(conversation.last_message_at)}` : ""}
+                  </p>
+                </li>
+              ))}
+            </Section>
 
-            <section className="grid gap-6 xl:grid-cols-2">
-              <Panel
-                title="Recent Conversations"
-                description="Metadata conversation terbaru tanpa raw message penuh."
-              >
-                {overview.recent_conversations.length === 0 ? (
-                  <EmptyText text="Belum ada conversation." />
-                ) : (
-                  <div className="space-y-3">
-                    {overview.recent_conversations.map((conversation) => (
-                      <div
-                        key={conversation.id}
-                        className="rounded-xl border border-clara-line p-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold clara-text-primary">
-                            {conversation.title}
-                          </p>
-                          <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
-                            {formatStatusLabel(conversation.status)}
-                          </span>
-                        </div>
-                        <div className="mt-2 grid gap-1 text-xs text-clara-ink-3">
-                          <p>org: {conversation.organization_name ?? "-"}</p>
-                          <p>
-                            sales owner: {conversation.sales_owner_name ?? "-"}
-                          </p>
-                          <p>source: {conversation.source}</p>
-                          <p>file: {conversation.raw_filename ?? "-"}</p>
-                          <p>
-                            last message:{" "}
-                            {formatDateTime(conversation.last_message_at)}
-                          </p>
-                          <p>
-                            created: {formatDateTime(conversation.created_at)}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+            <Section title="Pengetahuan produk terbaru" count={overview.recent_product_knowledge.length} empty="Belum ada pengetahuan produk.">
+              {overview.recent_product_knowledge.map((item) => (
+                <li key={item.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="break-words text-sm font-semibold clara-text-primary">{item.title}</p>
+                    <Tag tone={item.is_active ? "good" : "neutral"}>{item.is_active ? "Aktif" : "Nonaktif"}</Tag>
                   </div>
-                )}
-              </Panel>
+                  <p className="mt-1 break-words text-xs clara-text-muted">
+                    {item.organization_name ?? "Semua organisasi"} · diubah {formatRelativeTime(item.updated_at)}
+                  </p>
+                </li>
+              ))}
+            </Section>
 
-              <Panel
-                title="Audit log terbaru"
-                description="Aksi terbaru yang tercatat di sistem."
-              >
-                {overview.recent_audit_logs.length === 0 ? (
-                  <EmptyText text="Belum ada audit log." />
-                ) : (
-                  <div className="space-y-3">
-                    {overview.recent_audit_logs.map((log) => (
-                      <div
-                        key={log.id}
-                        className="rounded-xl border border-clara-line p-4"
-                      >
-                        <p className="text-sm font-semibold clara-text-primary">
-                          {log.action}
-                        </p>
-                        <div className="mt-2 grid gap-1 text-xs text-clara-ink-3">
-                          <p>actor: {log.actor_email ?? "-"}</p>
-                          <p>role: {log.actor_role ?? "-"}</p>
-                          <p>resource: {log.resource_type}</p>
-                          <p>resource id: {log.resource_id ?? "-"}</p>
-                          <p>org: {log.organization_name ?? "-"}</p>
-                          <p>created: {formatDateTime(log.created_at)}</p>
-                        </div>
-                      </div>
-                    ))}
+            <Section title="Catatan insight pasar" count={overview.recent_snapshots.length} empty="Belum ada catatan insight pasar.">
+              {overview.recent_snapshots.map((snapshot) => (
+                <li key={snapshot.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold clara-text-primary">
+                      {snapshot.period_start} s/d {snapshot.period_end}
+                    </p>
+                    <ValueTag table={SNAPSHOT_SCOPE} value={snapshot.scope_type} />
                   </div>
-                )}
-              </Panel>
-            </section>
-
-            <section className="grid gap-6 xl:grid-cols-2">
-              <Panel
-                title="Knowledge terbaru"
-                description="Knowledge base terbaru yang aktif maupun nonaktif."
-              >
-                {overview.recent_product_knowledge.length === 0 ? (
-                  <EmptyText text="Belum ada product knowledge." />
-                ) : (
-                  <div className="space-y-3">
-                    {overview.recent_product_knowledge.map((item) => (
-                      <div
-                        key={item.id}
-                        className="rounded-xl border border-clara-line p-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold clara-text-primary">
-                            {item.title}
-                          </p>
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              item.is_active
-                                ? "bg-clara-success-surface text-clara-success"
-                                : "bg-clara-raised text-clara-ink-2"
-                            }`}
-                          >
-                            {item.is_active ? "active" : "inactive"}
-                          </span>
-                        </div>
-                        <div className="mt-2 grid gap-1 text-xs text-clara-ink-3">
-                          <p>category: {item.category}</p>
-                          <p>source type: {item.source_type}</p>
-                          <p>org: {item.organization_name ?? "global"}</p>
-                          <p>updated: {formatDateTime(item.updated_at)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Panel>
-
-              <Panel
-                title="Recent Marketing Snapshots"
-                description="Snapshot insight terbaru untuk tracking tren."
-              >
-                {overview.recent_snapshots.length === 0 ? (
-                  <EmptyText text="Belum ada marketing snapshot." />
-                ) : (
-                  <div className="space-y-3">
-                    {overview.recent_snapshots.map((snapshot) => (
-                      <div
-                        key={snapshot.id}
-                        className="rounded-xl border border-clara-line p-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-semibold clara-text-primary">
-                            {snapshot.period_start} s/d {snapshot.period_end}
-                          </p>
-                          <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
-                            {formatStatusLabel(snapshot.scope_type)}
-                          </span>
-                        </div>
-                        <div className="mt-2 grid gap-1 text-xs text-clara-ink-3">
-                          <p>org: {snapshot.organization_name ?? "global"}</p>
-                          <p>conversations: {snapshot.total_conversations}</p>
-                          <p>
-                            analyzed conversations:{" "}
-                            {snapshot.total_analyzed_conversations}
-                          </p>
-                          <p>created: {formatDateTime(snapshot.created_at)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Panel>
-            </section>
+                  <p className="mt-1 text-xs clara-text-muted">
+                    {snapshot.total_conversations} percakapan, {snapshot.total_analyzed_conversations} sudah dibaca Clara
+                  </p>
+                </li>
+              ))}
+            </Section>
           </>
-        )}
+        ) : null}
       </div>
     </WorkspaceShell>
   );
 }
 
-function InfoCard({
-  label,
-  value,
-  description,
-}: {
-  label: string;
-  value: string;
-  description: string;
-}) {
+function Section({ title, count, empty, children }: { title: string; count: number; empty: string; children: React.ReactNode }) {
   return (
-    <article className="clara-card rounded-2xl p-5">
-      <p className="clara-kicker text-xs text-clara-ink-3">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
-        {value}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-clara-ink-2">{description}</p>
-    </article>
+    <details className="clara-card p-4 sm:p-5">
+      <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+        {title} ({count})
+      </summary>
+      {count === 0 ? <p className="mt-3 text-sm clara-text-secondary">{empty}</p> : <ul className="mt-3 space-y-2">{children}</ul>}
+    </details>
   );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <article className="clara-card rounded-2xl p-5">
-      <p className="text-sm font-medium text-clara-ink-3">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
-        {value}
-      </p>
-    </article>
-  );
-}
-
-function Panel({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="clara-card rounded-3xl p-5">
-      <div>
-        <h2 className="text-lg font-semibold clara-text-primary">{title}</h2>
-        <p className="mt-1 text-sm text-clara-ink-2">{description}</p>
-      </div>
-      <div className="mt-5">{children}</div>
-    </section>
-  );
-}
-
-function EmptyText({ text }: { text: string }) {
-  return <p className="text-sm text-clara-ink-3">{text}</p>;
 }
