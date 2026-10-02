@@ -33,8 +33,9 @@ import {
   sha256Hex
 } from "~/utils/delivery-governance"
 import { readWhatsAppFromPage } from "~/utils/whatsapp-page"
+import { toUserMessage } from "~/utils/user-messages"
+import { panelCss } from "~/utils/sidepanel-styles"
 
-import chatWallpaper from "./assets/eb24786e5579a01bdd4bb103695b8286.jpg"
 
 const OPENAI_PROXY_URL = getConfiguredProxyUrl()
 const CHAT_SNAPSHOT_PROXY_URL = getChatSnapshotProxyUrl(OPENAI_PROXY_URL)
@@ -53,6 +54,13 @@ const CHATGPT_CONTEXT_REGION_ID = "clara-chatgpt-context-details"
 const CHATGPT_CONTEXT_PROMPT_ID = "clara-chatgpt-context-prompt"
 const DRAFT_REPLY_TEXTAREA_ID = "clara-draft-reply"
 
+// Tab ChatGPT menyalin isi chat customer ke layanan di luar Clara, jadi default-nya mati.
+// Nyalakan dengan PLASMO_PUBLIC_CLARA_ENABLE_CHATGPT_WORKSPACE=true di .env extension.
+const ENABLE_CHATGPT_WORKSPACE =
+  (process.env.PLASMO_PUBLIC_CLARA_ENABLE_CHATGPT_WORKSPACE || "")
+    .trim()
+    .toLowerCase() === "true"
+
 class ConversationOwnershipError extends Error {}
 
 const getBackendErrorMessage = (payload: any) =>
@@ -62,1069 +70,6 @@ const getBackendErrorMessage = (payload: any) =>
     payload.detail.message.trim()) ||
   ""
 
-const panelCss = `
-  html,
-  body {
-    background: #070503;
-    margin: 0;
-    min-height: 100%;
-    padding: 0;
-  }
-
-  body {
-    overflow-x: hidden;
-  }
-
-  .clara-panel {
-    --clara-ink: #f7e7b7;
-    --clara-muted: #c9aa68;
-    --clara-line: rgba(240, 203, 115, 0.14);
-    --clara-surface: rgba(23, 17, 11, 0.94);
-    --clara-surface-2: rgba(33, 24, 16, 0.9);
-    --clara-accent: #f0cb73;
-    --clara-accent-strong: #c29032;
-    --clara-warm: #e1b24a;
-    --clara-danger: #e17c54;
-    background: linear-gradient(180deg, #120d08 0%, #070503 100%);
-    color: var(--clara-ink);
-    font-family: "Aptos", "Segoe UI Variable Display", "Trebuchet MS", "Segoe UI", sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-    padding: 12px;
-    box-sizing: border-box;
-    width: 100%;
-  }
-
-  .clara-panel--chatgpt {
-    max-height: 100vh;
-    overflow-x: hidden;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
-  }
-
-  .clara-panel *,
-  .clara-panel *::before,
-  .clara-panel *::after {
-    box-sizing: border-box;
-  }
-
-  .clara-stage {
-    display: grid;
-    gap: 12px;
-    min-width: 0;
-  }
-
-  .clara-stage--chatgpt {
-    grid-template-rows: auto minmax(0, 1fr);
-    min-height: calc(100vh - 24px);
-  }
-
-  .clara-stage > * {
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  .clara-hero {
-    background: #171008;
-    border: 1px solid rgba(240, 203, 115, 0.14);
-    border-radius: 16px;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
-    color: #fff0c9;
-    overflow: hidden;
-    padding: 14px;
-    position: relative;
-  }
-
-  .clara-hero::after {
-    content: none;
-  }
-
-  .clara-hero__top,
-  .clara-pane__header,
-  .clara-draft__head {
-    align-items: flex-start;
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 12px;
-    justify-content: space-between;
-    position: relative;
-    z-index: 1;
-  }
-
-  .clara-hero__top {
-    display: grid;
-    gap: 12px;
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .clara-build-badge {
-    align-self: start;
-    background: rgba(12, 9, 6, 0.72);
-    border: 1px solid rgba(240, 203, 115, 0.28);
-    border-radius: 999px;
-    color: #ffe3a0;
-    font-size: 11px;
-    font-weight: 800;
-    justify-self: start;
-    letter-spacing: 0.08em;
-    padding: 8px 10px;
-    text-transform: uppercase;
-  }
-
-  .clara-workspace-switcher {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    position: relative;
-    z-index: 1;
-  }
-
-  .clara-workspace-cta {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 10px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .clara-workspace-tab {
-    appearance: none;
-    background: rgba(12, 9, 6, 0.56);
-    border: 1px solid rgba(240, 203, 115, 0.14);
-    border-radius: 999px;
-    color: rgba(247, 231, 183, 0.82);
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 800;
-    justify-content: center;
-    letter-spacing: 0.08em;
-    min-height: 42px;
-    padding: 9px 12px;
-    text-align: center;
-    text-transform: uppercase;
-    transition:
-      border-color 0.16s ease,
-      background 0.16s ease,
-      color 0.16s ease,
-      transform 0.16s ease;
-  }
-
-  .clara-workspace-tab:hover {
-    border-color: rgba(240, 203, 115, 0.32);
-    color: #fff0c9;
-    transform: translateY(-1px);
-  }
-
-  .clara-hero__footer {
-    display: flex;
-    justify-content: flex-start;
-    margin-top: 12px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .clara-workspace-tab--active {
-    background: linear-gradient(135deg, rgba(240, 203, 115, 0.22), rgba(194, 144, 50, 0.18));
-    border-color: rgba(240, 203, 115, 0.42);
-    color: #fff0c9;
-  }
-
-  .clara-workspace-cta .clara-button {
-    min-height: 44px;
-  }
-
-  .clara-hero__eyebrow {
-    color: rgba(240, 203, 115, 0.88);
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
-  .clara-hero__title {
-    font-size: 24px;
-    font-weight: 800;
-    letter-spacing: -0.05em;
-    line-height: 0.98;
-    margin: 8px 0 0;
-    max-width: none;
-  }
-
-  .clara-hero__copy {
-    color: rgba(247, 231, 183, 0.84);
-    font-size: 12px;
-    line-height: 1.5;
-    margin: 8px 0 0;
-    max-width: none;
-  }
-
-  .clara-identity {
-    background: rgba(12, 9, 6, 0.44);
-    border: 1px solid rgba(240, 203, 115, 0.14);
-    border-radius: 16px;
-    min-width: 0;
-    max-width: 100%;
-    width: 100%;
-    padding: 12px;
-  }
-
-  .clara-identity__label {
-    color: rgba(240, 203, 115, 0.72);
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .clara-identity__name {
-    font-size: 15px;
-    font-weight: 800;
-    line-height: 1.2;
-    margin-top: 8px;
-    overflow-wrap: anywhere;
-  }
-
-  .clara-identity__meta {
-    color: rgba(247, 231, 183, 0.7);
-    font-size: 11px;
-    line-height: 1.45;
-    margin-top: 6px;
-    overflow-wrap: anywhere;
-  }
-
-  .clara-pane {
-    background: var(--clara-surface);
-    border: 1px solid rgba(240, 203, 115, 0.14);
-    border-radius: 16px;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-    display: grid;
-    gap: 12px;
-    min-width: 0;
-    padding: 14px;
-  }
-
-  .clara-pane--chatgpt {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    min-height: 72vh;
-    overflow: hidden;
-    padding: 0;
-  }
-
-  .clara-chatgpt-context {
-    background:
-      linear-gradient(180deg, rgba(28, 20, 13, 0.98), rgba(18, 13, 10, 0.98));
-    border-top: 1px solid rgba(240, 203, 115, 0.12);
-    display: grid;
-    gap: 10px;
-    max-height: min(42vh, 360px);
-    overflow-x: hidden;
-    overflow-y: auto;
-    padding: 14px;
-    scrollbar-gutter: stable;
-  }
-
-  .clara-chatgpt-context--collapsed {
-    gap: 8px;
-    max-height: none;
-    overflow: hidden;
-  }
-
-  .clara-chatgpt-context__details {
-    display: grid;
-    gap: 10px;
-  }
-
-  .clara-chatgpt-context::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .clara-chatgpt-context::-webkit-scrollbar-thumb {
-    background: rgba(240, 203, 115, 0.24);
-    border-radius: 999px;
-  }
-
-  .clara-chatgpt-context__top {
-    align-items: flex-start;
-    display: flex;
-    gap: 12px;
-    justify-content: space-between;
-  }
-
-  .clara-chatgpt-context__summary {
-    display: grid;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .clara-chatgpt-context__actions {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .clara-chatgpt-context__toggle {
-    align-items: center;
-    appearance: none;
-    background: rgba(255, 240, 201, 0.04);
-    border: 1px solid rgba(240, 203, 115, 0.14);
-    border-radius: 14px;
-    color: #f0cb73;
-    cursor: pointer;
-    display: inline-flex;
-    font-size: 11px;
-    font-weight: 800;
-    gap: 8px;
-    justify-content: center;
-    min-height: 38px;
-    padding: 8px 12px;
-    width: 100%;
-  }
-
-  .clara-chatgpt-context__toggle:hover {
-    border-color: rgba(240, 203, 115, 0.28);
-  }
-
-  .clara-chatgpt-context__toggle-icon {
-    font-size: 12px;
-    line-height: 1;
-  }
-
-  .clara-chatgpt-context__meta {
-    background: rgba(255, 240, 201, 0.06);
-    border: 1px solid rgba(240, 203, 115, 0.12);
-    border-radius: 16px;
-    color: #e5c98b;
-    display: grid;
-    gap: 6px;
-    font-size: 11px;
-    line-height: 1.45;
-    padding: 11px 12px;
-  }
-
-  .clara-chatgpt-context__meta strong {
-    color: #fff0c9;
-  }
-
-  .clara-chatgpt-context__prompt {
-    font-size: 11px;
-    line-height: 1.55;
-    min-height: 104px;
-    max-height: 148px;
-    resize: none;
-  }
-
-  .clara-chatgpt-context__prompt[readonly] {
-    cursor: text;
-  }
-
-  .clara-pane--chatgpt .clara-pane__header {
-    gap: 8px;
-  }
-
-  .clara-pane--chatgpt .clara-pane__eyebrow {
-    font-size: 10px;
-    letter-spacing: 0.16em;
-  }
-
-  .clara-pane--chatgpt .clara-pane__title {
-    font-size: 15px;
-    margin-top: 2px;
-  }
-
-  .clara-pane--chatgpt .clara-pane__copy {
-    font-size: 11px;
-    line-height: 1.35;
-    margin-top: 2px;
-  }
-
-  .clara-pane--reply {
-    background:
-      linear-gradient(180deg, rgba(35,25,16,0.96), rgba(18,13,10,0.98));
-  }
-
-  .clara-pane__eyebrow {
-    color: #c9aa68;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .clara-pane__title {
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1.05;
-    margin-top: 4px;
-  }
-
-  .clara-pane__copy {
-    color: var(--clara-muted);
-    font-size: 12px;
-    line-height: 1.5;
-    margin-top: 4px;
-  }
-
-  .clara-pane__actions {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .clara-action-bridge {
-    align-items: center;
-    display: grid;
-    gap: 10px;
-    grid-template-columns: 1fr auto 1fr;
-    margin: -2px 0;
-  }
-
-  .clara-action-bridge__line {
-    background: linear-gradient(
-      90deg,
-      rgba(240, 203, 115, 0),
-      rgba(240, 203, 115, 0.18),
-      rgba(240, 203, 115, 0)
-    );
-    height: 1px;
-    width: 100%;
-  }
-
-  .clara-action-bridge__actions {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    min-width: min(100%, 420px);
-    width: min(100%, 420px);
-  }
-
-  .clara-chip {
-    align-items: center;
-    border-radius: 999px;
-    display: inline-flex;
-    font-size: 11px;
-    font-weight: 700;
-    justify-content: center;
-    max-width: 100%;
-    min-height: 28px;
-    min-width: 0;
-    padding: 6px 10px;
-    text-align: center;
-    white-space: normal;
-  }
-
-  .clara-chip--dark {
-    background: rgba(240, 203, 115, 0.12);
-    border: 1px solid rgba(240, 203, 115, 0.16);
-    color: #fff0c9;
-  }
-
-  .clara-chip--soft {
-    background: rgba(255, 240, 201, 0.06);
-    border: 1px solid rgba(240, 203, 115, 0.12);
-    color: #e5c98b;
-  }
-
-  .clara-chip--good {
-    background: rgba(240, 203, 115, 0.14);
-    border: 1px solid rgba(240, 203, 115, 0.18);
-    color: #f0cb73;
-  }
-
-  .clara-chip--warn {
-    background: rgba(194, 144, 50, 0.14);
-    border: 1px solid rgba(240, 203, 115, 0.18);
-    color: #f3d694;
-  }
-
-  .clara-button {
-    appearance: none;
-    border: none;
-    border-radius: 16px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 800;
-    line-height: 1.2;
-    min-height: 42px;
-    min-width: 0;
-    max-width: 100%;
-    padding: 11px 13px;
-    transition:
-      transform 160ms ease,
-      opacity 160ms ease,
-      box-shadow 160ms ease;
-  }
-
-  .clara-button:hover:not(:disabled) {
-    transform: translateY(-1px);
-  }
-
-  .clara-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-
-  .clara-button--block {
-    width: 100%;
-  }
-
-  .clara-button--compact {
-    min-height: 40px;
-  }
-
-  .clara-button--primary {
-    background: linear-gradient(135deg, #f6d98c 0%, #c29032 100%);
-    box-shadow:
-      0 18px 30px rgba(0, 0, 0, 0.22),
-      inset 0 1px 0 rgba(255, 248, 224, 0.18);
-    color: #140f08;
-  }
-
-  .clara-button--ghost {
-    background: rgba(255, 240, 201, 0.05);
-    border: 1px solid rgba(240, 203, 115, 0.14);
-    color: #f0cb73;
-  }
-
-  .clara-button--insert {
-    background: linear-gradient(135deg, #2b1c0f 0%, #8b6321 100%);
-    color: #fff0c9;
-  }
-
-  .clara-button--send {
-    background: linear-gradient(135deg, #f0cb73 0%, #b67d27 100%);
-    color: #140f08;
-  }
-
-  .clara-note {
-    border-radius: 16px;
-    font-size: 12px;
-    line-height: 1.5;
-    padding: 11px 12px;
-  }
-
-  .clara-note--warn {
-    background: rgba(55, 38, 18, 0.96);
-    border: 1px solid rgba(240, 203, 115, 0.22);
-    color: #f3d694;
-  }
-
-  .clara-pane--chatgpt .clara-note--warn {
-    font-size: 10px;
-    line-height: 1.35;
-    padding: 9px 10px;
-  }
-
-  .clara-note--success {
-    background: rgba(41, 30, 17, 0.98);
-    border: 1px solid rgba(240, 203, 115, 0.18);
-    color: #f0cb73;
-  }
-
-  .clara-note--error {
-    background: rgba(66, 33, 21, 0.98);
-    border: 1px solid rgba(225, 124, 84, 0.28);
-    color: var(--clara-danger);
-  }
-
-  .clara-overview {
-    display: grid;
-    gap: 10px;
-    min-width: 0;
-  }
-
-  .clara-chat-shell {
-    background: #130d08;
-    border: 1px solid rgba(240, 203, 115, 0.12);
-    border-radius: 20px;
-    overflow: hidden;
-  }
-
-  .clara-chat-appbar {
-    align-items: center;
-    background: #1b130b;
-    border-bottom: 1px solid rgba(240, 203, 115, 0.12);
-    display: grid;
-    gap: 12px;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    padding: 10px 12px;
-  }
-
-  .clara-chat-avatar {
-    align-items: center;
-    background: linear-gradient(135deg, #f6d98c, #c29032);
-    border-radius: 50%;
-    color: #140f08;
-    display: inline-flex;
-    font-size: 14px;
-    font-weight: 800;
-    height: 36px;
-    justify-content: center;
-    width: 36px;
-  }
-
-  .clara-chat-appbar__title {
-    color: #fff0c9;
-    font-size: 14px;
-    font-weight: 700;
-    line-height: 1.25;
-    overflow-wrap: anywhere;
-  }
-
-  .clara-chat-appbar__meta {
-    color: #c9aa68;
-    font-size: 11px;
-    line-height: 1.35;
-    margin-top: 2px;
-    overflow-wrap: anywhere;
-  }
-
-  .clara-chat-latest {
-    background: rgba(255, 240, 201, 0.06);
-    border-bottom: 1px solid rgba(240, 203, 115, 0.08);
-    color: #d6bb84;
-    font-size: 11px;
-    line-height: 1.45;
-    padding: 8px 12px;
-  }
-
-  .clara-chat-latest strong {
-    color: #fff0c9;
-  }
-
-  .clara-thread {
-    background:
-      linear-gradient(rgba(10, 7, 5, 0.82), rgba(10, 7, 5, 0.82)),
-      url("${chatWallpaper}") center / cover no-repeat;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 280px;
-    min-width: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
-    padding: 12px;
-    margin: 0;
-    list-style: none;
-  }
-
-  .clara-thread::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  .clara-thread::-webkit-scrollbar-thumb {
-    background: rgba(240, 203, 115, 0.28);
-    border-radius: 999px;
-  }
-
-  .clara-thread-message {
-    background: #24180f;
-    border-radius: 10px;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.16), 0 1px 3px rgba(0, 0, 0, 0.2);
-    max-width: 82%;
-    min-width: 96px;
-    padding: 7px 9px 5px;
-    position: relative;
-    width: fit-content;
-  }
-
-  .clara-thread-message::before {
-    content: "";
-    position: absolute;
-    top: 0;
-  }
-
-  .clara-thread-message--in::before {
-    border-right: 10px solid #24180f;
-    border-top: 10px solid #24180f;
-    left: -5px;
-    transform: skewX(-24deg);
-  }
-
-  .clara-thread-message--out::before {
-    border-left: 10px solid #f0cb73;
-    border-top: 10px solid #f0cb73;
-    right: -5px;
-    transform: skewX(24deg);
-  }
-
-  .clara-thread-message--in {
-    align-self: flex-start;
-  }
-
-  .clara-thread-message--out {
-    align-self: flex-end;
-    background: #f0cb73;
-  }
-
-  .clara-thread-message__author {
-    color: #f0cb73;
-    font-size: 11px;
-    font-weight: 800;
-    line-height: 1.3;
-    margin-bottom: 4px;
-    overflow-wrap: anywhere;
-  }
-
-  .clara-thread-message__reply-context {
-    background: rgba(255, 240, 201, 0.06);
-    border: 1px solid rgba(240, 203, 115, 0.14);
-    border-radius: 10px;
-    margin-bottom: 6px;
-    padding: 6px 7px;
-  }
-
-  .clara-thread-message__reply-label {
-    color: #d6bb84;
-    font-size: 10px;
-    font-weight: 800;
-    line-height: 1.3;
-    margin-bottom: 2px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .clara-thread-message__reply-text {
-    color: #efd8a2;
-    font-size: 11px;
-    line-height: 1.4;
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-
-  .clara-thread-message__text {
-    color: #f7e7b7;
-    font-size: 12px;
-    line-height: 1.45;
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-
-  .clara-thread-message__footer {
-    color: #c9aa68;
-    display: flex;
-    font-size: 10px;
-    justify-content: flex-end;
-    line-height: 1.2;
-    margin-top: 4px;
-  }
-
-  .clara-thread-message--out .clara-thread-message__author {
-    color: rgba(20, 15, 8, 0.68);
-  }
-
-  .clara-thread-message--out .clara-thread-message__reply-context {
-    background: rgba(20, 15, 8, 0.08);
-    border-color: rgba(20, 15, 8, 0.12);
-  }
-
-  .clara-thread-message--out .clara-thread-message__reply-label {
-    color: rgba(20, 15, 8, 0.65);
-  }
-
-  .clara-thread-message--out .clara-thread-message__reply-text {
-    color: rgba(20, 15, 8, 0.88);
-  }
-
-  .clara-thread-message--out .clara-thread-message__text {
-    color: #140f08;
-  }
-
-  .clara-thread-message--out .clara-thread-message__footer {
-    color: rgba(20, 15, 8, 0.72);
-  }
-
-  .clara-empty {
-    background: rgba(255,240,201,0.06);
-    border: 1px dashed rgba(240, 203, 115, 0.18);
-    border-radius: 16px;
-    color: #d6bb84;
-    font-size: 13px;
-    line-height: 1.6;
-    padding: 14px;
-  }
-
-  .clara-empty__title {
-    color: #fff0c9;
-    font-size: 13px;
-    font-weight: 800;
-    margin-bottom: 6px;
-  }
-
-  .clara-empty__meta {
-    color: #c9aa68;
-    font-size: 12px;
-    line-height: 1.6;
-  }
-
-  .clara-embed-shell {
-    background: rgba(7, 5, 3, 0.56);
-    border: 1px solid rgba(240, 203, 115, 0.12);
-    border-radius: 18px;
-    min-height: 86vh;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .clara-embed-shell--chatgpt {
-    display: flex;
-    flex: 1 0 auto;
-    flex-direction: column;
-    min-height: 72vh;
-    border: none;
-    border-radius: inherit;
-    overflow: hidden;
-  }
-
-  .clara-embed-toolbar {
-    align-items: center;
-    background: rgba(13, 10, 7, 0.92);
-    border-bottom: 1px solid rgba(240, 203, 115, 0.12);
-    display: flex;
-    gap: 8px;
-    justify-content: space-between;
-    padding: 8px 10px;
-  }
-
-  .clara-embed-url {
-    color: rgba(247, 231, 183, 0.72);
-    font-size: 10px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .clara-embed-frame {
-    background: #0b0805;
-    border: 0;
-    display: block;
-    height: 86vh;
-    min-height: 820px;
-    width: 100%;
-  }
-
-  .clara-embed-frame--chatgpt {
-    flex: 1;
-    height: 100%;
-    min-height: 0;
-  }
-
-  .clara-brief {
-    background:
-      linear-gradient(180deg, rgba(34,24,16,0.96), rgba(19,13,10,0.96));
-    border: 1px solid rgba(240, 203, 115, 0.12);
-    border-radius: 18px;
-    display: grid;
-    gap: 10px;
-    padding: 12px;
-  }
-
-  .clara-brief__title {
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #c9aa68;
-  }
-
-  .clara-brief__grid {
-    display: grid;
-    gap: 10px;
-  }
-
-  .clara-brief__text {
-    color: #e5c98b;
-    font-size: 12px;
-    line-height: 1.65;
-    overflow-wrap: anywhere;
-  }
-
-  .clara-draft-list {
-    display: grid;
-    gap: 10px;
-    min-width: 0;
-  }
-
-  .clara-draft {
-    background: linear-gradient(180deg, rgba(34,24,16,0.96), rgba(18,13,10,0.94));
-    border: 1px solid rgba(240, 203, 115, 0.12);
-    border-radius: 18px;
-    box-shadow:
-      0 14px 28px rgba(0, 0, 0, 0.18),
-      inset 0 1px 0 rgba(255,240,201,0.06);
-    display: grid;
-    gap: 10px;
-    min-width: 0;
-    padding: 12px;
-  }
-
-  .clara-draft__number {
-    color: #f0cb73;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .clara-draft__tone {
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-  }
-
-  .clara-draft__hint {
-    color: var(--clara-muted);
-    font-size: 11px;
-    line-height: 1.45;
-    margin-top: 4px;
-  }
-
-  .clara-draft__text {
-    color: #f7e7b7;
-    font-size: 12px;
-    line-height: 1.58;
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-
-  .clara-draft__editor {
-    display: grid;
-    gap: 10px;
-  }
-
-  .clara-input {
-    appearance: none;
-    background: linear-gradient(180deg, rgba(20,14,10,0.98), rgba(15,10,7,0.94));
-    border: 1px solid rgba(240, 203, 115, 0.16);
-    border-radius: 16px;
-    box-shadow:
-      inset 0 1px 2px rgba(0, 0, 0, 0.18),
-      0 10px 24px rgba(0, 0, 0, 0.14);
-    color: #f7e7b7;
-    font-family: "Aptos", "Segoe UI Variable Display", "Trebuchet MS", "Segoe UI", sans-serif;
-    font-size: 13px;
-    line-height: 1.65;
-    min-width: 0;
-    outline: none;
-    padding: 14px 15px;
-    resize: vertical;
-    transition:
-      border-color 160ms ease,
-      box-shadow 160ms ease,
-      background 160ms ease;
-    width: 100%;
-  }
-
-  .clara-input::placeholder {
-    color: rgba(201, 170, 104, 0.72);
-  }
-
-  .clara-input:focus {
-    background: #1b130b;
-    border-color: rgba(240, 203, 115, 0.42);
-    box-shadow:
-      0 0 0 4px rgba(240, 203, 115, 0.12),
-      0 14px 26px rgba(0, 0, 0, 0.18);
-  }
-
-  .clara-input--textarea {
-    min-height: 172px;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-
-  .clara-field-label {
-    color: var(--clara-muted);
-    font-size: 12px;
-    font-weight: 700;
-  }
-
-  .clara-panel button:focus-visible,
-  .clara-panel textarea:focus-visible {
-    outline: 2px solid var(--clara-accent);
-    outline-offset: 2px;
-  }
-
-  .clara-draft__reason {
-    background: rgba(255, 240, 201, 0.06);
-    border-radius: 14px;
-    color: #d6bb84;
-    font-size: 12px;
-    line-height: 1.6;
-    padding: 10px 11px;
-  }
-
-  .clara-draft__actions {
-    display: grid;
-    gap: 8px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    min-width: 0;
-  }
-
-  @media (max-width: 560px) {
-    .clara-panel {
-      padding: 12px;
-    }
-
-    .clara-hero,
-    .clara-pane {
-      border-radius: 20px;
-      padding: 12px;
-    }
-
-    .clara-hero__title {
-      font-size: 22px;
-    }
-
-    .clara-overview__grid,
-    .clara-draft__actions,
-    .clara-workspace-cta {
-      grid-template-columns: 1fr;
-    }
-
-    .clara-action-bridge {
-      grid-template-columns: 1fr;
-    }
-
-    .clara-action-bridge__line {
-      display: none;
-    }
-
-    .clara-action-bridge__actions,
-    .clara-pane__actions {
-      grid-template-columns: 1fr;
-      min-width: 0;
-      width: 100%;
-    }
-  }
-
-  @media (max-width: 380px) {
-    .clara-hero__title {
-      font-size: 24px;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .clara-panel *,
-    .clara-panel *::before,
-    .clara-panel *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      scroll-behavior: auto !important;
-      transition-duration: 0.01ms !important;
-    }
-
-    .clara-panel button:hover {
-      transform: none;
-    }
-  }
-`
 
 const panelStyle = {
   background:
@@ -1791,9 +736,7 @@ const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
   const snapshotCandidates = getSnapshotSyncCandidates(chatData.channel)
 
   if (snapshotCandidates.length === 0) {
-    throw new Error(
-      "PLASMO_PUBLIC_CLARA_API_BASE_URL belum diisi. Fallback proxy lokal hanya aktif untuk development bila diizinkan eksplisit."
-    )
+    throw new Error(toUserMessage("PLASMO_PUBLIC_CLARA_API_BASE_URL belum diisi", "snapshot"))
   }
 
   for (const proxyUrl of snapshotCandidates) {
@@ -1841,9 +784,8 @@ const syncChatSnapshotToProxy = async (chatData: WhatsAppChatSnapshot) => {
     }
   }
 
-  throw new Error(
-    `Gagal menghubungi API snapshot di ${snapshotCandidates[0] || CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
-  )
+  console.warn("[Clara] sinkron snapshot gagal:", lastFetchError)
+  throw new Error(toUserMessage(lastFetchError || "Failed to fetch", "snapshot"))
 }
 
 const clearChatSnapshotInProxy = async () => {
@@ -1883,9 +825,8 @@ const clearChatSnapshotInProxy = async () => {
     }
   }
 
-  throw new Error(
-    `Gagal menghubungi API snapshot di ${snapshotCandidates[0] || CHAT_SNAPSHOT_PROXY_URL}. Detail: ${lastFetchError || "Failed to fetch"}`
-  )
+  console.warn("[Clara] sinkron snapshot gagal:", lastFetchError)
+  throw new Error(toUserMessage(lastFetchError || "Failed to fetch", "snapshot"))
 }
 
 const fetchSuggestionsFromClaraBackendOnly = async (
@@ -1896,7 +837,7 @@ const fetchSuggestionsFromClaraBackendOnly = async (
   if (!claraReplySuggestionsUrl) {
     if (!isDevFallbackAllowed()) {
       throw new Error(
-        "Endpoint backend Clara untuk reply suggestion belum dikonfigurasi. Fallback proxy lokal diblokir di mode non-development."
+        toUserMessage("Endpoint reply suggestion belum dikonfigurasi", "suggest")
       )
     }
     return null
@@ -1946,9 +887,8 @@ const fetchSuggestionsFromClaraBackendOnly = async (
     }
   }
 
-  throw new Error(
-    `Gagal menghubungi backend Clara untuk mengambil jawaban terbaik. Detail: ${lastFetchError || "Failed to fetch"}`
-  )
+  console.warn("[Clara] ambil jawaban gagal:", lastFetchError)
+  throw new Error(toUserMessage(lastFetchError || "Failed to fetch", "suggest"))
 }
 
 const shouldClearSnapshotForError = (message: string) =>
@@ -2189,6 +1129,8 @@ function ClaraSidePanel() {
   const [isLoading, setIsLoading] = useState(false)
   const [isInsertingIndex, setIsInsertingIndex] = useState<number | null>(null)
   const [isSuggesting, setIsSuggesting] = useState(false)
+  const [isConfirmingSend, setIsConfirmingSend] = useState(false)
+  const [chatReadAt, setChatReadAt] = useState<Date | null>(null)
   const [hasEditedSuggestion, setHasEditedSuggestion] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [draftSuggestions, setDraftSuggestions] = useState<string[]>([])
@@ -2222,7 +1164,8 @@ function ClaraSidePanel() {
   const editSuggestionButtonRef = useRef<HTMLButtonElement | null>(null)
   const sendInFlightRef = useRef(false)
 
-  const isClaraWorkspace = activeWorkspace === "clara"
+  const isClaraWorkspace =
+    !ENABLE_CHATGPT_WORKSPACE || activeWorkspace === "clara"
   const isAuthenticated = authStatus === "authenticated"
   const shouldShowLoginGate = !isAuthenticated
 
@@ -2576,6 +1519,7 @@ function ClaraSidePanel() {
       const data = await readChatFromActiveTab()
       const mergedData = mergeChatSnapshots(chatDataRef.current, data)
       setChatData(mergedData)
+      setChatReadAt(new Date())
 
       try {
         const syncResult = await syncChatSnapshotToProxy(mergedData)
@@ -2589,8 +1533,8 @@ function ClaraSidePanel() {
           syncError instanceof ConversationOwnershipError
             ? syncError.message
             : syncError instanceof Error
-            ? `Chat berhasil dibaca, tapi gagal dikirim ke API: ${syncError.message}`
-            : "Chat berhasil dibaca, tapi gagal dikirim ke API."
+            ? `Chat berhasil dibaca, tapi belum tersimpan ke Clara. ${syncError.message}`
+            : "Chat berhasil dibaca, tapi belum tersimpan ke Clara. Coba klik Baca Ulang Chat lagi."
         )
       }
     } catch (err) {
@@ -2709,14 +1653,13 @@ function ClaraSidePanel() {
     }
 
     setIsSuggesting(true)
+    setIsConfirmingSend(false)
     setError("")
     setFeedback("")
 
     try {
-      const currentChatData =
-        chatData && chatData.messages.length > 0
-          ? chatData
-          : await readChatFromActiveTab()
+      // Selalu baca chat yang sedang terbuka supaya jawaban tidak dibuat dari tampilan lama.
+      const currentChatData = await readChatFromActiveTab()
       const mergedChatData = mergeChatSnapshots(
         chatDataRef.current,
         currentChatData
@@ -2724,11 +1667,12 @@ function ClaraSidePanel() {
 
       if (mergedChatData.messages.length === 0) {
         throw new Error(
-          "Chat aktif belum punya pesan teks yang bisa dipakai untuk generate jawaban."
+          "Belum ada pesan teks yang bisa dibaca dari chat ini. Buka chat yang berisi teks, gulir ke atas sebentar, lalu klik Buat Jawaban lagi."
         )
       }
 
       setChatData(mergedChatData)
+      setChatReadAt(new Date())
       const suggestionResult =
         await fetchSuggestionsFromClaraBackendOnly(mergedChatData)
       const bestSuggestion = suggestionResult?.suggestions[0]?.trim()
@@ -2764,10 +1708,10 @@ function ClaraSidePanel() {
           : "Jawaban terbaik Clara sudah siap dipakai."
       )
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Terjadi kendala saat membuat saran jawaban."
+      const message = toUserMessage(
+        err instanceof Error ? err.message : "",
+        "suggest"
+      )
 
       setSuggestions([])
       setDraftSuggestions([])
@@ -2832,6 +1776,7 @@ function ClaraSidePanel() {
   }
 
   const handleInsertSuggestion = async (suggestion: string, index: number) => {
+    setIsConfirmingSend(false)
     if (isInsertingIndex !== null) {
       return
     }
@@ -2906,9 +1851,10 @@ function ClaraSidePanel() {
       )
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Terjadi kendala saat memasukkan saran ke chatbox."
+        toUserMessage(
+          err instanceof Error ? err.message : "",
+          "suggest"
+        )
       )
     } finally {
       setIsInsertingIndex(null)
@@ -2916,6 +1862,7 @@ function ClaraSidePanel() {
   }
 
   const handleStartEditingSuggestion = (index: number) => {
+    setIsConfirmingSend(false)
     setEditingSuggestionIndex(index)
     setError("")
     setFeedback("")
@@ -2967,6 +1914,7 @@ function ClaraSidePanel() {
   }
 
   const handleSendSuggestion = async (suggestion: string, index: number) => {
+    setIsConfirmingSend(false)
     if (
       isInsertingIndex !== null ||
       !canStartGovernedSend({
@@ -3198,12 +2146,14 @@ function ClaraSidePanel() {
             : "Pesan terkirim dan status sent sudah tercatat di Clara."
       )
     } catch (err) {
-      const message =
+      const message = toUserMessage(
         err instanceof Error
           ? err.message
           : wasSent
             ? "Pesan terkirim, tetapi status sent gagal disinkronkan ke Clara."
-            : "Terjadi kendala saat mengirim draft ke chat aktif."
+            : "Terjadi kendala saat mengirim draft ke chat aktif.",
+        "suggest"
+      )
 
       setError(
         wasSent && !message.toLowerCase().includes("terkirim")
@@ -3228,19 +2178,36 @@ function ClaraSidePanel() {
           : "Belum terdeteksi"
   const authStatusLabel =
     authStatus === "authenticated"
-      ? "Connected"
+      ? "Terhubung"
       : authStatus === "checking"
-        ? "Checking"
+        ? "Memeriksa"
         : authStatus === "misconfigured"
-          ? "Setup needed"
-          : "Login needed"
+          ? "Perlu pengaturan"
+          : "Perlu login"
+  const chatReadTimeLabel = chatReadAt
+    ? chatReadAt.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    : ""
+  const chatStatusText = isSuggesting
+    ? "Clara sedang membaca chat dan menyusun jawaban..."
+    : isLoading
+      ? "Membaca chat yang sedang terbuka..."
+      : chatData
+        ? chatData.messages.length === 0
+          ? `${getChannelLabel(chatData.channel)}: belum ada pesan teks yang terbaca.`
+          : `${getChannelLabel(chatData.channel)} · ${chatData.messages.length} pesan terbaca${chatReadTimeLabel ? ` · ${chatReadTimeLabel}` : ""}`
+        : isSupportedTab
+          ? "Chat belum dibaca. Klik Buat Jawaban dan Clara akan membacanya."
+          : "Buka chat di WhatsApp Web, Instagram DM, atau TikTok Messages dulu."
   const draftStatusLabel = suggestions.length
     ? hasEditedSuggestion
       ? "Draft diedit"
-      : "Draft dari Clara"
+      : "Siap dicek"
     : isSuggesting
-      ? "Sedang menyusun jawaban"
-      : "Belum ada jawaban"
+      ? "Sedang disusun"
+      : "Belum ada draft"
 
   return (
     <div
@@ -3258,27 +2225,28 @@ function ClaraSidePanel() {
       <div
         className={`clara-stage ${!isClaraWorkspace ? "clara-stage--chatgpt" : ""}`}>
         <section className="clara-hero">
-          <div className="clara-workspace-switcher">
-            <button
-              aria-pressed={isClaraWorkspace}
-              className={`clara-workspace-tab ${isClaraWorkspace ? "clara-workspace-tab--active" : ""}`}
-              onClick={() => setActiveWorkspace("clara")}
-              type="button">
-              Clara Ops
-            </button>
-            <button
-              aria-pressed={!isClaraWorkspace}
-              className={`clara-workspace-tab ${!isClaraWorkspace ? "clara-workspace-tab--active" : ""}`}
-              onClick={() => setActiveWorkspace("chatgpt")}
-              type="button">
-              ChatGPT
-            </button>
-          </div>
+          {ENABLE_CHATGPT_WORKSPACE ? (
+            <div className="clara-workspace-switcher">
+              <button
+                aria-pressed={isClaraWorkspace}
+                className={`clara-workspace-tab ${isClaraWorkspace ? "clara-workspace-tab--active" : ""}`}
+                onClick={() => setActiveWorkspace("clara")}
+                type="button">
+                Clara
+              </button>
+              <button
+                aria-pressed={!isClaraWorkspace}
+                className={`clara-workspace-tab ${!isClaraWorkspace ? "clara-workspace-tab--active" : ""}`}
+                onClick={() => setActiveWorkspace("chatgpt")}
+                type="button">
+                ChatGPT
+              </button>
+            </div>
+          ) : null}
           <div className="clara-hero__footer">
             <div className="clara-chip clara-chip--soft" role="status">
               {authStatusLabel} · {activeChannelLabel}
             </div>
-            <div className="clara-build-badge">{EXTENSION_BUILD_LABEL}</div>
           </div>
         </section>
 
@@ -3292,7 +2260,7 @@ function ClaraSidePanel() {
                 </div>
                 <p className="clara-pane__copy">
                   {authStatus === "misconfigured"
-                    ? "PLASMO_PUBLIC_CLARA_API_BASE_URL belum diisi. Extension butuh koneksi ke backend Clara."
+                    ? "Extension belum terhubung ke server Clara. Hubungi admin untuk memperbarui extension."
                     : authStatus === "checking"
                       ? "Sedang memeriksa session login Clara."
                       : "Seluruh fitur extension dikunci sampai kamu login di web Clara dengan akun yang benar."}
@@ -3455,34 +2423,225 @@ function ClaraSidePanel() {
 
         {!isClaraWorkspace || shouldShowLoginGate ? null : (
           <>
+            <section className="clara-actionbar" aria-label="Aksi utama">
+              <p
+                aria-live="polite"
+                className="clara-actionbar__status"
+                role="status">
+                {chatStatusText}
+              </p>
+              <div className="clara-actionbar__buttons">
+                <button
+                  aria-busy={isSuggesting}
+                  className="clara-button clara-button--primary clara-button--block"
+                  disabled={
+                    isSuggesting || isLoading || isInsertingIndex !== null
+                  }
+                  onClick={handleSuggestReplies}
+                  type="button">
+                  {isSuggesting
+                    ? "Clara sedang menyusun..."
+                    : suggestions.length
+                      ? "Buat Ulang Jawaban"
+                      : "Buat Jawaban"}
+                </button>
+                <button
+                  aria-busy={isLoading}
+                  className="clara-button clara-button--ghost clara-button--block"
+                  disabled={
+                    isLoading || isSuggesting || isInsertingIndex !== null
+                  }
+                  onClick={handleReadChat}
+                  type="button">
+                  {isLoading ? "Membaca chat..." : "Baca Ulang Chat"}
+                </button>
+              </div>
+              {feedback ? (
+                <div
+                  aria-live="polite"
+                  className="clara-note clara-note--success"
+                  role="status">
+                  {feedback}
+                </div>
+              ) : null}
+
+              {error ? (
+                <div className="clara-note clara-note--error" role="alert">
+                  {error}
+                </div>
+              ) : null}
+            </section>
+
+            <section className="clara-pane clara-pane--reply">
+              <div className="clara-pane__header">
+                <div>
+                  <div className="clara-pane__eyebrow">Balasan AI</div>
+                  <div className="clara-pane__title">Draft jawaban</div>
+                </div>
+
+                <div
+                  aria-live="polite"
+                  className="clara-chip clara-chip--soft"
+                  role="status">
+                  {draftStatusLabel}
+                </div>
+              </div>
+
+              {primarySuggestion ? (
+                <>
+                  <div className="clara-draft-list">
+                    <article className="clara-draft">
+                      <div className="clara-draft__head">
+                        <div>
+                          <div className="clara-draft__number">
+                            Draft dari Clara
+                          </div>
+                          <div className="clara-draft__tone">
+                            Periksa dulu sebelum dipakai
+                          </div>
+                        </div>
+                      </div>
+
+                      {editingSuggestionIndex === 0 ? (
+                        <div className="clara-draft__editor">
+                          <label
+                            className="clara-field-label"
+                            htmlFor={DRAFT_REPLY_TEXTAREA_ID}>
+                            Edit draft balasan
+                          </label>
+                          <textarea
+                            autoFocus
+                            className="clara-input clara-input--textarea"
+                            id={DRAFT_REPLY_TEXTAREA_ID}
+                            onChange={(event) =>
+                              handleDraftSuggestionChange(0, event.target.value)
+                            }
+                            rows={6}
+                            value={primaryDraftSuggestion}
+                          />
+                          <div className="clara-draft__actions clara-draft__actions--pair">
+                            <button
+                              className="clara-button clara-button--ghost"
+                              onClick={() => handleCancelEditingSuggestion(0)}
+                              type="button">
+                              Batal
+                            </button>
+                            <button
+                              className="clara-button clara-button--insert"
+                              onClick={() => handleSaveEditedSuggestion(0)}
+                              type="button">
+                              Simpan
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="clara-draft__text">
+                          {primarySuggestion}
+                        </div>
+                      )}
+
+                      {editingSuggestionIndex !== 0 ? (
+                        <>
+                          <div className="clara-draft__actions clara-draft__actions--pair">
+                            <button
+                              className="clara-button clara-button--ghost"
+                              disabled={isInsertingIndex !== null}
+                              onClick={() => handleStartEditingSuggestion(0)}
+                              ref={editSuggestionButtonRef}
+                              type="button">
+                              Edit
+                            </button>
+                            <button
+                              className="clara-button clara-button--insert"
+                              disabled={isInsertingIndex !== null}
+                              onClick={() =>
+                                handleInsertSuggestion(primarySuggestion, 0)
+                              }
+                              type="button">
+                              {isInsertingIndex === 0
+                                ? "Memasukkan..."
+                                : "Masukkan ke Chat"}
+                            </button>
+                          </div>
+                          <p className="clara-draft__hint-text">
+                            Teks dimasukkan ke kolom balasan. Kamu cek dulu, lalu
+                            kirim sendiri di WhatsApp.
+                          </p>
+
+                          {isConfirmingSend ? (
+                            <div
+                              className="clara-confirm"
+                              role="alertdialog"
+                              aria-label="Konfirmasi kirim langsung">
+                              <p className="clara-confirm__text">
+                                Kirim ke{" "}
+                                <strong>
+                                  {chatData?.chatTitle || "chat ini"}
+                                </strong>{" "}
+                                sekarang? Pesan langsung terkirim dan tidak bisa
+                                ditarik dari sini.
+                              </p>
+                              <div className="clara-draft__actions clara-draft__actions--pair">
+                                <button
+                                  autoFocus
+                                  className="clara-button clara-button--ghost"
+                                  onClick={() => setIsConfirmingSend(false)}
+                                  type="button">
+                                  Batal
+                                </button>
+                                <button
+                                  className="clara-button clara-button--send"
+                                  disabled={isInsertingIndex !== null}
+                                  onClick={() =>
+                                    handleSendSuggestion(primarySuggestion, 0)
+                                  }
+                                  type="button">
+                                  {isInsertingIndex === 0
+                                    ? "Mengirim..."
+                                    : "Ya, kirim sekarang"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              className="clara-linkbutton"
+                              disabled={isInsertingIndex !== null}
+                              onClick={() => setIsConfirmingSend(true)}
+                              type="button">
+                              Kirim langsung tanpa dicek di chat
+                            </button>
+                          )}
+                        </>
+                      ) : null}
+                    </article>
+                  </div>
+                </>
+              ) : (
+                <div className="clara-empty">
+                  <div className="clara-empty__title">
+                    Belum ada draft jawaban
+                  </div>
+                  <div className="clara-empty__meta">
+                    Klik <strong>Buat Jawaban</strong>. Clara membaca chat yang
+                    sedang terbuka lalu menyiapkan satu draft balasan untuk
+                    kamu cek.
+                  </div>
+                </div>
+              )}
+            </section>
+
             <section className="clara-pane">
               <div className="clara-pane__header">
                 <div>
                   <div className="clara-pane__eyebrow">Chat Aktif</div>
-                  <div className="clara-pane__title">
-                    Ambil percakapan yang sedang dibuka
-                  </div>
-                  <p className="clara-pane__copy">
-                    Baca percakapan aktif dari channel yang didukung untuk
-                    dijadikan konteks.
-                  </p>
-                  <p className="clara-pane__copy">
-                    Build aktif: <strong>{EXTENSION_BUILD_LABEL}</strong>
-                  </p>
-                </div>
-
-                <div className="clara-chip clara-chip--soft">
-                  {chatData
-                    ? `${chatData.messages.length} pesan`
-                    : "Siap baca chat"}
+                  <div className="clara-pane__title">Chat yang terbaca</div>
                 </div>
               </div>
 
               {!isSupportedTab && !chatData && (
                 <div className="clara-note clara-note--warn" role="status">
-                  Buka percakapan aktif di WhatsApp Web, Instagram DM, atau
-                  TikTok Messages, lalu jalankan pembacaan chat dari
-                  panel ini.
+                  Buka percakapan di WhatsApp Web, Instagram DM, atau TikTok
+                  Messages, lalu klik Buat Jawaban.
                 </div>
               )}
 
@@ -3499,7 +2658,7 @@ function ClaraSidePanel() {
                         </div>
                         <div className="clara-chat-appbar__meta">
                           {chatData.chatSubtitle ||
-                            "last seen recently | Clara preview"}
+                            getChannelLabel(chatData.channel)}
                         </div>
                       </div>
                       <div className="clara-chip clara-chip--soft">
@@ -3519,8 +2678,9 @@ function ClaraSidePanel() {
                       className="clara-thread">
                       {chatData.messages.length === 0 ? (
                         <li className="clara-empty">
-                          Belum ada pesan teks yang berhasil diambil dari
-                          percakapan ini.
+                          Belum ada pesan teks yang terbaca. Pastikan chat
+                          berisi teks (bukan hanya gambar atau stiker), lalu
+                          klik Baca Ulang Chat.
                         </li>
                       ) : (
                         chatData.messages.map((message) => (
@@ -3568,196 +2728,15 @@ function ClaraSidePanel() {
               ) : (
                 <div className="clara-empty">
                   <div className="clara-empty__title">
-                    Belum ada percakapan yang ditampilkan
+                    Belum ada chat yang terbaca
                   </div>
                   <div className="clara-empty__meta">
-                    Buka percakapan di channel yang didukung, lalu klik{" "}
-                    <strong>Baca Chat Aktif</strong>. Setelah itu isi percakapan
-                    akan muncul di area ini dan tombol generate bisa langsung
-                    dipakai di sebelahnya.
+                    Klik <strong>Buat Jawaban</strong> atau{" "}
+                    <strong>Baca Ulang Chat</strong> di atas. Clara hanya
+                    membaca chat yang sedang terbuka, bukan seluruh inbox.
                   </div>
                 </div>
               )}
-            </section>
-
-            <div className="clara-action-bridge">
-              <div className="clara-action-bridge__line" />
-              <div className="clara-action-bridge__actions">
-                <button
-                  aria-busy={isLoading}
-                  aria-live="polite"
-                  className="clara-button clara-button--ghost clara-button--block clara-button--compact"
-                  disabled={
-                    isLoading || isSuggesting || isInsertingIndex !== null
-                  }
-                  onClick={handleReadChat}
-                  type="button">
-                  {isLoading
-                    ? "Membaca chat..."
-                    : chatData
-                      ? "Refresh Chat"
-                      : "Baca Chat Aktif"}
-                </button>
-                <button
-                  aria-busy={isSuggesting}
-                  aria-live="polite"
-                  className="clara-button clara-button--primary clara-button--block clara-button--compact"
-                  disabled={
-                    isSuggesting ||
-                    isLoading ||
-                    isInsertingIndex !== null ||
-                    !chatData
-                  }
-                  onClick={handleSuggestReplies}
-                  type="button">
-                  {isSuggesting ? "Generate..." : "Generate Jawaban"}
-                </button>
-              </div>
-              <div className="clara-action-bridge__line" />
-            </div>
-
-            <section className="clara-pane clara-pane--reply">
-              <div className="clara-pane__header">
-                <div>
-                  <div className="clara-pane__eyebrow">Balasan AI</div>
-                  <div className="clara-pane__title">
-                    Satu jawaban terbaik yang siap dipakai
-                  </div>
-                  <p className="clara-pane__copy">
-                    Clara fokus kasih satu hasil generate terbaik biar lebih
-                    cepat dan praktis.
-                  </p>
-                </div>
-
-                <div
-                  aria-live="polite"
-                  className="clara-chip clara-chip--soft"
-                  role="status">
-                  {draftStatusLabel}
-                </div>
-              </div>
-
-              {primarySuggestion ? (
-                <>
-                  <div className="clara-draft-list">
-                    <article className="clara-draft">
-                      <div className="clara-draft__head">
-                        <div>
-                          <div className="clara-draft__number">
-                            Jawaban Terbaik
-                          </div>
-                          <div className="clara-draft__tone">
-                            Periksa sebelum digunakan
-                          </div>
-                        </div>
-
-                        <div className="clara-draft__hint">Draft Clara</div>
-                      </div>
-
-                      {editingSuggestionIndex === 0 ? (
-                        <div className="clara-draft__editor">
-                          <label
-                            className="clara-field-label"
-                            htmlFor={DRAFT_REPLY_TEXTAREA_ID}>
-                            Edit draft balasan
-                          </label>
-                          <textarea
-                            autoFocus
-                            className="clara-input clara-input--textarea"
-                            id={DRAFT_REPLY_TEXTAREA_ID}
-                            onChange={(event) =>
-                              handleDraftSuggestionChange(0, event.target.value)
-                            }
-                            rows={6}
-                            value={primaryDraftSuggestion}
-                          />
-                          <div className="clara-draft__actions">
-                            <button
-                              className="clara-button clara-button--ghost"
-                              onClick={() => handleCancelEditingSuggestion(0)}
-                              type="button">
-                              Batal
-                            </button>
-                            <button
-                              className="clara-button clara-button--insert"
-                              onClick={() => handleSaveEditedSuggestion(0)}
-                              type="button">
-                              Simpan
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="clara-draft__text">
-                          {primarySuggestion}
-                        </div>
-                      )}
-
-                      {editingSuggestionIndex !== 0 ? (
-                        <div className="clara-draft__actions">
-                          <button
-                            className="clara-button clara-button--ghost"
-                            disabled={isInsertingIndex !== null}
-                            onClick={() => handleStartEditingSuggestion(0)}
-                            ref={editSuggestionButtonRef}
-                            type="button">
-                            Edit
-                          </button>
-                          <>
-                            <button
-                              className="clara-button clara-button--insert"
-                              disabled={isInsertingIndex !== null}
-                              onClick={() =>
-                                handleInsertSuggestion(primarySuggestion, 0)
-                              }
-                              type="button">
-                              {isInsertingIndex === 0
-                                ? "Memasukkan..."
-                                : "Masukkan ke Chat"}
-                            </button>
-                            <button
-                              className="clara-button clara-button--send"
-                              disabled={isInsertingIndex !== null}
-                              onClick={() =>
-                                handleSendSuggestion(primarySuggestion, 0)
-                              }
-                              type="button">
-                              {isInsertingIndex === 0
-                                ? "Mengirim..."
-                                : "Kirim Sekarang"}
-                            </button>
-                          </>
-                        </div>
-                      ) : null}
-                    </article>
-                  </div>
-                </>
-              ) : (
-                <div className="clara-empty">
-                  <div className="clara-empty__title">
-                    Belum ada jawaban terbaik
-                  </div>
-                  <div className="clara-empty__meta">
-                    Setelah isi chat berhasil dibaca, klik{" "}
-                    <strong>Generate Jawaban</strong> supaya Clara menyiapkan
-                    satu balasan terbaik yang bisa langsung kamu pakai.
-                  </div>
-                </div>
-              )}
-
-              {feedback ? (
-                <div
-                  aria-live="polite"
-                  className="clara-note clara-note--success"
-                  role="status">
-                  {feedback}
-                </div>
-              ) : null}
-
-              {error ? (
-                <div className="clara-note clara-note--error" role="alert">
-                  {error}
-                </div>
-              ) : null}
             </section>
           </>
         )}

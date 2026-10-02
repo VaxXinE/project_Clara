@@ -345,7 +345,9 @@ export const getCurrentClaraSessionUser =
     const apiBaseUrl = getConfiguredClaraApiBaseUrl()
 
     if (!apiBaseUrl) {
-      throw new Error("PLASMO_PUBLIC_CLARA_API_BASE_URL belum dikonfigurasi.")
+      throw new Error(
+        "Extension belum terhubung ke server Clara. Hubungi admin untuk memperbarui extension."
+      )
     }
 
     const headers = await getClaraAuthHeaders()
