@@ -204,3 +204,37 @@ def test_dashboard_channel_overview_returns_counts(
     assert payload["scope_type"] == "organization"
     channel_keys = {item["key"] for item in payload["items"]}
     assert {"whatsapp", "telegram", "live_chat"} <= channel_keys
+
+
+def test_upload_txt_over_5mb_is_rejected_for_both_formats(
+    client,
+    seeded_data: dict[str, object],
+) -> None:
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+    oversized = b"a" * (5 * 1024 * 1024 + 1)
+
+    for endpoint in ("/upload/whatsapp-txt", "/upload/telegram-txt"):
+        response = client.post(
+            endpoint,
+            files={"file": ("chat.txt", BytesIO(oversized), "text/plain")},
+            headers=csrf_headers(client),
+        )
+
+        assert response.status_code == 413, (endpoint, response.text)
+        assert response.json()["detail"] == "File too large. Maximum size is 5MB."
+
+
+def test_upload_txt_at_exactly_5mb_is_not_rejected_for_size(
+    client,
+    seeded_data: dict[str, object],
+) -> None:
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+    at_limit = b"a" * (5 * 1024 * 1024)
+
+    response = client.post(
+        "/upload/whatsapp-txt",
+        files={"file": ("chat.txt", BytesIO(at_limit), "text/plain")},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code != 413

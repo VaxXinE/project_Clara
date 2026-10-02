@@ -49,12 +49,32 @@ router = APIRouter(prefix="/upload", tags=["upload"])
 
 
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
+UPLOAD_READ_CHUNK_BYTES = 64 * 1024
 CONTACT_PHONE_PATTERN = re.compile(
     r"(?:\+?\d[\d\-\s().]{6,}\d)"
 )
 CONTACT_EMAIL_PATTERN = re.compile(
     r"\b[^@\s]+@[^@\s]+\.[^@\s]+\b"
 )
+
+
+async def read_upload_within_limit(file: UploadFile) -> bytes:
+    # Baca per potongan dan berhenti begitu melewati batas, jangan muat seluruh file ke memori dulu.
+    chunks: list[bytes] = []
+    total_bytes = 0
+
+    while chunk := await file.read(UPLOAD_READ_CHUNK_BYTES):
+        total_bytes += len(chunk)
+
+        if total_bytes > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail="File too large. Maximum size is 5MB.",
+            )
+
+        chunks.append(chunk)
+
+    return b"".join(chunks)
 
 
 class UploadRawChatRequest(BaseModel):
@@ -654,13 +674,7 @@ async def upload_whatsapp_txt(
             detail="Only .txt files are allowed.",
         )
 
-    content = await file.read()
-
-    if len(content) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="File too large. Maximum size is 5MB.",
-        )
+    content = await read_upload_within_limit(file)
 
     try:
         raw_text = content.decode("utf-8")
@@ -734,13 +748,7 @@ async def upload_telegram_txt(
             detail="Only .txt files are allowed.",
         )
 
-    content = await file.read()
-
-    if len(content) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="File too large. Maximum size is 5MB.",
-        )
+    content = await read_upload_within_limit(file)
 
     try:
         raw_text = content.decode("utf-8")
