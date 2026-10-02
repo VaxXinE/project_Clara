@@ -203,3 +203,14 @@ export function getProviderBadgeClass(provider?: string | null): string {
       return "border-slate-300 bg-slate-100 text-slate-700";
   }
 }
+
+const PASSWORD_STRENGTH_TEXT: Record<string, string> = {
+  strong: "Kuat",
+  medium: "Cukup",
+  weak: "Lemah",
+};
+
+/** Label kekuatan kata sandi ("strong") dalam bahasa Indonesia. */
+export function formatPasswordStrengthLabel(label: string): string {
+  return PASSWORD_STRENGTH_TEXT[label] ?? label;
+}

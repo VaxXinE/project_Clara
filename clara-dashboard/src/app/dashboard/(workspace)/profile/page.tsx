@@ -1,19 +1,13 @@
 "use client";
 
-import {
-  faUserShield,
-  faCloudArrowDown,
-  faCloudArrowUp,
-  faEnvelope,
-  faUser,
-} from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
+import { ErrorState, LoadingState } from "@/components/dashboard/StateViews";
+import { Tag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, getPasswordStrength } from "@/lib/format";
+import { formatDateTime, formatPasswordStrengthLabel, getPasswordStrength } from "@/lib/format";
+import { PAGE_NAMES } from "@/lib/labels";
 import { canAccessAdminPages, getRoleDisplayLabel } from "@/lib/roles";
 import type {
   ChangePasswordRequest,
@@ -35,12 +29,8 @@ const EMPTY_PASSWORD_FORM: ChangePasswordRequest = {
 export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [extensionBuild, setExtensionBuild] = useState<ExtensionBuildItem | null>(null);
-  const [profileForm, setProfileForm] = useState<UpdateUserRequest>(
-    EMPTY_PROFILE_FORM,
-  );
-  const [passwordForm, setPasswordForm] = useState<ChangePasswordRequest>(
-    EMPTY_PASSWORD_FORM,
-  );
+  const [profileForm, setProfileForm] = useState<UpdateUserRequest>(EMPTY_PROFILE_FORM);
+  const [passwordForm, setPasswordForm] = useState<ChangePasswordRequest>(EMPTY_PASSWORD_FORM);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -57,33 +47,31 @@ export default function ProfilePage() {
   const [extensionUploadFile, setExtensionUploadFile] = useState<File | null>(null);
 
   async function loadExtensionBuilds() {
-    const build = await apiFetch<ExtensionBuildItem>("/dashboard/extension-builds");
-    setExtensionBuild(build);
+    setExtensionBuild(await apiFetch<ExtensionBuildItem>("/dashboard/extension-builds"));
+  }
+
+  async function loadProfile() {
+    setLoadErrorMessage("");
+
+    try {
+      const me = await apiFetch<CurrentUser>("/auth/me");
+      setCurrentUser(me);
+      setProfileForm({ name: me.name, email: me.email });
+      await loadExtensionBuilds();
+    } catch (error) {
+      setLoadErrorMessage(error instanceof Error ? error.message : "Profil belum bisa dimuat.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   useEffect(() => {
-    async function loadProfile() {
-      setIsLoading(true);
-      setLoadErrorMessage("");
+    const timer = setTimeout(() => {
+      void loadProfile();
+    }, 0);
 
-      try {
-        const me = await apiFetch<CurrentUser>("/auth/me");
-        setCurrentUser(me);
-        setProfileForm({
-          name: me.name,
-          email: me.email,
-        });
-        await loadExtensionBuilds();
-      } catch (error) {
-        setLoadErrorMessage(
-          error instanceof Error ? error.message : "Gagal memuat profil akun.",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadProfile();
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSaveProfile(event: React.FormEvent<HTMLFormElement>) {
@@ -97,21 +85,13 @@ export default function ProfilePage() {
     try {
       const updatedUser = await apiFetch<CurrentUser>("/auth/me", {
         method: "PATCH",
-        body: {
-          name: profileForm.name,
-          email: profileForm.email,
-        },
+        body: { name: profileForm.name, email: profileForm.email },
       });
       setCurrentUser(updatedUser);
-      setProfileForm({
-        name: updatedUser.name,
-        email: updatedUser.email,
-      });
-      setProfileSuccessMessage("Profil akun berhasil diperbarui.");
+      setProfileForm({ name: updatedUser.name, email: updatedUser.email });
+      setProfileSuccessMessage("Data akun sudah disimpan.");
     } catch (error) {
-      setProfileErrorMessage(
-        error instanceof Error ? error.message : "Gagal memperbarui profil akun.",
-      );
+      setProfileErrorMessage(error instanceof Error ? error.message : "Data akun belum bisa disimpan. Coba lagi.");
     } finally {
       setIsSavingProfile(false);
     }
@@ -125,7 +105,7 @@ export default function ProfilePage() {
     setProfileSuccessMessage("");
 
     if (passwordForm.new_password !== confirmPassword) {
-      setPasswordErrorMessage("Confirm password harus sama dengan password baru.");
+      setPasswordErrorMessage("Kata sandi baru dan pengulangannya harus sama.");
       return;
     }
 
@@ -139,30 +119,26 @@ export default function ProfilePage() {
       setCurrentUser(updatedUser);
       setPasswordForm(EMPTY_PASSWORD_FORM);
       setConfirmPassword("");
-      setPasswordSuccessMessage("Password akun berhasil diperbarui.");
+      setPasswordSuccessMessage("Kata sandi sudah diganti.");
     } catch (error) {
-      setPasswordErrorMessage(
-        error instanceof Error ? error.message : "Gagal memperbarui password akun.",
-      );
+      setPasswordErrorMessage(error instanceof Error ? error.message : "Kata sandi belum bisa diganti. Coba lagi.");
     } finally {
       setIsSavingPassword(false);
     }
   }
 
-  async function handleUploadExtensionBuild(
-    event: React.FormEvent<HTMLFormElement>,
-  ) {
+  async function handleUploadExtensionBuild(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setExtensionErrorMessage("");
     setExtensionSuccessMessage("");
 
     if (!extensionUploadFile) {
-      setExtensionErrorMessage("Pilih file extension .zip atau .crx dulu.");
+      setExtensionErrorMessage("Pilih berkas ekstensi (.zip atau .crx) dulu.");
       return;
     }
 
     if (extensionUploadVersion.trim().length < 2) {
-      setExtensionErrorMessage("Versi extension wajib diisi.");
+      setExtensionErrorMessage("Isi nomor versi dulu.");
       return;
     }
 
@@ -173,19 +149,14 @@ export default function ProfilePage() {
       formData.set("version", extensionUploadVersion.trim());
       formData.set("file", extensionUploadFile);
 
-      await apiFetch<ExtensionBuildItem>("/dashboard/extension-builds", {
-        method: "POST",
-        body: formData,
-      });
+      await apiFetch<ExtensionBuildItem>("/dashboard/extension-builds", { method: "POST", body: formData });
 
       await loadExtensionBuilds();
       setExtensionUploadFile(null);
       setExtensionUploadVersion("");
-      setExtensionSuccessMessage("Package extension berhasil diupload.");
+      setExtensionSuccessMessage("Ekstensi baru sudah diunggah dan siap diunduh semua pengguna.");
     } catch (error) {
-      setExtensionErrorMessage(
-        error instanceof Error ? error.message : "Gagal upload package extension.",
-      );
+      setExtensionErrorMessage(error instanceof Error ? error.message : "Ekstensi belum bisa diunggah. Coba lagi.");
     } finally {
       setIsUploadingExtension(false);
     }
@@ -197,275 +168,210 @@ export default function ProfilePage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.account}
       title={PAGE_NAMES.profile}
-      description="Kelola identitas akun aktif dan perbarui password dari satu halaman."
+      description="Ubah data akunmu, ganti kata sandi, dan unduh Ekstensi Clara."
       backHref="/workspace"
       backLabel="Kembali ke beranda"
     >
       <div className="space-y-6">
-        {isLoading ? (
-          <section className="clara-empty-state text-sm text-[#d6bb84]">
-            Memuat profil...
-          </section>
-        ) : null}
+        {isLoading ? <LoadingState message="Memuat profil..." /> : null}
 
-        {loadErrorMessage ? (
-          <section className="clara-alert clara-alert-danger">
-            {loadErrorMessage}
-          </section>
-        ) : null}
+        {!isLoading && loadErrorMessage ? <ErrorState message={loadErrorMessage} onRetry={() => void loadProfile()} /> : null}
 
         {currentUser && !isLoading && !loadErrorMessage ? (
           <>
-            <section className="grid gap-4 md:grid-cols-3">
-              <ProfileStat
-                icon={faUser}
-                label="Nama Akun"
-                value={currentUser.name}
-                hint="Nama yang sedang dipakai di workspace."
-              />
-              <ProfileStat
-                icon={faEnvelope}
-                label="Email"
-                value={currentUser.email}
-                hint="Email login untuk akun ini."
-              />
-              <ProfileStat
-                icon={faUserShield}
-                label="Role"
-                value={getRoleDisplayLabel(currentUser.role)}
-                hint={currentUser.is_active ? "Akun aktif" : "Akun tidak aktif"}
-              />
+            <section
+              data-onboarding-id="profile-extension-download"
+              aria-labelledby="profile-extension"
+              className="clara-card space-y-3 p-5 sm:p-6"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id="profile-extension" className="text-xl font-bold clara-text-primary">
+                  Ekstensi Clara untuk Chrome
+                </h2>
+                {extensionBuild?.available ? <Tag tone="good">Versi {extensionBuild.version || "-"}</Tag> : <Tag>Belum tersedia</Tag>}
+              </div>
+              <p className="text-sm leading-6 clara-text-secondary">
+                Ekstensi membaca chat yang sedang kamu buka di halaman chat (misalnya WhatsApp Web) lalu mengirimnya ke Clara. Satu berkas yang sama dipakai semua pengguna.
+              </p>
+              {extensionErrorMessage ? (
+                <div role="alert" className="clara-alert clara-alert-danger">
+                  {extensionErrorMessage}
+                </div>
+              ) : null}
+              {extensionSuccessMessage ? (
+                <div role="status" className="clara-alert clara-alert-success">
+                  {extensionSuccessMessage}
+                </div>
+              ) : null}
+              {extensionBuild?.available ? (
+                <>
+                  <p className="text-xs clara-text-muted">
+                    {extensionBuild.file_name ?? "Berkas ekstensi"}
+                    {extensionBuild.uploaded_at ? ` · diunggah ${formatDateTime(extensionBuild.uploaded_at)}` : ""}
+                    {extensionBuild.uploaded_by_email ? ` oleh ${extensionBuild.uploaded_by_email}` : ""}
+                  </p>
+                  <a href="/api/dashboard/extension-builds/download" className="clara-button clara-button-primary">
+                    Unduh ekstensi
+                  </a>
+                </>
+              ) : (
+                <p className="text-sm clara-text-secondary">
+                  Superadmin belum mengunggah ekstensi. Setelah diunggah, tombol unduh muncul di sini.
+                </p>
+              )}
             </section>
 
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_0.95fr]">
-              <Panel title="Edit Profile" eyebrow="Identity">
-                <form onSubmit={handleSaveProfile} className="space-y-4">
-                  {profileErrorMessage ? (
-                    <div className="rounded-2xl border border-[#7a5520]/18 bg-[#38250f] px-4 py-3 text-sm text-[#e1c27c]">
-                      {profileErrorMessage}
-                    </div>
-                  ) : null}
+            <section aria-labelledby="profile-account" className="clara-card p-5 sm:p-6">
+              <h2 id="profile-account" className="text-xl font-bold clara-text-primary">
+                Data akun
+              </h2>
+              <form onSubmit={handleSaveProfile} className="mt-4 space-y-4">
+                {profileErrorMessage ? (
+                  <div role="alert" className="clara-alert clara-alert-danger">
+                    {profileErrorMessage}
+                  </div>
+                ) : null}
+                {profileSuccessMessage ? (
+                  <div role="status" className="clara-alert clara-alert-success">
+                    {profileSuccessMessage}
+                  </div>
+                ) : null}
 
-                  {profileSuccessMessage ? (
-                    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[#20170f] px-4 py-3 text-sm text-[#f0cb73]">
-                      {profileSuccessMessage}
-                    </div>
-                  ) : null}
-
+                <div className="grid gap-4 sm:grid-cols-2">
                   <InputField
                     label="Nama lengkap"
                     value={profileForm.name ?? ""}
-                    onChange={(value) =>
-                      setProfileForm((current) => ({ ...current, name: value }))
-                    }
-                    placeholder="Nama akun"
+                    onChange={(value) => setProfileForm((current) => ({ ...current, name: value }))}
+                    placeholder="Nama kamu"
+                    autoComplete="name"
                   />
                   <InputField
-                    label="Email"
+                    label="Email (untuk masuk)"
                     value={profileForm.email ?? ""}
-                    onChange={(value) =>
-                      setProfileForm((current) => ({ ...current, email: value }))
-                    }
-                    placeholder="email@company.com"
+                    onChange={(value) => setProfileForm((current) => ({ ...current, email: value }))}
+                    placeholder="nama@perusahaan.com"
                     type="email"
+                    autoComplete="email"
                   />
+                </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <ProfileField
-                      label="Role"
-                      value={getRoleDisplayLabel(currentUser.role)}
-                    />
-                    <ProfileField
-                      label="Dibuat pada"
-                      value={formatDateTime(currentUser.created_at)}
-                    />
-                    <ProfileField
-                      label="Organization"
-                      value={currentUser.organization_name ?? "-"}
-                    />
-                    <ProfileField
-                      label="Sales Team"
-                      value={currentUser.team_name ?? "-"}
-                    />
+                <dl className="grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+                  <ReadOnly label="Peran" value={getRoleDisplayLabel(currentUser.role)} />
+                  <ReadOnly label="Organisasi" value={currentUser.organization_name ?? "-"} />
+                  <ReadOnly label="Tim" value={currentUser.team_name ?? "-"} />
+                  <ReadOnly label="Akun dibuat" value={formatDateTime(currentUser.created_at)} />
+                </dl>
+
+                <button type="submit" disabled={isSavingProfile} className="clara-button clara-button-primary">
+                  {isSavingProfile ? "Menyimpan..." : "Simpan data akun"}
+                </button>
+              </form>
+            </section>
+
+            <section aria-labelledby="profile-password" className="clara-card p-5 sm:p-6">
+              <h2 id="profile-password" className="text-xl font-bold clara-text-primary">
+                Ganti kata sandi
+              </h2>
+              <form onSubmit={handleSavePassword} className="mt-4 space-y-4">
+                {passwordErrorMessage ? (
+                  <div role="alert" className="clara-alert clara-alert-danger">
+                    {passwordErrorMessage}
                   </div>
+                ) : null}
+                {passwordSuccessMessage ? (
+                  <div role="status" className="clara-alert clara-alert-success">
+                    {passwordSuccessMessage}
+                  </div>
+                ) : null}
 
-                  <button
-                    type="submit"
-                    disabled={isSavingProfile}
-                    className="clara-button clara-button-primary"
-                  >
-                    {isSavingProfile ? "Saving..." : "Save Profile"}
-                  </button>
-                </form>
-              </Panel>
-
-              <Panel title="Update Password" eyebrow="Security">
-                <form onSubmit={handleSavePassword} className="space-y-4">
-                  {passwordErrorMessage ? (
-                    <div className="rounded-2xl border border-[#7a5520]/18 bg-[#38250f] px-4 py-3 text-sm text-[#e1c27c]">
-                      {passwordErrorMessage}
-                    </div>
-                  ) : null}
-
-                  {passwordSuccessMessage ? (
-                    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[#20170f] px-4 py-3 text-sm text-[#f0cb73]">
-                      {passwordSuccessMessage}
-                    </div>
-                  ) : null}
-
+                <div className="grid gap-4 sm:grid-cols-3">
                   <InputField
-                    label="Current Password"
+                    label="Kata sandi sekarang"
                     value={passwordForm.current_password}
-                    onChange={(value) =>
-                      setPasswordForm((current) => ({
-                        ...current,
-                        current_password: value,
-                      }))
-                    }
-                    placeholder="Password saat ini"
+                    onChange={(value) => setPasswordForm((current) => ({ ...current, current_password: value }))}
+                    placeholder="Kata sandi yang kamu pakai sekarang"
                     type="password"
+                    autoComplete="current-password"
                   />
                   <InputField
-                    label="New Password"
+                    label="Kata sandi baru"
                     value={passwordForm.new_password}
-                    onChange={(value) =>
-                      setPasswordForm((current) => ({
-                        ...current,
-                        new_password: value,
-                      }))
-                    }
-                    placeholder="Minimum 8 karakter"
+                    onChange={(value) => setPasswordForm((current) => ({ ...current, new_password: value }))}
+                    placeholder="Minimal 8 karakter"
                     type="password"
+                    autoComplete="new-password"
                   />
                   <InputField
-                    label="Confirm Password"
+                    label="Ulangi kata sandi baru"
                     value={confirmPassword}
                     onChange={setConfirmPassword}
-                    placeholder="Ulangi password baru"
+                    placeholder="Ketik ulang kata sandi baru"
                     type="password"
+                    autoComplete="new-password"
                   />
+                </div>
 
-                  <PasswordStrengthHint strength={passwordStrength} />
+                {passwordForm.new_password ? (
+                  <div className="space-y-2" aria-live="polite">
+                    <p className="text-sm clara-text-secondary">
+                      Kekuatan:{" "}
+                      <Tag tone={passwordStrength.label === "strong" ? "good" : passwordStrength.label === "medium" ? "warn" : "danger"}>
+                        {formatPasswordStrengthLabel(passwordStrength.label)}
+                      </Tag>
+                    </p>
+                    <ul className="flex flex-wrap gap-2">
+                      {passwordStrength.checks.map((check) => (
+                        <li key={check.label}>
+                          <Tag tone={check.passed ? "good" : "neutral"}>
+                            {check.passed ? "Sudah: " : "Belum: "}
+                            {check.label}
+                          </Tag>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
 
-                  <button
-                    type="submit"
-                    disabled={isSavingPassword}
-                    className="clara-button clara-button-secondary"
-                  >
-                    {isSavingPassword ? "Saving..." : "Update Password"}
+                <button type="submit" disabled={isSavingPassword} className="clara-button clara-button-secondary">
+                  {isSavingPassword ? "Menyimpan..." : "Ganti kata sandi"}
+                </button>
+              </form>
+            </section>
+
+            {canManageExtensionBuilds ? (
+              <details data-onboarding-id="profile-extension-upload" className="clara-card p-4 sm:p-5">
+                <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                  Unggah versi baru ekstensi (khusus admin)
+                </summary>
+                <form onSubmit={handleUploadExtensionBuild} className="mt-3 space-y-4">
+                  <p className="text-sm leading-6 clara-text-secondary">
+                    Unggah sekali untuk semua pengguna. Berkas lama langsung tergantikan.
+                  </p>
+                  <InputField
+                    label="Nomor versi"
+                    value={extensionUploadVersion}
+                    onChange={setExtensionUploadVersion}
+                    placeholder="Contoh: v0.1.2"
+                  />
+                  <div>
+                    <label htmlFor="extension-file" className="clara-label">
+                      Berkas ekstensi (.zip atau .crx)
+                    </label>
+                    <input
+                      id="extension-file"
+                      accept=".zip,.crx"
+                      onChange={(event) => setExtensionUploadFile(event.target.files?.[0] ?? null)}
+                      type="file"
+                      className="clara-file-input mt-2"
+                    />
+                  </div>
+                  <button type="submit" disabled={isUploadingExtension} className="clara-button clara-button-primary">
+                    {isUploadingExtension ? "Mengunggah..." : "Unggah ekstensi"}
                   </button>
                 </form>
-              </Panel>
-            </section>
-
-            <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_0.9fr]">
-              <Panel title="Clara Extension" eyebrow="Distribution">
-                {extensionErrorMessage ? (
-                  <div className="rounded-2xl border border-[#7a5520]/18 bg-[#38250f] px-4 py-3 text-sm text-[#e1c27c]">
-                    {extensionErrorMessage}
-                  </div>
-                ) : null}
-
-                {extensionSuccessMessage ? (
-                  <div className="rounded-2xl border border-[#f0cb73]/18 bg-[#20170f] px-4 py-3 text-sm text-[#f0cb73]">
-                    {extensionSuccessMessage}
-                  </div>
-                ) : null}
-
-                <article
-                  data-onboarding-id="profile-extension-download"
-                  className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold text-[#8d6737]">
-                        Package Global
-                      </p>
-                      <p className="mt-2 text-lg font-semibold text-[#fff0c9]">
-                        {extensionBuild?.available
-                          ? extensionBuild.version || "Tanpa versi"
-                          : "Belum ada package"}
-                      </p>
-                    </div>
-                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
-                      <FontAwesomeIcon icon={faCloudArrowDown} className="h-4 w-4" />
-                    </span>
-                  </div>
-
-                  <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
-                    {extensionBuild?.available
-                      ? `File: ${extensionBuild.file_name ?? "-"}`
-                      : "Superadmin belum upload package extension global."}
-                  </p>
-                  <p className="mt-2 text-xs text-[#b89a62]">
-                    {extensionBuild?.uploaded_at
-                      ? `Upload: ${formatDateTime(extensionBuild.uploaded_at)} • ${extensionBuild.uploaded_by_email ?? "-"}`
-                      : "Begitu package global diupload, semua role akan download file yang sama dari sini."}
-                  </p>
-
-                  {extensionBuild?.available ? (
-                    <a
-                      href="/api/dashboard/extension-builds/download"
-                      className="clara-button clara-button-primary mt-4"
-                    >
-                      Download Extension
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled
-                      className="clara-button clara-button-secondary mt-4"
-                    >
-                      Belum bisa didownload
-                    </button>
-                  )}
-                </article>
-              </Panel>
-
-              {canManageExtensionBuilds ? (
-                <Panel
-                  title="Upload Extension Package"
-                  eyebrow="Admin Only"
-                  onboardingId="profile-extension-upload"
-                >
-                  <form onSubmit={handleUploadExtensionBuild} className="space-y-4">
-                    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.92)_0%,rgba(18,13,10,0.92)_100%)] p-4 text-sm leading-6 text-[#d6bb84]">
-                      Superadmin upload sekali untuk semua user. File lama langsung tergantikan dan semua role akan download package yang sama.
-                    </div>
-
-                    <InputField
-                      label="Versi package"
-                      value={extensionUploadVersion}
-                      onChange={setExtensionUploadVersion}
-                      placeholder="Contoh: v0.1.2"
-                    />
-
-                    <div>
-                      <label className="text-sm font-semibold text-[#fff0c9]">File extension</label>
-                      <input
-                        accept=".zip,.crx"
-                        onChange={(event) =>
-                          setExtensionUploadFile(event.target.files?.[0] ?? null)
-                        }
-                        type="file"
-                        className="clara-file-input mt-2"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isUploadingExtension}
-                      className="clara-button clara-button-primary"
-                    >
-                      <FontAwesomeIcon icon={faCloudArrowUp} className="h-4 w-4" />
-                      {isUploadingExtension ? "Uploading..." : "Upload Package"}
-                    </button>
-                  </form>
-                </Panel>
-              ) : null}
-            </section>
+              </details>
+            ) : null}
           </>
         ) : null}
       </div>
@@ -473,64 +379,11 @@ export default function ProfilePage() {
   );
 }
 
-function Panel({
-  eyebrow,
-  title,
-  onboardingId,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  onboardingId?: string;
-  children: React.ReactNode;
-}) {
+function ReadOnly({ label, value }: { label: string; value: string }) {
   return (
-    <section data-onboarding-id={onboardingId} className="clara-card rounded-3xl p-6">
-      <p className="clara-kicker text-xs">{eyebrow}</p>
-      <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] clara-text-primary">
-        {title}
-      </h2>
-      <div className="mt-5">{children}</div>
-    </section>
-  );
-}
-
-function ProfileStat({
-  icon,
-  label,
-  value,
-  hint,
-}: {
-  icon: typeof faUser;
-  label: string;
-  value: string;
-  hint: string;
-}) {
-  return (
-    <article className="clara-card rounded-3xl p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="clara-kicker text-xs">{label}</p>
-          <p className="mt-3 text-xl font-bold tracking-tight clara-text-primary">
-            {value}
-          </p>
-        </div>
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
-          <FontAwesomeIcon icon={icon} className="h-4 w-4" />
-        </span>
-      </div>
-      <p className="mt-3 text-sm leading-6 text-clara-ink-2">{hint}</p>
-    </article>
-  );
-}
-
-function ProfileField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="clara-card-soft rounded-2xl px-4 py-3">
-      <p className="text-xs font-semibold text-[#8d6737]">
-        {label}
-      </p>
-      <p className="mt-1.5 text-sm font-semibold clara-text-primary">{value}</p>
+    <div className="clara-card-soft min-w-0 p-3">
+      <dt className="text-xs clara-text-muted">{label}</dt>
+      <dd className="mt-1 break-words font-semibold clara-text-primary">{value}</dd>
     </div>
   );
 }
@@ -541,64 +394,31 @@ function InputField({
   onChange,
   placeholder,
   type = "text",
+  autoComplete,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   type?: string;
+  autoComplete?: string;
 }) {
+  const id = useId();
+
   return (
     <div>
-      <label className="text-sm font-semibold text-[#fff0c9]">{label}</label>
+      <label htmlFor={id} className="clara-label">
+        {label}
+      </label>
       <input
+        id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         type={type}
-        className="clara-input mt-2"
+        autoComplete={autoComplete}
+        className="clara-input mt-2 w-full"
         placeholder={placeholder}
       />
-    </div>
-  );
-}
-
-function PasswordStrengthHint({
-  strength,
-}: {
-  strength: ReturnType<typeof getPasswordStrength>;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.92)_0%,rgba(18,13,10,0.92)_100%)] p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold text-[#8d6737]">
-          Password Strength
-        </p>
-        <span
-          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-            strength.label === "strong"
-              ? "border border-[#f0cb73]/18 bg-[#f0cb73]/12 text-[#f7dfa2]"
-              : strength.label === "medium"
-                ? "border border-[#d3a74b]/18 bg-[#5c4015] text-[#f0cb73]"
-                : "border border-[#7a5520]/18 bg-[#38250f] text-[#d6bb84]"
-          }`}
-        >
-          {strength.label}
-        </span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {strength.checks.map((check) => (
-          <span
-            key={check.label}
-            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-              check.passed
-                ? "border border-[#f0cb73]/18 bg-[#f0cb73]/10 text-[#f0cb73]"
-                : "border border-[#3c2c16] bg-[#22190f] text-[#c8ad75]"
-            }`}
-          >
-            {check.label}
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
