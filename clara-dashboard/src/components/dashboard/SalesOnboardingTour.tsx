@@ -108,22 +108,16 @@ const TOUR_ROUTES: TourRoute[] = [
     title: "Customer",
     steps: [
       {
-        id: "sales-customers-hero",
-        title: "Fokus customer sekarang",
-        description:
-          "Bagian atas ini membantu kamu lihat customer mana yang paling layak dibuka dulu beserta ringkasan tekanan kerjanya.",
-      },
-      {
         id: "sales-customers-filters",
         title: "Cari dan saring customer",
         description:
-          "Gunakan pencarian dan filter status untuk cepat menemukan customer yang mau dicek tanpa scroll daftar panjang secara manual.",
+          "Cari nama, telepon, email, atau penanggung jawab. Pilih status Aktif kalau hanya ingin customer yang masih berjalan.",
       },
       {
         id: "sales-customers-list",
         title: "Daftar customer aktif",
         description:
-          "Di sini kamu bisa baca ringkasan tiap customer, lihat hot lead atau lead aktifnya, lalu lanjut ke profil customer yang paling relevan.",
+          "Tiap customer punya ringkasan singkat: jumlah lead aktif, percakapan, dan kapan terakhir dihubungi. Klik Buka profil untuk detailnya.",
       },
     ],
   },

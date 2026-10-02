@@ -290,3 +290,48 @@ export function humanizeActivityValue(eventType: string, value: string | null): 
 
   return value;
 }
+
+/** Tahap proses nyata seorang customer, dari pertama bertanya sampai akunnya aktif. */
+export const PROCESS_STATE: VocabTable = {
+  unknown: { label: "Belum diketahui", tone: "neutral" },
+  new_inquiry: { label: "Baru bertanya", tone: "info" },
+  exploration: { label: "Sedang menjajaki", tone: "info" },
+  ready_to_proceed: { label: "Siap lanjut", tone: "warn" },
+  data_submitted: { label: "Data sudah dikirim", tone: "warn" },
+  verification_in_progress: { label: "Sedang diverifikasi", tone: "warn" },
+  verified: { label: "Sudah terverifikasi", tone: "good" },
+  onboarding_or_activation: { label: "Proses aktivasi akun", tone: "good" },
+  account_active: { label: "Akun aktif", tone: "good" },
+  funded: { label: "Sudah setor dana", tone: "good" },
+  active_support: { label: "Aktif, butuh dukungan", tone: "gold" },
+};
+
+export const PROCESS_DECISION: VocabTable = {
+  observed: { label: "Terbaca dari chat", tone: "neutral" },
+  applied: { label: "Diterapkan", tone: "good" },
+  same_state_confirmed: { label: "Tahap yang sama dikonfirmasi", tone: "neutral" },
+  rejected_regression: { label: "Ditolak: mundur dari tahap sebelumnya", tone: "warn" },
+  rejected_low_confidence: { label: "Ditolak: Clara kurang yakin", tone: "warn" },
+  rejected_insufficient_evidence: { label: "Ditolak: bukti kurang", tone: "warn" },
+  requires_review: { label: "Perlu ditinjau", tone: "warn" },
+  manual_correction: { label: "Dikoreksi manual", tone: "info" },
+  merge_reconciliation_required: { label: "Perlu dicocokkan setelah penggabungan", tone: "danger" },
+  merge_reconciled: { label: "Sudah dicocokkan setelah penggabungan", tone: "good" },
+};
+
+export const PROCESS_SOURCE: VocabTable = {
+  automatic: { label: "Otomatis dari chat", tone: "neutral" },
+  manual_forward: { label: "Diisi manual", tone: "neutral" },
+  manual_correction: { label: "Koreksi manual", tone: "neutral" },
+  system_confirmed: { label: "Dikonfirmasi sistem", tone: "neutral" },
+  import_reconciliation: { label: "Impor data", tone: "neutral" },
+  customer_merge_reconciliation: { label: "Penggabungan profil", tone: "neutral" },
+  customer_profile_merge: { label: "Penggabungan profil", tone: "neutral" },
+};
+
+export const TRUST_LEVEL: VocabTable = {
+  low: { label: "Rendah", tone: "warn" },
+  medium: { label: "Sedang", tone: "neutral" },
+  high: { label: "Tinggi", tone: "good" },
+  authoritative: { label: "Pasti", tone: "good" },
+};
