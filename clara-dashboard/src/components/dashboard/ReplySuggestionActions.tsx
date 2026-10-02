@@ -2,122 +2,128 @@
 
 import { useState } from "react";
 
+import { Tag } from "@/components/dashboard/Tag";
 import { apiFetch } from "@/lib/api";
+import { REPLY_TONE, labelOf } from "@/lib/vocab";
 import type { SuggestedReply } from "@/types/dashboard";
 
 type Props = {
   replySuggestionId: string;
   suggestedReplies: SuggestedReply[];
   approvalStatus: string;
+  /** Jawaban final yang sudah dipakai (ada setelah disetujui). */
+  finalReplyText?: string | null;
   hasBeenSent?: boolean;
   isStale?: boolean;
   onUpdated: () => Promise<void>;
 };
 
+function meaningfulReasoning(value: string | undefined): string {
+  const text = (value ?? "").trim();
+  return text === "-" ? "" : text;
+}
+
 export function ReplySuggestionActions({
   replySuggestionId,
   suggestedReplies,
   approvalStatus,
+  finalReplyText = null,
   hasBeenSent = false,
   isStale = false,
   onUpdated,
 }: Props) {
-  const [selectedText, setSelectedText] = useState(
-    suggestedReplies[0]?.text ?? ""
-  );
+  const [selectedText, setSelectedText] = useState(suggestedReplies[0]?.text ?? "");
   const [finalText, setFinalText] = useState(suggestedReplies[0]?.text ?? "");
   const [rejectReason, setRejectReason] = useState("");
+  const [showReject, setShowReject] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMarkingSent, setIsMarkingSent] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
   const isPending = approvalStatus === "pending";
   const isApproved = approvalStatus === "approved";
   const isBusy = isSubmitting || isMarkingSent;
+  const readyText = (finalReplyText ?? "").trim() || finalText.trim();
 
-  async function handleApprove() {
+  async function run(action: () => Promise<unknown>, failure: string, setBusy: (value: boolean) => void) {
     setErrorMessage("");
-    setIsSubmitting(true);
+    setBusy(true);
 
     try {
-      await apiFetch(`/reply-suggestions/${replySuggestionId}/approve`, {
-        method: "POST",
-        body: {
-          selected_reply_text: selectedText,
-          final_reply_text: finalText,
-          reviewer_name: "Sales Dashboard",
-        },
-      });
-
+      await action();
       await onUpdated();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal menyetujui draft balasan."
-      );
+      setErrorMessage(error instanceof Error ? error.message : failure);
     } finally {
-      setIsSubmitting(false);
+      setBusy(false);
     }
   }
 
-  async function handleReject() {
-    setErrorMessage("");
-    setIsSubmitting(true);
-
-    try {
-      await apiFetch(`/reply-suggestions/${replySuggestionId}/reject`, {
-        method: "POST",
-        body: {
-          reason: rejectReason || "Rejected from dashboard.",
-          reviewer_name: "Sales Dashboard",
-        },
-      });
-
-      await onUpdated();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal menolak draft balasan."
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+  function handleApprove() {
+    void run(
+      () =>
+        apiFetch(`/reply-suggestions/${replySuggestionId}/approve`, {
+          method: "POST",
+          body: {
+            selected_reply_text: selectedText,
+            final_reply_text: finalText,
+            reviewer_name: "Sales Dashboard",
+          },
+        }),
+      "Jawaban belum bisa disimpan. Coba lagi.",
+      setIsSubmitting,
+    );
   }
 
-  async function handleMarkSent() {
-    setErrorMessage("");
-    setIsMarkingSent(true);
+  function handleReject() {
+    void run(
+      () =>
+        apiFetch(`/reply-suggestions/${replySuggestionId}/reject`, {
+          method: "POST",
+          body: {
+            reason: rejectReason.trim() || "Ditolak dari dashboard.",
+            reviewer_name: "Sales Dashboard",
+          },
+        }),
+      "Draft belum bisa ditolak. Coba lagi.",
+      setIsSubmitting,
+    );
+  }
 
+  function handleMarkSent() {
+    void run(
+      () =>
+        apiFetch(`/reply-suggestions/${replySuggestionId}/mark-sent`, {
+          method: "POST",
+          body: { sent_by_name: "Sales Dashboard" },
+        }),
+      "Belum bisa menandai terkirim. Coba lagi.",
+      setIsMarkingSent,
+    );
+  }
+
+  async function handleCopy() {
     try {
-      await apiFetch(`/reply-suggestions/${replySuggestionId}/mark-sent`, {
-        method: "POST",
-        body: {
-          sent_by_name: "Sales Dashboard",
-        },
-      });
-
-      await onUpdated();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal menandai balasan terkirim."
-      );
-    } finally {
-      setIsMarkingSent(false);
+      await navigator.clipboard.writeText(readyText);
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
     }
   }
 
   if (hasBeenSent) {
     return (
-      <section className="clara-card-outline p-4">
-        <p className="text-sm font-semibold clara-text-primary">
-          Jawaban ini sudah ditandai terkirim.
-        </p>
+      <section className="rounded-2xl border border-clara-success-line bg-clara-success-surface p-4">
+        <p className="text-sm font-semibold text-clara-success">Jawaban ini sudah ditandai terkirim.</p>
         <p className="mt-1 text-sm leading-6 clara-text-secondary">
-          Ini catatan manual dari dashboard, bukan konfirmasi delivery atau
-          read receipt dari provider.
+          Ini catatan manual dari dashboard. Clara tidak tahu apakah pesannya benar-benar sampai atau
+          sudah dibaca customer.
         </p>
         {isStale ? (
           <p role="alert" className="clara-alert clara-alert-warning mt-3">
-            Customer sudah membalas lagi setelah pesan terkirim. Draft lama ini
-            sebaiknya tidak dipakai sebagai patokan balasan berikutnya.
+            Customer sudah membalas lagi. Jangan pakai draft lama untuk balasan berikutnya, susun
+            jawaban baru.
           </p>
         ) : null}
       </section>
@@ -126,105 +132,142 @@ export function ReplySuggestionActions({
 
   if (!isPending && !isApproved) {
     return (
-      <div className="clara-card-soft p-4">
-        <p className="text-sm font-medium clara-text-secondary">
-          Suggestion status: {approvalStatus}
+      <section className="rounded-2xl border border-clara-line bg-clara-raised p-4">
+        <p className="text-sm font-semibold clara-text-primary">Draft ini sudah ditolak.</p>
+        <p className="mt-1 text-sm leading-6 clara-text-secondary">
+          Pakai tombol &ldquo;Susun jawaban baru&rdquo; di atas supaya Clara membuat draft yang baru.
         </p>
-      </div>
+      </section>
     );
   }
 
   if (isApproved) {
     return (
-      <section className="clara-card space-y-4 p-5">
+      <section className="space-y-4 rounded-2xl border border-clara-line bg-clara-raised p-5">
         <div>
-          <p className="clara-kicker">Jawaban siap kirim</p>
-          <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
-            Jawaban sudah siap dipakai
-          </h3>
-          <p className="mt-2 text-sm leading-6 clara-text-secondary">
-            Approval belum berarti pesan terkirim. Setelah benar-benar dikirim
-            melalui channel asal, catat statusnya secara manual.
+          <h3 className="text-lg font-bold clara-text-primary">Jawaban siap dikirim</h3>
+          <p className="mt-1 text-sm leading-6 clara-text-secondary">
+            Clara tidak mengirim pesan ke customer. Kamu yang mengirimnya dari WhatsApp.
           </p>
         </div>
 
-        {errorMessage && (
+        <div>
+          <label htmlFor="approved-reply" className="clara-label">
+            Jawaban yang akan dikirim
+          </label>
+          <textarea
+            id="approved-reply"
+            readOnly
+            value={readyText}
+            rows={5}
+            onFocus={(event) => event.currentTarget.select()}
+            className="clara-textarea mt-2"
+          />
+        </div>
+
+        <ol className="space-y-1.5 text-sm clara-text-secondary">
+          <li>1. Salin jawaban di atas.</li>
+          <li>2. Tempel dan kirim di WhatsApp customer.</li>
+          <li>3. Kembali ke sini dan tandai sudah terkirim.</li>
+        </ol>
+
+        {errorMessage ? (
           <p role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </p>
-        )}
+        ) : null}
 
-        <button
-          type="button"
-          onClick={handleMarkSent}
-          disabled={isBusy}
-          className="clara-button clara-button-success"
-        >
-          {isMarkingSent ? "Menandai..." : "Tandai Sudah Terkirim"}
-        </button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => void handleCopy()}
+            disabled={!readyText}
+            className="clara-button clara-button-primary"
+          >
+            {copyState === "copied" ? "Tersalin" : "Salin jawaban"}
+          </button>
+          <button
+            type="button"
+            onClick={handleMarkSent}
+            disabled={isBusy}
+            className="clara-button clara-button-secondary"
+          >
+            {isMarkingSent ? "Menyimpan..." : "Tandai sudah terkirim"}
+          </button>
+        </div>
+
+        <p role="status" aria-live="polite" className="text-sm clara-text-secondary">
+          {copyState === "copied" ? "Jawaban sudah disalin. Tempel di WhatsApp." : ""}
+          {copyState === "failed"
+            ? "Browser menolak menyalin otomatis. Klik kotak jawaban di atas, lalu tekan Ctrl+C."
+            : ""}
+        </p>
       </section>
     );
   }
 
   return (
-    <section className="clara-card space-y-5 p-5">
+    <section className="space-y-5 rounded-2xl border border-clara-line bg-clara-raised p-5">
       <div>
-        <p className="clara-kicker">Jawaban Clara</p>
-        <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
-          Pilih jawaban yang paling pas
-        </h3>
-        <p className="mt-2 text-sm leading-6 clara-text-secondary">
-          Pilih draft, edit bila perlu, lalu setujui secara eksplisit. Approval
-          tidak mengirim pesan ke customer.
+        <h3 className="text-lg font-bold clara-text-primary">Pilih jawaban untuk customer</h3>
+        <p className="mt-1 text-sm leading-6 clara-text-secondary">
+          Pilih salah satu draft, ubah kalau perlu, lalu pakai. Belum ada pesan yang terkirim ke customer.
         </p>
         {isStale ? (
           <div role="alert" className="clara-alert clara-alert-warning mt-4">
-            Draft ini dibuat sebelum chat terbaru masuk. Baca pesan terakhir
-            customer dulu, lalu pertimbangkan generate ulang sebelum approve.
+            Draft ini dibuat sebelum chat terbaru masuk. Baca pesan terakhir customer dulu, lalu pertimbangkan
+            menyusun jawaban baru.
           </div>
         ) : null}
       </div>
 
       <fieldset className="space-y-3">
-        <legend className="clara-label mb-3">Pilihan draft jawaban</legend>
-        {suggestedReplies.map((reply, index) => (
-          <label
-            key={`${reply.tone}-${index}`}
-            className="clara-card-soft block cursor-pointer p-4 hover:border-[rgba(141,103,55,0.24)]"
-          >
-            <div className="flex items-start gap-3">
-              <input
-                type="radio"
-                name="selectedReply"
-                className="mt-1"
-                checked={selectedText === reply.text}
-                onChange={() => {
-                  setSelectedText(reply.text);
-                  setFinalText(reply.text);
-                }}
-              />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold capitalize clara-text-primary">
-                  {reply.tone}
-                </p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm clara-text-secondary [overflow-wrap:anywhere]">
-                  {reply.text}
-                </p>
-                <p className="mt-2 break-words text-xs clara-text-muted [overflow-wrap:anywhere]">
-                  Alasan saran: {reply.reasoning}
-                </p>
+        <legend className="clara-label mb-3">Draft dari Clara</legend>
+        {suggestedReplies.map((reply, index) => {
+          const reasoning = meaningfulReasoning(reply.reasoning);
+
+          return (
+            <label
+              key={`${reply.tone}-${index}`}
+              className={`block min-h-11 cursor-pointer rounded-2xl border p-4 ${
+                selectedText === reply.text
+                  ? "border-clara-gold bg-clara-wash"
+                  : "border-clara-line-subtle bg-clara-sunken hover:border-clara-line"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  name="selectedReply"
+                  className="mt-1 h-4 w-4"
+                  checked={selectedText === reply.text}
+                  onChange={() => {
+                    setSelectedText(reply.text);
+                    setFinalText(reply.text);
+                  }}
+                />
+                <div className="min-w-0">
+                  <Tag tone={reply.tone === "best" ? "gold" : "neutral"}>
+                    {labelOf(REPLY_TONE, reply.tone)}
+                  </Tag>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-sm clara-text-primary [overflow-wrap:anywhere]">
+                    {reply.text}
+                  </p>
+                  {reasoning ? (
+                    <p className="mt-2 break-words text-xs clara-text-muted [overflow-wrap:anywhere]">
+                      Kenapa Clara menyarankan ini: {reasoning}
+                    </p>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          </label>
-        ))}
+            </label>
+          );
+        })}
       </fieldset>
 
       <div>
-        <label
-          htmlFor="finalReply"
-          className="clara-label"
-        >
-          Jawaban final
+        <label htmlFor="finalReply" className="clara-label">
+          Jawaban yang akan kamu pakai (boleh diubah)
         </label>
         <textarea
           id="finalReply"
@@ -235,27 +278,26 @@ export function ReplySuggestionActions({
         />
       </div>
 
-      <div>
-        <label
-          htmlFor="rejectReason"
-          className="clara-label"
-        >
-          Alasan tidak dipakai
-        </label>
-        <input
-          id="rejectReason"
-          value={rejectReason}
-          onChange={(event) => setRejectReason(event.target.value)}
-          placeholder="Contoh: Draft terlalu umum / kurang sesuai tone brand"
-          className="clara-input mt-2"
-        />
-      </div>
+      {showReject ? (
+        <div>
+          <label htmlFor="rejectReason" className="clara-label">
+            Kenapa draft ini kurang pas? (boleh dikosongkan)
+          </label>
+          <input
+            id="rejectReason"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="Contoh: terlalu umum, nadanya kurang sesuai"
+            className="clara-input mt-2"
+          />
+        </div>
+      ) : null}
 
-      {errorMessage && (
+      {errorMessage ? (
         <p role="alert" className="clara-alert clara-alert-danger">
           {errorMessage}
         </p>
-      )}
+      ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <button
@@ -264,17 +306,28 @@ export function ReplySuggestionActions({
           disabled={isBusy || finalText.trim().length === 0}
           className="clara-button clara-button-primary"
         >
-          Setujui Jawaban Final
+          {isSubmitting && !showReject ? "Menyimpan..." : "Pakai jawaban ini"}
         </button>
 
-        <button
-          type="button"
-          onClick={handleReject}
-          disabled={isBusy}
-          className="clara-button clara-button-ghost"
-        >
-          Tolak Draft
-        </button>
+        {showReject ? (
+          <button
+            type="button"
+            onClick={handleReject}
+            disabled={isBusy}
+            className="clara-button clara-button-danger"
+          >
+            {isSubmitting ? "Menyimpan..." : "Tolak draft ini"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowReject(true)}
+            disabled={isBusy}
+            className="clara-button clara-button-ghost"
+          >
+            Draft ini kurang pas
+          </button>
+        )}
       </div>
     </section>
   );

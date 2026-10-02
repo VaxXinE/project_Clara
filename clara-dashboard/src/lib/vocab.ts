@@ -79,6 +79,13 @@ export const APPROVAL: VocabTable = {
   rejected: { label: "Ditolak", tone: "danger" },
 };
 
+/** Status draft jawaban dari sisi Sales (bukan istilah persetujuan manager). */
+export const SUGGESTION_STATE: VocabTable = {
+  pending: { label: "Draft jawaban siap", tone: "gold", hint: "Cek draft, ubah kalau perlu, lalu pakai." },
+  approved: { label: "Jawaban siap dikirim", tone: "good", hint: "Salin jawabannya dan kirim dari WhatsApp." },
+  rejected: { label: "Draft ditolak", tone: "neutral" },
+};
+
 export const CONVERSATION_STATUS: VocabTable = {
   uploaded: { label: "Belum dibaca Clara", tone: "warn" },
   analyzed: { label: "Sudah dibaca Clara", tone: "info" },

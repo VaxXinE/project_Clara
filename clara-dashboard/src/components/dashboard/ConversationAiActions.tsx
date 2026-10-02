@@ -13,6 +13,7 @@ type Props = {
   onUpdated: () => Promise<void>;
 };
 
+/** Dua langkah Clara: baca chat, lalu susun jawaban. Tombol utama selalu langkah yang sedang dibutuhkan. */
 export function ConversationAiActions({
   conversationId,
   hasAiExtraction,
@@ -26,126 +27,98 @@ export function ConversationAiActions({
   const [errorMessage, setErrorMessage] = useState("");
   const isBusy = isAnalyzing || isGeneratingReply;
   const shouldPrioritizeAnalysis = !hasAiExtraction || analysisNeedsRefresh;
+  // Kalau draft yang ada masih relevan, aksi utama di layar adalah memakainya, bukan menyusun ulang.
+  const shouldPrioritizeGeneration =
+    !shouldPrioritizeAnalysis && (!hasReplySuggestion || replyNeedsRefresh);
 
-  async function handleAnalyze() {
+  async function run(path: string, failure: string, setBusy: (value: boolean) => void) {
     setErrorMessage("");
-    setIsAnalyzing(true);
+    setBusy(true);
 
     try {
-      await apiFetch(`/conversations/${conversationId}/analyze`, {
-        method: "POST",
-      });
-
+      await apiFetch(path, { method: "POST" });
       await onUpdated();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal membaca percakapan."
-      );
+      setErrorMessage(error instanceof Error ? error.message : failure);
     } finally {
-      setIsAnalyzing(false);
+      setBusy(false);
     }
   }
 
-  async function handleGenerateReply() {
-    setErrorMessage("");
-    setIsGeneratingReply(true);
-
-    try {
-      await apiFetch(`/conversations/${conversationId}/reply-suggestions`, {
-        method: "POST",
-      });
-
-      await onUpdated();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat jawaban."
-      );
-    } finally {
-      setIsGeneratingReply(false);
-    }
-  }
+  const status = isAnalyzing
+    ? "Clara sedang membaca percakapan ini."
+    : isGeneratingReply
+      ? "Clara sedang menyusun jawaban."
+      : "";
 
   return (
-    <section className="clara-card p-5" aria-labelledby="clara-actions-title">
-      <p className="clara-kicker">Aksi Clara</p>
-      <h2
-        id="clara-actions-title"
-        className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary"
-      >
-        Siapkan konteks dan jawaban
+    <section aria-labelledby="clara-actions-title" className="rounded-2xl border border-clara-line bg-clara-raised p-4">
+      <h2 id="clara-actions-title" className="text-base font-bold clara-text-primary">
+        {hasAiExtraction ? "Perlu jawaban yang berbeda?" : "Minta Clara membantu"}
       </h2>
-      <p className="mt-2 text-sm leading-6 clara-text-secondary">
-        Hasil AI adalah saran. Baca konteks terbaru dan review jawaban sebelum
-        menyetujuinya.
+      <p className="mt-1 text-sm leading-6 clara-text-secondary">
+        {analysisNeedsRefresh
+          ? "Ada pesan customer baru sejak Clara terakhir membaca. Baca ulang dulu sebelum menyusun jawaban."
+          : replyNeedsRefresh
+            ? "Draft lama sudah tertinggal dari chat terbaru. Susun ulang jawabannya."
+            : hasAiExtraction
+              ? "Saran Clara boleh kamu ubah. Susun ulang kalau draft yang ada belum cocok."
+              : "Clara perlu membaca percakapan ini dulu, baru bisa menyusun jawaban."}
       </p>
 
-      {analysisNeedsRefresh || replyNeedsRefresh ? (
-        <div role="alert" className="clara-alert clara-alert-warning mt-4">
-          {analysisNeedsRefresh
-            ? "Ada pesan customer baru sejak analisis terakhir. Jalankan ulang AI analysis dulu."
-            : "Draft lama sudah tertinggal dari chat terbaru. Generate ulang reply suggestion setelah baca konteks baru."}
-        </div>
-      ) : null}
-
-      <div className="mt-4 flex flex-col gap-3">
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
-          onClick={handleAnalyze}
+          onClick={() =>
+            void run(
+              `/conversations/${conversationId}/analyze`,
+              "Clara belum bisa membaca percakapan ini. Coba lagi.",
+              setIsAnalyzing,
+            )
+          }
           disabled={isBusy}
-          className={`clara-button ${
-            shouldPrioritizeAnalysis
-              ? "clara-button-primary"
-              : "clara-button-ghost"
-          }`}
+          className={`clara-button ${shouldPrioritizeAnalysis ? "clara-button-primary" : "clara-button-secondary"}`}
         >
           {isAnalyzing
-            ? "Menganalisis..."
+            ? "Membaca..."
             : analysisNeedsRefresh
-              ? "Analisis Ulang karena Ada Chat Baru"
+              ? "Baca ulang (ada chat baru)"
               : hasAiExtraction
-                ? "Jalankan Analisis Lagi"
-              : "Analisis Percakapan"}
+                ? "Baca ulang percakapan"
+                : "Baca percakapan ini"}
         </button>
 
         <button
           type="button"
-          onClick={handleGenerateReply}
+          onClick={() =>
+            void run(
+              `/conversations/${conversationId}/reply-suggestions`,
+              "Clara belum bisa menyusun jawaban. Coba lagi.",
+              setIsGeneratingReply,
+            )
+          }
           disabled={isBusy || !hasAiExtraction}
-          className={`clara-button ${
-            shouldPrioritizeAnalysis
-              ? "clara-button-ghost"
-              : "clara-button-primary"
-          }`}
+          className={`clara-button ${shouldPrioritizeGeneration ? "clara-button-primary" : "clara-button-secondary"}`}
         >
           {isGeneratingReply
-            ? "Membuat jawaban..."
+            ? "Menyusun..."
             : replyNeedsRefresh
-              ? "Buat Ulang Jawaban"
+              ? "Susun ulang jawaban"
               : hasReplySuggestion
-                ? "Buat Jawaban Baru"
-              : "Buat Jawaban Terbaik"}
+                ? "Susun jawaban baru"
+                : "Susun jawaban"}
         </button>
-
-        {!hasAiExtraction && (
-          <p className="clara-helper">
-            Jalankan analisis dulu sebelum membuat jawaban terbaik.
-          </p>
-        )}
-
-        {isBusy ? (
-          <p role="status" aria-live="polite" className="clara-helper">
-            {isAnalyzing
-              ? "Clara sedang menganalisis percakapan."
-              : "Clara sedang membuat draft jawaban."}
-          </p>
-        ) : null}
       </div>
 
-      {errorMessage && (
-        <p role="alert" className="clara-alert clara-alert-danger mt-4">
+      <p role="status" aria-live="polite" className="mt-2 min-h-5 text-sm clara-text-secondary">
+        {status}
+      </p>
+
+      {errorMessage ? (
+        <p role="alert" className="clara-alert clara-alert-danger mt-2">
           {errorMessage}
         </p>
-      )}
+      ) : null}
     </section>
   );
 }

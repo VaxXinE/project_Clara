@@ -5,22 +5,28 @@ import { useParams, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { ConversationAiActions } from "@/components/dashboard/ConversationAiActions";
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { ReplySuggestionActions } from "@/components/dashboard/ReplySuggestionActions";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import {
   formatChannelLabel,
   formatDateTime,
   formatProviderLabel,
+  formatRelativeTime,
   formatStatusLabel,
-  getChannelBadgeClass,
-  getLeadBadgeClass,
-  getProviderBadgeClass,
-  getRiskBadgeClass,
   inferProviderFromSource,
   isExperimentalChannel,
 } from "@/lib/format";
+import {
+  ACCOUNT_CATEGORY,
+  BUYING_INTENT,
+  SENTIMENT,
+  STAGE,
+  SUGGESTION_STATE,
+  TEMPERATURE,
+  labelOf,
+} from "@/lib/vocab";
 import {
   canAccessQueueAndActionCenter,
   normalizeWorkspaceRole,
@@ -73,30 +79,6 @@ function formatReviewCaseLabel(value: string): string {
 
 function formatKnowledgeProposalStatus(value: string): string {
   return formatStatusLabel(value);
-}
-
-function formatAccountCategory(value: string): string {
-  switch (value) {
-    case "mini":
-      return "Mini";
-    case "reguler":
-      return "Reguler";
-    case "unknown":
-      return "Belum ditentukan";
-    default:
-      return value.replaceAll("_", " ");
-  }
-}
-
-function getAccountCategoryBadgeClass(value: string): string {
-  switch (value) {
-    case "mini":
-      return "bg-clara-success-surface text-clara-success";
-    case "reguler":
-      return "bg-clara-tint text-clara-gold";
-    default:
-      return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
-  }
 }
 
 function getLatestConversationMessage(detail: SalesConversationDetail) {
@@ -164,7 +146,7 @@ function buildContinuationHref(detail: SalesConversationDetail): string {
     channel: detail.source_channel || "whatsapp",
     conversationId: detail.conversation_id,
   });
-  return `/dashboard/upload?${params.toString()}`;
+  return `/upload?${params.toString()}`;
 }
 
 function buildUploadResultBanner(
@@ -181,21 +163,21 @@ function buildUploadResultBanner(
   if (uploadStatus === "created") {
     return {
       tone: "success",
-      text: `Conversation baru dibuat dari ${messageCount} pesan yang baru di-upload.`,
+      text: `Percakapan baru dibuat dari ${messageCount} pesan yang baru kamu masukkan.`,
     };
   }
 
   if (uploadStatus === "updated") {
     return {
       tone: "success",
-      text: `${appendedCount} pesan baru berhasil ditempelkan ke conversation ini. Cek lagi analisis dan draft lama karena konteks chat sudah berkembang.`,
+      text: `${appendedCount} pesan baru ditambahkan ke percakapan ini. Baca ulang percakapan dan susun ulang jawaban, karena isi chat sudah bertambah.`,
     };
   }
 
   if (uploadStatus === "unchanged") {
     return {
       tone: "neutral",
-      text: "Upload terakhir tidak menambah pesan baru. Clara menganggap isi chat yang Anda kirim sama dengan yang sudah ada di conversation ini.",
+      text: "Tidak ada pesan baru. Isi chat yang kamu masukkan sama dengan yang sudah ada di percakapan ini.",
     };
   }
 
@@ -560,47 +542,44 @@ export default function SalesConversationDetailPage() {
     }
   }
 
+  const isReviewer = Boolean(currentUser && !canAccessQueueAndActionCenter(currentUser.role));
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.daily}
       title={detail?.title ?? "Detail percakapan"}
-      description="Baca timeline chat, cek hasil analisis AI, dan review draft balasan dari satu layar kerja yang konsisten."
-      backHref={
-        currentUser && !canAccessQueueAndActionCenter(currentUser.role)
-          ? "/dashboard/approvals"
-          : "/dashboard/sales"
+      description={
+        isReviewer
+          ? "Baca chat dan tinjau jawaban yang disarankan Clara untuk Sales ini."
+          : "Baca chat di sebelah kiri, lalu pakai jawaban yang disarankan Clara di sebelah kanan."
       }
-      backLabel={
-        currentUser && !canAccessQueueAndActionCenter(currentUser.role)
-          ? "Kembali ke review sales"
-          : "Kembali ke inbox"
-      }
+      backHref={isReviewer ? "/approvals" : "/sales"}
+      backLabel={isReviewer ? "Kembali ke Review Sales" : "Kembali ke Chat Masuk"}
       actions={
         <>
           {detail ? (
             <Link
               href={buildContinuationHref(detail)}
-              className="clara-button clara-button-primary"
+              className="clara-button clara-button-secondary"
             >
-              Tambah Chat Lanjutan
+              Tambah chat lanjutan
             </Link>
           ) : null}
           <Link
             href={
-              currentUser && !canAccessQueueAndActionCenter(currentUser.role)
-                ? normalizeWorkspaceRole(currentUser.role) === "head"
-                  ? "/dashboard/notifications"
-                  : "/dashboard/manager-insights"
-                : "/dashboard/follow-up"
+              isReviewer
+                ? normalizeWorkspaceRole(currentUser?.role) === "head"
+                  ? "/notifications"
+                  : "/manager-insights"
+                : "/follow-up"
             }
             className="clara-button clara-button-ghost"
           >
-            {currentUser && !canAccessQueueAndActionCenter(currentUser.role)
-              ? normalizeWorkspaceRole(currentUser.role) === "head"
-                ? "Buka Alert Tim"
-                : "Buka Monitor Tim"
-              : "Buka Worklist"}
+            {isReviewer
+              ? normalizeWorkspaceRole(currentUser?.role) === "head"
+                ? "Lihat Alert Tim"
+                : "Lihat Monitor Tim"
+              : "Lihat Tindak Lanjut"}
           </Link>
         </>
       }
@@ -618,20 +597,13 @@ export default function SalesConversationDetailPage() {
 
         {errorMessage && !isLoading && (
           <div role="alert" className="clara-alert clara-alert-danger">
-            {errorMessage}. Coba kembali ke{" "}
+            <p>{errorMessage}</p>
             <Link
-              href={
-                currentUser && !canAccessQueueAndActionCenter(currentUser.role)
-                  ? "/dashboard/approvals"
-                  : "/dashboard/sales"
-              }
-              className="font-semibold underline"
+              href={isReviewer ? "/approvals" : "/sales"}
+              className="clara-button clara-button-secondary mt-3"
             >
-              {currentUser && !canAccessQueueAndActionCenter(currentUser.role)
-                ? "review sales"
-                : "sales inbox"}
+              {isReviewer ? "Kembali ke Review Sales" : "Kembali ke Chat Masuk"}
             </Link>
-            .
           </div>
         )}
 
@@ -742,52 +714,27 @@ function ConversationFreshnessBanner({
 
       {(freshCustomerReply || analysisStale || suggestionStale) ? (
         <div role="alert" className="clara-alert clara-alert-warning p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="clara-kicker">
-                Chat terus berkembang
-              </p>
-              <h2 className="mt-2 text-lg font-bold clara-text-primary">
-                Ada konteks baru setelah tindakan terakhir
+              <h2 className="text-base font-bold clara-text-primary">
+                Chat ini sudah berubah sejak terakhir dibaca
               </h2>
-              <div className="mt-3 space-y-2 text-sm leading-6 clara-text-secondary">
+              <div className="mt-2 space-y-1.5 text-sm leading-6 clara-text-secondary">
                 {freshCustomerReply ? (
-                  <p>
-                    Customer sudah membalas lagi setelah pesan terakhir yang
-                    ditandai terkirim. Conversation ini aktif lagi dan perlu
-                    dibaca ulang.
-                  </p>
+                  <p>Customer membalas lagi setelah jawaban terakhir yang kamu kirim. Baca pesan terbarunya dulu.</p>
                 ) : null}
                 {analysisStale ? (
-                  <p>
-                    AI analysis lama sudah tertinggal dari chat terbaru. Jalankan
-                    ulang analisis sebelum mengambil keputusan baru.
-                  </p>
+                  <p>Bacaan Clara sudah tertinggal dari chat terbaru. Baca ulang percakapan sebelum memutuskan.</p>
                 ) : null}
                 {suggestionStale ? (
-                  <p>
-                    Draft balasan lama sudah tidak sepenuhnya relevan. Generate
-                    ulang reply suggestion setelah memastikan konteks terbaru.
-                  </p>
+                  <p>Draft jawaban yang lama mungkin sudah tidak cocok. Susun ulang setelah membaca ulang.</p>
                 ) : null}
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href={continuationHref}
-                className="clara-button clara-button-primary"
-              >
-                Upload Chat Lanjutan
-              </Link>
-              <button
-                type="button"
-                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-                className="clara-button clara-button-ghost"
-              >
-                Baca dari atas lagi
-              </button>
-            </div>
+            <Link href={continuationHref} className="clara-button clara-button-secondary shrink-0">
+              Tambah chat lanjutan
+            </Link>
           </div>
         </div>
       ) : null}
@@ -806,153 +753,58 @@ function ConversationDetailHeader({
   const suggestionStale = isReplySuggestionStale(detail);
   const provider = inferProviderFromSource(detail.source);
   const latestCustomerMessage = getLatestCustomerMessage(detail);
+  const category =
+    detail.account_category && detail.account_category !== "unknown"
+      ? labelOf(ACCOUNT_CATEGORY, detail.account_category)
+      : null;
 
   return (
-    <section className="clara-card p-5 sm:p-6">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
-        <div className="min-w-0">
-          <p className="clara-kicker">Konteks percakapan</p>
-          <h2 className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl">
-            Status dan pesan customer terbaru
-          </h2>
-          <p className="mt-2 text-sm leading-6 clara-text-secondary">
-            Aktivitas terakhir {formatDateTime(detail.last_message_at)}
-          </p>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getChannelBadgeClass(
-                detail.source_channel,
-              )}`}
-            >
-              {formatChannelLabel(detail.source_channel)}
-            </span>
-
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${getProviderBadgeClass(
-                provider,
-              )}`}
-            >
-              {formatProviderLabel(provider)}
-            </span>
-
-            {isExperimentalChannel(detail.source_channel) ? (
-              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-clara-gold">
-                Experimental
-              </span>
+    <section aria-label="Ringkasan percakapan" className="clara-card p-5 sm:p-6">
+      <div className="flex flex-wrap items-center gap-2">
+        {extraction ? (
+          <>
+            <ValueTag table={TEMPERATURE} value={extraction.lead_temperature} />
+            <ValueTag table={STAGE} value={extraction.pipeline_stage} />
+            {extraction.risk_level !== "low" ? (
+              <Tag tone={extraction.risk_level === "high" ? "danger" : "warn"}>
+                {extraction.risk_level === "high" ? "Risiko tinggi" : "Risiko sedang"}
+              </Tag>
             ) : null}
-
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
-                detail.account_category,
-              )}`}
-            >
-              Kategori akun: {formatAccountCategory(detail.account_category)}
-            </span>
-
-            {extraction ? (
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                  extraction.lead_temperature,
-                )}`}
-              >
-                {extraction.lead_temperature.toUpperCase()}
-              </span>
-            ) : (
-              <span className="rounded-full border border-clara-line bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-2">
-                Menunggu AI analysis
-              </span>
-            )}
-
-            {extraction ? (
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${getRiskBadgeClass(
-                  extraction.risk_level,
-                )}`}
-              >
-                Risk {extraction.risk_level}
-              </span>
-            ) : null}
-
-            {suggestion ? (
-              <span className="rounded-full bg-clara-info-surface px-3 py-1 text-xs font-semibold text-clara-info">
-                {formatStatusLabel(suggestion.approval_status)}
-              </span>
-            ) : (
-              <span className="rounded-full border border-[#d3a74b]/22 bg-[#f3e0b3] px-3 py-1 text-xs font-semibold text-[#5c3a12]">
-                Belum ada draft
-              </span>
-            )}
-
-            {analysisStale ? (
-              <span className="rounded-full bg-clara-tint px-3 py-1 text-xs font-semibold text-clara-gold">
-                Analysis perlu diperbarui
-              </span>
-            ) : null}
-
-            {suggestionStale ? (
-              <span className="rounded-full bg-clara-warning-surface px-3 py-1 text-xs font-semibold text-clara-warning">
-                Draft lama
-              </span>
-            ) : null}
-          </div>
-
-          <article className="clara-card-soft mt-5 min-w-0 p-4">
-            <p className="clara-kicker text-xs">
-              Pesan customer terbaru
-            </p>
-            {latestCustomerMessage ? (
-              <>
-                <p className="mt-2 break-words whitespace-pre-wrap text-sm leading-6 clara-text-primary [overflow-wrap:anywhere]">
-                  {latestCustomerMessage.message_text}
-                </p>
-                <p className="mt-2 text-xs clara-text-muted">
-                  {latestCustomerMessage.sender_name} ·{" "}
-                  {formatDateTime(latestCustomerMessage.message_timestamp)}
-                </p>
-              </>
-            ) : (
-              <p className="mt-2 text-sm clara-text-secondary">
-                Belum ada pesan customer pada timeline ini.
-              </p>
-            )}
-          </article>
-        </div>
-
-        <aside className="clara-card-outline p-4" aria-label="Metadata percakapan">
-          <p className="clara-kicker">Identitas</p>
-          <div className="mt-3 grid gap-2">
-            <MetaPill
-              label="Channel"
-              value={formatChannelLabel(detail.source_channel)}
-            />
-            <MetaPill
-              label="Provider"
-              value={formatProviderLabel(provider)}
-            />
-            <MetaPill label="Source" value={detail.source_label} />
-            <MetaPill label="Status" value={formatStatusLabel(detail.status)} />
-            <MetaPill
-              label="Kategori"
-              value={formatAccountCategory(detail.account_category)}
-            />
-            <MetaPill
-              label="Pesan"
-              value={String(detail.messages.length)}
-            />
-            <MetaPill
-              label="AI status"
-              value={
-                analysisStale
-                  ? "Perlu diperbarui"
-                  : extraction
-                    ? "Tersedia"
-                    : "Belum tersedia"
-              }
-            />
-          </div>
-        </aside>
+          </>
+        ) : (
+          <Tag tone="warn">Belum dibaca Clara</Tag>
+        )}
+        {suggestion ? (
+          <ValueTag table={SUGGESTION_STATE} value={suggestion.approval_status} />
+        ) : (
+          <Tag tone="warn">Belum ada draft jawaban</Tag>
+        )}
+        {category ? <Tag>{category}</Tag> : null}
+        {isExperimentalChannel(detail.source_channel) ? <Tag tone="warn">Eksperimental</Tag> : null}
+        {analysisStale ? <Tag tone="warn">Perlu dibaca ulang</Tag> : null}
+        {suggestionStale ? <Tag tone="warn">Draft sudah lama</Tag> : null}
       </div>
+
+      <p className="mt-3 text-xs leading-5 clara-text-muted">
+        Channel: {formatChannelLabel(detail.source_channel)} · Asal data: {formatProviderLabel(provider)} · Sumber:{" "}
+        {detail.source_label} · Aktivitas terakhir {formatRelativeTime(detail.last_message_at)}
+      </p>
+
+      <article className="mt-4 min-w-0 rounded-2xl border border-clara-line-subtle bg-clara-sunken p-4">
+        <h2 className="text-sm font-semibold clara-text-primary">Pesan terbaru dari customer</h2>
+        {latestCustomerMessage ? (
+          <>
+            <p className="mt-2 break-words whitespace-pre-wrap text-base leading-7 clara-text-primary [overflow-wrap:anywhere]">
+              {latestCustomerMessage.message_text}
+            </p>
+            <p className="mt-2 text-xs clara-text-muted">
+              {latestCustomerMessage.sender_name} · {formatDateTime(latestCustomerMessage.message_timestamp)}
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 text-sm clara-text-secondary">Belum ada pesan dari customer di chat ini.</p>
+        )}
+      </article>
     </section>
   );
 }
@@ -1063,7 +915,6 @@ function ConversationDetailContent({
   const knowledgeProposal = detail.knowledge_update_proposal;
   const analysisStale = isAnalysisStale(detail);
   const suggestionStale = isReplySuggestionStale(detail);
-  const provider = inferProviderFromSource(detail.source);
   const [activePanel, setActivePanel] = useState<
     "ai_reply" | "coaching" | "knowledge" | "sent_logs"
   >("ai_reply");
@@ -1071,42 +922,40 @@ function ConversationDetailContent({
   const visibleMessages = showAllMessages
     ? detail.messages
     : detail.messages.slice(Math.max(detail.messages.length - 12, 0));
+  const aiActions = (
+    <ConversationAiActions
+      conversationId={detail.conversation_id}
+      hasAiExtraction={Boolean(extraction)}
+      hasReplySuggestion={Boolean(suggestion)}
+      analysisNeedsRefresh={analysisStale}
+      replyNeedsRefresh={suggestionStale}
+      onUpdated={onUpdated}
+    />
+  );
   const chatTimeline = (
     <section
       data-onboarding-id="sales-conversation-timeline"
       className="clara-card min-w-0 p-4 sm:p-6"
       aria-labelledby="conversation-timeline-title"
     >
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <p className="clara-kicker">Timeline</p>
-          <h2
-            id="conversation-timeline-title"
-            className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl"
-          >
-            Timeline percakapan
-          </h2>
-          <p className="mt-2 text-sm leading-6 clara-text-secondary">
-            Fokus ke pesan terbaru dulu. Expand penuh hanya saat butuh membaca
-            konteks lama.
-          </p>
-        </div>
-
-        <div className="clara-chip clara-chip-neutral">
-          Menampilkan {visibleMessages.length} dari {detail.messages.length}{" "}
-          pesan
-        </div>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="conversation-timeline-title" className="text-lg font-bold clara-text-primary">
+          Isi chat
+        </h2>
+        <p className="text-sm clara-text-secondary">
+          Menampilkan {visibleMessages.length} dari {detail.messages.length} pesan
+        </p>
       </div>
 
       <div
-        className="clara-scrollbar mt-5 max-h-[70vh] overflow-y-auto rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-muted)] p-3 sm:p-4"
+        className="clara-scrollbar mt-4 max-h-[70vh] overflow-y-auto rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-muted)] p-3 sm:p-4"
       >
         <ol className="space-y-3" aria-label="Pesan percakapan">
           {!showAllMessages &&
           detail.messages.length > visibleMessages.length ? (
             <li className="clara-card-outline p-3 text-sm clara-text-secondary">
-              {detail.messages.length - visibleMessages.length} pesan lama
-              disembunyikan dulu supaya halaman tetap ringkas.
+              {detail.messages.length - visibleMessages.length} pesan lama disembunyikan.
+              Pakai tombol di bawah untuk melihat semuanya.
             </li>
           ) : null}
 
@@ -1172,7 +1021,7 @@ function ConversationDetailContent({
             onClick={() => setShowAllMessages((current) => !current)}
             className="clara-button clara-button-ghost"
           >
-            {showAllMessages ? "Tampilkan ringkas" : "Tampilkan semua pesan"}
+            {showAllMessages ? "Tampilkan pesan terbaru saja" : "Tampilkan semua pesan"}
           </button>
         </div>
       ) : null}
@@ -1194,190 +1043,157 @@ function ConversationDetailContent({
 
             <section
               data-onboarding-id="sales-conversation-workspace"
-              className="clara-card rounded-3xl p-5 xl:sticky xl:top-28"
+              aria-label="Balas customer"
+              className="min-w-0 space-y-4"
             >
-              <div>
-                <p className="clara-kicker">Area kerja sales</p>
-                <h3 className="mt-2 text-lg font-semibold clara-text-primary">
-                  Baca konteks lalu pilih aksi
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-clara-ink-2">
-                  Fokus ke timeline chat, hasil baca Clara, lalu lanjut pilih jawaban atau cek riwayat kirim.
-                </p>
+              <div className="clara-card p-5">
+                <h2 className="text-lg font-bold clara-text-primary">Balas customer ini</h2>
+                <ol className="mt-2 grid gap-1 text-sm clara-text-secondary sm:grid-cols-2">
+                  <li>1. Baca chat di sebelah kiri</li>
+                  <li>2. Pilih atau ubah jawaban</li>
+                  <li>3. Kirim sendiri dari WhatsApp</li>
+                  <li>4. Tandai sudah terkirim</li>
+                </ol>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <PanelTab
+                    label="Jawaban"
+                    isActive={activePanel === "ai_reply"}
+                    onClick={() => setActivePanel("ai_reply")}
+                  />
+                  <PanelTab
+                    label={`Riwayat kirim (${detail.sent_messages.length})`}
+                    isActive={activePanel === "sent_logs"}
+                    onClick={() => setActivePanel("sent_logs")}
+                  />
+                </div>
               </div>
 
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <PanelTab
-                  label="AI & Jawaban"
-                  isActive={activePanel === "ai_reply"}
-                  onClick={() => setActivePanel("ai_reply")}
-                />
-                <PanelTab
-                  label="Riwayat Kirim"
-                  isActive={activePanel === "sent_logs"}
-                  onClick={() => setActivePanel("sent_logs")}
-                />
-              </div>
+              {activePanel === "ai_reply" ? (
+                <div className="space-y-4">
+                  {!suggestion ? aiActions : null}
 
-              <div className="mt-5">
-                {activePanel === "ai_reply" ? (
-                  <div className="space-y-6">
-                    <ConversationAiActions
-                      conversationId={detail.conversation_id}
-                      hasAiExtraction={Boolean(extraction)}
-                      hasReplySuggestion={Boolean(suggestion)}
-                      analysisNeedsRefresh={analysisStale}
-                      replyNeedsRefresh={suggestionStale}
-                      onUpdated={onUpdated}
-                    />
-
-                    <div
-                      data-onboarding-id="sales-conversation-ai-summary"
-                      className="rounded-2xl border border-clara-line bg-clara-raised p-5"
-                    >
-                      <p className="clara-kicker">Ringkasan Clara</p>
-                      <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
-                        Hasil baca percakapan
-                      </h2>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span
-                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getChannelBadgeClass(
-                            detail.source_channel,
-                          )}`}
-                        >
-                          Channel: {formatChannelLabel(detail.source_channel)}
-                        </span>
-                        <span
-                          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getProviderBadgeClass(
-                            provider,
-                          )}`}
-                        >
-                          Sumber draft: {formatProviderLabel(provider)}
-                        </span>
-                      </div>
-                      {isExperimentalChannel(detail.source_channel) ? (
-                        <p className="mt-3 text-xs leading-6 text-clara-ink-3">
-                          Channel ini masih experimental. Untuk Instagram dan TikTok, baca ulang konteks sebelum pakai draft mentah.
-                        </p>
-                      ) : null}
-
-                      {extraction ? (
-                        <div className="mt-4 space-y-3 text-sm">
-                          <InfoBlock
-                            label="Tahap customer"
-                            value={formatStatusLabel(extraction.pipeline_stage)}
-                          />
-                          <InfoBlock
-                            label="Minat beli"
-                            value={formatStatusLabel(extraction.buying_intent)}
-                          />
-                          <InfoBlock
-                            label="Sentimen"
-                            value={formatStatusLabel(extraction.sentiment)}
-                          />
-                          <div className="clara-card-soft rounded-2xl p-4">
-                            <p className="clara-kicker text-xs">
-                              Objection utama
-                            </p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {extraction.main_objections.length > 0 ? (
-                                extraction.main_objections.map((objection) => (
-                                  <span
-                                    key={objection}
-                                    className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-medium text-clara-ink-2"
-                                  >
-                                    {objection}
-                                  </span>
-                                ))
-                              ) : (
-                                <p className="text-clara-ink-2">
-                                  Belum ada objection utama yang menonjol.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <InfoBlock
-                            label="Langkah berikutnya"
-                            value={extraction.next_best_action}
-                          />
-                          <InfoBlock
-                            label="Tingkat keyakinan Clara"
-                            value={`${(extraction.confidence_score * 100).toFixed(0)}%`}
-                          />
-                        </div>
-                      ) : (
-                        <div className="clara-card-outline mt-4 rounded-2xl p-4 text-sm text-clara-ink-2">
-                          Percakapan ini belum dibaca AI. Jalankan analisis dulu supaya Clara bisa bantu menyiapkan arah balasan.
-                        </div>
-                      )}
-                    </div>
-
-                    <div data-onboarding-id="sales-conversation-reply-actions">
-                      {suggestion ? (
-                        <ReplySuggestionActions
-                          replySuggestionId={suggestion.id}
-                          suggestedReplies={suggestion.suggested_replies}
-                          approvalStatus={suggestion.approval_status}
-                          hasBeenSent={detail.sent_messages.some(
-                            (sentMessage) =>
-                              sentMessage.reply_suggestion_id === suggestion.id,
-                          )}
-                          isStale={suggestionStale}
-                          onUpdated={onUpdated}
-                        />
-                      ) : (
-                        <div className="clara-card-outline rounded-3xl p-5">
-                          <h2 className="text-lg font-semibold clara-text-primary">
-                            Belum ada jawaban terbaik
-                          </h2>
-                          <p className="mt-2 text-sm text-clara-ink-2">
-                            Setelah chat dibaca AI, lanjut buat jawaban terbaik supaya kamu tinggal review dan pakai.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-
-                {activePanel === "sent_logs" ? (
-                  <div className="rounded-2xl border border-clara-line bg-clara-raised p-5">
-                    <p className="clara-kicker">Riwayat kirim</p>
-                    <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
-                      Balasan yang sudah ditandai terkirim
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 clara-text-secondary">
-                      Riwayat manual dashboard; bukan konfirmasi delivery atau
-                      read receipt dari provider.
-                    </p>
-
-                    {detail.sent_messages.length > 0 ? (
-                      <div className="mt-4 space-y-3">
-                        {detail.sent_messages.map((sentMessage) => (
-                          <div
-                            key={sentMessage.id}
-                            className="rounded-2xl border border-clara-success-line bg-clara-success-surface p-4 text-sm text-clara-success"
-                          >
-                            <p className="font-semibold">
-                              Dikirim oleh {sentMessage.sent_by_name}
-                            </p>
-                            <p className="mt-1 text-xs text-clara-success">
-                              {formatDateTime(sentMessage.sent_at)} &bull;{" "}
-                              {sentMessage.send_mode}
-                            </p>
-                            <p className="mt-3 break-words whitespace-pre-wrap leading-6 [overflow-wrap:anywhere]">
-                              {sentMessage.message_text}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                  <div data-onboarding-id="sales-conversation-reply-actions">
+                    {suggestion ? (
+                      <ReplySuggestionActions
+                        key={suggestion.id}
+                        replySuggestionId={suggestion.id}
+                        suggestedReplies={suggestion.suggested_replies}
+                        approvalStatus={suggestion.approval_status}
+                        finalReplyText={suggestion.final_reply_text}
+                        hasBeenSent={detail.sent_messages.some(
+                          (sentMessage) => sentMessage.reply_suggestion_id === suggestion.id,
+                        )}
+                        isStale={suggestionStale}
+                        onUpdated={onUpdated}
+                      />
                     ) : (
-                      <p className="mt-3 text-sm text-clara-ink-2">
-                        Belum ada balasan yang ditandai terkirim untuk percakapan ini.
-                      </p>
+                      <div className="rounded-2xl border border-dashed border-clara-line p-5">
+                        <h3 className="text-base font-semibold clara-text-primary">Belum ada jawaban</h3>
+                        <p className="mt-1 text-sm leading-6 clara-text-secondary">
+                          {extraction
+                            ? "Klik Susun jawaban di atas. Clara akan menyiapkan beberapa pilihan yang tinggal kamu cek."
+                            : "Klik Baca percakapan ini di atas. Setelah itu Clara bisa menyusun jawaban."}
+                        </p>
+                      </div>
                     )}
                   </div>
-                ) : null}
-              </div>
+
+                  <section
+                    data-onboarding-id="sales-conversation-ai-summary"
+                    className="clara-card p-5"
+                  >
+                    <h3 className="text-base font-bold clara-text-primary">Yang Clara baca dari chat ini</h3>
+
+                    {extraction ? (
+                      <>
+                        {extraction.customer_summary ? (
+                          <p className="mt-2 text-sm leading-6 clara-text-primary">{extraction.customer_summary}</p>
+                        ) : null}
+
+                        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                          <SummaryItem label="Tahap customer">
+                            <ValueTag table={STAGE} value={extraction.pipeline_stage} />
+                          </SummaryItem>
+                          <SummaryItem label="Minat beli">
+                            <ValueTag table={BUYING_INTENT} value={extraction.buying_intent} />
+                          </SummaryItem>
+                          <SummaryItem label="Suasana hati customer">
+                            <ValueTag table={SENTIMENT} value={extraction.sentiment} />
+                          </SummaryItem>
+                          <SummaryItem label="Keyakinan Clara">
+                            <span className="text-sm clara-text-primary">
+                              {(extraction.confidence_score * 100).toFixed(0)}%
+                            </span>
+                          </SummaryItem>
+                          <div className="col-span-2">
+                            <dt className="text-xs clara-text-muted">Hal yang membuat customer ragu</dt>
+                            <dd className="mt-1.5 flex flex-wrap gap-2">
+                              {extraction.main_objections.length > 0 ? (
+                                extraction.main_objections.map((objection) => (
+                                  <Tag key={objection}>{objection}</Tag>
+                                ))
+                              ) : (
+                                <span className="text-sm clara-text-secondary">Tidak ada yang menonjol.</span>
+                              )}
+                            </dd>
+                          </div>
+                        </dl>
+
+                        <div className="mt-4 rounded-xl bg-clara-wash p-3">
+                          <p className="text-sm leading-6 clara-text-primary">
+                            <span className="font-semibold">Langkah berikutnya: </span>
+                            {extraction.next_best_action}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                        Clara belum membaca percakapan ini. Klik Baca percakapan ini supaya muncul ringkasan,
+                        tahap customer, dan langkah berikutnya.
+                      </p>
+                    )}
+
+                    {isExperimentalChannel(detail.source_channel) ? (
+                      <p className="mt-3 text-xs leading-5 clara-text-muted">
+                        Channel ini masih eksperimental. Baca ulang konteks chat sebelum memakai draft apa adanya.
+                      </p>
+                    ) : null}
+                  </section>
+
+                  {suggestion ? aiActions : null}
+                </div>
+              ) : null}
+
+              {activePanel === "sent_logs" ? (
+                <div className="clara-card p-5">
+                  <h3 className="text-base font-bold clara-text-primary">Balasan yang sudah ditandai terkirim</h3>
+                  <p className="mt-1 text-sm leading-6 clara-text-secondary">
+                    Ini catatan manual dari dashboard, bukan bukti pesan sampai atau sudah dibaca customer.
+                  </p>
+
+                  {detail.sent_messages.length > 0 ? (
+                    <div className="mt-4 space-y-3">
+                      {detail.sent_messages.map((sentMessage) => (
+                        <div
+                          key={sentMessage.id}
+                          className="rounded-2xl border border-clara-success-line bg-clara-success-surface p-4 text-sm text-clara-success"
+                        >
+                          <p className="font-semibold">Dikirim oleh {sentMessage.sent_by_name}</p>
+                          <p className="mt-1 text-xs">{formatDateTime(sentMessage.sent_at)}</p>
+                          <p className="mt-3 break-words whitespace-pre-wrap leading-6 [overflow-wrap:anywhere]">
+                            {sentMessage.message_text}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-sm clara-text-secondary">
+                      Belum ada balasan yang ditandai terkirim untuk percakapan ini.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </section>
           </>
         ) : (
@@ -2105,28 +1921,20 @@ function PanelTab({
   );
 }
 
-function MetaPill({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex min-w-0 items-start justify-between gap-3 rounded-lg bg-[var(--color-surface-muted)] px-3 py-2.5">
-      <span className="text-sm clara-text-secondary">{label}</span>
-      <span className="min-w-0 break-words text-right text-sm font-semibold clara-text-primary [overflow-wrap:anywhere]">
-        {value}
-      </span>
-    </div>
-  );
-}
-
 function InfoBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="clara-card-soft rounded-2xl p-4">
       <p className="clara-kicker text-xs">{label}</p>
       <p className="mt-2 text-sm leading-6 text-clara-ink-2">{value}</p>
+    </div>
+  );
+}
+
+function SummaryItem({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs clara-text-muted">{label}</dt>
+      <dd className="mt-1.5">{children}</dd>
     </div>
   );
 }

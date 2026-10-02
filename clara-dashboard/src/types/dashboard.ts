@@ -58,6 +58,8 @@ export type DashboardAIExtractionSummary = {
   sentiment: string;
   risk_level: string;
   main_objections: string[];
+  /** Ringkasan satu-dua kalimat dari Clara tentang isi chat. */
+  customer_summary?: string | null;
   next_best_action: string;
   confidence_score: number;
   created_at: string;
@@ -69,12 +71,14 @@ export type DashboardReplySuggestionSummary = {
   approval_status: string;
   risk_level: string;
   suggested_replies: SuggestedReply[];
+  /** Ada setelah jawaban disetujui; null selama masih draft. */
+  final_reply_text?: string | null;
   policy_reasons: string[];
   created_at: string;
 };
 
 export type SuggestedReply = {
-  tone: "friendly" | "professional" | "empathetic" | "urgent";
+  tone: "friendly" | "professional" | "empathetic" | "urgent" | "best";
   text: string;
   reasoning: string;
 };
