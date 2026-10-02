@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
-import { canAccessStrategicInsights } from "@/lib/roles";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
+import { PAGE_NAMES } from "@/lib/labels";
+import { canAccessStrategicInsights, getRoleDisplayLabel } from "@/lib/roles";
+import { ALERT_SEVERITY, ALERT_STATUS, plainJargon } from "@/lib/vocab";
 import type {
   CurrentUser,
   KpiAlertHistoryResponse,
@@ -17,53 +20,43 @@ import type {
 } from "@/types/dashboard";
 
 const SOURCE_CHANNEL_OPTIONS = [
-  { value: "all", label: "Semua Channel" },
+  { value: "all", label: "Semua channel" },
   { value: "whatsapp", label: "WhatsApp" },
   { value: "telegram", label: "Telegram" },
 ] as const;
 
-type StatusBadgeTone = "good" | "warning" | "critical" | "neutral";
-
-type OpsStatusCard = {
-  label: string;
-  title: string;
-  description: string;
-  tone: StatusBadgeTone;
-};
-
-type OpsPriorityItem = {
-  label: string;
-  title: string;
-  description: string;
-  href: string | null;
-  cta: string;
-  tone: StatusBadgeTone;
-};
+const SALES_STEP = 5;
 
 function numberOrZero(value: number | undefined | null): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 function formatIdr(value: number | undefined | null): string {
-  return `IDR ${numberOrZero(value).toLocaleString("id-ID")}`;
+  return `Rp ${numberOrZero(value).toLocaleString("id-ID")}`;
 }
 
 function formatPercent(value: number | undefined | null): string {
   return `${(numberOrZero(value) * 100).toFixed(0)}%`;
 }
 
+/** Link dari backend memakai awalan /dashboard; rute sebenarnya tanpa awalan itu. */
+function toRoute(href: string | null | undefined): string | null {
+  if (!href) {
+    return null;
+  }
+
+  return href.replace(/^\/dashboard(?=\/|$)/, "") || "/";
+}
+
 export default function KpiCommandCenterPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
-  const [alertHistory, setAlertHistory] =
-    useState<KpiAlertHistoryResponse | null>(null);
-  const [snapshotHistory, setSnapshotHistory] =
-    useState<KpiSnapshotHistoryResponse | null>(null);
-  const [resolutionNotes, setResolutionNotes] = useState<
-    Record<string, string>
-  >({});
+  const [alertHistory, setAlertHistory] = useState<KpiAlertHistoryResponse | null>(null);
+  const [snapshotHistory, setSnapshotHistory] = useState<KpiSnapshotHistoryResponse | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState<Record<string, string>>({});
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
+  const [salesVisible, setSalesVisible] = useState(SALES_STEP);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -75,9 +68,7 @@ export default function KpiCommandCenterPage() {
       const kpiPath =
         sourceChannelFilter === "all"
           ? "/dashboard/kpi/command-center"
-          : `/dashboard/kpi/command-center?source_channel=${encodeURIComponent(
-              sourceChannelFilter,
-            )}`;
+          : `/dashboard/kpi/command-center?source_channel=${encodeURIComponent(sourceChannelFilter)}`;
       const me = await apiFetch<CurrentUser>("/auth/me");
       setCurrentUser(me);
 
@@ -86,12 +77,11 @@ export default function KpiCommandCenterPage() {
         return;
       }
 
-      const [kpiResult, alertsResult, snapshotsResult] =
-        await Promise.allSettled([
-          apiFetch<KpiCommandCenterResponse>(kpiPath),
-          apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts"),
-          apiFetch<KpiSnapshotHistoryResponse>("/dashboard/kpi/snapshots"),
-        ]);
+      const [kpiResult, alertsResult, snapshotsResult] = await Promise.allSettled([
+        apiFetch<KpiCommandCenterResponse>(kpiPath),
+        apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts"),
+        apiFetch<KpiSnapshotHistoryResponse>("/dashboard/kpi/snapshots"),
+      ]);
 
       if (kpiResult.status === "fulfilled") {
         setKpi(kpiResult.value);
@@ -107,16 +97,10 @@ export default function KpiCommandCenterPage() {
         alertsResult.status === "rejected" ||
         snapshotsResult.status === "rejected"
       ) {
-        setErrorMessage(
-          "Sebagian data KPI gagal dimuat. Data yang berhasil dimuat tetap ditampilkan.",
-        );
+        setErrorMessage("Sebagian data belum bisa dimuat. Data yang berhasil dimuat tetap ditampilkan.");
       }
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal memuat KPI command center.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Dashboard operasional belum bisa dimuat.");
     } finally {
       setIsLoading(false);
     }
@@ -124,23 +108,14 @@ export default function KpiCommandCenterPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void (async () => {
-        try {
-          await loadKpiPage();
-        } catch {
-          // loadKpiPage already mengatur error state.
-        }
-      })();
+      void loadKpiPage();
     }, 0);
 
     return () => clearTimeout(timer);
   }, [loadKpiPage]);
 
   async function reloadAlertHistory() {
-    const alertsResponse = await apiFetch<KpiAlertHistoryResponse>(
-      "/dashboard/kpi/alerts",
-    );
-    setAlertHistory(alertsResponse);
+    setAlertHistory(await apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts"));
   }
 
   async function handleRefreshSnapshot() {
@@ -151,13 +126,8 @@ export default function KpiCommandCenterPage() {
       const refreshPath =
         sourceChannelFilter === "all"
           ? "/dashboard/kpi/command-center/refresh"
-          : `/dashboard/kpi/command-center/refresh?source_channel=${encodeURIComponent(
-              sourceChannelFilter,
-            )}`;
-      const refreshed = await apiFetch<KpiCommandCenterResponse>(refreshPath, {
-        method: "POST",
-      });
-      setKpi(refreshed);
+          : `/dashboard/kpi/command-center/refresh?source_channel=${encodeURIComponent(sourceChannelFilter)}`;
+      setKpi(await apiFetch<KpiCommandCenterResponse>(refreshPath, { method: "POST" }));
       const [alertsResponse, snapshotsResponse] = await Promise.all([
         apiFetch<KpiAlertHistoryResponse>("/dashboard/kpi/alerts"),
         apiFetch<KpiSnapshotHistoryResponse>("/dashboard/kpi/snapshots"),
@@ -165,927 +135,412 @@ export default function KpiCommandCenterPage() {
       setAlertHistory(alertsResponse);
       setSnapshotHistory(snapshotsResponse);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal me-refresh snapshot KPI.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Data belum bisa diperbarui. Coba lagi.");
     } finally {
       setIsRefreshing(false);
     }
   }
 
-  async function handleAcknowledgeAlert(alertId: string) {
+  async function runAlertAction(alertId: string, action: "acknowledge" | "resolve" | "reopen", failure: string) {
+    setErrorMessage("");
+
     try {
-      await apiFetch(`/dashboard/kpi/alerts/${alertId}/acknowledge`, {
+      await apiFetch(`/dashboard/kpi/alerts/${alertId}/${action}`, {
         method: "PATCH",
+        body: action === "resolve" ? { resolution_note: resolutionNotes[alertId]?.trim() || null } : undefined,
       });
+      if (action === "resolve") {
+        setResolutionNotes((current) => ({ ...current, [alertId]: "" }));
+      }
       await reloadAlertHistory();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal acknowledge alert.",
-      );
+      setErrorMessage(error instanceof Error ? error.message : failure);
     }
   }
 
-  async function handleResolveAlert(alertId: string) {
-    try {
-      await apiFetch(`/dashboard/kpi/alerts/${alertId}/resolve`, {
-        method: "PATCH",
-        body: {
-          resolution_note: resolutionNotes[alertId]?.trim() || null,
-        },
-      });
-      setResolutionNotes((current) => ({
-        ...current,
-        [alertId]: "",
-      }));
-      await reloadAlertHistory();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal resolve alert.",
-      );
-    }
-  }
+  const summary = kpi?.summary;
+  const liveAlerts = kpi?.alerts.slice(0, 3) ?? [];
+  const recommendations = kpi?.recommendations.slice(0, 3) ?? [];
+  const observations = kpi?.key_observations.slice(0, 3) ?? [];
+  const salesRows = [...(kpi?.sales_performance ?? [])].sort(
+    (a, b) => b.overdue_follow_ups - a.overdue_follow_ups || b.pipeline_value - a.pipeline_value,
+  );
+  const sources = kpi?.source_performance ?? [];
+  const organizations = kpi?.organization_performance ?? [];
+  const keptAlerts = alertHistory?.items.slice(0, 6) ?? [];
+  const snapshots = snapshotHistory?.items.slice(0, 6) ?? [];
+  const marketing = kpi?.marketing_execution_summary;
 
-  async function handleReopenAlert(alertId: string) {
-    try {
-      await apiFetch(`/dashboard/kpi/alerts/${alertId}/reopen`, {
-        method: "PATCH",
-      });
-      await reloadAlertHistory();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal reopen alert.",
-      );
-    }
-  }
-
-  const topSales = kpi?.sales_performance.slice(0, 3) ?? [];
-  const topSources = kpi?.source_performance.slice(0, 4) ?? [];
-  const topOrganizations = kpi?.organization_performance.slice(0, 3) ?? [];
-  const activeAlerts = alertHistory?.items.slice(0, 6) ?? [];
-  const latestSnapshots = snapshotHistory?.items.slice(0, 6) ?? [];
-  const urgentLiveAlerts = kpi?.alerts.slice(0, 3) ?? [];
-  const topRecommendations = kpi?.recommendations.slice(0, 3) ?? [];
-  const topObservations = kpi?.key_observations.slice(0, 3) ?? [];
-  const opsStatus = buildOpsStatus(kpi);
-  const opsPriorities = buildOpsPriorities(kpi);
+  const needsAttention = Boolean(summary && (summary.overdue_follow_ups > 0 || (kpi?.alerts.length ?? 0) >= 3));
+  const statusTitle = !summary
+    ? ""
+    : needsAttention
+      ? "Ada hal yang perlu kamu cek dulu"
+      : "Kondisi operasional stabil";
+  const statusHelper = !summary
+    ? ""
+    : needsAttention
+      ? `${summary.overdue_follow_ups} follow-up lewat jadwal dan ${kpi?.alerts.length ?? 0} alert aktif. Mulai dari bagian "Perlu perhatian" di bawah.`
+      : "Tidak ada yang mendesak. Cukup jaga ritme follow-up tim.";
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.analysis}
       title={PAGE_NAMES.opsDashboard}
-      description="Superadmin dan head bisa membaca kesehatan pipeline, produktivitas sales, dan performa organization dari data conversation yang benar-benar sudah ada."
+      description="Gambaran kesehatan penjualan: lead, follow-up, dan nilai penjualan dari chat yang sudah masuk."
       backHref="/dashboard"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
-        <div className="flex flex-wrap items-center gap-3">
-          {kpi ? (
-            <div className="rounded-2xl border border-[#f0cb73]/18 bg-[#1d150d] px-4 py-3">
-              <p className="text-xs font-semibold text-[#b89a62]">
-                Snapshot terakhir
-              </p>
-              <p className="mt-1 text-sm text-[#fff0c9]">
-                {formatDateTime(kpi.generated_at)}
-              </p>
-            </div>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              void handleRefreshSnapshot();
-            }}
-            disabled={isRefreshing}
-            className="clara-button clara-button-primary"
-          >
-            {isRefreshing ? "Refreshing..." : "Refresh Snapshot"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => void handleRefreshSnapshot()}
+          disabled={isRefreshing}
+          className="clara-button clara-button-primary"
+        >
+          {isRefreshing ? "Memperbarui..." : "Perbarui data"}
+        </button>
       }
     >
-      <div className="space-y-8">
-        {isLoading ? (
-          <div role="status" className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
-            Memuat dashboard operasional...
-          </div>
+      <div className="space-y-6">
+        {isLoading ? <LoadingState message="Memuat dashboard operasional..." /> : null}
+
+        {!isLoading && errorMessage && !kpi ? (
+          <ErrorState message={errorMessage} onRetry={() => void loadKpiPage()} />
         ) : null}
 
-        {errorMessage ? (
-          <div role="alert" className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
+        {errorMessage && kpi ? (
+          <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
         ) : null}
 
-        {kpi && !isLoading ? (
+        {kpi && summary && !isLoading ? (
           <>
-            <p className="text-sm leading-6 text-[#b89a62]">
-              KPI mendukung review manusia dan bukan satu-satunya dasar untuk
-              keputusan terkait anggota tim atau keuangan.
-            </p>
-            <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-              <SectionPanel
-                eyebrow="Status Hari Ini"
-                title={opsStatus.title}
-                description={opsStatus.description}
-                action={
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusBadge tone={opsStatus.tone} label={opsStatus.label} />
-                    <Badge label={kpi.scope_type} />
-                  </div>
-                }
-              >
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <MetricCard
-                    label="Overdue Follow-up"
-                    value={String(kpi.summary.overdue_follow_ups)}
-                    hint="Item yang paling cepat mengganggu ritme tim."
-                    tone={kpi.summary.overdue_follow_ups > 0 ? "highlight" : "default"}
-                  />
-                  <MetricCard
-                    label="Lead Panas"
-                    value={String(kpi.summary.hot_leads)}
-                    hint="Prospect yang harus dijaga momentumnya."
-                    tone="highlight"
-                  />
-                  <MetricCard
-                    label="Reply Sent Rate"
-                    value={formatPercent(kpi.summary.reply_sent_rate)}
-                    hint="Conversation yang sudah berhasil dikirim final."
-                  />
-                  <MetricCard
-                    label="Active Alerts"
-                    value={String(kpi.alerts.length)}
-                    hint="Jumlah sinyal yang sekarang perlu perhatian."
-                  />
-                </div>
-
-                <div className="mt-6 grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
-                  <div className="rounded-2xl border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(26,19,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] p-5">
-                    <p className="text-sm font-semibold text-[#f0cb73]">
-                      Prioritas Utama
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-[#b89a62]">
-                      Tiga jalur baca paling aman sebelum turun ke panel yang lebih detail.
-                    </p>
-                    <div className="mt-4 space-y-3">
-                      {opsPriorities.map((item) => (
-                        <article
-                          key={item.title}
-                          className="flex flex-col gap-3 rounded-2xl border border-[#f0cb73]/12 bg-[#1b130c] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.16)]"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <StatusBadge tone={item.tone} label={item.label} />
-                            <p className="text-sm font-semibold text-[#fff0c9]">
-                              {item.title}
-                            </p>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
-                            {item.description}
-                          </p>
-                          {item.href ? (
-                            <Link
-                              href={item.href}
-                              className="mt-1 inline-flex w-fit rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
-                            >
-                              {item.cta}
-                            </Link>
-                          ) : null}
-                        </article>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(25,18,13,0.94)_0%,rgba(16,12,9,0.96)_100%)] p-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-[#f0cb73]">
-                          Bacaan Cepat
-                        </p>
-                        <p className="mt-2 text-sm leading-6 text-[#b89a62]">
-                          Angka pendukung untuk memastikan konteks sebelum ambil keputusan.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-4 space-y-3">
-                    <SummaryRow
-                      label="Generated"
-                      value={formatDateTime(kpi.generated_at)}
-                    />
-                    <SummaryRow
-                      label="Organizations"
-                      value={String(kpi.summary.total_organizations)}
-                    />
-                    <SummaryRow
-                      label="Sales users"
-                      value={String(kpi.summary.total_sales_users)}
-                    />
-                    <SummaryRow
-                      label="Closing leads"
-                      value={String(kpi.summary.closing_leads)}
-                    />
-                    <SummaryRow
-                      label="Analyzed conversations"
-                      value={String(kpi.summary.analyzed_conversations)}
-                    />
-                    <SummaryRow
-                      label="Approved reply rate"
-                      value={formatPercent(kpi.summary.approved_reply_rate)}
-                    />
-                    </div>
-                  </div>
-                </div>
-              </SectionPanel>
-
-              <div className="space-y-6">
-                <SectionPanel
-                  eyebrow="Rail Kontrol"
-                  title="Filter dan jalur aksi"
-                  description="Ganti scope channel, lalu lompat cepat ke area kerja yang paling relevan."
-                >
-                  <div className="space-y-5">
-                    <div>
-                      <p className="text-xs font-semibold text-[#f0cb73]">
-                        Source Channel
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {SOURCE_CHANNEL_OPTIONS.map((option) => {
-                          const isActive = sourceChannelFilter === option.value;
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              onClick={() => {
-                                setSourceChannelFilter(option.value);
-                              }}
-                              className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
-                                isActive
-                                  ? "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-                                  : "border border-[#3c2c16] bg-[#22190f] text-[#e1c27c] hover:border-[#f0cb73]/28"
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <SummaryTile
-                        label="Alerts"
-                        value={String(kpi.alerts.length)}
-                      />
-                      <SummaryTile
-                        label="Recommendations"
-                        value={String(kpi.recommendations.length)}
-                      />
-                      <SummaryTile
-                        label="Top Sources"
-                        value={String(kpi.source_performance.length)}
-                      />
-                      <SummaryTile
-                        label="Snapshots"
-                        value={String(snapshotHistory?.items.length ?? 0)}
-                      />
-                    </div>
-
-                    <div className="grid gap-3">
-                      <QuickLink
-                        href="/dashboard/follow-up"
-                        label="Buka Worklist"
-                        description="Eksekusi follow-up yang sudah overdue atau tertahan."
-                      />
-                      <QuickLink
-                        href="/dashboard/marketing"
-                        label="Buka Insight Pasar"
-                        description="Bandingkan output marketing terhadap performa pipeline."
-                      />
-                      <QuickLink
-                        href="/dashboard/notifications"
-                        label="Buka Notification Center"
-                        description="Pantau alert yang aktif lintas modul."
-                      />
-                    </div>
-                  </div>
-                </SectionPanel>
-
-                <SectionPanel
-                  eyebrow="Observasi Cepat"
-                  title="Yang paling perlu dibaca"
-                  description="Ringkas dulu tiga pembacaan utama sebelum turun ke panel performa dan histori."
-                >
-                  <div className="space-y-3">
-                    {topObservations.length === 0 ? (
-                      <EmptyState text="Belum ada observasi utama yang cukup kuat untuk ditampilkan." />
-                    ) : (
-                      topObservations.map((item, index) => (
-                        <div
-                          key={item}
-                          className="rounded-2xl border border-[#f0cb73]/12 bg-[#1b130c] p-4"
-                        >
-                          <div className="flex gap-3">
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#f0cb73]/14 bg-[#22190f] text-xs font-semibold text-[#f0cb73]">
-                              {index + 1}
-                            </span>
-                            <p className="text-sm leading-6 text-[#fff0c9]">{item}</p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </SectionPanel>
+            <section aria-labelledby="kpi-status" className="clara-card p-5 sm:p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 id="kpi-status" className="text-xl font-bold clara-text-primary sm:text-2xl">
+                  {statusTitle}
+                </h2>
+                <Tag tone={needsAttention ? "warn" : "good"}>{needsAttention ? "Perlu perhatian" : "Aman"}</Tag>
               </div>
-            </section>
+              <p className="mt-1 text-sm leading-6 clara-text-secondary">{statusHelper}</p>
+              <p className="mt-1 text-xs clara-text-muted">
+                Data per {formatRelativeTime(kpi.generated_at)} ({formatDateTime(kpi.generated_at)}). Angka ini
+                membantu penilaian manusia, bukan satu-satunya dasar keputusan soal anggota tim atau keuangan.
+              </p>
 
-            <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-              <SectionPanel
-                eyebrow="Live Alerts"
-                title="Anomali yang perlu perhatian"
-                description="Tiga alert teratas ditaruh di depan supaya layar pertama langsung menunjukkan apa yang harus dicek."
-              >
-                <div className="space-y-4">
-                  {urgentLiveAlerts.length === 0 ? (
-                    <EmptyState text="Belum ada alert yang cukup kuat untuk ditampilkan." />
-                  ) : (
-                    urgentLiveAlerts.map((alert) => (
-                      <article
-                        key={`${alert.severity}-${alert.title}`}
-                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.16)]"
-                      >
-                        <div className="flex flex-wrap items-center gap-3">
-                          <StatusBadge
-                            tone={alert.severity === "high" ? "critical" : "warning"}
-                            label={alert.severity}
-                          />
-                          <h3 className="text-base font-semibold text-[#fff0c9]">
-                            {alert.title}
-                          </h3>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
-                          {alert.description}
-                        </p>
-                        <div className="mt-4 rounded-2xl bg-[#1d150d] p-4">
-                          <p className="text-xs font-semibold text-[#f0cb73]">
-                            Recommended action
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
-                            {alert.recommended_action}
-                          </p>
-                        </div>
-                        {alert.target_href ? (
-                          <Link
-                            href={alert.target_href}
-                            className="mt-4 inline-flex rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
-                          >
-                            Buka area terkait
-                          </Link>
-                        ) : null}
-                      </article>
-                    ))
-                  )}
-                </div>
-              </SectionPanel>
-
-              <SectionPanel
-                eyebrow="Executive Actions"
-                title="Tindakan prioritas"
-                description="Tiga langkah terdekat yang paling masuk akal untuk superadmin dan head."
-              >
-                <div className="space-y-4">
-                  {topRecommendations.length === 0 ? (
-                    <EmptyState text="Belum ada rekomendasi aksi yang cukup kuat." />
-                  ) : (
-                    topRecommendations.map((recommendation) => (
-                      <article
-                        key={`${recommendation.owner_role}-${recommendation.title}`}
-                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.16)]"
-                      >
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Badge label={recommendation.owner_role} />
-                          <h3 className="text-base font-semibold text-[#fff0c9]">
-                            {recommendation.title}
-                          </h3>
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
-                          {recommendation.rationale}
-                        </p>
-                        <div className="mt-4 rounded-2xl bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-4 text-[#fff0c9]">
-                          <p className="text-xs font-semibold text-[#f0cb73]">
-                            Next step
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
-                            {recommendation.next_step}
-                          </p>
-                        </div>
-                        {recommendation.target_href ? (
-                          <Link
-                            href={recommendation.target_href}
-                            className="mt-4 inline-flex rounded-xl border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
-                          >
-                            Jalankan sekarang
-                          </Link>
-                        ) : null}
-                      </article>
-                    ))
-                  )}
-                </div>
-              </SectionPanel>
-            </section>
-
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                label="Pipeline Value"
-                value={formatIdr(kpi.summary.pipeline_value)}
-                hint="Total nilai deal yang masih terbuka."
-              />
-              <MetricCard
-                label="Won Value"
-                value={formatIdr(kpi.summary.won_value)}
-                hint="Nilai deal yang sudah dimenangkan tim."
-              />
-              <MetricCard
-                label="Deposit Amount"
-                value={formatIdr(kpi.summary.deposit_amount)}
-                hint="Akumulasi deposit yang sudah tercatat."
-              />
-              <MetricCard
-                label="Win Rate"
-                value={formatPercent(kpi.summary.win_rate)}
-                hint="Proporsi deal won terhadap closed deal."
-              />
-            </section>
-
-            <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-              <SectionPanel
-                eyebrow="Sales Leaderboard"
-                title="Produktivitas per sales"
-                description="Urutkan energi tim dari volume reply ke nilai pipeline dan deal yang benar-benar jadi."
-                className="h-full"
-                bodyClassName="flex-1"
-                action={
-                  <Link
-                    href="/dashboard/follow-up"
-                    className="clara-button clara-button-ghost"
-                  >
-                    Buka Worklist
-                  </Link>
-                }
-              >
-                <div className="h-full space-y-4">
-                  {topSales.length === 0 ? (
-                    <EmptyState
-                      text="Belum ada data sales yang cukup untuk dirangking."
-                      className="flex h-full min-h-[240px] items-center justify-center"
-                    />
-                  ) : (
-                    topSales.map((row, index) => (
-                      <article
-                        key={row.user_id}
-                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
-                      >
-                        <div className="flex flex-wrap items-start justify-between gap-4">
-                          <div>
-                            <p className="text-xs font-semibold text-[#b89a62]">
-                              Rank {index + 1}
-                            </p>
-                            <h3 className="mt-1 text-lg font-semibold text-[#fff0c9]">
-                              {row.user_name}
-                            </h3>
-                            <p className="mt-1 text-sm text-[#b89a62]">
-                              {row.organization_name ?? "No organization"}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.98)_100%)] px-4 py-3 text-right text-[#fff0c9]">
-                            <p className="text-xs text-[#f0cb73]">
-                              Replies Sent
-                            </p>
-                            <p className="mt-1 text-2xl font-bold">
-                              {row.replies_sent}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                          <SummaryTile
-                            label="Lead Ditugaskan"
-                            value={String(row.assigned_leads)}
-                          />
-                          <SummaryTile
-                            label="Lead Panas"
-                            value={String(row.hot_leads)}
-                          />
-                          <SummaryTile
-                            label="Lead Closing"
-                            value={String(row.closing_leads)}
-                          />
-                          <SummaryTile
-                            label="Lead Closing"
-                            value={String(row.won_leads)}
-                          />
-                          <SummaryTile
-                            label="Overdue"
-                            value={String(row.overdue_follow_ups)}
-                          />
-                          <SummaryTile
-                            label="Owned Conv"
-                            value={String(row.conversations_owned)}
-                          />
-                          <SummaryTile
-                            label="Analyzed"
-                            value={String(row.analyzed_conversations)}
-                          />
-                          <SummaryTile
-                            label="Approved Drafts"
-                            value={String(row.approved_drafts)}
-                          />
-                          <SummaryTile
-                            label="Pipeline"
-                            value={formatIdr(row.pipeline_value)}
-                          />
-                          <SummaryTile
-                            label="Won Value"
-                            value={formatIdr(row.won_value)}
-                          />
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </SectionPanel>
-
-              <SectionPanel
-                eyebrow="Marketing Attribution"
-                title="Attribution pulse"
-                description="Kontribusi marketing tetap penting, tapi dibaca setelah status operasional dan alert utama sudah jelas."
-              >
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <SummaryTile
-                    label="Lead Masuk"
-                    value={String(
-                      kpi.marketing_execution_summary.leads_generated,
-                    )}
-                  />
-                  <SummaryTile
-                    label="Lead Closing"
-                    value={String(kpi.marketing_execution_summary.won_leads)}
-                  />
-                  <SummaryTile
-                    label="Attributed Won"
-                    value={formatIdr(
-                      kpi.marketing_execution_summary.attributed_won_value,
-                    )}
-                  />
-                  <SummaryTile
-                    label="Attributed Deposit"
-                    value={formatIdr(
-                      kpi.marketing_execution_summary
-                        .attributed_deposit_amount,
-                    )}
-                  />
-                </div>
-              </SectionPanel>
-            </section>
-
-            <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-              <SectionPanel
-                eyebrow="Source Performance"
-                title="Per source dan channel"
-                description="Membandingkan sumber lead yang paling sehat dan yang paling banyak menyumbat pipeline."
-                action={
-                  <Badge label={`${kpi.source_performance.length} sources`} />
-                }
-              >
-                <div className="space-y-4">
-                  {topSources.length === 0 ? (
-                    <EmptyState text="Belum ada data source yang cukup untuk dibandingkan." />
-                  ) : (
-                    topSources.map((row) => (
-                      <article
-                        key={row.source_key}
-                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <h3 className="text-lg font-semibold text-[#fff0c9]">
-                              {row.source_label}
-                            </h3>
-                            <p className="mt-1 text-sm text-[#b89a62]">
-                              Channel: {row.source_channel}
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <Badge label={`Lead ${row.lead_count}`} />
-                            <Badge label={`Conv ${row.conversation_count}`} />
-                            <Badge label={`Hot ${row.hot_leads}`} />
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                          <SummaryTile
-                            label="Analyzed"
-                            value={String(row.analyzed_conversations)}
-                          />
-                          <SummaryTile
-                            label="Reply Sent Rate"
-                            value={formatPercent(row.reply_sent_rate)}
-                          />
-                          <SummaryTile
-                            label="Pipeline Value"
-                            value={formatIdr(row.pipeline_value)}
-                          />
-                          <SummaryTile
-                            label="Won Value"
-                            value={formatIdr(row.won_value)}
-                          />
-                          <SummaryTile
-                            label="Source Key"
-                            value={row.source_key}
-                          />
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </SectionPanel>
-
-              <SectionPanel
-                eyebrow="Persistent Alerts"
-                title="Riwayat alert yang tersimpan"
-                description="Workflow acknowledge, resolve, dan reopen untuk alert yang sudah dipersist ke database."
-                action={
-                  alertHistory ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Badge label={`Active ${alertHistory.active_count}`} />
-                      <Badge label={`Ack ${alertHistory.acknowledged_count}`} />
-                      <Badge
-                        label={`Resolved ${alertHistory.resolved_count}`}
-                      />
-                    </div>
-                  ) : null
-                }
-              >
-                <div className="space-y-4">
-                  {activeAlerts.length === 0 ? (
-                    <EmptyState text="Belum ada alert yang tersimpan. Jalankan refresh snapshot untuk mulai menyimpan alert historis." />
-                  ) : (
-                    activeAlerts.map((alert) => (
-                      <article
-                        key={alert.id}
-                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <Badge label={alert.status} />
-                            <Badge label={alert.severity} />
-                            <h3 className="text-base font-semibold text-[#fff0c9]">
-                              {alert.title}
-                            </h3>
-                          </div>
-                          {alert.status === "active" ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void handleAcknowledgeAlert(alert.id);
-                              }}
-                              className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
-                            >
-                              Acknowledge
-                            </button>
-                          ) : null}
-                        </div>
-                        <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
-                          {alert.description}
-                        </p>
-                        <div className="mt-4 rounded-2xl bg-[#1d150d] p-4">
-                          <p className="text-xs font-semibold text-[#f0cb73]">
-                            Recommended action
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
-                            {alert.recommended_action}
-                          </p>
-                        </div>
-                        {alert.resolution_note ? (
-                          <div className="mt-4 rounded-2xl border border-[#f0cb73]/16 bg-[#1d150d] p-4">
-                            <p className="text-xs font-semibold text-[#f0cb73]">
-                              Resolution note
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
-                              {alert.resolution_note}
-                            </p>
-                          </div>
-                        ) : null}
-                        {alert.status !== "resolved" ? (
-                          <div className="mt-4 space-y-3">
-                            <textarea
-                              value={resolutionNotes[alert.id] ?? ""}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                setResolutionNotes((current) => ({
-                                  ...current,
-                                  [alert.id]: value,
-                                }));
-                              }}
-                              placeholder="Catatan resolusi opsional sebelum alert ditutup..."
-                              className="clara-textarea min-h-[96px]"
-                            />
-                            <div className="flex flex-wrap gap-3">
-                              {alert.status === "active" ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    void handleAcknowledgeAlert(alert.id);
-                                  }}
-                                  className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
-                                >
-                                  Acknowledge
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void handleResolveAlert(alert.id);
-                                }}
-                                className="rounded-xl border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
-                              >
-                                Resolve
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-4 flex flex-wrap items-center gap-3">
-                            <p className="text-xs text-[#b89a62]">
-                              Resolved:{" "}
-                              {alert.resolved_at
-                                ? formatDateTime(alert.resolved_at)
-                                : "-"}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                void handleReopenAlert(alert.id);
-                              }}
-                              className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
-                            >
-                              Reopen
-                            </button>
-                          </div>
-                        )}
-                        <p className="mt-3 text-xs text-[#b89a62]">
-                          First detected:{" "}
-                          {formatDateTime(alert.first_detected_at)} | Last
-                          detected: {formatDateTime(alert.last_detected_at)}
-                        </p>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </SectionPanel>
-            </section>
-
-            <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-              <SectionPanel
-                eyebrow="Snapshot History"
-                title="Jejak KPI yang tersimpan"
-                description="Riwayat snapshot dipakai untuk membaca perubahan kesehatan pipeline dari waktu ke waktu."
-              >
-                <div className="space-y-4">
-                  {latestSnapshots.length === 0 ? (
-                    <EmptyState text="Belum ada snapshot yang tersimpan. Jalankan refresh snapshot untuk mulai merekam histori KPI." />
-                  ) : (
-                    latestSnapshots.map((snapshot, index) => (
-                      <article
-                        key={snapshot.id}
-                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-xs font-semibold text-[#b89a62]">
-                              Snapshot {latestSnapshots.length - index}
-                            </p>
-                            <h3 className="mt-1 text-base font-semibold text-[#fff0c9]">
-                              {formatDateTime(snapshot.created_at)}
-                            </h3>
-                          </div>
-                          <Badge label={snapshot.scope_type} />
-                        </div>
-
-                        <div className="mt-4 grid gap-3 md:grid-cols-2">
-                          <SummaryTile
-                            label="Total Lead"
-                            value={String(snapshot.metrics_json.total_leads)}
-                          />
-                          <SummaryTile
-                            label="Lead Panas"
-                            value={String(snapshot.metrics_json.hot_leads)}
-                          />
-                          <SummaryTile
-                            label="Reply Sent Rate"
-                            value={formatPercent(
-                              snapshot.metrics_json.reply_sent_rate,
-                            )}
-                          />
-                          <SummaryTile
-                            label="Overdue"
-                            value={String(
-                              snapshot.metrics_json.overdue_follow_ups,
-                            )}
-                          />
-                          <SummaryTile
-                            label="Won Value"
-                            value={formatIdr(snapshot.metrics_json.won_value)}
-                          />
-                          <SummaryTile
-                            label="Deposit"
-                            value={formatIdr(
-                              snapshot.metrics_json.deposit_amount,
-                            )}
-                          />
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </SectionPanel>
-            </section>
-
-            <SectionPanel
-              eyebrow="Organization Health"
-              title="Pipeline readiness per organization"
-              description="Melihat organisasi mana yang paling sehat, paling padat, atau paling tertahan di approval dan follow-up."
-              action={
-                <Link
-                  href="/dashboard/marketing"
-                  className="clara-button clara-button-ghost"
-                >
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link href="/notifications" className="clara-button clara-button-secondary">
+                  Lihat Alert Tim
+                </Link>
+                <Link href="/manager-insights" className="clara-button clara-button-secondary">
+                  Buka Monitor Tim
+                </Link>
+                <Link href="/marketing" className="clara-button clara-button-secondary">
                   Buka Insight Pasar
                 </Link>
-              }
-            >
-              <div className="space-y-4">
-                {topOrganizations.length === 0 ? (
-                  <EmptyState text="Belum ada organization performance yang cukup untuk ditampilkan." />
-                ) : (
-                  topOrganizations.map((row) => (
-                    <article
-                      key={row.organization_id}
-                      className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="text-lg font-semibold text-[#fff0c9]">
-                          {row.organization_name}
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge label={`Lead ${row.total_leads}`} />
-                          <Badge label={`Hot ${row.hot_leads}`} />
-                          <Badge label={`Closing ${row.closing_leads}`} />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-                        <SummaryTile
-                          label="Conversations"
-                          value={String(row.conversations)}
-                        />
-                        <SummaryTile
-                          label="Analyzed"
-                          value={String(row.analyzed_conversations)}
-                        />
-                        <SummaryTile
-                          label="Lead Closing"
-                          value={String(row.won_leads)}
-                        />
-                        <SummaryTile
-                          label="Reply Sent Rate"
-                          value={formatPercent(row.reply_sent_rate)}
-                        />
-                        <SummaryTile
-                          label="Approved Reply Rate"
-                          value={formatPercent(row.approved_reply_rate)}
-                        />
-                        <SummaryTile
-                          label="Overdue"
-                          value={String(row.overdue_follow_ups)}
-                        />
-                        <SummaryTile
-                          label="Pipeline Value"
-                          value={formatIdr(row.pipeline_value)}
-                        />
-                        <SummaryTile
-                          label="Won Value"
-                          value={formatIdr(row.won_value)}
-                        />
-                        <SummaryTile
-                          label="Deposit"
-                          value={formatIdr(row.deposit_amount)}
-                        />
-                      </div>
-                    </article>
-                  ))
-                )}
               </div>
-            </SectionPanel>
+            </section>
+
+            <section aria-labelledby="kpi-numbers" className="space-y-3">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <h2 id="kpi-numbers" className="text-lg font-bold clara-text-primary">
+                  Angka utama
+                </h2>
+                <div>
+                  <label htmlFor="kpi-channel" className="clara-label">
+                    Tampilkan chat dari
+                  </label>
+                  <select
+                    id="kpi-channel"
+                    value={sourceChannelFilter}
+                    onChange={(event) => setSourceChannelFilter(event.target.value)}
+                    className="clara-select mt-1 w-full sm:w-52"
+                  >
+                    {SOURCE_CHANNEL_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Figure label="Lead aktif" value={String(summary.total_leads)} hint="Seluruh lead yang tercatat" />
+                <Figure label="Lead panas" value={String(summary.hot_leads)} hint="Paling siap dibeli" />
+                <Figure label="Siap closing" value={String(summary.closing_leads)} hint="Tinggal diselesaikan" />
+                <Figure
+                  label="Follow-up terlambat"
+                  value={String(summary.overdue_follow_ups)}
+                  hint="Sudah lewat jadwal"
+                  warn={summary.overdue_follow_ups > 0}
+                />
+                <Figure label="Nilai pipeline" value={formatIdr(summary.pipeline_value)} hint="Deal yang masih berjalan" />
+                <Figure label="Nilai closing" value={formatIdr(summary.won_value)} hint="Deal yang sudah menang" />
+                <Figure label="Deposit masuk" value={formatIdr(summary.deposit_amount)} hint="Yang sudah tercatat" />
+                <Figure label="Tingkat closing" value={formatPercent(summary.win_rate)} hint="Menang dari deal yang selesai" />
+              </dl>
+
+              <p className="text-sm clara-text-secondary">
+                Dari {summary.analyzed_conversations} chat yang sudah dianalisis, {formatPercent(summary.reply_sent_rate)}{" "}
+                balasan sudah dikirim dan {formatPercent(summary.approved_reply_rate)} disetujui.
+              </p>
+            </section>
+
+            <section aria-labelledby="kpi-attention" className="space-y-3">
+              <h2 id="kpi-attention" className="text-lg font-bold clara-text-primary">
+                Perlu perhatian
+              </h2>
+              {liveAlerts.length === 0 && recommendations.length === 0 ? (
+                <EmptyState title="Belum ada yang perlu dicek" description="Alert dan saran langkah muncul di sini saat ada pola yang menonjol." />
+              ) : (
+                <ul className="space-y-3">
+                  {liveAlerts.map((alert) => {
+                    const href = toRoute(alert.target_href);
+
+                    return (
+                      <li key={`alert-${alert.severity}-${alert.title}`} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="break-words text-base font-semibold clara-text-primary">{plainJargon(alert.title)}</h3>
+                          <ValueTag table={ALERT_SEVERITY} value={alert.severity} />
+                        </div>
+                        <p className="mt-2 text-sm leading-6 clara-text-secondary">{plainJargon(alert.description)}</p>
+                        <p className="mt-2 text-sm leading-6 clara-text-primary">
+                          <span className="font-semibold">Saran: </span>
+                          {plainJargon(alert.recommended_action)}
+                        </p>
+                        {href ? (
+                          <Link href={href} className="clara-button clara-button-secondary mt-3">
+                            Buka bagian terkait
+                          </Link>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                  {recommendations.map((item) => {
+                    const href = toRoute(item.target_href);
+
+                    return (
+                      <li key={`rec-${item.owner_role}-${item.title}`} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="break-words text-base font-semibold clara-text-primary">{plainJargon(item.title)}</h3>
+                          <Tag tone="info">Untuk {getRoleDisplayLabel(item.owner_role)}</Tag>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 clara-text-secondary">{plainJargon(item.rationale)}</p>
+                        <p className="mt-2 text-sm leading-6 clara-text-primary">
+                          <span className="font-semibold">Langkah berikutnya: </span>
+                          {plainJargon(item.next_step)}
+                        </p>
+                        {href ? (
+                          <Link href={href} className="clara-button clara-button-primary mt-3">
+                            Kerjakan sekarang
+                          </Link>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {observations.length > 0 ? (
+                <ul className="list-disc space-y-1 pl-5 text-sm clara-text-secondary">
+                  {observations.map((text) => (
+                    <li key={text}>{plainJargon(text)}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+
+            <section aria-labelledby="kpi-sales" className="space-y-3">
+              <h2 id="kpi-sales" className="text-lg font-bold clara-text-primary">
+                Kinerja per Sales
+              </h2>
+              <p className="text-sm clara-text-secondary">Diurutkan dari yang follow-up terlambatnya paling banyak.</p>
+              {salesRows.length === 0 ? (
+                <EmptyState title="Belum ada data Sales" description="Data muncul setelah ada lead yang ditangani Sales." />
+              ) : (
+                <ul className="space-y-3">
+                  {salesRows.slice(0, salesVisible).map((row) => (
+                    <li key={row.user_id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="break-words text-base font-semibold clara-text-primary">{row.user_name}</h3>
+                        {row.organization_name ? <span className="text-xs clara-text-muted">{row.organization_name}</span> : null}
+                        {row.overdue_follow_ups > 0 ? <Tag tone="warn">{row.overdue_follow_ups} follow-up terlambat</Tag> : null}
+                      </div>
+                      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
+                        <Stat label="Lead dipegang" value={String(row.assigned_leads)} />
+                        <Stat label="Lead panas" value={String(row.hot_leads)} />
+                        <Stat label="Siap closing" value={String(row.closing_leads)} />
+                        <Stat label="Balasan terkirim" value={String(row.replies_sent)} />
+                        <Stat label="Nilai pipeline" value={formatIdr(row.pipeline_value)} />
+                        <Stat label="Nilai closing" value={formatIdr(row.won_value)} />
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {salesRows.length > salesVisible ? (
+                <button type="button" onClick={() => setSalesVisible((count) => count + SALES_STEP)} className="clara-button clara-button-ghost">
+                  Tampilkan {Math.min(salesRows.length - salesVisible, SALES_STEP)} Sales lagi ({salesRows.length - salesVisible} tersisa)
+                </button>
+              ) : null}
+            </section>
+
+            <section aria-labelledby="kpi-sources" className="space-y-3">
+              <h2 id="kpi-sources" className="text-lg font-bold clara-text-primary">
+                Dari mana lead datang
+              </h2>
+              {sources.length === 0 ? (
+                <EmptyState title="Belum ada data sumber lead" description="Sumber lead terisi otomatis dari channel chat yang dipakai." />
+              ) : (
+                <ul className="space-y-3">
+                  {sources.slice(0, 6).map((row) => (
+                    <li key={row.source_key} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                      <h3 className="break-words text-base font-semibold clara-text-primary">{row.source_label}</h3>
+                      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
+                        <Stat label="Lead" value={String(row.lead_count)} />
+                        <Stat label="Lead panas" value={String(row.hot_leads)} />
+                        <Stat label="Nilai pipeline" value={formatIdr(row.pipeline_value)} />
+                        <Stat label="Nilai closing" value={formatIdr(row.won_value)} />
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {marketing && marketing.total_items > 0 ? (
+                <p className="text-sm clara-text-secondary">
+                  Dari kampanye: {marketing.done_items} dari {marketing.total_items} kegiatan selesai, menghasilkan{" "}
+                  {marketing.leads_generated} lead ({marketing.won_leads} closing, nilai{" "}
+                  {formatIdr(marketing.attributed_won_value)}).
+                </p>
+              ) : null}
+            </section>
+
+            {organizations.length > 1 ? (
+              <details className="clara-card p-4 sm:p-5">
+                <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                  Perbandingan antar organisasi ({organizations.length})
+                </summary>
+                <ul className="mt-3 space-y-3">
+                  {organizations.map((row) => (
+                    <li key={row.organization_id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                      <h3 className="break-words text-base font-semibold clara-text-primary">{row.organization_name}</h3>
+                      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
+                        <Stat label="Lead" value={String(row.total_leads)} />
+                        <Stat label="Lead panas" value={String(row.hot_leads)} />
+                        <Stat label="Follow-up terlambat" value={String(row.overdue_follow_ups)} />
+                        <Stat label="Lead closing" value={String(row.won_leads)} />
+                        <Stat label="Nilai pipeline" value={formatIdr(row.pipeline_value)} />
+                        <Stat label="Nilai closing" value={formatIdr(row.won_value)} />
+                        <Stat label="Deposit" value={formatIdr(row.deposit_amount)} />
+                        <Stat label="Balasan terkirim" value={formatPercent(row.reply_sent_rate)} />
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+
+            <details className="clara-card p-4 sm:p-5">
+              <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                Riwayat alert ({alertHistory?.active_count ?? 0} aktif)
+              </summary>
+              <p className="mt-1 text-sm clara-text-secondary">
+                Alert yang ditandai selesai akan muncul lagi kalau masalahnya belum beres.
+              </p>
+              {keptAlerts.length === 0 ? (
+                <p className="mt-3 text-sm clara-text-secondary">Belum ada riwayat alert.</p>
+              ) : (
+                <ul className="mt-3 space-y-3">
+                  {keptAlerts.map((item) => {
+                    const noteId = `kpi-note-${item.id}`;
+
+                    return (
+                      <li key={item.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="break-words text-base font-semibold clara-text-primary">{plainJargon(item.title)}</h3>
+                          <ValueTag table={ALERT_SEVERITY} value={item.severity} />
+                          <ValueTag table={ALERT_STATUS} value={item.status} />
+                        </div>
+                        <p className="mt-1 text-xs clara-text-muted">Terakhir terdeteksi {formatRelativeTime(item.last_detected_at)}</p>
+                        <p className="mt-2 text-sm leading-6 clara-text-secondary">{plainJargon(item.description)}</p>
+                        {item.resolution_note ? (
+                          <p className="mt-2 text-sm clara-text-secondary">
+                            <span className="font-semibold clara-text-primary">Catatan: </span>
+                            {item.resolution_note}
+                          </p>
+                        ) : null}
+                        {item.status !== "resolved" ? (
+                          <div className="mt-3">
+                            <label htmlFor={noteId} className="clara-label">
+                              Catatan penyelesaian (opsional)
+                            </label>
+                            <input
+                              id={noteId}
+                              value={resolutionNotes[item.id] ?? ""}
+                              onChange={(event) => setResolutionNotes((current) => ({ ...current, [item.id]: event.target.value }))}
+                              className="clara-input mt-1 w-full"
+                              placeholder="Contoh: sudah dibahas dengan manager"
+                            />
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {item.status === "active" ? (
+                            <button
+                              type="button"
+                              onClick={() => void runAlertAction(item.id, "acknowledge", "Alert belum bisa ditandai dibaca. Coba lagi.")}
+                              className="clara-button clara-button-secondary"
+                            >
+                              Tandai sudah dibaca
+                            </button>
+                          ) : null}
+                          {item.status !== "resolved" ? (
+                            <button
+                              type="button"
+                              onClick={() => void runAlertAction(item.id, "resolve", "Alert belum bisa ditandai selesai. Coba lagi.")}
+                              className="clara-button clara-button-secondary"
+                            >
+                              Tandai selesai
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void runAlertAction(item.id, "reopen", "Alert belum bisa dibuka lagi. Coba lagi.")}
+                              className="clara-button clara-button-secondary"
+                            >
+                              Buka lagi
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </details>
+
+            <details className="clara-card p-4 sm:p-5">
+              <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                Catatan angka dari waktu ke waktu ({snapshots.length})
+              </summary>
+              {snapshots.length === 0 ? (
+                <p className="mt-3 text-sm clara-text-secondary">Belum ada catatan. Tekan Perbarui data untuk menyimpan satu.</p>
+              ) : (
+                <ul className="mt-3 space-y-3">
+                  {snapshots.map((item) => (
+                    <li key={item.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                      <p className="text-sm font-semibold clara-text-primary">{formatDateTime(item.created_at)}</p>
+                      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
+                        <Stat label="Lead" value={String(item.metrics_json.total_leads)} />
+                        <Stat label="Lead panas" value={String(item.metrics_json.hot_leads)} />
+                        <Stat label="Follow-up terlambat" value={String(item.metrics_json.overdue_follow_ups)} />
+                        <Stat label="Nilai closing" value={formatIdr(item.metrics_json.won_value)} />
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
           </>
         ) : null}
       </div>
@@ -1093,243 +548,21 @@ export default function KpiCommandCenterPage() {
   );
 }
 
-function buildOpsStatus(kpi: KpiCommandCenterResponse | null): OpsStatusCard {
-  if (!kpi) {
-    return {
-      label: "Loading",
-      title: "Menyiapkan status operasional",
-      description: "Snapshot sedang dimuat.",
-      tone: "neutral" as const,
-    };
-  }
-
-  if (kpi.summary.overdue_follow_ups > 0 || kpi.alerts.length >= 3) {
-    return {
-      label: "Perlu perhatian",
-      title: "Ada beberapa titik operasional yang harus dibaca dulu",
-      description:
-        "Mulai dari overdue follow-up dan alert aktif, lalu turun ke area yang ritmenya paling bocor.",
-      tone: "warning" as const,
-    };
-  }
-
-  return {
-    label: "Relatif aman",
-    title: "Kondisi operasional cukup stabil untuk saat ini",
-    description:
-      "Tidak ada tekanan besar yang langsung mendesak. Fokus berikutnya adalah menjaga ritme follow-up dan kualitas eksekusi.",
-    tone: "good" as const,
-  };
-}
-
-function buildOpsPriorities(
-  kpi: KpiCommandCenterResponse | null,
-): OpsPriorityItem[] {
-  if (!kpi) {
-    return [];
-  }
-
-  return [
-    {
-      label: "Prioritas 1",
-      title: "Cek follow-up yang sudah overdue",
-      description:
-        kpi.summary.overdue_follow_ups > 0
-          ? `${kpi.summary.overdue_follow_ups} follow-up sudah lewat jadwal dan berisiko bikin pipeline melambat.`
-          : "Belum ada overdue besar, tapi area ini tetap jadi pembacaan pertama untuk menjaga ritme tim.",
-      href: "/dashboard/follow-up",
-      cta: "Buka Worklist",
-      tone: kpi.summary.overdue_follow_ups > 0 ? "critical" : "neutral",
-    },
-    {
-      label: "Prioritas 2",
-      title: "Baca alert yang sekarang aktif",
-      description:
-        kpi.alerts.length > 0
-          ? `${kpi.alerts.length} alert aktif sudah cukup untuk menentukan area mana yang perlu intervensi cepat.`
-          : "Belum ada alert besar sekarang, jadi halaman alert bisa dipakai untuk validasi bahwa kondisi tetap aman.",
-      href: "/dashboard/notifications",
-      cta: "Buka Notification Center",
-      tone: kpi.alerts.length > 0 ? "warning" : "neutral",
-    },
-    {
-      label: "Prioritas 3",
-      title: "Bandingkan performa organisasi dan source",
-      description:
-        "Setelah tahu area yang mendesak, baru lihat apakah hambatannya datang dari tim tertentu, source tertentu, atau pola market yang lebih luas.",
-      href: "/dashboard/marketing",
-      cta: "Buka Insight Pasar",
-      tone: "good" as const,
-    },
-  ];
-}
-
-function SectionPanel({
-  eyebrow,
-  title,
-  description,
-  action,
-  className,
-  bodyClassName,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  description?: string;
-  action?: React.ReactNode;
-  className?: string;
-  bodyClassName?: string;
-  children: React.ReactNode;
-}) {
+function Figure({ label, value, hint, warn = false }: { label: string; value: string; hint: string; warn?: boolean }) {
   return (
-    <section
-      className={`flex flex-col rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)] ${className ?? ""}`.trim()}
-    >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#f0cb73]">
-            {eyebrow}
-          </p>
-          <h2 className="mt-2 text-xl font-bold tracking-tight text-[#fff0c9]">
-            {title}
-          </h2>
-          {description ? (
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#d6bb84]">
-              {description}
-            </p>
-          ) : null}
-        </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
-      </div>
-
-      <div className={`mt-6 ${bodyClassName ?? ""}`.trim()}>{children}</div>
-    </section>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  hint,
-  tone = "default",
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  tone?: "default" | "highlight";
-}) {
-  if (tone === "highlight") {
-    return (
-      <article className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-        <p className="text-xs font-semibold text-[#140f08]">
-          {label}
-        </p>
-        <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
-          {value}
-        </p>
-        <p className="mt-2 text-sm leading-6 text-[#2f210f]">{hint}</p>
-      </article>
-    );
-  }
-
-  return (
-    <article className="clara-card rounded-2xl p-5">
-      <p className="text-xs font-semibold text-[#f0cb73]">
-        {label}
-      </p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-[#fff0c9]">
-        {value}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{hint}</p>
-    </article>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="clara-card-soft flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
-      <span className="text-sm text-[#d6bb84]">{label}</span>
-      <span className="text-sm font-semibold text-[#fff0c9]">{value}</span>
+    <div className={`clara-card-soft min-w-0 p-4 ${warn ? "border-clara-warning-line" : ""}`}>
+      <dt className="text-sm clara-text-secondary">{label}</dt>
+      <dd className="mt-1 break-words text-2xl font-bold clara-text-primary">{value}</dd>
+      <p className="mt-1 text-xs clara-text-muted">{hint}</p>
     </div>
   );
 }
 
-function SummaryTile({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="clara-card-soft rounded-2xl px-4 py-3">
-      <p className="clara-kicker text-xs text-[#b89a62]">{label}</p>
-      <p className="mt-2 text-lg font-semibold text-[#fff0c9] break-words">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function QuickLink({
-  href,
-  label,
-  description,
-}: {
-  href: string;
-  label: string;
-  description: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="block rounded-2xl border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.98)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.12)] hover:border-[#f0cb73]/26"
-    >
-      <p className="text-sm font-semibold text-[#fff0c9]">{label}</p>
-      <p className="mt-1 text-sm leading-6 text-[#d6bb84]">{description}</p>
-    </Link>
-  );
-}
-
-function Badge({ label }: { label: string }) {
-  return (
-    <span className="clara-chip clara-chip-neutral px-3 py-1 text-xs">
-      {label}
-    </span>
-  );
-}
-
-function StatusBadge({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: StatusBadgeTone;
-}) {
-  const className =
-    tone === "good"
-      ? "border border-emerald-400/30 bg-emerald-500/12 text-emerald-200"
-      : tone === "warning"
-        ? "border border-amber-400/30 bg-amber-500/12 text-amber-100"
-        : tone === "critical"
-          ? "border border-red-400/30 bg-red-500/12 text-clara-danger"
-          : "border border-[#f0cb73]/18 bg-[#22190f] text-[#f0cb73]";
-
-  return (
-    <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${className}`}
-    >
-      {label}
-    </span>
-  );
-}
-
-function EmptyState({
-  text,
-  className,
-}: {
-  text: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`clara-empty-state p-5 text-sm text-[#d6bb84] ${className ?? ""}`.trim()}
-    >
-      {text}
+    <div className="min-w-0">
+      <dt className="text-xs clara-text-muted">{label}</dt>
+      <dd className="mt-1 break-words font-semibold clara-text-primary">{value}</dd>
     </div>
   );
 }

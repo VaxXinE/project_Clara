@@ -156,6 +156,28 @@ const JARGON_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bstale\b/gi, "lama"],
   [/\blog\b/gi, "catatan"],
   [/boundary alert/gi, "peringatan tim"],
+  [/(\d[\d.,]*) IDR/g, "Rp $1"],
+  [/reply sent rate/gi, "tingkat balasan terkirim"],
+  [/approved-ready-to-send/gi, "siap dikirim"],
+  [/high-severity alert/gi, "alert penting"],
+  [/won value/gi, "nilai closing"],
+  [/pipeline value/gi, "nilai pipeline"],
+  [/hot leads?/gi, "lead panas"],
+  [/stage closing/gi, "tahap closing"],
+  [/scale pola/gi, "tiru pola"],
+  [/coaching targeted/gi, "pendampingan langsung"],
+  [/quality reply/gi, "kualitas balasan"],
+  [/angle marketing/gi, "pendekatan pemasaran"],
+  [/kpi center/gi, "Dashboard Operasional"],
+  [/inbox\/worklist/gi, "Chat Masuk dan Tindak Lanjut"],
+  [/\bworklist\b/gi, "daftar Tindak Lanjut"],
+  [/\binbox\b/gi, "Chat Masuk"],
+  [/\borganization\b/gi, "organisasi"],
+  [/\bbaseline\b/gi, "acuan"],
+  [/\bdelivery\b/gi, "pengiriman"],
+  [/\breply\b/gi, "balasan"],
+  [/\bdraft\b/gi, "draf"],
+  [/\bapproval\b/gi, "persetujuan"],
 ];
 
 /** Label periode dari backend ("7d", "prev_7d", "prev_weekly") jadi kalimat. */
@@ -194,11 +216,13 @@ export function plainJargon(text: string | null | undefined): string {
   let result = text ?? "";
 
   for (const [pattern, replacement] of JARGON_REPLACEMENTS) {
-    result = result.replace(pattern, (match) =>
-      match[0] === match[0].toUpperCase()
-        ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
-        : replacement,
-    );
+    result = result.replace(pattern, (match) => {
+      const replaced = match.replace(pattern, replacement);
+
+      return match[0] === match[0].toUpperCase()
+        ? replaced.charAt(0).toUpperCase() + replaced.slice(1)
+        : replaced;
+    });
   }
 
   return result;
