@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { BUCKETS, BUCKET_ORDER, getQueueBucket, type QueueBucketKey } from "@/lib/inbox";
 import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import {
@@ -40,63 +41,6 @@ const ARCHIVE_SCOPE_OPTIONS = [
 
 const VISIBLE_STEP = 8;
 
-type QueueBucketKey =
-  | "reply_now"
-  | "waiting_customer"
-  | "needs_analysis"
-  | "needs_draft"
-  | "pending_review"
-  | "high_risk"
-  | "archived";
-
-/** Urutan kerja: yang paling butuh perhatian di atas. */
-const BUCKET_ORDER: QueueBucketKey[] = [
-  "high_risk",
-  "needs_analysis",
-  "needs_draft",
-  "pending_review",
-  "reply_now",
-  "waiting_customer",
-];
-
-const BUCKETS: Record<QueueBucketKey, { label: string; chip: string; description: string }> = {
-  high_risk: {
-    label: "Risiko tinggi",
-    chip: "Risiko tinggi",
-    description: "Topiknya sensitif. Baca dengan teliti sebelum membalas.",
-  },
-  needs_analysis: {
-    label: "Belum dibaca Clara",
-    chip: "Belum dibaca Clara",
-    description: "Minta Clara membaca chat ini supaya bisa menyarankan jawaban.",
-  },
-  needs_draft: {
-    label: "Belum ada draft jawaban",
-    chip: "Belum ada draft",
-    description: "Chat sudah dibaca. Minta Clara menyusun draft jawaban.",
-  },
-  pending_review: {
-    label: "Menunggu persetujuan",
-    chip: "Menunggu persetujuan",
-    description: "Draft jawabannya masih menunggu keputusan reviewer.",
-  },
-  reply_now: {
-    label: "Siap dibalas",
-    chip: "Siap dibalas",
-    description: "Draft sudah ada. Cek, ubah kalau perlu, lalu kirim sendiri dari WhatsApp.",
-  },
-  waiting_customer: {
-    label: "Menunggu balasan customer",
-    chip: "Menunggu customer",
-    description: "Kamu sudah membalas. Tidak perlu dibalas lagi sampai customer menjawab.",
-  },
-  archived: {
-    label: "Chat lama (arsip)",
-    chip: "Arsip",
-    description: "Chat yang sudah lama tidak aktif. Datanya tetap aman.",
-  },
-};
-
 function buildInboxPath(sourceChannelFilter: string, archiveScope: string): string {
   const params = new URLSearchParams();
 
@@ -111,34 +55,6 @@ function buildInboxPath(sourceChannelFilter: string, archiveScope: string): stri
   return params.size
     ? `/dashboard/sales/inbox?${params.toString()}`
     : "/dashboard/sales/inbox";
-}
-
-function getQueueBucket(item: SalesInboxItem): QueueBucketKey {
-  if (item.is_archived) {
-    return "archived";
-  }
-
-  if (item.latest_ai_extraction?.risk_level === "high") {
-    return "high_risk";
-  }
-
-  if (!item.latest_ai_extraction) {
-    return "needs_analysis";
-  }
-
-  if (item.latest_reply_suggestion?.approval_status === "pending_approval") {
-    return "pending_review";
-  }
-
-  if (!item.latest_reply_suggestion && item.ui_status !== "reply_sent") {
-    return "needs_draft";
-  }
-
-  if (item.ui_status === "reply_sent") {
-    return "waiting_customer";
-  }
-
-  return "reply_now";
 }
 
 function emptyMessage(

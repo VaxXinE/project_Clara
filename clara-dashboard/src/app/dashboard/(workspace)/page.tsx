@@ -15,13 +15,18 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
+import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import {
+  formatChannelLabel,
   formatDateTime,
+  formatRelativeTime,
   formatStatusLabel,
 } from "@/lib/format";
+import { ACTIONABLE_BUCKETS, getQueueBucket, pickNextChat } from "@/lib/inbox";
+import { REPLY_STATE, TEMPERATURE } from "@/lib/vocab";
 import { canAccessQueueAndActionCenter } from "@/lib/roles";
 import type {
   CurrentUser,
@@ -70,8 +75,7 @@ const LOADING_VALUE = "__loading__";
 export default function DashboardHomePage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [metrics, setMetrics] = useState<OverviewMetrics>(EMPTY_METRICS);
-  const [latestConversation, setLatestConversation] =
-    useState<SalesInboxItem | null>(null);
+  const [inboxItems, setInboxItems] = useState<SalesInboxItem[]>([]);
   const [worklist, setWorklist] = useState<SalesWorklistResponse | null>(null);
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
   const [managerInsights, setManagerInsights] =
@@ -98,7 +102,7 @@ export default function DashboardHomePage() {
             nextMetrics.analyzedCount = inbox.filter(
               (item) => item.latest_ai_extraction !== null,
             ).length;
-            setLatestConversation(inbox[0] ?? null);
+            setInboxItems(inbox);
             setWorklist(worklistResponse);
           } catch {
             // Some roles do not rely on queue data as their primary workspace.
@@ -268,61 +272,19 @@ export default function DashboardHomePage() {
             href: "/dashboard/manager-insights",
             label: "Buka Monitor Tim",
           };
+  const nextChat = pickNextChat(inboxItems);
+  // Dipakai panel "Chat terbaru" milik Head dan Superadmin.
+  const latestConversation = inboxItems[0] ?? null;
   const latestActivityHref = latestConversation
     ? `/sales/conversations/${latestConversation.conversation_id}`
     : "/upload";
-  const latestActivityLabel = latestConversation
-    ? "Buka Chat"
-    : "Buka Input Chat";
-  const salesDailySummary = isLoading
-    ? "Clara sedang menyiapkan ringkasan kerja hari ini."
-    : pendingAiCount > 0 && openTaskCount > 0
-      ? `Hari ini ada ${pendingAiCount} chat yang perlu langkah berikutnya dan ${openTaskCount} follow-up yang masih berjalan.`
-      : pendingAiCount > 0
-        ? `Hari ini ada ${pendingAiCount} chat yang perlu langkah berikutnya.`
-        : openTaskCount > 0
-          ? `Hari ini ada ${openTaskCount} follow-up yang masih perlu dibereskan.`
-          : "Saat ini belum ada tekanan besar. Kamu bisa lanjut cek lead atau input chat baru.";
-  const salesNextAction = pendingAiCount > 0
-    ? {
-        eyebrow: "Kerja berikutnya",
-        title: `${pendingAiCount} chat perlu dibalas atau dicek dulu`,
-        description:
-          "Mulai dari Chat Masuk untuk baca konteks, lihat draft Clara, lalu lanjutkan balasan ke customer.",
-        href: "/dashboard/sales",
-        label: "Lanjut ke Chat Masuk",
-      }
-    : nextWorkItem
-      ? {
-          eyebrow: "Kerja berikutnya",
-          title: `${nextWorkItem.lead_name} butuh tindak lanjut`,
-          description:
-            nextWorkItem.reason ||
-            "Ada follow-up aktif yang perlu segera dirapikan supaya ritme lead tetap jalan.",
-          href: nextWorkItem.conversation_id
-            ? `/dashboard/sales/conversations/${nextWorkItem.conversation_id}`
-            : "/dashboard/follow-up",
-          label: nextWorkItem.conversation_id
-            ? "Buka Percakapan"
-            : "Buka Tindak Lanjut",
-        }
-      : latestConversation
-        ? {
-            eyebrow: "Kerja berikutnya",
-            title: `Lanjut cek percakapan ${latestConversation.title}`,
-            description:
-              "Tidak ada antrean mendesak. Kamu bisa lanjut dari percakapan terakhir atau cek lead yang sedang aktif.",
-            href: latestActivityHref,
-            label: latestActivityLabel,
-          }
-        : {
-            eyebrow: "Kerja berikutnya",
-            title: "Belum ada chat aktif saat ini",
-            description:
-              "Kalau ada chat baru dari luar extension, masukkan lewat Input Chat supaya pipeline sales tetap rapi.",
-            href: "/dashboard/upload",
-            label: "Buka Input Chat",
-          };
+  const latestActivityLabel = latestConversation ? "Buka chat" : "Buka Input Chat";
+  const actionableChatCount = inboxItems.filter((item) =>
+    ACTIONABLE_BUCKETS.includes(getQueueBucket(item)),
+  ).length;
+  const highRiskChatCount = inboxItems.filter(
+    (item) => !item.is_archived && item.latest_ai_extraction?.risk_level === "high",
+  ).length;
   const topSales = kpi?.sales_performance[0] ?? null;
   const topOrganization = kpi?.organization_performance[0] ?? null;
   const primaryObservation = kpi?.key_observations[0] ?? null;
@@ -334,9 +296,12 @@ export default function DashboardHomePage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.daily}
       title={currentUser ? `Halo, ${currentUser.name}.` : PAGE_NAMES.home}
-      description={roleLabel?.summary ?? "Ringkasan kerja hari ini."}
+      description={
+        isSalesWorkspace
+          ? "Ini yang perlu kamu kerjakan hari ini."
+          : (roleLabel?.summary ?? "Ringkasan kerja hari ini.")
+      }
     >
       <div className="space-y-6">
         {errorMessage && (
@@ -354,147 +319,124 @@ export default function DashboardHomePage() {
         {isSalesWorkspace ? (
           <>
             <section
-              data-onboarding-id="sales-home-summary"
+              data-onboarding-id="sales-home-next-action"
+              aria-labelledby="sales-next-title"
               className="clara-card p-5 sm:p-6"
             >
-              <p className="clara-kicker text-xs">Ringkasan hari ini</p>
-              <div className="mt-3">
-                <div className="max-w-3xl">
-                  <h2 className="text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl">
-                    Kerjakan yang paling dekat ke customer
+              <p className="text-sm font-semibold text-clara-gold">Mulai dari sini</p>
+
+              {isLoading ? (
+                <div className="mt-3 space-y-3" role="status" aria-label="Memuat">
+                  <LoadingBar className="h-6 w-1/2" />
+                  <LoadingBar className="h-4 w-full" />
+                  <LoadingBar className="h-4 w-2/3" />
+                </div>
+              ) : nextChat ? (
+                <>
+                  <h2
+                    id="sales-next-title"
+                    className="mt-2 break-words text-xl font-bold clara-text-primary sm:text-2xl"
+                  >
+                    {nextChat.title}
                   </h2>
-                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
-                    {salesDailySummary}
+                  <p className="mt-1 text-xs clara-text-muted">
+                    {formatChannelLabel(nextChat.source_channel)} · {formatRelativeTime(nextChat.last_message_at)}
                   </p>
-                </div>
-              </div>
-            </section>
-
-            <section
-              data-onboarding-id="sales-home-metrics"
-              className="grid gap-3 sm:grid-cols-3"
-            >
-              {[
-                ["Chat perlu respons", pendingAiCount],
-                ["Follow-up aktif", openTaskCount],
-                ["Risiko tinggi", metrics.highRiskCount],
-              ].map(([label, value]) => (
-                <div key={label} className="clara-card-soft p-4">
-                  <p className="text-sm clara-text-secondary">{label}</p>
-                  <p className="mt-1 text-2xl font-bold clara-text-primary">
-                    {isLoading ? LOADING_VALUE : value}
+                  <p className="mt-3 line-clamp-2 text-sm leading-6 clara-text-secondary">
+                    {nextChat.latest_message?.message_text ?? "Belum ada pesan."}
                   </p>
-                </div>
-              ))}
-            </section>
-
-            <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.7fr)]">
-              <article
-                data-onboarding-id="sales-home-next-action"
-                className="clara-card p-5 sm:p-6"
-              >
-                <p className="clara-kicker text-xs">{salesNextAction.eyebrow}</p>
-                <h2 className="mt-2 break-words text-xl font-bold clara-text-primary">
-                  {salesNextAction.title}
-                </h2>
-                <p className="mt-2 text-sm leading-6 clara-text-secondary">
-                  {salesNextAction.description}
-                </p>
-                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                  <Link
-                    href={salesNextAction.href}
-                    className="clara-button clara-button-primary justify-center"
-                  >
-                    {salesNextAction.label}
-                  </Link>
-                  <Link
-                    href="/dashboard/follow-up"
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    Lihat semua follow-up
-                  </Link>
-                </div>
-              </article>
-
-              <article
-                data-onboarding-id="sales-home-latest-conversation"
-                className="clara-card-outline p-5 sm:p-6"
-              >
-                <p className="clara-kicker text-xs">Percakapan terbaru</p>
-                {latestConversation ? (
-                  <>
-                    <h2 className="mt-2 break-words text-lg font-semibold clara-text-primary">
-                      {latestConversation.title}
-                    </h2>
-                    <p className="mt-2 line-clamp-3 text-sm leading-6 clara-text-secondary">
-                      {latestConversation.latest_message?.message_text ??
-                        "Belum ada pesan terakhir yang bisa ditampilkan."}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {nextChat.latest_ai_extraction ? (
+                      <ValueTag table={TEMPERATURE} value={nextChat.latest_ai_extraction.lead_temperature} />
+                    ) : null}
+                    {nextChat.latest_ai_extraction?.risk_level === "high" ? (
+                      <Tag tone="danger">Risiko tinggi</Tag>
+                    ) : null}
+                    <ValueTag table={REPLY_STATE} value={nextChat.ui_status} />
+                  </div>
+                  {nextChat.latest_ai_extraction?.next_best_action ? (
+                    <p className="mt-3 text-sm leading-6 clara-text-secondary">
+                      <span className="font-semibold clara-text-primary">Langkah berikutnya: </span>
+                      {nextChat.latest_ai_extraction.next_best_action}
                     </p>
-                    <dl className="mt-4 grid gap-2 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <dt className="clara-text-muted">Status</dt>
-                        <dd className="text-right font-medium clara-text-primary">
-                          {formatStatusLabel(latestConversation.ui_status)}
-                        </dd>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <dt className="clara-text-muted">Terakhir aktif</dt>
-                        <dd className="text-right font-medium clara-text-primary">
-                          {formatDateTime(latestConversation.last_message_at)}
-                        </dd>
-                      </div>
-                    </dl>
+                  ) : null}
+                  <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                     <Link
-                      href={latestActivityHref}
-                      className="clara-button clara-button-ghost mt-4 w-full justify-center"
+                      href={`/sales/conversations/${nextChat.conversation_id}`}
+                      className="clara-button clara-button-primary justify-center"
                     >
-                      {latestActivityLabel}
+                      Buka dan balas
                     </Link>
-                  </>
-                ) : (
-                  <div className="clara-empty-state mt-3 p-4">
-                    <p className="text-sm leading-6 clara-text-secondary">
-                      Belum ada percakapan. Input chat baru jika percakapan datang
-                      dari luar extension.
-                    </p>
-                    <Link
-                      href="/dashboard/upload"
-                      className="clara-button clara-button-ghost mt-3 justify-center"
-                    >
-                      Buka Input Chat
+                    <Link href="/sales" className="clara-button clara-button-secondary justify-center">
+                      Lihat semua chat ({actionableChatCount})
                     </Link>
                   </div>
-                )}
-              </article>
+                </>
+              ) : nextWorkItem ? (
+                <>
+                  <h2
+                    id="sales-next-title"
+                    className="mt-2 break-words text-xl font-bold clara-text-primary sm:text-2xl"
+                  >
+                    {nextWorkItem.lead_name}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                    {nextWorkItem.reason || "Ada tindak lanjut yang perlu kamu selesaikan."}
+                  </p>
+                  <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                    <Link
+                      href={
+                        nextWorkItem.conversation_id
+                          ? `/sales/conversations/${nextWorkItem.conversation_id}`
+                          : "/follow-up"
+                      }
+                      className="clara-button clara-button-primary justify-center"
+                    >
+                      {nextWorkItem.conversation_id ? "Buka chat" : "Buka Tindak Lanjut"}
+                    </Link>
+                    <Link href="/follow-up" className="clara-button clara-button-secondary justify-center">
+                      Lihat semua tindak lanjut
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 id="sales-next-title" className="mt-2 text-xl font-bold clara-text-primary sm:text-2xl">
+                    Belum ada yang mendesak
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                    Semua chat sudah kamu tangani. Kalau ada percakapan dari luar extension, masukkan lewat Input
+                    Chat supaya Clara bisa membantu membalasnya.
+                  </p>
+                  <div className="mt-5">
+                    <Link href="/upload" className="clara-button clara-button-primary">
+                      Masukkan chat baru
+                    </Link>
+                  </div>
+                </>
+              )}
             </section>
 
             <section
-              data-onboarding-id="sales-home-quick-nav"
-              className="clara-card-outline flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+              data-onboarding-id="sales-home-counts"
+              aria-label="Ringkasan pekerjaan"
+              className="grid gap-3 sm:grid-cols-3"
             >
-              <div data-onboarding-id="sales-home-focus">
-                <h2 className="text-sm font-semibold clara-text-primary">
-                  Jalur kerja lain
-                </h2>
-                <p
-                  data-onboarding-id="sales-home-health"
-                  className="mt-1 text-sm clara-text-secondary"
-                >
-                  {metrics.analyzedCount} chat sudah dianalisis dari{" "}
-                  {metrics.inboxCount} chat aktif.
-                </p>
-              </div>
-              <nav aria-label="Jalur kerja Sales" className="flex flex-wrap gap-2">
-                <Link href="/dashboard/crm" className="clara-button clara-button-ghost">
-                  Lead
-                </Link>
-                <Link
-                  href="/dashboard/upload"
-                  className="clara-button clara-button-ghost"
-                >
-                  Input Chat
-                </Link>
-              </nav>
+              <CountLink
+                href="/sales"
+                label="Chat menunggu kamu"
+                value={isLoading ? null : actionableChatCount}
+              />
+              <CountLink
+                href="/sales"
+                label="Chat berisiko tinggi"
+                value={isLoading ? null : highRiskChatCount}
+              />
+              <CountLink
+                href="/follow-up"
+                label="Tindak lanjut aktif"
+                value={isLoading ? null : openTaskCount}
+              />
             </section>
           </>
         ) : !shouldRenderLeadershipWorkspace ? null : isManagerWorkspace ? (
@@ -1043,6 +985,22 @@ function MetricCard({
       </div>
       <p className="mt-3 text-sm leading-6 text-clara-ink-2">{hint}</p>
     </article>
+  );
+}
+
+function CountLink({ href, label, value }: { href: string; label: string; value: number | null }) {
+  return (
+    <Link
+      href={href}
+      className="clara-card-soft block min-h-11 p-4 hover:border-clara-gold focus-visible:border-clara-gold"
+    >
+      <p className="text-sm clara-text-secondary">{label}</p>
+      {value === null ? (
+        <LoadingBar className="mt-2 h-8 w-12" />
+      ) : (
+        <p className="mt-1 text-3xl font-bold clara-text-primary">{value}</p>
+      )}
+    </Link>
   );
 }
 

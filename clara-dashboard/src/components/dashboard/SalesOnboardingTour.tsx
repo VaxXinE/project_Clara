@@ -43,15 +43,15 @@ const TOUR_ROUTES: TourRoute[] = [
       },
       {
         id: "sales-home-next-action",
-        title: "Kerja berikutnya",
+        title: "Mulai dari sini",
         description:
-          "Ikuti rekomendasi ini saat kamu perlu menentukan satu pekerjaan yang harus dikerjakan sekarang.",
+          "Ini chat yang paling perlu kamu kerjakan sekarang. Klik Buka dan balas, tidak perlu memilih sendiri.",
       },
       {
-        id: "sales-home-latest-conversation",
-        title: "Kembali ke konteks terakhir",
+        id: "sales-home-counts",
+        title: "Ringkasan pekerjaan",
         description:
-          "Buka percakapan terbaru untuk meninjau kembali konteks sebelum melanjutkan respons.",
+          "Tiga angka ini bisa diklik. Pilih salah satu untuk langsung ke daftar chat atau tindak lanjut.",
       },
     ],
   },
@@ -1138,8 +1138,8 @@ export function SalesOnboardingTour() {
     return null;
   }
 
-  const routeLabel = `${tourState.routeIndex + 1}/${activeTourRoutes.length}`;
-  const stepLabel = `${tourState.stepIndex + 1}/${activeRoute.steps.length}`;
+  const routeLabel = `${tourState.routeIndex + 1} dari ${activeTourRoutes.length}`;
+  const stepLabel = `${tourState.stepIndex + 1} dari ${activeRoute.steps.length}`;
   const isLastStepOnRoute =
     tourState.stepIndex >= activeRoute.steps.length - 1;
   const isLastRoute = tourState.routeIndex >= activeTourRoutes.length - 1;
@@ -1311,7 +1311,7 @@ export function SalesOnboardingTour() {
         </p>
 
         <div className="mt-4 rounded-2xl border border-[#f6d98c]/16 bg-[rgba(246,217,140,0.12)] px-3 py-2 text-xs font-medium text-[#f4e0b5]">
-          Halaman {routeLabel}: {activeRoute.title} • Komponen {stepLabel}
+          {activeRoute.title}: langkah {stepLabel} (halaman {routeLabel})
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-3">
@@ -1322,7 +1322,7 @@ export function SalesOnboardingTour() {
                 : nextRouteRequiresManualOpen
                   ? "Setelah ini buka halaman detail berikutnya untuk lanjut onboarding."
                   : "Setelah ini Clara akan pindah ke halaman berikutnya."
-              : "Lanjutkan untuk melihat komponen berikutnya di halaman ini."}
+              : "Klik Lanjut untuk melihat bagian berikutnya di halaman ini."}
           </p>
 
           <button
