@@ -40,6 +40,7 @@ from app.services.extension_ingest_service import (
     generate_extension_reply_suggestions_for_channel,
     sync_extension_snapshot,
 )
+from app.services.rate_limiter import extension_rate_limiter
 from app.services.reply_suggestion_service import ReplySuggestionError
 from app.services.clara_extension_delivery_service import (
     CLARA_EXTENSION_DELIVERY_CONTRACT_VERSION,
@@ -52,7 +53,27 @@ from app.services.clara_extension_delivery_service import (
     reconcile_extension_delivery,
 )
 
-router = APIRouter(prefix="/extension", tags=["extension"])
+
+
+def _require_extension_payload_size(request: Request) -> None:
+    content_length = request.headers.get("content-length")
+
+    if content_length and content_length.isdigit():
+        if int(content_length) > settings.extension_max_payload_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail={
+                    "code": "PAYLOAD_TOO_LARGE",
+                    "message": "Payload terlalu besar. Kurangi jumlah pesan yang dikirim.",
+                },
+            )
+
+
+router = APIRouter(
+    prefix="/extension",
+    tags=["extension"],
+    dependencies=[Depends(_require_extension_payload_size)],
+)
 
 ALLOWED_EXTENSION_CHANNELS = {"whatsapp", "instagram", "tiktok"}
 
@@ -104,6 +125,23 @@ def _require_enabled_extension_channel(channel: str) -> None:
         )
 
 
+def _enforce_extension_rate_limit(
+    *, operation: str, current_user: User, limit: int
+) -> None:
+    if not extension_rate_limiter.is_allowed(
+        key=f"extension:{operation}:{current_user.id}",
+        limit=limit,
+        window_seconds=60,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "code": "RATE_LIMITED",
+                "message": "Terlalu banyak request. Coba lagi sebentar lagi.",
+            },
+        )
+
+
 def _sync_extension_snapshot(
     *,
     channel: str,
@@ -114,6 +152,11 @@ def _sync_extension_snapshot(
 ) -> ExtensionSnapshotSyncResponse:
     normalized_channel = _normalize_extension_channel_or_raise(channel)
     _require_enabled_extension_channel(normalized_channel)
+    _enforce_extension_rate_limit(
+        operation="snapshots",
+        current_user=current_user,
+        limit=settings.extension_snapshot_rate_limit_per_minute,
+    )
 
     try:
         result = sync_extension_snapshot(
@@ -167,6 +210,11 @@ def _send_extension_reply_suggestion(
 ) -> ExtensionSendReplyResponse:
     normalized_channel = _normalize_extension_channel_or_raise(channel)
     _require_enabled_extension_channel(normalized_channel)
+    _enforce_extension_rate_limit(
+        operation="send",
+        current_user=current_user,
+        limit=settings.extension_send_rate_limit_per_minute,
+    )
     if (
         normalize_extension_delivery_mode(settings.clara_extension_delivery_mode).mode
         == ExtensionDeliveryMode.GOVERNED
@@ -279,6 +327,11 @@ def _generate_extension_reply_suggestions(
 ) -> ExtensionReplySuggestionsResponse:
     normalized_channel = _normalize_extension_channel_or_raise(channel)
     _require_enabled_extension_channel(normalized_channel)
+    _enforce_extension_rate_limit(
+        operation="reply_suggestions",
+        current_user=current_user,
+        limit=settings.extension_reply_suggestions_rate_limit_per_minute,
+    )
 
     try:
         result = generate_extension_reply_suggestions_for_channel(

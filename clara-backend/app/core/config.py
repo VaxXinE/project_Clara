@@ -114,6 +114,14 @@ class Settings(BaseSettings):
     live_chat_signature_tolerance_seconds: int = Field(default=300, ge=30, le=3600)
     live_chat_rate_limit_per_minute: int = Field(default=120, ge=1, le=10_000)
     conversation_auto_archive_days: int = 7
+    extension_snapshot_rate_limit_per_minute: int = Field(default=60, ge=1, le=10_000)
+    extension_reply_suggestions_rate_limit_per_minute: int = Field(
+        default=20, ge=1, le=10_000
+    )
+    extension_send_rate_limit_per_minute: int = Field(default=60, ge=1, le=10_000)
+    extension_max_payload_bytes: int = Field(
+        default=1_048_576, ge=1024, le=10_485_760
+    )
     extension_whatsapp_enabled: bool = True
     extension_instagram_enabled: bool = False
     extension_tiktok_enabled: bool = False

@@ -7,6 +7,7 @@ import type {
 } from "~/types/whatsapp"
 
 const INSERT_LOCK_KEY = "__sgExtensionInsertLock__"
+const MAX_SNAPSHOT_MESSAGES = 80
 
 const parsePrePlainText = (value: string) => {
   const trimmedValue = value.trim()
@@ -457,6 +458,7 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     .filter(
       (message): message is NonNullable<typeof message> => Boolean(message)
     )
+    .slice(-MAX_SNAPSHOT_MESSAGES)
 
   return {
     data: {

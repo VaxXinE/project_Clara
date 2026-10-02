@@ -3,6 +3,9 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+MAX_EXTENSION_SNAPSHOT_MESSAGES = 100
+
+
 class ExtensionChannelConfigItem(BaseModel):
     enabled: bool
     provider: str = "extension"
@@ -33,7 +36,7 @@ class WhatsAppExtensionMessage(BaseModel):
         default=None,
         pattern="^(incoming|outgoing|unknown)$",
     )
-    timestamp_label: str = Field(alias="timestampLabel", default="", max_length=255)
+    timestamp_label: str = Field(alias="timestampLabel", default="", max_length=100)
 
 
 class WhatsAppExtensionChatSnapshot(BaseModel):
@@ -45,7 +48,10 @@ class WhatsAppExtensionChatSnapshot(BaseModel):
         default=None,
         max_length=255,
     )
-    messages: list[WhatsAppExtensionMessage] = Field(default_factory=list)
+    messages: list[WhatsAppExtensionMessage] = Field(
+        default_factory=list,
+        max_length=MAX_EXTENSION_SNAPSHOT_MESSAGES,
+    )
 
 
 class WhatsAppExtensionSnapshotSyncRequest(BaseModel):

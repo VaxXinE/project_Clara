@@ -1532,3 +1532,97 @@ def test_extension_snapshot_sync_reuses_synthetic_sales_message_after_send(
     assert timeline_messages[1].sender_type == "sales"
     assert timeline_messages[1].message_text == "Iya kak, legal dan diawasi BAPPEBTI."
     assert timeline_messages[1].external_message_id is not None
+
+
+def _snapshot_body(message_count: int, *, timestamp_label: str = "09.00") -> dict:
+    return {
+        "chatData": {
+            "capturedAt": "2026-05-12T09:00:00.000Z",
+            "chatTitle": "Leoni Customer",
+            "messages": [
+                {
+                    "id": f"m-{index}",
+                    "author": "Leoni",
+                    "direction": "incoming",
+                    "text": f"pesan {index}",
+                    "timestampLabel": timestamp_label,
+                }
+                for index in range(message_count)
+            ],
+        }
+    }
+
+
+def test_extension_snapshot_accepts_exactly_100_messages_and_rejects_101(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+
+    accepted = client.post(
+        "/extension/whatsapp/snapshots",
+        json=_snapshot_body(100),
+        headers=csrf_headers(client),
+    )
+    rejected = client.post(
+        "/extension/whatsapp/snapshots",
+        json=_snapshot_body(101),
+        headers=csrf_headers(client),
+    )
+
+    assert accepted.status_code == 201, accepted.text
+    assert rejected.status_code == 422
+
+
+def test_extension_snapshot_rejects_timestamp_label_over_100_chars(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+
+    response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=_snapshot_body(1, timestamp_label="x" * 101),
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 422
+
+
+def test_extension_endpoints_reject_payload_over_size_limit(
+    client: TestClient,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+    monkeypatch.setattr(settings, "extension_max_payload_bytes", 1024)
+
+    response = client.post(
+        "/extension/whatsapp/snapshots",
+        json=_snapshot_body(20),
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 413
+    assert response.json()["detail"]["code"] == "PAYLOAD_TOO_LARGE"
+
+
+def test_extension_snapshot_endpoint_is_rate_limited_per_user(
+    client: TestClient,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+    monkeypatch.setattr(settings, "extension_snapshot_rate_limit_per_minute", 2)
+
+    statuses = [
+        client.post(
+            "/extension/whatsapp/snapshots",
+            json=_snapshot_body(1),
+            headers=csrf_headers(client),
+        ).status_code
+        for _ in range(3)
+    ]
+
+    assert statuses[:2] == [201, 201]
+    assert statuses[2] == 429

@@ -26,3 +26,5 @@ sgcc_integration_rate_limiter = InMemoryRateLimiter()
 live_chat_webhook_rate_limiter = InMemoryRateLimiter()
 # ponytail: process-local limit; replace with Redis before horizontal scaling.
 sso_rate_limiter = InMemoryRateLimiter()
+# ponytail: process-local limit; replace with Redis before horizontal scaling.
+extension_rate_limiter = InMemoryRateLimiter()
