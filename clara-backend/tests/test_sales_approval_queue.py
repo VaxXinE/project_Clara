@@ -116,3 +116,47 @@ def test_marketing_only_sees_their_own_pending_approvals(
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["items"] == []
+
+
+def test_conversation_detail_exposes_summary_and_final_reply_for_the_ui(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    seed_pending_approval(db_session_factory, seeded_data)
+    owned = seeded_data["owned_conversation"]
+    marketing_b = seeded_data["marketing_b"]
+
+    db = db_session_factory()
+    suggestion = db.query(ReplySuggestion).filter_by(conversation_id=owned.id).one()
+    suggestion.action_mode = "draft"
+    suggestion.risk_level = "low"
+    suggestion.policy_reasons = []
+    db.commit()
+    suggestion_id = suggestion.id
+    db.close()
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+
+    before = client.get(f"/dashboard/sales/conversations/{owned.id}")
+    assert before.status_code == 200, before.text
+    detail = before.json()
+    assert detail["latest_ai_extraction"]["customer_summary"] == "Masih ragu tapi tertarik."
+    assert detail["latest_reply_suggestion"]["final_reply_text"] is None
+
+    approved = client.post(
+        f"/reply-suggestions/{suggestion_id}/approve",
+        json={
+            "selected_reply_text": "Kami akan bantu cek legalitas secara detail.",
+            "final_reply_text": "Halo kak, kami bantu cek legalitasnya ya.",
+            "reviewer_name": "Marketing Beta",
+        },
+        headers=csrf_headers(client),
+    )
+    assert approved.status_code == 200, approved.text
+
+    after = client.get(f"/dashboard/sales/conversations/{owned.id}").json()
+    assert (
+        after["latest_reply_suggestion"]["final_reply_text"]
+        == "Halo kak, kami bantu cek legalitasnya ya."
+    )

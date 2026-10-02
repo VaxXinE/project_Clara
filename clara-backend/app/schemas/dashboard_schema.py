@@ -24,6 +24,7 @@ class DashboardAIExtractionSummary(BaseModel):
     sentiment: str
     risk_level: str
     main_objections: list[str]
+    customer_summary: str | None = None
     next_best_action: str
     confidence_score: float
     created_at: datetime
@@ -35,6 +36,7 @@ class DashboardReplySuggestionSummary(BaseModel):
     approval_status: str
     risk_level: str
     suggested_replies: list[dict]
+    final_reply_text: str | None = None
     policy_reasons: list[str]
     created_at: datetime
 

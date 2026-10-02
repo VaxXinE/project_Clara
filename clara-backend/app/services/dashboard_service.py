@@ -234,6 +234,7 @@ def build_ai_summary(
         sentiment=extraction.sentiment,
         risk_level=extraction.risk_level,
         main_objections=extraction.main_objections,
+        customer_summary=extraction.customer_summary,
         next_best_action=extraction.next_best_action,
         confidence_score=extraction.confidence_score,
         created_at=extraction.created_at,
@@ -1006,6 +1007,7 @@ def build_reply_summary(
         approval_status=suggestion.approval_status,
         risk_level=suggestion.risk_level,
         suggested_replies=suggestion.suggested_replies,
+        final_reply_text=suggestion.final_reply_text,
         policy_reasons=suggestion.policy_reasons,
         created_at=suggestion.created_at,
     )
