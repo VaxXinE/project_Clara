@@ -10,6 +10,10 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.extension_schema import (
     ExtensionConfigResponse,
+    ExtensionManualSentReplyRequest,
+    ExtensionManualSentReplyResponse,
+    ExtensionReplyInsertedRequest,
+    ExtensionReplyInsertedResponse,
     ExtensionReplySuggestionsResponse,
     ExtensionSendReplyRequest,
     ExtensionSendReplyResponse,
@@ -30,9 +34,12 @@ from app.services.audit_service import create_audit_log
 from app.services.ai_extraction_service import AIExtractionError
 from app.services.extension_ingest_service import (
     confirm_extension_reply_sent_for_channel,
+    ExtensionConversationNotFoundError,
     ExtensionOwnershipConflictError,
     ExtensionSnapshotError,
     generate_extension_reply_suggestions_for_channel,
+    mark_extension_reply_inserted,
+    sync_extension_manual_sent_reply,
     sync_extension_snapshot,
 )
 from app.services.rate_limiter import extension_rate_limiter
@@ -690,3 +697,134 @@ def generate_extension_reply_suggestions_endpoint(
         db=db,
         current_user=current_user,
     )
+
+
+@router.post(
+    "/{channel}/reply-suggestions/{reply_suggestion_id}/inserted",
+    response_model=ExtensionReplyInsertedResponse,
+)
+def mark_extension_reply_inserted_endpoint(
+    channel: str,
+    reply_suggestion_id: UUID,
+    payload: ExtensionReplyInsertedRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
+):
+    normalized_channel = _normalize_extension_channel_or_raise(channel)
+    _require_enabled_extension_channel(normalized_channel)
+    _enforce_extension_rate_limit(
+        operation="inserted",
+        current_user=current_user,
+        limit=settings.extension_send_rate_limit_per_minute,
+    )
+
+    try:
+        suggestion = get_accessible_reply_suggestion_or_raise(
+            db=db,
+            reply_suggestion_id=reply_suggestion_id,
+            current_user=current_user,
+        )
+        result = mark_extension_reply_inserted(
+            db=db,
+            channel=normalized_channel,
+            provider="extension",
+            suggestion=suggestion,
+            delivery_mode=payload.delivery_mode,
+            inserted_at=payload.inserted_at,
+        )
+        create_audit_log(
+            db=db,
+            action="extension.reply.inserted",
+            resource_type="reply_suggestion",
+            resource_id=str(reply_suggestion_id),
+            current_user=current_user,
+            request=request,
+            metadata={
+                "channel": normalized_channel,
+                "provider": "extension",
+                "conversation_id": str(result.conversation_id),
+                "delivery_mode": payload.delivery_mode,
+            },
+        )
+        return result
+    except AccessDeniedError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ExtensionSnapshotError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post(
+    "/{channel}/manual-sent-replies",
+    response_model=ExtensionManualSentReplyResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def sync_extension_manual_sent_reply_endpoint(
+    channel: str,
+    payload: ExtensionManualSentReplyRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        require_roles("sales", "manager", "head", "superadmin")
+    ),
+):
+    normalized_channel = _normalize_extension_channel_or_raise(channel)
+    _require_enabled_extension_channel(normalized_channel)
+    _enforce_extension_rate_limit(
+        operation="manual_sent",
+        current_user=current_user,
+        limit=settings.extension_send_rate_limit_per_minute,
+    )
+
+    try:
+        result = sync_extension_manual_sent_reply(
+            db=db,
+            channel=normalized_channel,
+            provider="extension",
+            current_user=current_user,
+            chat_title=payload.chat_title,
+            external_thread_id=payload.external_thread_id,
+            sent_text=payload.sent_text,
+            sent_at=payload.sent_at,
+        )
+        create_audit_log(
+            db=db,
+            action="extension.manual_reply.sent_synced",
+            resource_type="conversation",
+            resource_id=str(result.conversation_id),
+            current_user=current_user,
+            request=request,
+            metadata={
+                "channel": normalized_channel,
+                "provider": "extension",
+                "duplicate": result.duplicate,
+                "delivery_mode": payload.delivery_mode,
+            },
+        )
+        return result
+    except ExtensionOwnershipConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "CONVERSATION_OWNED_BY_OTHER_SALES",
+                "message": str(exc),
+            },
+        ) from exc
+    except ExtensionConversationNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"code": "CONVERSATION_NOT_FOUND", "message": str(exc)},
+        ) from exc
+    except ExtensionSnapshotError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc

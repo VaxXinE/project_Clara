@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.core.config import settings
+from app.core.config import Settings, settings
 from app.models.ai_extraction import AIExtraction
 from app.models.approval_log import ApprovalLog
 from app.models.conversation import Conversation
@@ -1626,3 +1626,273 @@ def test_extension_snapshot_endpoint_is_rate_limited_per_user(
 
     assert statuses[:2] == [201, 201]
     assert statuses[2] == 429
+
+
+def _two_message_snapshot(*, external_thread_id: str | None = None) -> dict:
+    chat_data = {
+        "capturedAt": "2026-05-12T09:00:00.000Z",
+        "chatTitle": "Leoni Customer",
+        "chatSubtitle": "online",
+        "messages": [
+            {
+                "id": "09.00-0",
+                "author": "Leoni",
+                "direction": "incoming",
+                "text": "Ini legal tidak ya kak?",
+                "timestampLabel": "09.00",
+            },
+            {
+                "id": "09.01-1",
+                "author": "Arya",
+                "direction": "outgoing",
+                "text": "Saya bantu jelaskan ya kak.",
+                "timestampLabel": "09.01",
+            },
+        ],
+    }
+    if external_thread_id:
+        chat_data["externalThreadId"] = external_thread_id
+    return {"chatData": chat_data}
+
+
+def _patch_ai_for_suggestions(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.ai_extraction_service.call_openai_for_extraction",
+        lambda _conversation_text: AIExtractionCreate(
+            lead_temperature="warm",
+            pipeline_stage="objection",
+            buying_intent="medium",
+            sentiment="cautious",
+            risk_level="medium",
+            main_objections=["legalitas"],
+            budget_signal={"detected": False, "amount_text": None, "notes": "-"},
+            recommended_reply_strategy={
+                "tone": "professional",
+                "key_points": ["jelaskan legalitas"],
+                "avoid_topics": ["janji hasil"],
+            },
+            customer_summary="Customer ragu pada legalitas.",
+            next_best_action="Jelaskan legalitas.",
+            content_insight="Legalitas dominan.",
+            internal_notes="-",
+            confidence_score=0.9,
+        ),
+    )
+    monkeypatch.setattr(
+        "app.services.reply_suggestion_service.call_openai_for_reply_suggestion",
+        lambda **_kwargs: ReplySuggestionCreate(
+            suggested_replies=[
+                {"tone": "friendly", "text": "Siap kak, saya jelaskan ya.", "reasoning": "a"},
+                {"tone": "professional", "text": "Baik kak, saya kirim referensi resmi.", "reasoning": "b"},
+                {"tone": "empathetic", "text": "Wajar kak kalau ragu, saya bantu.", "reasoning": "c"},
+            ]
+        ),
+    )
+
+
+def test_manual_sent_reply_is_stored_once_and_requires_a_synced_chat(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+    body = {
+        "chatTitle": "Leoni Customer",
+        "sentText": "Baik kak, nanti saya cek dulu ya.",
+        "sentAt": datetime.now(timezone.utc).isoformat(),
+        "deliveryMode": "manual_typed_by_user",
+    }
+
+    not_synced = client.post(
+        "/extension/whatsapp/manual-sent-replies", json=body, headers=csrf_headers(client)
+    )
+    assert not_synced.status_code == 404
+    assert not_synced.json()["detail"]["code"] == "CONVERSATION_NOT_FOUND"
+
+    client.post(
+        "/extension/whatsapp/snapshots",
+        json=_two_message_snapshot(),
+        headers=csrf_headers(client),
+    )
+
+    first = client.post(
+        "/extension/whatsapp/manual-sent-replies", json=body, headers=csrf_headers(client)
+    )
+    second = client.post(
+        "/extension/whatsapp/manual-sent-replies", json=body, headers=csrf_headers(client)
+    )
+
+    assert first.status_code == 201, first.text
+    assert first.json()["duplicate"] is False
+    assert second.json()["duplicate"] is True
+    assert second.json()["message_id"] == first.json()["message_id"]
+
+    db = db_session_factory()
+    stored = db.get(Message, UUID(first.json()["message_id"]))
+    assert stored is not None
+    assert stored.sender_type == "sales"
+    assert stored.external_message_id is None
+    assert stored.channel == "whatsapp"
+    assert stored.message_text == body["sentText"]
+    sales_copies = db.scalars(
+        select(Message).where(
+            Message.conversation_id == stored.conversation_id,
+            Message.message_text == body["sentText"],
+        )
+    ).all()
+    assert len(sales_copies) == 1
+
+
+def test_manual_sent_reply_on_a_chat_owned_by_another_sales_is_a_conflict(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+    client.post(
+        "/extension/whatsapp/snapshots",
+        json=_two_message_snapshot(external_thread_id="thread-shared-1"),
+        headers=csrf_headers(client),
+    )
+
+    login(client, email=seeded_data["marketing_b"].email, password="MarketingPass123!")
+    response = client.post(
+        "/extension/whatsapp/manual-sent-replies",
+        json={
+            "chatTitle": "Leoni Customer",
+            "externalThreadId": "thread-shared-1",
+            "sentText": "Halo kak.",
+        },
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"]["code"] == "CONVERSATION_OWNED_BY_OTHER_SALES"
+
+
+def test_manual_sent_reply_respects_channel_feature_flag(
+    client: TestClient,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "extension_instagram_enabled", False)
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+
+    response = client.post(
+        "/extension/instagram/manual-sent-replies",
+        json={"chatTitle": "john.doe", "sentText": "Halo"},
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "FEATURE_DISABLED"
+
+
+def test_mark_reply_inserted_records_time_and_mode_without_changing_approval(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    _patch_ai_for_suggestions(monkeypatch)
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+    generated = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json=_two_message_snapshot(),
+        headers=csrf_headers(client),
+    )
+    assert generated.status_code == 201, generated.text
+    suggestion_id = generated.json()["reply_suggestion_id"]
+
+    response = client.post(
+        f"/extension/whatsapp/reply-suggestions/{suggestion_id}/inserted",
+        json={
+            "insertedText": "Siap kak, saya jelaskan ya.",
+            "insertedAt": "2026-05-12T09:05:00Z",
+            "deliveryMode": "insert_only",
+        },
+        headers=csrf_headers(client),
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["channel"] == "whatsapp"
+
+    db = db_session_factory()
+    suggestion = db.get(ReplySuggestion, UUID(suggestion_id))
+    assert suggestion.inserted_at is not None
+    assert suggestion.delivery_mode == "insert_only"
+    assert suggestion.approval_status == "pending"
+
+
+def test_mark_reply_inserted_rejects_wrong_channel_and_other_tenants(
+    client: TestClient,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    _patch_ai_for_suggestions(monkeypatch)
+    monkeypatch.setattr(settings, "extension_instagram_enabled", True)
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+    generated = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json=_two_message_snapshot(),
+        headers=csrf_headers(client),
+    )
+    suggestion_id = generated.json()["reply_suggestion_id"]
+    body = {"insertedText": "Halo", "deliveryMode": "insert_only"}
+
+    wrong_channel = client.post(
+        f"/extension/instagram/reply-suggestions/{suggestion_id}/inserted",
+        json=body,
+        headers=csrf_headers(client),
+    )
+    assert wrong_channel.status_code == 400
+
+    login(
+        client,
+        email=seeded_data["marketing_other_org"].email,
+        password="MarketingPass123!",
+    )
+    other_tenant = client.post(
+        f"/extension/whatsapp/reply-suggestions/{suggestion_id}/inserted",
+        json=body,
+        headers=csrf_headers(client),
+    )
+    assert other_tenant.status_code == 404
+
+
+def test_confirmed_send_sets_sent_at_on_the_suggestion(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+    monkeypatch,
+) -> None:
+    _patch_ai_for_suggestions(monkeypatch)
+    login(client, email=seeded_data["marketing_a"].email, password="MarketingPass123!")
+    generated = client.post(
+        "/extension/whatsapp/reply-suggestions",
+        json=_two_message_snapshot(),
+        headers=csrf_headers(client),
+    )
+    suggestion_id = generated.json()["reply_suggestion_id"]
+    text = generated.json()["suggestions"][0]
+
+    sent = client.post(
+        f"/extension/whatsapp/reply-suggestions/{suggestion_id}/send",
+        json={"selectedReplyText": text, "finalReplyText": text, "sentByName": "Marketing Alpha"},
+        headers=csrf_headers(client),
+    )
+    assert sent.status_code == 201, sent.text
+
+    suggestion = db_session_factory().get(ReplySuggestion, UUID(suggestion_id))
+    assert suggestion.sent_at is not None
+
+
+def test_extension_feature_flags_accept_the_documented_env_names(monkeypatch) -> None:
+    monkeypatch.setenv("ENABLE_INSTAGRAM_EXTENSION_READER", "true")
+    monkeypatch.setenv("ENABLE_WHATSAPP_EXTENSION_READER", "false")
+    monkeypatch.delenv("EXTENSION_TIKTOK_ENABLED", raising=False)
+
+    loaded = Settings(database_url="sqlite://", _env_file=None)
+
+    assert loaded.extension_instagram_enabled is True
+    assert loaded.extension_whatsapp_enabled is False
+    assert loaded.extension_tiktok_enabled is False

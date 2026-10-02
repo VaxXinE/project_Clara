@@ -1,3 +1,5 @@
+from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -243,3 +245,50 @@ class ExtensionDeliveryResultResponse(BaseModel):
     duplicate_prevented: bool = False
     reason_codes: list[str]
     delivery_contract_version: str
+
+
+ExtensionDeliveryModeName = Literal[
+    "insert_only",
+    "manual_insert_then_user_send",
+    "extension_send_button",
+    "manual_typed_by_user",
+]
+
+
+class ExtensionReplyInsertedRequest(BaseModel):
+    inserted_text: str = Field(alias="insertedText", min_length=1, max_length=2000)
+    inserted_at: datetime | None = Field(alias="insertedAt", default=None)
+    delivery_mode: ExtensionDeliveryModeName = Field(
+        alias="deliveryMode", default="insert_only"
+    )
+
+
+class ExtensionReplyInsertedResponse(BaseModel):
+    ok: bool = True
+    suggestion_id: UUID
+    conversation_id: UUID
+    channel: str
+    inserted_at: datetime
+
+
+class ExtensionManualSentReplyRequest(BaseModel):
+    chat_title: str = Field(alias="chatTitle", min_length=1, max_length=255)
+    chat_subtitle: str = Field(alias="chatSubtitle", default="", max_length=255)
+    external_thread_id: str | None = Field(
+        alias="externalThreadId", default=None, max_length=255
+    )
+    sent_text: str = Field(alias="sentText", min_length=1, max_length=5000)
+    sent_at: datetime | None = Field(alias="sentAt", default=None)
+    delivery_mode: ExtensionDeliveryModeName = Field(
+        alias="deliveryMode", default="manual_typed_by_user"
+    )
+
+
+class ExtensionManualSentReplyResponse(BaseModel):
+    ok: bool = True
+    channel: str
+    provider: str = "extension"
+    conversation_id: UUID
+    message_id: UUID
+    duplicate: bool = False
+    synced_at: datetime

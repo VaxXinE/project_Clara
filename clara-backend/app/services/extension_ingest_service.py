@@ -20,6 +20,8 @@ from app.models.reply_suggestion import ReplySuggestion
 from app.models.sent_message import SentMessage
 from app.models.user import User
 from app.schemas.extension_schema import (
+    ExtensionManualSentReplyResponse,
+    ExtensionReplyInsertedResponse,
     ExtensionReplySuggestionsResponse,
     ExtensionSendReplyResponse,
     ExtensionSnapshotSyncResponse,
@@ -77,6 +79,10 @@ class ExtensionSnapshotError(RuntimeError):
 
 
 class ExtensionOwnershipConflictError(ExtensionSnapshotError):
+    pass
+
+
+class ExtensionConversationNotFoundError(ExtensionSnapshotError):
     pass
 
 
@@ -1390,6 +1396,7 @@ def confirm_extension_reply_sent_for_channel(
         else sent_message.sent_at
     )
     conversation.last_message_at = sent_message.sent_at
+    suggestion.sent_at = sent_message.sent_at
     db.add(
         Message(
             conversation_id=conversation.id,
@@ -1434,4 +1441,163 @@ def confirm_extension_reply_sent(
         selected_reply_text=selected_reply_text,
         final_reply_text=final_reply_text,
         sent_by_name=sent_by_name,
+    )
+
+
+CLIENT_TIMESTAMP_FUTURE_TOLERANCE = timedelta(minutes=5)
+
+
+def resolve_client_timestamp(value: datetime | None) -> datetime:
+    now = datetime.now(timezone.utc)
+
+    if value is None:
+        return now
+
+    resolved = ensure_aware_utc(value)
+
+    # Jam browser bisa meleset; jangan simpan waktu yang jauh di masa depan.
+    if resolved - now > CLIENT_TIMESTAMP_FUTURE_TOLERANCE:
+        return now
+
+    return resolved
+
+
+def mark_extension_reply_inserted(
+    db: Session,
+    *,
+    channel: str,
+    provider: str = EXTENSION_PROVIDER,
+    suggestion: ReplySuggestion,
+    delivery_mode: str,
+    inserted_at: datetime | None,
+) -> ExtensionReplyInsertedResponse:
+    channel_context = get_extension_channel_context(channel=channel, provider=provider)
+    conversation = db.get(Conversation, suggestion.conversation_id)
+
+    if conversation is None:
+        raise ExtensionSnapshotError("Conversation not found.")
+
+    suggestion_channel = suggestion.channel or conversation.channel or DEFAULT_EXTENSION_CHANNEL
+
+    if suggestion_channel != channel_context.channel:
+        raise ExtensionSnapshotError("Channel tidak cocok dengan reply suggestion.")
+
+    suggestion.inserted_at = resolve_client_timestamp(inserted_at)
+    suggestion.delivery_mode = delivery_mode
+    db.add(suggestion)
+    db.commit()
+    db.refresh(suggestion)
+
+    return ExtensionReplyInsertedResponse(
+        suggestion_id=suggestion.id,
+        conversation_id=conversation.id,
+        channel=channel_context.channel,
+        inserted_at=suggestion.inserted_at,
+    )
+
+
+def sync_extension_manual_sent_reply(
+    db: Session,
+    *,
+    channel: str,
+    provider: str = EXTENSION_PROVIDER,
+    current_user: User,
+    chat_title: str,
+    external_thread_id: str | None,
+    sent_text: str,
+    sent_at: datetime | None,
+) -> ExtensionManualSentReplyResponse:
+    channel_context = get_extension_channel_context(channel=channel, provider=provider)
+
+    if current_user.organization_id is None:
+        raise ExtensionSnapshotError("User has no organization assigned.")
+
+    normalized_text = sent_text.strip()
+
+    if not normalized_text:
+        raise ExtensionSnapshotError("Reply text cannot be empty.")
+
+    thread_key = build_extension_thread_key(
+        channel_context=channel_context,
+        current_user=current_user,
+        chat_title=chat_title,
+        provider_thread_id=external_thread_id,
+    )
+    conversation = get_existing_extension_conversation(
+        db=db,
+        channel_context=channel_context,
+        current_user=current_user,
+        chat_title=chat_title,
+        external_thread_id=thread_key,
+        shared_thread_identity=bool(external_thread_id),
+    )
+
+    if conversation is None:
+        raise ExtensionConversationNotFoundError(
+            "Chat belum disinkronkan. Baca chat aktif dulu sebelum mencatat balasan manual."
+        )
+
+    if conversation.sales_user_id != current_user.id:
+        raise ExtensionOwnershipConflictError(
+            build_ownership_conflict_message(conversation)
+        )
+
+    resolved_sent_at = resolve_client_timestamp(sent_at)
+    existing_messages = list(
+        db.scalars(
+            select(Message).where(Message.conversation_id == conversation.id)
+        ).all()
+    )
+    duplicate = next(
+        (
+            message
+            for message in existing_messages
+            if message.sender_type == "sales"
+            and message.message_text.strip() == normalized_text
+            and message.message_timestamp is not None
+            and abs(ensure_aware_utc(message.message_timestamp) - resolved_sent_at)
+            <= SYNTHETIC_SALES_MATCH_WINDOW
+        ),
+        None,
+    )
+
+    if duplicate is not None:
+        return ExtensionManualSentReplyResponse(
+            channel=channel_context.channel,
+            provider=channel_context.provider,
+            conversation_id=conversation.id,
+            message_id=duplicate.id,
+            duplicate=True,
+            synced_at=datetime.now(timezone.utc),
+        )
+
+    # external_message_id kosong: snapshot berikutnya akan menggabungkan pesan ini lewat
+    # find_matching_synthetic_sales_message, sama seperti balasan dari suggestion.
+    message = Message(
+        conversation_id=conversation.id,
+        sender_name=current_user.name,
+        sender_type="sales",
+        channel=channel_context.channel,
+        provider=channel_context.provider,
+        external_message_id=None,
+        message_text=normalized_text,
+        message_timestamp=resolved_sent_at,
+    )
+    db.add(message)
+    db.flush()
+
+    last_message_at = conversation.last_message_at
+    if last_message_at is None or resolved_sent_at > ensure_aware_utc(last_message_at):
+        conversation.last_message_at = resolved_sent_at
+    conversation.status = "replied"
+    db.add(conversation)
+    db.commit()
+    db.refresh(message)
+
+    return ExtensionManualSentReplyResponse(
+        channel=channel_context.channel,
+        provider=channel_context.provider,
+        conversation_id=conversation.id,
+        message_id=message.id,
+        synced_at=datetime.now(timezone.utc),
     )

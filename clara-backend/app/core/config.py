@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -124,9 +124,25 @@ class Settings(BaseSettings):
     extension_max_payload_bytes: int = Field(
         default=1_048_576, ge=1024, le=10_485_760
     )
-    extension_whatsapp_enabled: bool = True
-    extension_instagram_enabled: bool = False
-    extension_tiktok_enabled: bool = False
+    # Nama ENABLE_*_EXTENSION_READER mengikuti docs/features/social-dm-extension-reader.
+    extension_whatsapp_enabled: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "EXTENSION_WHATSAPP_ENABLED", "ENABLE_WHATSAPP_EXTENSION_READER"
+        ),
+    )
+    extension_instagram_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "EXTENSION_INSTAGRAM_ENABLED", "ENABLE_INSTAGRAM_EXTENSION_READER"
+        ),
+    )
+    extension_tiktok_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "EXTENSION_TIKTOK_ENABLED", "ENABLE_TIKTOK_EXTENSION_READER"
+        ),
+    )
     extension_distribution_dir: str = "./storage/extension-builds"
 
     model_config = SettingsConfigDict(
