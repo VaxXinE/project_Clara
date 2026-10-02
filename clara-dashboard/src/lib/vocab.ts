@@ -142,7 +142,48 @@ const JARGON_REPLACEMENTS: Array<[RegExp, string]> = [
   [/tahap pipeline/gi, "tahap"],
   [/stage lead/gi, "tahap lead"],
   [/conversation/gi, "percakapan"],
+  [/disiplin crm/gi, "kerapian catatan lead"],
+  [/kerapian crm/gi, "kerapian catatan lead"],
+  [/(log|update) crm/gi, "catatan lead"],
+  [/next action di crm/gi, "langkah berikutnya di catatan lead"],
+  [/next action/gi, "langkah berikutnya"],
+  [/follow-up overdue/gi, "follow-up yang terlambat"],
+  [/overdue/gi, "terlambat"],
+  [/score turun/gi, "nilai kinerja turun"],
+  [/\bcrm\b/gi, "data lead"],
+  [/approval queue/gi, "Chat perlu keputusan"],
+  [/\bstale\b/gi, "sudah lama"],
+  [/\blog\b/gi, "catatan"],
+  [/boundary alert/gi, "peringatan tim"],
 ];
+
+/** Label periode dari backend ("7d", "prev_7d", "prev_weekly") jadi kalimat. */
+export function describeRangeLabel(label: string | null | undefined): string {
+  const value = (label ?? "").trim();
+  const match = /^(prev_)?(\d+)d$/.exec(value);
+
+  if (match) {
+    return match[1] ? `${match[2]} hari sebelumnya` : `${match[2]} hari terakhir`;
+  }
+  if (value === "prev_weekly") return "minggu sebelumnya";
+  if (value === "weekly") return "minggu ini";
+
+  return value || "-";
+}
+
+/** Label cakupan data dari backend jadi kata yang dipakai user. */
+export function describeScopeLabel(label: string | null | undefined): string {
+  switch ((label ?? "").trim()) {
+    case "Scoped team or unit manager view":
+      return "Timmu";
+    case "Organization-wide manager view":
+      return "Semua tim";
+    case "No organization scope":
+      return "Belum terhubung ke organisasi";
+    default:
+      return label?.trim() || "-";
+  }
+}
 
 /**
  * Teks bebas dari backend kadang memakai istilah internal ("Discipline log belum diisi").
@@ -377,3 +418,98 @@ export const REVIEW_NEXT_STEP: Record<string, { sales: string; head: string }> =
     head: "Relatif aman. Pastikan tidak ada pola risiko yang terlewat.",
   },
 };
+
+export const PRIORITY: VocabTable = {
+  urgent: { label: "Sangat mendesak", tone: "danger" },
+  high: { label: "Mendesak", tone: "warn" },
+  normal: { label: "Biasa", tone: "neutral" },
+  low: { label: "Santai", tone: "neutral" },
+  stable: { label: "Stabil", tone: "good" },
+  tinggi: { label: "Tinggi", tone: "danger" },
+  sedang: { label: "Sedang", tone: "warn" },
+  rendah: { label: "Rendah", tone: "neutral" },
+};
+
+export const MOMENTUM: VocabTable = {
+  improving: { label: "Membaik", tone: "good" },
+  stable: { label: "Stabil", tone: "neutral" },
+  declining: { label: "Menurun", tone: "danger" },
+};
+
+export const SLA_STATUS: VocabTable = {
+  healthy: { label: "Balasan cepat", tone: "good", hint: "Rata-rata waktu membalas masih dalam batas." },
+  warning: { label: "Balasan mulai lambat", tone: "warn" },
+  critical: { label: "Balasan terlalu lambat", tone: "danger" },
+};
+
+export const CRM_DISCIPLINE: VocabTable = {
+  disciplined: { label: "Catatan rapi", tone: "good" },
+  needs_attention: { label: "Catatan perlu dirapikan", tone: "warn" },
+};
+
+export const SCORE_LABEL: VocabTable = {
+  excellent: { label: "Sangat baik", tone: "good" },
+  good: { label: "Baik", tone: "good" },
+  stable: { label: "Cukup", tone: "neutral" },
+  needs_attention: { label: "Perlu perhatian", tone: "warn" },
+  critical: { label: "Kritis", tone: "danger" },
+};
+
+export const FOCUS_AREA: VocabTable = {
+  reply_backlog: { label: "Chat belum dibalas", tone: "neutral" },
+  follow_up: { label: "Follow-up", tone: "neutral" },
+  discipline: { label: "Kerapian catatan", tone: "neutral" },
+  analysis: { label: "Chat belum dibaca Clara", tone: "neutral" },
+  conversion: { label: "Menuju closing", tone: "neutral" },
+};
+
+export const ACTION_STATUS: VocabTable = {
+  open: { label: "Belum dimulai", tone: "warn" },
+  in_progress: { label: "Sedang dikerjakan", tone: "info" },
+  done: { label: "Selesai", tone: "good" },
+  skipped: { label: "Dilewati", tone: "neutral" },
+};
+
+export const ACTION_TYPE: VocabTable = {
+  coaching: { label: "Pembinaan", tone: "neutral" },
+  follow_up_recovery: { label: "Kejar follow-up yang tertinggal", tone: "neutral" },
+  reply_backlog_review: { label: "Bereskan chat yang belum dibalas", tone: "neutral" },
+  crm_cleanup: { label: "Rapikan catatan lead", tone: "neutral" },
+  weekly_review: { label: "Review mingguan", tone: "neutral" },
+};
+
+export const REVIEW_STATUS: VocabTable = {
+  draft: { label: "Draf kasus", tone: "neutral" },
+  in_review: { label: "Sedang ditinjau", tone: "info" },
+  needs_rework: { label: "Perlu diperbaiki", tone: "warn" },
+  coaching_done: { label: "Pembinaan selesai", tone: "good" },
+  escalated: { label: "Dieskalasi", tone: "danger" },
+};
+
+export const ALERT_SEVERITY: VocabTable = {
+  high: { label: "Penting", tone: "danger" },
+  medium: { label: "Perlu dicek", tone: "warn" },
+  low: { label: "Info", tone: "neutral" },
+  critical: { label: "Kritis", tone: "danger" },
+};
+
+export const PERFORMANCE_SOURCE: VocabTable = {
+  sales_performance: { label: "Dari performa Sales", tone: "neutral" },
+  team_performance: { label: "Dari performa tim", tone: "neutral" },
+  weekly_review: { label: "Dari review mingguan", tone: "neutral" },
+  manual: { label: "Dibuat manual", tone: "neutral" },
+};
+
+/** Perubahan angka dibanding periode lalu, dalam kata. `lowerIsBetter` untuk beban kerja seperti backlog. */
+export function describeDelta(value: number, lowerIsBetter = false): { text: string; tone: Tone } {
+  if (value === 0) {
+    return { text: "tidak berubah", tone: "neutral" };
+  }
+
+  const better = lowerIsBetter ? value < 0 : value > 0;
+
+  return {
+    text: `${value > 0 ? "naik" : "turun"} ${Math.abs(value)}`,
+    tone: better ? "good" : "warn",
+  };
+}

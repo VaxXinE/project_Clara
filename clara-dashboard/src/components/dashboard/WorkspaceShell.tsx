@@ -41,6 +41,7 @@ import {
 } from "@/lib/labels";
 import { getRoleDisplayLabel, normalizeWorkspaceRole } from "@/lib/roles";
 import { tasksForUser } from "@/lib/tasks";
+import { plainJargon } from "@/lib/vocab";
 import type {
   CurrentUser,
   OpsNotificationItem,
@@ -967,10 +968,10 @@ export function WorkspaceShell({
                           </span>
                         </div>
                         <p className="mt-2 text-sm font-semibold">
-                          {notification.title}
+                          {plainJargon(notification.title)}
                         </p>
                         <p className="clara-text-secondary mt-1 text-sm leading-5">
-                          {notification.body}
+                          {plainJargon(notification.body)}
                         </p>
                       </div>
 

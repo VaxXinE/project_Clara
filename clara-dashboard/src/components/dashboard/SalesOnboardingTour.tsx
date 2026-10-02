@@ -376,45 +376,27 @@ const MANAGER_TOUR_ROUTES: TourRoute[] = [
     steps: [
       {
         id: "manager-insights-hero",
-        title: "Ringkasan monitor tim",
+        title: "Ringkasan tim",
         description:
-          "Bagian atas ini menjelaskan area tim yang mulai melambat dan apa yang paling layak dipantau manager sekarang.",
+          "Kalimat di atas merangkum berapa hal yang perlu perhatianmu, ditambah beberapa angka utama: follow-up terlambat dan ketepatan follow-up.",
       },
       {
         id: "manager-insights-steps",
-        title: "Urutan baca monitor",
+        title: "Perlu perhatian",
         description:
-          "Panduan ini membantu manager membaca halaman monitor dengan urutan yang benar: tim bermasalah dulu, lalu case coaching, lalu pola hambatan.",
+          "Peringatan dari tim dan kasus pembinaan ada di sini. Tiap item menjelaskan apa yang perlu kamu lakukan dan punya tombol untuk membukanya.",
       },
       {
-        id: "manager-insights-metrics",
-        title: "Angka utama monitor",
+        id: "manager-insights-sales-performance",
+        title: "Anggota tim",
         description:
-          "Kartu angka ini dipakai untuk membaca urgensi tim tanpa perlu membuka semua panel detail.",
-      },
-      {
-        id: "manager-insights-alerts",
-        title: "Alert tim yang perlu dicek",
-        description:
-          "Bagian ini berisi area risiko yang paling menonjol, supaya manager bisa mulai dari tim yang paling butuh dorongan.",
-      },
-      {
-        id: "manager-insights-cases",
-        title: "Case review prioritas",
-        description:
-          "Panel ini mengelompokkan case coaching yang paling cepat memberi dampak kalau manager ambil keputusan sekarang.",
-      },
-      {
-        id: "manager-insights-teams",
-        title: "Ringkasan kondisi tiap tim",
-        description:
-          "Di sini manager bisa membandingkan kondisi tim secara cepat, lalu membuka anggota tim saat butuh konteks lebih dalam.",
+          "Lihat kondisi tiap Sales. Klik Lihat detail untuk melihat lead dan chat yang bermasalah, atau Beri tugas untuk membuat tugas pembinaan.",
       },
       {
         id: "manager-insights-objections",
-        title: "Pola hambatan tim",
+        title: "Keraguan customer",
         description:
-          "Bagian ini membantu manager melihat objection yang berulang, supaya arahan tim bisa lebih sistematis dan tidak hanya case-by-case.",
+          "Hal yang paling sering membuat customer ragu. Kalau sama terus, beri arahan umum ke seluruh tim.",
       },
     ],
   },
@@ -589,45 +571,27 @@ const HEAD_TOUR_ROUTES: TourRoute[] = [
     steps: [
       {
         id: "manager-insights-hero",
-        title: "Ringkasan head insight",
+        title: "Ringkasan semua tim",
         description:
-          "Bagian atas ini membantu head membaca area risiko tim dan memutuskan intervensi lintas tim yang paling penting.",
+          "Kalimat di atas merangkum berapa hal yang perlu keputusanmu, ditambah angka utama lintas tim.",
       },
       {
         id: "manager-insights-steps",
-        title: "Urutan baca head insight",
+        title: "Perlu perhatian",
         description:
-          "Blok ini menjelaskan cara membaca insight untuk head: area risiko, case keputusan, lalu pola hambatan tim.",
+          "Peringatan dari tim dan kasus yang butuh arahan Head. Tiap item menjelaskan apa yang perlu kamu lakukan.",
       },
       {
-        id: "manager-insights-metrics",
-        title: "Angka utama head insight",
+        id: "manager-insights-sales-performance",
+        title: "Anggota tim",
         description:
-          "Kartu angka ini memberi pembacaan cepat kondisi lintas tim tanpa perlu membuka semua panel detail.",
-      },
-      {
-        id: "manager-insights-alerts",
-        title: "Area risiko tim",
-        description:
-          "Panel ini berisi boundary alert atau area tim yang cukup besar untuk masuk radar keputusan head.",
-      },
-      {
-        id: "manager-insights-cases",
-        title: "Case yang butuh keputusan head",
-        description:
-          "Di sinilah head melihat case coaching yang memang butuh arahan atau validasi level lebih tinggi.",
-      },
-      {
-        id: "manager-insights-teams",
-        title: "Tim yang perlu dipantau",
-        description:
-          "Bagian ini membantu head membandingkan kondisi tiap tim tanpa harus membaca semua lead satu per satu.",
+          "Lihat kondisi tiap Sales dari semua tim, buka detailnya, atau beri tugas pembinaan.",
       },
       {
         id: "manager-insights-objections",
-        title: "Pola hambatan lintas tim",
+        title: "Keraguan customer",
         description:
-          "Panel ini membantu head melihat objection berulang yang layak dijadikan arahan umum untuk banyak tim sekaligus.",
+          "Pola keraguan yang berulang bisa dijadikan arahan umum untuk seluruh tim.",
       },
     ],
   },
