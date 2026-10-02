@@ -218,6 +218,7 @@ def logout(response: Response) -> Response:
 def change_password_endpoint(
     payload: ChangePasswordRequest,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -236,6 +237,10 @@ def change_password_endpoint(
             current_user=current_user,
             request=request,
             metadata={"email": updated_user.email},
+        )
+        # Token lama (di perangkat lain) sudah tidak berlaku; sesi ini diberi token baru.
+        set_auth_cookies(
+            response=response, access_token=create_access_token(updated_user)
         )
         return build_user_response(updated_user)
     except AuthError as exc:

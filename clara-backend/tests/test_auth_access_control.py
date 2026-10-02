@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID
 
+import jwt
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import sessionmaker
 
@@ -471,3 +472,82 @@ def test_sales_inbox_can_be_filtered_by_source_channel(
     whatsapp_payload = whatsapp_response.json()
     assert len(whatsapp_payload) >= 1
     assert all(item["source_channel"] == "whatsapp" for item in whatsapp_payload)
+
+
+def _issue_bearer_token(client: TestClient) -> str:
+    response = client.post("/auth/access-token", headers=csrf_headers(client))
+    assert response.status_code == 200, response.text
+    return response.json()["access_token"]
+
+
+def test_changing_own_password_revokes_old_tokens_but_keeps_current_session(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    owner = seeded_data["owner"]
+    login(client, email=owner.email, password="OwnerPass123!")
+    old_token = _issue_bearer_token(client)
+
+    response = client.post(
+        "/auth/change-password",
+        json={"current_password": "OwnerPass123!", "new_password": "OwnerNewPass123!"},
+        headers=csrf_headers(client),
+    )
+    assert response.status_code == 200, response.text
+
+    stale = client.get("/auth/me", headers={"Authorization": f"Bearer {old_token}"})
+    current_session = client.get("/auth/me")
+
+    assert stale.status_code == 401
+    assert current_session.status_code == 200, current_session.text
+
+
+def test_admin_password_reset_revokes_the_target_users_tokens(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    owner = seeded_data["owner"]
+    marketing_b = seeded_data["marketing_b"]
+
+    victim_client = TestClient(client.app)
+    login(victim_client, email=marketing_b.email, password="MarketingPass123!")
+    stolen_token = _issue_bearer_token(victim_client)
+    before_reset = TestClient(client.app).get(
+        "/auth/me", headers={"Authorization": f"Bearer {stolen_token}"}
+    )
+    assert before_reset.status_code == 200, before_reset.text
+
+    login(client, email=owner.email, password="OwnerPass123!")
+    reset = client.post(
+        f"/auth/users/{marketing_b.id}/reset-password",
+        json={"password": "SuperadminReset123!"},
+        headers=csrf_headers(client),
+    )
+    assert reset.status_code == 200, reset.text
+
+    after_reset = TestClient(client.app).get(
+        "/auth/me", headers={"Authorization": f"Bearer {stolen_token}"}
+    )
+
+    assert after_reset.status_code == 401
+
+
+def test_token_without_version_claim_is_still_accepted_until_first_revocation(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    owner = seeded_data["owner"]
+    legacy_token = jwt.encode(
+        {
+            "sub": str(owner.id),
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        },
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    response = TestClient(client.app).get(
+        "/auth/me", headers={"Authorization": f"Bearer {legacy_token}"}
+    )
+
+    assert response.status_code == 200, response.text

@@ -76,6 +76,13 @@ def get_current_user(
             detail="User not found or inactive.",
         )
 
+    # Token lama tanpa klaim "ver" dianggap versi 0.
+    if payload.get("ver", 0) != (user.token_version or 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session is no longer valid. Please log in again.",
+        )
+
     normalized_role = normalize_role(user.role)
     if normalized_role != user.role:
         set_committed_value(user, "role", normalized_role)

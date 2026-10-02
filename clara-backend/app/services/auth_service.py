@@ -78,6 +78,7 @@ def create_access_token(user: User) -> str:
         "organization_id": (
             str(user.organization_id) if user.organization_id is not None else None
         ),
+        "ver": user.token_version or 0,
         "exp": expires_at,
         "iat": datetime.now(timezone.utc),
     }
@@ -251,6 +252,7 @@ def set_user_password(
     password: str,
 ) -> User:
     user.hashed_password = hash_password(password)
+    user.token_version = (user.token_version or 0) + 1
     db.add(user)
     db.commit()
     db.refresh(user)

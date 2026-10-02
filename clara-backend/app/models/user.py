@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -39,6 +39,10 @@ class User(Base):
 
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="sales")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Dinaikkan saat password berubah/di-reset; token dengan versi lama langsung tidak berlaku.
+    token_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
