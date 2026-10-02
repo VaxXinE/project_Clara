@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useId, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import { canAccessQueueAndActionCenter, isHeadRole, isManagerRole, normalizeWorkspaceRole } from "@/lib/roles";
@@ -356,19 +357,17 @@ export default function NotificationsPage() {
     <WorkspaceShell
       currentUser={currentUser}
       eyebrow={
-        isHeadMonitorView
-          ? "Alert Tim"
-          : isOversightAlertView
-            ? "Manager follow-up"
-            : "Operational orchestration"
+        isHeadMonitorView || isOversightAlertView
+          ? NAV_GROUP_NAMES.monitoring
+          : NAV_GROUP_NAMES.daily
       }
-      title={isHeadMonitorView ? "Alert Tim" : "Alert Center"}
+      title={isHeadMonitorView ? PAGE_NAMES.alertsTeam : PAGE_NAMES.alerts}
       description={
         isHeadMonitorView
-          ? "Halaman ini dipakai Head untuk membaca alert lintas tim yang paling penting, lalu cepat memutuskan area mana yang perlu dipantau, ditekan, atau dinaikkan eskalasinya."
+          ? "Alert lintas tim yang paling penting, supaya kamu cepat memutuskan area mana yang perlu ditindak."
           : isOversightAlertView
-            ? "Halaman ini dipakai manager untuk mengecek follow-up sales yang mulai overdue, lead yang belum ditindak, dan titik yang perlu segera ditekan ke tim."
-          : "Tempat untuk melihat sinyal operasional yang harus segera ditindak: follow-up overdue, chat review kritis, dan alert KPI yang relevan dengan role Anda."
+            ? "Follow-up Sales yang mulai terlambat dan lead yang belum ditindak."
+          : "Hal yang perlu segera ditindak: follow-up terlambat, review kritis, dan alert KPI sesuai role kamu."
       }
       backHref="/dashboard"
       backLabel="Kembali ke beranda"
@@ -377,21 +376,21 @@ export default function NotificationsPage() {
           {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
             <Link
               href="/dashboard/follow-up"
-              className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+              className="clara-button clara-button-secondary"
             >
-              Action Center
+              Tindak Lanjut
             </Link>
           ) : (
             <Link
               href={isHeadMonitorView ? "/dashboard/crm" : "/dashboard/manager-insights"}
-              className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+              className="clara-button clara-button-secondary"
             >
               {isHeadMonitorView ? "Buka Lead Tim" : "Monitor Tim"}
             </Link>
           )}
           <Link
             href="/dashboard/approvals"
-            className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
+            className="clara-button clara-button-primary"
           >
             {isHeadMonitorView ? "Buka Arahan Tim" : "Review Sales"}
           </Link>
@@ -401,7 +400,7 @@ export default function NotificationsPage() {
       <div className="space-y-6">
         {isLoading && (
           <div role="status" className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
-            Loading alert center...
+            Memuat alert...
           </div>
         )}
 
@@ -416,11 +415,11 @@ export default function NotificationsPage() {
             {isHeadMonitorView ? (
               <section
                 data-onboarding-id="head-alerts-summary"
-                className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
+                className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="max-w-3xl">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                    <p className="text-xs font-semibold text-[#f0cb73]">
                       Ringkasan hari ini
                     </p>
                     <h2 className="mt-2 text-2xl font-semibold text-[#fff0c9]">
@@ -434,13 +433,13 @@ export default function NotificationsPage() {
                   <div className="flex flex-wrap gap-3">
                     <Link
                       href="/dashboard/manager-insights"
-                      className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                      className="clara-button clara-button-secondary"
                     >
-                      Buka Head Insight
+                      Buka Monitor Tim
                     </Link>
                     <Link
                       href="/dashboard/approvals"
-                      className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105"
+                      className="clara-button clara-button-primary"
                     >
                       Buka Arahan Tim
                     </Link>
@@ -448,8 +447,8 @@ export default function NotificationsPage() {
                 </div>
 
                 {headPrimaryAlert ? (
-                  <div className="mt-5 rounded-[24px] border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                  <div className="mt-5 rounded-2xl border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
+                    <p className="text-xs font-semibold text-[#f0cb73]">
                       Alert teratas untuk dibaca dulu
                     </p>
                     <p className="mt-2 text-base font-semibold text-[#fff0c9]">
@@ -503,7 +502,7 @@ export default function NotificationsPage() {
                       />
                     </section>
 
-                    <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+                    <section className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
                       <div
                         className={`grid gap-4 ${isOversightAlertView ? "md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-4"}`}
                       >
@@ -516,10 +515,10 @@ export default function NotificationsPage() {
                           value={formatDateTime(notifications.generated_at)}
                         />
                         {!isOversightAlertView ? (
-                          <div className="rounded-[28px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-6 md:col-span-2">
+                          <div className="rounded-3xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-6 md:col-span-2">
                             <label
                               htmlFor={resolutionNoteId}
-                              className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]"
+                              className="text-xs font-semibold text-[#f0cb73]"
                             >
                               Resolution Note
                             </label>
@@ -530,7 +529,7 @@ export default function NotificationsPage() {
                                 setResolutionNote(event.target.value);
                               }}
                               placeholder="Catatan saat resolve notification..."
-                              className="mt-3 min-h-[88px] w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] p-3 text-sm text-[#f7e7b7] outline-none placeholder:text-[#907953]"
+                              className="clara-textarea mt-3 min-h-[88px]"
                             />
                           </div>
                         ) : null}
@@ -538,10 +537,10 @@ export default function NotificationsPage() {
                     </section>
                   </>
                 ) : (
-                  <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+                  <section className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                        <p className="text-xs font-semibold text-[#f0cb73]">
                           Tidak Ada Alert Aktif
                         </p>
                         <h3 className="mt-2 text-lg font-semibold text-[#fff0c9]">
@@ -558,9 +557,9 @@ export default function NotificationsPage() {
                               : "Kalau area ini kosong, berarti belum ada sales yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead tim, monitor tim, atau histori alert follow-up yang sudah selesai."
                             : `Fokus halaman ini adalah alert aktif. Karena sekarang kosong, lanjutkan kerja dari ${
                                 canAccessQueue
-                                  ? "Action Center, Queue, atau Lead Management"
+                                  ? "Tindak Lanjut, Chat Masuk, atau Lead"
                                   : isHeadMonitorView
-                                    ? "Head Insight, Lead Tim, atau Arahan Tim"
+                                    ? "Monitor Tim, Lead Tim, atau Arahan Tim"
                                     : "Monitor Tim atau Review Sales"
                               }.`}
                           {scopedCounts.resolved > 0
@@ -575,7 +574,7 @@ export default function NotificationsPage() {
                             setStatusFilter("resolved");
                             setNotificationPage(1);
                           }}
-                          className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
+                          className="clara-button clara-button-secondary"
                         >
                           Lihat Histori Alert
                         </button>
@@ -587,12 +586,12 @@ export default function NotificationsPage() {
                                 ? "/dashboard/manager-insights"
                                 : "/dashboard/manager-insights"
                           }
-                          className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
+                          className="clara-button clara-button-primary"
                         >
                           {canAccessQueue
-                            ? "Buka Action Center"
+                            ? "Buka Tindak Lanjut"
                             : isHeadMonitorView
-                              ? "Buka Head Insight"
+                              ? "Buka Monitor Tim"
                               : "Buka Monitor Tim"}
                         </Link>
                       </div>
@@ -628,11 +627,11 @@ export default function NotificationsPage() {
 
                 <section
                   data-onboarding-id="head-alerts-filters"
-                  className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
+                  className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
                 >
                   <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
+                      <p className="text-xs font-semibold text-[#f0cb73]">
                         {isHeadMonitorView ? "Saring radar head" : "Saring alert"}
                       </p>
                       <h3 className="mt-1 text-lg font-semibold text-[#fff0c9]">
@@ -652,7 +651,7 @@ export default function NotificationsPage() {
                           setStatusFilter(event.target.value);
                           setNotificationPage(1);
                         }}
-                        className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none"
+                        className="clara-select"
                       >
                         <option value="all">Semua status</option>
                         <option value="active">Active</option>
@@ -670,7 +669,7 @@ export default function NotificationsPage() {
                           setSeverityFilter(event.target.value);
                           setNotificationPage(1);
                         }}
-                        className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none"
+                        className="clara-select"
                       >
                         <option value="all">Semua severity</option>
                         <option value="critical">Critical</option>
@@ -680,7 +679,7 @@ export default function NotificationsPage() {
                       </select>
                     </label>
 
-                    <div className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4 xl:col-span-2">
+                    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4 xl:col-span-2">
                       <p className="text-sm text-[#d8bc84]">{filterSummaryText}</p>
                       <p className="mt-2 text-sm text-[#d8bc84]">
                         Halaman {effectiveNotificationPage} dari {totalNotificationPages}
@@ -704,11 +703,11 @@ export default function NotificationsPage() {
                         data-onboarding-id={
                           index === 0 ? "head-alerts-list" : undefined
                         }
-                        className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(27,20,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
+                        className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(27,20,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0cb73]/12 pb-4">
                           <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
+                            <p className="text-xs font-semibold text-[#f0cb73]">
                               {isHeadMonitorView ? "PIC sales" : "Sales Owner"}
                             </p>
                             <h2 className="mt-2 text-lg font-semibold text-[#fff0c9]">
@@ -724,7 +723,7 @@ export default function NotificationsPage() {
                           {group.items.map((item) => (
                             <article
                               key={item.id}
-                              className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                              className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                             >
                               <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                                 <div className="min-w-0 flex-1">
@@ -772,7 +771,7 @@ export default function NotificationsPage() {
                                           currentUser?.role,
                                         ) as string
                                       }
-                                      className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
+                                      className="clara-button clara-button-primary"
                                   >
                                       {isHeadMonitorView ? "Buka konteks" : "Buka Follow-up"}
                                     </Link>
@@ -785,7 +784,7 @@ export default function NotificationsPage() {
                                         onClick={() => {
                                           void handleAcknowledge(item);
                                         }}
-                                        className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                        className="clara-button clara-button-secondary"
                                       >
                                         {updatingId === item.id ? "Memproses..." : isHeadMonitorView ? "Tandai dibaca" : "Sudah Dicek"}
                                       </button>
@@ -795,7 +794,7 @@ export default function NotificationsPage() {
                                         onClick={() => {
                                           void handleResolve(item);
                                         }}
-                                        className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-70"
+                                        className="clara-button clara-button-primary"
                                       >
                                         {isHeadMonitorView ? "Tandai selesai" : "Tandai Selesai"}
                                       </button>
@@ -805,7 +804,7 @@ export default function NotificationsPage() {
                                         onClick={() => {
                                           void handleIgnore(item);
                                         }}
-                                        className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#1d150d] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                        className="clara-button clara-button-secondary"
                                       >
                                         Abaikan
                                       </button>
@@ -819,7 +818,7 @@ export default function NotificationsPage() {
                                         onClick={() => {
                                           void handleResolve(item);
                                         }}
-                                        className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-70"
+                                        className="clara-button clara-button-primary"
                                       >
                                         Tandai Selesai
                                       </button>
@@ -829,7 +828,7 @@ export default function NotificationsPage() {
                                         onClick={() => {
                                           void handleIgnore(item);
                                         }}
-                                        className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#1d150d] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                        className="clara-button clara-button-secondary"
                                       >
                                         Abaikan
                                       </button>
@@ -846,7 +845,7 @@ export default function NotificationsPage() {
                     paginatedNotifications.map((item) => (
                       <article
                         key={item.id}
-                        className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
+                        className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
                       >
                         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                           <div>
@@ -897,7 +896,7 @@ export default function NotificationsPage() {
                                     currentUser?.role,
                                   ) as string
                                 }
-                                className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
+                                className="clara-button clara-button-primary"
                               >
                                 Buka Tindakan
                               </Link>
@@ -910,7 +909,7 @@ export default function NotificationsPage() {
                                   onClick={() => {
                                     void handleAcknowledge(item);
                                   }}
-                                  className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                  className="clara-button clara-button-secondary"
                                 >
                                   {updatingId === item.id ? "Memproses..." : "Acknowledge"}
                                 </button>
@@ -920,7 +919,7 @@ export default function NotificationsPage() {
                                   onClick={() => {
                                     void handleResolve(item);
                                   }}
-                                  className="inline-flex justify-center rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] disabled:cursor-not-allowed disabled:opacity-70"
+                                  className="clara-button clara-button-primary"
                                 >
                                   Resolve
                                 </button>
@@ -931,7 +930,7 @@ export default function NotificationsPage() {
                                     onClick={() => {
                                       void handleEscalate(item);
                                     }}
-                                    className="inline-flex justify-center rounded-full border border-[#f0cb73]/18 bg-[#2c1f12] px-4 py-2.5 text-sm font-semibold text-[#f0cb73] disabled:cursor-not-allowed disabled:opacity-70"
+                                    className="clara-button clara-button-ghost"
                                   >
                                     Escalate
                                   </button>
@@ -945,7 +944,7 @@ export default function NotificationsPage() {
                                 onClick={() => {
                                   void handleReopen(item);
                                 }}
-                                className="inline-flex justify-center rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-70"
+                                className="clara-button clara-button-secondary"
                               >
                                 Reopen
                               </button>
@@ -958,7 +957,7 @@ export default function NotificationsPage() {
                 </section>
 
                 {filteredNotifications.length > pageSize ? (
-                  <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-4 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+                  <section className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-4 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-sm text-[#d8bc84]">Navigasi daftar alert</p>
                       <div className="flex flex-wrap gap-2">
@@ -990,40 +989,40 @@ export default function NotificationsPage() {
                 ) : null}
               </>
             ) : (
-              <section className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+              <section className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
+                <p className="text-xs font-semibold text-[#f0cb73]">
                   Lanjutkan Dari Sini
                 </p>
                 <p className="mt-3 max-w-3xl text-sm leading-6 text-[#e3c990]">
                   {isHeadMonitorView
-                    ? "Saat Alert Tim kosong, itu artinya follow-up tim sedang relatif aman. Untuk role Head, langkah berikutnya biasanya lanjut ke Head Insight, Lead Tim, lalu cek pipeline yang masih tertahan."
-                    : "Saat Alert Center kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role manager, langkah berikutnya biasanya memantau tim, review balasan sales, atau cek lead yang masih tertahan."}
+                    ? "Saat Alert Tim kosong, itu artinya follow-up tim sedang relatif aman. Untuk role Head, langkah berikutnya biasanya lanjut ke Monitor Tim, Lead Tim, lalu cek pipeline yang masih tertahan."
+                    : "Saat Alert kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role manager, langkah berikutnya biasanya memantau tim, review balasan sales, atau cek lead yang masih tertahan."}
                 </p>
                 <div className="mt-5 flex flex-wrap gap-3">
                   {isHeadMonitorView ? (
                     <Link
                       href="/dashboard/manager-insights"
-                      className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
+                      className="clara-button clara-button-primary"
                     >
-                      Buka Head Insight
+                      Buka Monitor Tim
                     </Link>
                   ) : (
                     <Link
                       href="/dashboard/manager-insights"
-                      className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
+                      className="clara-button clara-button-primary"
                     >
-                      Buka Head Insight
+                      Buka Monitor Tim
                     </Link>
                   )}
                   <Link
                     href="/dashboard/approvals"
-                    className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
+                    className="clara-button clara-button-secondary"
                   >
                     {isHeadMonitorView ? "Buka Arahan Tim" : "Buka Review Sales"}
                   </Link>
                   <Link
                     href="/dashboard/crm"
-                    className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c]"
+                    className="clara-button clara-button-secondary"
                   >
                     Buka Lead Tim
                   </Link>
@@ -1042,8 +1041,8 @@ export default function NotificationsPage() {
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#140f08]">
+    <article className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
+      <p className="text-xs font-semibold text-[#140f08]">
         {label}
       </p>
       <p className="mt-3 text-3xl font-bold text-[#140f08]">{value}</p>

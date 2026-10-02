@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { getPasswordStrength } from "@/lib/format";
 import { isOwnerLike } from "@/lib/roles";
@@ -89,9 +90,9 @@ export default function AdminAccessEditPasswordPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Access management"
-      title="Reset Password User"
-      description="Halaman khusus untuk mengganti password user."
+      eyebrow={NAV_GROUP_NAMES.admin}
+      title="Reset Password Pengguna"
+      description="Atur password baru untuk pengguna ini."
       backHref="/admin/access"
       backLabel="Kembali ke index access"
       actions={
@@ -103,7 +104,7 @@ export default function AdminAccessEditPasswordPage() {
       <div className="mx-auto max-w-3xl space-y-6">
         {isLoading ? (
           <div className="clara-empty-state text-sm text-[#d6bb84]">
-            Loading reset password...
+            Memuat form reset password...
           </div>
         ) : null}
 
@@ -112,7 +113,7 @@ export default function AdminAccessEditPasswordPage() {
         ) : null}
 
         {!isLoading ? (
-          <div className="clara-card space-y-5 rounded-[30px] p-5">
+          <div className="clara-card space-y-5 rounded-3xl p-5">
             <div>
               <h2 className="text-lg font-semibold text-[#fff0c9]">Reset Password</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">

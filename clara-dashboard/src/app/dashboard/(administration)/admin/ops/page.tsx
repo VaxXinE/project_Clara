@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import { canAccessAdminPages } from "@/lib/roles";
@@ -49,9 +50,9 @@ export default function AdminOpsPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Admin operations"
-      title="Database Overview"
-      description="Pantau metadata sistem penting secara read-only tanpa harus membuka database client secara manual."
+      eyebrow={NAV_GROUP_NAMES.admin}
+      title={PAGE_NAMES.audit}
+      description="Pantau jejak audit dan status sistem. Halaman ini hanya untuk dibaca."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
@@ -59,7 +60,7 @@ export default function AdminOpsPage() {
           href="/admin/access"
           className="clara-button clara-button-ghost"
         >
-          Manage Users
+          Pengguna & Akses
         </Link>
       }
     >
@@ -87,8 +88,8 @@ export default function AdminOpsPage() {
         </section>
 
         {isLoading && (
-          <div role="status" className="clara-empty-state text-sm text-slate-600">
-            Loading database overview...
+          <div role="status" className="clara-empty-state text-sm text-clara-ink-2">
+            Memuat status sistem...
           </div>
         )}
 
@@ -122,26 +123,26 @@ export default function AdminOpsPage() {
                     {overview.recent_users.map((user) => (
                       <div
                         key={user.id}
-                        className="rounded-xl border border-slate-200 p-4"
+                        className="rounded-xl border border-clara-line p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm font-semibold clara-text-primary">
                             {user.email}
                           </p>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                             {formatStatusLabel(user.role)}
                           </span>
                         </div>
-                        <p className="mt-1 text-sm text-slate-600">
+                        <p className="mt-1 text-sm text-clara-ink-2">
                           {user.name}
                         </p>
-                        <p className="mt-2 text-xs text-slate-500">
+                        <p className="mt-2 text-xs text-clara-ink-3">
                           org: {user.organization_id ?? "-"}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-clara-ink-3">
                           created by: {user.created_by_user_name ?? "-"}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-clara-ink-3">
                           created: {formatDateTime(user.created_at)}
                         </p>
                       </div>
@@ -161,15 +162,15 @@ export default function AdminOpsPage() {
                     {overview.recent_organizations.map((organization) => (
                       <div
                         key={organization.id}
-                        className="rounded-xl border border-slate-200 p-4"
+                        className="rounded-xl border border-clara-line p-4"
                       >
                         <p className="text-sm font-semibold clara-text-primary">
                           {organization.name}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-clara-ink-3">
                           slug: {organization.slug}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-clara-ink-3">
                           created: {formatDateTime(organization.created_at)}
                         </p>
                       </div>
@@ -191,17 +192,17 @@ export default function AdminOpsPage() {
                     {overview.recent_conversations.map((conversation) => (
                       <div
                         key={conversation.id}
-                        className="rounded-xl border border-slate-200 p-4"
+                        className="rounded-xl border border-clara-line p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm font-semibold clara-text-primary">
                             {conversation.title}
                           </p>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                             {formatStatusLabel(conversation.status)}
                           </span>
                         </div>
-                        <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                        <div className="mt-2 grid gap-1 text-xs text-clara-ink-3">
                           <p>org: {conversation.organization_name ?? "-"}</p>
                           <p>
                             sales owner: {conversation.sales_owner_name ?? "-"}
@@ -223,7 +224,7 @@ export default function AdminOpsPage() {
               </Panel>
 
               <Panel
-                title="Recent Audit Logs"
+                title="Audit log terbaru"
                 description="Aksi terbaru yang tercatat di sistem."
               >
                 {overview.recent_audit_logs.length === 0 ? (
@@ -233,12 +234,12 @@ export default function AdminOpsPage() {
                     {overview.recent_audit_logs.map((log) => (
                       <div
                         key={log.id}
-                        className="rounded-xl border border-slate-200 p-4"
+                        className="rounded-xl border border-clara-line p-4"
                       >
                         <p className="text-sm font-semibold clara-text-primary">
                           {log.action}
                         </p>
-                        <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                        <div className="mt-2 grid gap-1 text-xs text-clara-ink-3">
                           <p>actor: {log.actor_email ?? "-"}</p>
                           <p>role: {log.actor_role ?? "-"}</p>
                           <p>resource: {log.resource_type}</p>
@@ -255,7 +256,7 @@ export default function AdminOpsPage() {
 
             <section className="grid gap-6 xl:grid-cols-2">
               <Panel
-                title="Recent Product Knowledge"
+                title="Knowledge terbaru"
                 description="Knowledge base terbaru yang aktif maupun nonaktif."
               >
                 {overview.recent_product_knowledge.length === 0 ? (
@@ -265,7 +266,7 @@ export default function AdminOpsPage() {
                     {overview.recent_product_knowledge.map((item) => (
                       <div
                         key={item.id}
-                        className="rounded-xl border border-slate-200 p-4"
+                        className="rounded-xl border border-clara-line p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm font-semibold clara-text-primary">
@@ -274,14 +275,14 @@ export default function AdminOpsPage() {
                           <span
                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                               item.is_active
-                                ? "bg-green-100 text-green-700"
-                                : "bg-slate-100 text-slate-700"
+                                ? "bg-clara-success-surface text-clara-success"
+                                : "bg-clara-raised text-clara-ink-2"
                             }`}
                           >
                             {item.is_active ? "active" : "inactive"}
                           </span>
                         </div>
-                        <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                        <div className="mt-2 grid gap-1 text-xs text-clara-ink-3">
                           <p>category: {item.category}</p>
                           <p>source type: {item.source_type}</p>
                           <p>org: {item.organization_name ?? "global"}</p>
@@ -304,17 +305,17 @@ export default function AdminOpsPage() {
                     {overview.recent_snapshots.map((snapshot) => (
                       <div
                         key={snapshot.id}
-                        className="rounded-xl border border-slate-200 p-4"
+                        className="rounded-xl border border-clara-line p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm font-semibold clara-text-primary">
                             {snapshot.period_start} s/d {snapshot.period_end}
                           </p>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                             {formatStatusLabel(snapshot.scope_type)}
                           </span>
                         </div>
-                        <div className="mt-2 grid gap-1 text-xs text-slate-500">
+                        <div className="mt-2 grid gap-1 text-xs text-clara-ink-3">
                           <p>org: {snapshot.organization_name ?? "global"}</p>
                           <p>conversations: {snapshot.total_conversations}</p>
                           <p>
@@ -346,12 +347,12 @@ function InfoCard({
   description: string;
 }) {
   return (
-    <article className="clara-card rounded-[24px] p-5">
-      <p className="clara-kicker text-xs text-slate-500">{label}</p>
+    <article className="clara-card rounded-2xl p-5">
+      <p className="clara-kicker text-xs text-clara-ink-3">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
         {value}
       </p>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      <p className="mt-2 text-sm leading-6 text-clara-ink-2">{description}</p>
     </article>
   );
 }
@@ -359,7 +360,7 @@ function InfoCard({
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <article className="clara-card rounded-2xl p-5">
-      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <p className="text-sm font-medium text-clara-ink-3">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
         {value}
       </p>
@@ -377,10 +378,10 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="clara-card rounded-[28px] p-5">
+    <section className="clara-card rounded-3xl p-5">
       <div>
         <h2 className="text-lg font-semibold clara-text-primary">{title}</h2>
-        <p className="mt-1 text-sm text-slate-600">{description}</p>
+        <p className="mt-1 text-sm text-clara-ink-2">{description}</p>
       </div>
       <div className="mt-5">{children}</div>
     </section>
@@ -388,5 +389,5 @@ function Panel({
 }
 
 function EmptyText({ text }: { text: string }) {
-  return <p className="text-sm text-slate-500">{text}</p>;
+  return <p className="text-sm text-clara-ink-3">{text}</p>;
 }

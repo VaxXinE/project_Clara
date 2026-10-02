@@ -19,6 +19,7 @@ import {
 } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
 import {
@@ -449,16 +450,15 @@ export default function CrmPage() {
       : summary.won > 0
         ? "Lead aktif relatif aman. Pakai halaman ini untuk cek lead won, kualitas update stage, dan ritme follow-up tim."
         : "Belum ada tekanan besar. Manager bisa pakai halaman ini untuk audit ritme kerja tim dan melihat lead yang mulai naik prioritasnya.";
-  const pageTitle = isHeadWorkspace
-    ? "Lead Tim"
-    : isManagerWorkspace
-      ? "Lead Management"
-      : "Leads";
+  const pageTitle =
+    isHeadWorkspace || isManagerWorkspace
+      ? PAGE_NAMES.leadsTeam
+      : PAGE_NAMES.leads;
   const pageDescription = isHeadWorkspace
-    ? "Halaman head untuk membaca lead lintas tim yang mulai berisiko, cek owner dan stage, lalu turun ke detail hanya saat memang perlu keputusan."
+    ? "Lead semua tim yang mulai berisiko. Cek owner dan stage, lalu buka detail hanya saat perlu keputusan."
     : isManagerWorkspace
-      ? "Halaman manager untuk melihat lead tim yang paling butuh perhatian, lalu turun ke detail lead atau percakapan saat memang perlu."
-      : "Tempat paling cepat untuk lihat lead yang masih perlu disentuh, update stage, lalu lanjut ke percakapan.";
+      ? "Lead timmu yang paling butuh perhatian. Buka detail lead atau percakapan saat perlu."
+      : "Lead yang masih perlu kamu hubungi. Update stage, lalu lanjut ke percakapan.";
   const heroTitle = isHeadWorkspace
     ? "Mulai dari lead tim yang paling dekat ke risiko, eskalasi, atau keputusan"
     : isManagerWorkspace
@@ -577,7 +577,7 @@ export default function CrmPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="CRM workspace"
+      eyebrow={NAV_GROUP_NAMES.daily}
       title={pageTitle}
       description={pageDescription}
       backHref="/dashboard"
@@ -621,7 +621,7 @@ export default function CrmPage() {
             }
             className="clara-button clara-button-primary"
           >
-            {isHeadWorkspace ? "Buka Arahan Tim" : "Lead Capture"}
+            {isHeadWorkspace ? "Buka Arahan Tim" : "Input Chat"}
           </Link>
         </>
       }
@@ -820,7 +820,7 @@ export default function CrmPage() {
               <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.88fr)]">
                 {paginatedVisibleLeads.length === 0 ? (
                   <div className="clara-empty-state p-6 text-sm text-[#d6bb84]">
-                    Tidak ada lead yang cocok dengan filter saat ini.
+                    Tidak ada lead yang cocok dengan filter ini. Ubah pencarian atau filter untuk melihat lead lain.
                   </div>
                 ) : (
                   <>
@@ -880,7 +880,7 @@ export default function CrmPage() {
                       {selectedLead ? (
                         <>
                           <div className="border-b border-[#f0cb73]/12 pb-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                            <p className="text-xs font-semibold text-[#f0cb73]">
                               {previewTitle}
                             </p>
                             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -914,14 +914,14 @@ export default function CrmPage() {
                             </div>
                             <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
                               {selectedLead.summary ??
-                                "Belum ada summary lead. Buka detail penuh kalau mau update konteks atau review AI lebih dalam."}
+                                "Belum ada ringkasan untuk lead ini. Buka detail lead untuk menambah konteks atau minta Clara membacanya."}
                             </p>
                           </div>
 
                           <div className="mt-4 space-y-4">
                             {isLeadershipWorkspace ? (
-                              <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(34,25,18,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
+                              <section className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(34,25,18,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                                <p className="text-xs font-semibold text-[#f0cb73]">
                                   {isHeadWorkspace
                                     ? "Fokus head"
                                     : "Fokus manager"}
@@ -930,7 +930,7 @@ export default function CrmPage() {
                                   {selectedLeadLeadershipFocus}
                                 </p>
                                 <div className="mt-3 rounded-2xl border border-[#f0cb73]/12 bg-[#1e160f] px-3 py-3">
-                                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b9924b]">
+                                  <p className="text-xs font-semibold text-[#b9924b]">
                                     Langkah berikutnya
                                   </p>
                                   <p className="mt-2 text-sm font-medium leading-6 text-[#f3d89a]">
@@ -940,8 +940,8 @@ export default function CrmPage() {
                               </section>
                             ) : null}
 
-                            <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#f0cb73]">
+                            <section className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                              <p className="text-xs font-semibold text-[#f0cb73]">
                                 Sync Health
                               </p>
                               <div className="mt-3 flex flex-wrap gap-2">
@@ -1010,8 +1010,8 @@ export default function CrmPage() {
                               />
                             </section>
 
-                            <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                              <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                            <section className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                              <label className="text-xs font-semibold text-[#f0cb73]">
                                 {isHeadWorkspace
                                   ? "Kontrol cepat head"
                                   : isManagerWorkspace
@@ -1221,7 +1221,7 @@ function LeadListRow({
 
         <p className="mt-3 line-clamp-2 break-words text-sm leading-6 clara-text-secondary">
           {lead.summary ??
-            "Belum ada summary lead. Jalankan AI analysis dulu kalau konteksnya masih mentah."}
+            "Belum ada ringkasan lead. Minta Clara membaca percakapannya dulu."}
         </p>
 
         <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-2">
@@ -1266,7 +1266,7 @@ function LeadMetaPill({
         <FontAwesomeIcon icon={icon} className="h-3 w-3" />
       </span>
       <span className="min-w-0">
-        <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9f7a38]">
+        <span className="block text-xs font-semibold text-[#9f7a38]">
           {label}
         </span>
         <span className="block truncate text-sm font-semibold text-[#f0cb73]">
@@ -1279,8 +1279,8 @@ function LeadMetaPill({
 
 function PreviewStat({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-[18px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
+    <article className="rounded-xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.16)]">
+      <p className="text-xs font-semibold text-[#f0cb73]">
         {label}
       </p>
       <p className="mt-2 text-sm font-semibold leading-6 text-[#fff0c9]">
@@ -1336,7 +1336,7 @@ function StageQuickSelect({
         aria-haspopup="listbox"
         disabled={disabled}
         onClick={() => setIsOpen((previous) => !previous)}
-        className="flex w-full items-center justify-between rounded-[18px] border border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(24,18,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] px-4 py-3 text-left text-sm font-semibold text-[#fff8de] shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition hover:border-[#f0cb73]/40 hover:text-[#fffdf5] disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-between rounded-xl border border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(24,18,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] px-4 py-3 text-left text-sm font-semibold text-[#fff8de] shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition hover:border-[#f0cb73]/40 hover:text-[#fffdf5] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span>{STAGE_LABELS[value] ?? value}</span>
         <span
@@ -1350,7 +1350,7 @@ function StageQuickSelect({
       </button>
 
       {isDropdownOpen ? (
-        <div className="absolute inset-x-0 z-30 mt-2 rounded-[18px] border border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(28,20,15,0.99)_0%,rgba(17,12,9,0.99)_100%)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.42)]">
+        <div className="absolute inset-x-0 z-30 mt-2 rounded-xl border border-[#f0cb73]/24 bg-[linear-gradient(180deg,rgba(28,20,15,0.99)_0%,rgba(17,12,9,0.99)_100%)] p-2 shadow-[0_18px_40px_rgba(0,0,0,0.42)]">
           <ul
             role="listbox"
             aria-label="Stage lead"
@@ -1371,7 +1371,7 @@ function StageQuickSelect({
                         onChange(stage);
                       }
                     }}
-                    className={`flex w-full items-center justify-between rounded-[14px] px-3 py-2.5 text-left text-sm transition ${
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
                       isSelected
                         ? "bg-[#f0cb73] text-[#130d07]"
                         : "text-[#fff2cf] hover:bg-[#3a2917] hover:text-[#fffdf5]"
@@ -1379,7 +1379,7 @@ function StageQuickSelect({
                   >
                     <span>{STAGE_LABELS[stage]}</span>
                     {isSelected ? (
-                      <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#2a1c0e]">
+                      <span className="text-xs font-bold text-[#2a1c0e]">
                         Aktif
                       </span>
                     ) : null}

@@ -59,24 +59,18 @@ const HEAD_WORKFLOW_STEPS = [
   },
   {
     step: "2",
-    title: "Cek Area Yang Mulai Bocor",
+    title: "Cek Area yang Mulai Bocor",
     description: "Pilih lead atau area tim yang butuh perhatian lebih dulu.",
     href: "/dashboard/crm",
     cta: "Buka Lead Tim",
   },
   {
     step: "3",
-    title: "Buka Arahan Tim",
-    description: "Masuk ke item yang macet atau perlu keputusan lanjut.",
+    title: "Beri Arahan ke Tim",
+    description:
+      "Buka Arahan Tim, putuskan item yang macet, lalu kirim arahan dan langkah berikutnya.",
     href: "/dashboard/approvals",
     cta: "Buka Arahan Tim",
-  },
-  {
-    step: "4",
-    title: "Beri Arahan Perbaikan",
-    description: "Kirim rekomendasi dan next action ke tim.",
-    href: "/dashboard/notifications",
-    cta: "Kembali ke Alert Tim",
   },
 ] as const;
 
@@ -91,23 +85,17 @@ const MANAGER_WORKFLOW_STEPS = [
   {
     step: "2",
     title: "Cek Balasan Sales",
-    description: "Buka Review Sales.",
+    description:
+      "Baca balasan Sales, lalu putuskan apakah sudah aman, jelas, dan layak lanjut.",
     href: "/dashboard/approvals",
     cta: "Buka Review Sales",
   },
   {
     step: "3",
-    title: "Tentukan Arah Perbaikan",
-    description: "Cek apakah balasan sudah aman, jelas, dan layak lanjut.",
-    href: "/dashboard/approvals",
-    cta: "Review Jawaban Sales",
-  },
-  {
-    step: "4",
     title: "Kirim Arahan ke Sales",
     description: "Kirim feedback kalau masih perlu revisi atau tindak lanjut.",
     href: "/dashboard/approvals",
-    cta: "Kirim Feedback",
+    cta: "Beri Arahan",
   },
 ] as const;
 
@@ -118,7 +106,7 @@ const SUPERADMIN_WORKFLOW_STEPS = [
     description:
       "Mulai dari ops dashboard dan alert aktif untuk melihat kesehatan eksekusi, tim, dan sinyal anomali secara global.",
     href: "/dashboard/kpi",
-    cta: "Buka Ops Dashboard",
+    cta: "Buka Dashboard Operasional",
   },
   {
     step: "2",
@@ -126,7 +114,7 @@ const SUPERADMIN_WORKFLOW_STEPS = [
     description:
       "Masuk ke chat insight untuk membaca objection, pola percakapan, dan sinyal yang perlu diterjemahkan jadi intervensi operasional.",
     href: "/dashboard/marketing",
-    cta: "Buka Chat Insight",
+    cta: "Buka Insight Pasar",
   },
   {
     step: "3",
@@ -134,7 +122,7 @@ const SUPERADMIN_WORKFLOW_STEPS = [
     description:
       "Kalau ada sinyal yang perlu dicek lebih dalam, turun ke lead management, queue, atau action center untuk melihat konteks operasionalnya.",
     href: "/dashboard/follow-up",
-    cta: "Buka Action Center",
+    cta: "Buka Tindak Lanjut",
   },
   {
     step: "4",
@@ -142,7 +130,7 @@ const SUPERADMIN_WORKFLOW_STEPS = [
     description:
       "Gunakan access control, system ops, atau knowledge base saat perlu membenahi governance, akses, atau landasan jawaban tim.",
     href: "/admin/access",
-    cta: "Buka Access Control",
+    cta: "Buka Pengguna & Akses",
   },
 ] as const;
 
@@ -208,17 +196,17 @@ function buildRoleTasks(role?: string) {
     return [
       {
         title: "Saya mau baca health operasional",
-        description: "Buka Ops Dashboard.",
+        description: "Buka Dashboard Operasional.",
         href: "/dashboard/kpi",
       },
       {
         title: "Saya mau lihat pola objection lapangan",
-        description: "Buka Chat Insight.",
+        description: "Buka Insight Pasar.",
         href: "/dashboard/marketing",
       },
       {
         title: "Saya mau verifikasi eksekusi di level lead",
-        description: "Turun ke lead atau action center.",
+        description: "Turun ke lead atau Tindak Lanjut.",
         href: "/dashboard/crm",
       },
     ];
@@ -309,9 +297,9 @@ function buildRoleStartCopy(role?: string) {
       description:
         "Lihat kondisi operasional dulu, lalu turun ke halaman eksekusi bila perlu.",
       primaryHref: "/dashboard/kpi",
-      primaryLabel: "Buka Ops Dashboard",
+      primaryLabel: "Buka Dashboard Operasional",
       secondaryHref: "/dashboard/marketing",
-      secondaryLabel: "Buka Chat Insight",
+      secondaryLabel: "Buka Insight Pasar",
     };
   }
 
@@ -367,16 +355,16 @@ export function RoleBasedStartGuide({
 
   return (
     <section className="space-y-6">
-      <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+      <article className="rounded-3xl border border-clara-line bg-clara-raised p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-xs font-semibold text-clara-ink-3">
               {roleStartCopy.eyebrow}
             </p>
             <h2 className="mt-2 text-2xl font-bold tracking-tight clara-text-primary">
               {roleStartCopy.title}
             </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-clara-ink-2">
               {roleStartCopy.description}
             </p>
           </div>
@@ -385,13 +373,13 @@ export function RoleBasedStartGuide({
             <div className="flex flex-wrap gap-2">
               <Link
                 href={roleStartCopy.primaryHref}
-                className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                className="clara-button clara-button-primary"
               >
                 {roleStartCopy.primaryLabel}
               </Link>
               <Link
                 href={roleStartCopy.secondaryHref}
-                className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                className="clara-button clara-button-secondary"
               >
                 {roleStartCopy.secondaryLabel}
               </Link>
@@ -399,24 +387,28 @@ export function RoleBasedStartGuide({
           ) : null}
         </div>
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-4">
+        <div
+          className={`mt-5 grid gap-4 ${
+            workflowSteps.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4"
+          }`}
+        >
           {workflowSteps.map((item) => (
             <article
               key={item.step}
-              className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5"
+              className="rounded-2xl border border-clara-line bg-clara-raised p-5"
             >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-clara-deep text-sm font-bold text-clara-cream">
                 {item.step}
               </span>
               <h3 className="mt-4 text-lg font-semibold clara-text-primary">
                 {item.title}
               </h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p className="mt-3 text-sm leading-6 text-clara-ink-2">
                 {item.description}
               </p>
               <Link
                 href={item.href}
-                className="mt-5 inline-flex rounded-full border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                className="clara-button clara-button-secondary mt-5"
               >
                 {item.cta}
               </Link>
@@ -427,8 +419,8 @@ export function RoleBasedStartGuide({
 
       {!compact ? (
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <article className="rounded-3xl border border-clara-line bg-clara-raised p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+            <p className="text-xs font-semibold text-clara-ink-3">
               Fitur Setiap Role
             </p>
             <div className="mt-5 grid gap-4 lg:grid-cols-3">
@@ -440,36 +432,36 @@ export function RoleBasedStartGuide({
                 return (
                   <article
                     key={featureSet.roleKey}
-                    className={`rounded-[24px] border p-5 transition ${
+                    className={`rounded-2xl border p-5 transition ${
                       isHighlighted
-                        ? "border-slate-900 bg-slate-950 text-white shadow-[0_16px_32px_rgba(15,23,42,0.16)]"
-                        : "border-slate-200 bg-slate-50"
+                        ? "border-clara-line bg-clara-deep text-clara-cream shadow-[0_16px_32px_rgba(15,23,42,0.16)]"
+                        : "border-clara-line bg-clara-raised"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span
-                        className={`text-xs font-semibold uppercase tracking-[0.18em] ${
-                          isHighlighted ? "text-slate-300" : "text-slate-500"
+                        className={`text-xs font-semibold ${
+                          isHighlighted ? "text-clara-ink-3" : "text-clara-ink-3"
                         }`}
                       >
                         {featureSet.label}
                       </span>
                       {isHighlighted ? (
-                        <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+                        <span className="rounded-full border border-white/15 bg-clara-wash px-2.5 py-1 text-xs font-semibold text-clara-cream">
                           Role aktif
                         </span>
                       ) : null}
                     </div>
                     <h3
                       className={`mt-4 text-base font-semibold ${
-                        isHighlighted ? "text-white" : "clara-text-primary"
+                        isHighlighted ? "text-clara-cream" : "clara-text-primary"
                       }`}
                     >
                       {featureSet.title}
                     </h3>
                       <p
                         className={`mt-2 text-sm leading-5 ${
-                          isHighlighted ? "text-slate-300" : "text-slate-600"
+                          isHighlighted ? "text-clara-ink-3" : "text-clara-ink-2"
                         }`}
                     >
                       {featureSet.summary}
@@ -480,8 +472,8 @@ export function RoleBasedStartGuide({
                           key={item}
                           className={`rounded-2xl border px-3.5 py-3 text-sm leading-5 ${
                             isHighlighted
-                              ? "border-white/10 bg-white/5 text-slate-100"
-                              : "border-slate-200 bg-white text-slate-700"
+                              ? "border-clara-line bg-clara-wash text-clara-ink-3"
+                              : "border-clara-line bg-clara-raised text-clara-ink-2"
                           }`}
                         >
                           {item}
@@ -494,8 +486,8 @@ export function RoleBasedStartGuide({
             </div>
           </article>
 
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <article className="rounded-3xl border border-clara-line bg-clara-raised p-6 shadow-[0_12px_34px_rgba(15,23,42,0.05)]">
+            <p className="text-xs font-semibold text-clara-ink-3">
               Shortcut Sesuai Role
             </p>
             <div className="mt-5 space-y-4">
@@ -503,31 +495,31 @@ export function RoleBasedStartGuide({
                 <Link
                   key={task.title}
                   href={task.href}
-                  className="block rounded-[22px] border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white"
+                  className="block rounded-2xl border border-clara-line bg-clara-raised p-4 transition hover:border-clara-line hover:bg-clara-raised"
                 >
                   <h3 className="text-base font-semibold clara-text-primary">
                     {task.title}
                   </h3>
-                   <p className="mt-2 text-sm leading-5 text-slate-600">
+                   <p className="mt-2 text-sm leading-5 text-clara-ink-2">
                      {task.description}
                    </p>
                 </Link>
               ))}
             </div>
-            <div className="mt-6 space-y-3 border-t border-slate-200 pt-6 text-sm leading-6 text-slate-600">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <div className="mt-6 space-y-3 border-t border-clara-line pt-6 text-sm leading-6 text-clara-ink-2">
+              <p className="text-xs font-semibold text-clara-ink-3">
                 Cara Baca Menu
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Queue</span>:
+                <span className="font-semibold clara-text-primary">Chat Masuk</span>:
                 chat yang harus ditangani.
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Lead Management</span>:
+                <span className="font-semibold clara-text-primary">Lead</span>:
                 progres dan status lead.
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Action Center</span>:
+                <span className="font-semibold clara-text-primary">Tindak Lanjut</span>:
                 follow-up harian.
               </p>
               <p>
@@ -535,11 +527,11 @@ export function RoleBasedStartGuide({
                 review jawaban dan arahan ke Sales.
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Alert Center</span>:
+                <span className="font-semibold clara-text-primary">Alert</span>:
                 alert follow-up tim.
               </p>
               <p>
-                <span className="font-semibold clara-text-primary">Chat Insight / Ops Dashboard</span>:
+                <span className="font-semibold clara-text-primary">Insight Pasar / Dashboard Operasional</span>:
                 insight dan kondisi operasional.
               </p>
             </div>

@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type {
@@ -326,8 +327,8 @@ export default function ProductKnowledgePage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Knowledge base"
-      title="Knowledge Base"
+      eyebrow={NAV_GROUP_NAMES.analysis}
+      title={PAGE_NAMES.knowledge}
       description="Temukan dan kelola sumber jawaban resmi tanpa memisahkan pencarian dari konteks yang sedang dibaca."
       backHref="/workspace"
       backLabel="Kembali ke overview"
@@ -715,7 +716,7 @@ export default function ProductKnowledgePage() {
               className="flex min-h-16 w-full items-center justify-between gap-4 px-5 text-left hover:bg-[var(--color-surface-muted)]"
             >
               <div>
-                <p className="font-semibold">Knowledge Update Queue</p>
+                <p className="font-semibold">Antrean Update Knowledge</p>
                 <p className="clara-helper mt-1">
                   Usulan dari coaching review yang menunggu keputusan
                   governance.

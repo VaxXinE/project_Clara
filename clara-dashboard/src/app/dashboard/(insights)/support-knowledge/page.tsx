@@ -15,8 +15,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import type { CurrentUser } from "@/types/dashboard";
+import { useConfirm } from "@/components/dashboard/ConfirmDialog";
 
 type Article = {
   id: string;
@@ -75,6 +77,7 @@ function statusTone(status: string) {
 }
 
 export default function SupportKnowledgePage() {
+  const confirm = useConfirm();
   const [me, setMe] = useState<CurrentUser | null>(null);
   const [items, setItems] = useState<Article[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -185,13 +188,15 @@ export default function SupportKnowledgePage() {
   }
 
   async function transition(article: Article, action: string) {
-    if (
-      action === "retire" &&
-      !window.confirm(
-        `Nonaktifkan "${article.title}"? Histori tetap tersimpan.`,
-      )
-    )
-      return;
+    if (action === "retire") {
+      const accepted = await confirm({
+        title: "Nonaktifkan artikel ini?",
+        message: `"${article.title}" tidak lagi dipakai Clara untuk menjawab. Histori tetap tersimpan.`,
+        confirmLabel: "Nonaktifkan",
+        tone: "danger",
+      });
+      if (!accepted) return;
+    }
     setBusy(article.id);
     setError("");
     setMessage("");
@@ -353,8 +358,8 @@ export default function SupportKnowledgePage() {
   return (
     <WorkspaceShell
       currentUser={me}
-      eyebrow="Customer service governance"
-      title="Support Knowledge L0–L1"
+      eyebrow={NAV_GROUP_NAMES.analysis}
+      title={PAGE_NAMES.supportKnowledge}
       description="Kelola jawaban support terverifikasi dengan batas eskalasi dan trust metadata yang jelas."
       backHref="/knowledge"
       backLabel="Knowledge Base"
@@ -454,7 +459,7 @@ export default function SupportKnowledgePage() {
                         {article.title}
                       </p>
                       <span
-                        className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ${statusTone(article.support_level)}`}
+                        className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${statusTone(article.support_level)}`}
                       >
                         {article.support_level.replace("LEVEL_", "L")}
                       </span>
@@ -572,7 +577,7 @@ export default function SupportKnowledgePage() {
                 <div
                   className={`rounded-xl border p-4 ${statusTone(selected.lifecycle_status)}`}
                 >
-                  <p className="text-xs font-bold uppercase tracking-wider">
+                  <p className="text-xs font-bold">
                     Status saat ini
                   </p>
                   <p className="mt-1 font-bold">{selected.lifecycle_status}</p>

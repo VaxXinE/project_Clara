@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
 import {
@@ -654,7 +655,7 @@ export default function LeadDetailPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Detail lead"
+      eyebrow={NAV_GROUP_NAMES.daily}
       title={lead?.display_name ?? "Detail Lead"}
       description={
         isSalesWorkspace
@@ -773,7 +774,7 @@ export default function LeadDetailPage() {
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    <p className="text-xs font-semibold text-clara-ink-3">
                       Snapshot lead
                     </p>
                     <h2 className="mt-2 text-xl font-semibold clara-text-primary">
@@ -785,7 +786,7 @@ export default function LeadDetailPage() {
                     </h2>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                    <span className="rounded-full bg-clara-info-surface px-3 py-1 text-xs font-semibold text-clara-info">
                       Kategori akun:{" "}
                       {formatAccountCategory(lead.account_category)}
                     </span>
@@ -843,7 +844,7 @@ export default function LeadDetailPage() {
                           ? "Kontrol Konteks Lead"
                           : "Lead Context"}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-clara-ink-2">
                       {isSalesWorkspace
                         ? "Rapikan kategori akun, stage, suhu lead, ringkasan, dan jadwal follow-up dari satu form."
                         : isHeadWorkspace
@@ -968,7 +969,7 @@ export default function LeadDetailPage() {
                           ? "Jejak Eksekusi Sales"
                           : "Daily Discipline Log"}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-clara-ink-2">
                       {isSalesWorkspace
                         ? "Catat hasil follow-up harian supaya lead ini punya jejak kerja yang jelas dan follow-up berikutnya tidak hilang."
                         : isHeadWorkspace
@@ -986,7 +987,7 @@ export default function LeadDetailPage() {
                 </div>
 
                 {disciplineSuggestionHint ? (
-                  <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-700">
+                  <div className="mt-4 rounded-2xl border border-clara-info-line bg-clara-info-surface p-4 text-sm text-clara-info">
                     {disciplineSuggestionHint}
                   </div>
                 ) : null}
@@ -1020,7 +1021,7 @@ export default function LeadDetailPage() {
 
                 <form
                   onSubmit={(event) => void handleCreateDisciplineLog(event)}
-                  className="mt-6 space-y-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5"
+                  className="mt-6 space-y-5 rounded-2xl border border-clara-line bg-clara-raised p-5"
                 >
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <Field label="Log date">
@@ -1146,14 +1147,14 @@ export default function LeadDetailPage() {
 
                 <div className="mt-6 space-y-3">
                   {lead.discipline_logs.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
+                    <div className="rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-3">
                       Belum ada discipline log untuk lead ini.
                     </div>
                   ) : (
                     lead.discipline_logs.slice(0, 5).map((log) => (
                       <article
                         key={log.id}
-                        className="rounded-2xl border border-slate-200 bg-white p-4"
+                        className="rounded-2xl border border-clara-line bg-clara-raised p-4"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
@@ -1161,11 +1162,11 @@ export default function LeadDetailPage() {
                               {log.activity_type.replaceAll("_", " ")} ·{" "}
                               {log.result_status.replaceAll("_", " ")}
                             </h3>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="mt-1 text-xs text-clara-ink-3">
                               {log.actor_user_name ?? "System"} · {log.log_date}
                             </p>
                           </div>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+                          <span className="rounded-full bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-2">
                             {log.customer_mood?.replaceAll("_", " ") ??
                               "no mood"}
                           </span>
@@ -1183,7 +1184,7 @@ export default function LeadDetailPage() {
                         </div>
 
                         {log.notes ? (
-                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                          <p className="mt-3 text-sm leading-6 text-clara-ink-2">
                             {log.notes}
                           </p>
                         ) : null}
@@ -1209,7 +1210,7 @@ export default function LeadDetailPage() {
                           ? "Customer yang Terkait dengan Lead Ini"
                           : "Unified Customer Identity"}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-clara-ink-2">
                       {isSalesWorkspace
                         ? "Kalau customer ini pernah muncul di channel atau lead lain, Clara akan tampilkan keterkaitannya di sini."
                         : isHeadWorkspace
@@ -1222,13 +1223,13 @@ export default function LeadDetailPage() {
 
                 {lead.customer_profile ? (
                   <div className="mt-5 space-y-4">
-                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                    <div className="rounded-2xl border border-clara-line bg-clara-raised p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h3 className="text-lg font-semibold clara-text-primary">
                             {lead.customer_profile.display_name}
                           </h3>
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className="mt-1 text-sm text-clara-ink-3">
                             PIC customer:{" "}
                             {lead.customer_profile.assigned_user_name ??
                               "Belum ada"}
@@ -1265,7 +1266,7 @@ export default function LeadDetailPage() {
                         {lead.customer_profile.source_labels.map((label) => (
                           <span
                             key={label}
-                            className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                            className="rounded-full bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-2"
                           >
                             {label}
                           </span>
@@ -1278,20 +1279,20 @@ export default function LeadDetailPage() {
                         (relatedLead) => (
                           <article
                             key={relatedLead.id}
-                            className="rounded-[24px] border border-slate-200 bg-white p-4"
+                            className="rounded-2xl border border-clara-line bg-clara-raised p-4"
                           >
                             <div className="flex flex-wrap items-center gap-2">
                               <h3 className="text-sm font-semibold clara-text-primary">
                                 {relatedLead.display_name}
                               </h3>
                               <span
-                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${getLeadBadgeClass(
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
                                   relatedLead.lead_temperature,
                                 )}`}
                               >
                                 {relatedLead.lead_temperature.toUpperCase()}
                               </span>
-                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                              <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                                 {relatedLead.source_label}
                               </span>
                             </div>
@@ -1313,14 +1314,14 @@ export default function LeadDetailPage() {
                             <div className="mt-3 flex flex-wrap gap-2">
                               <Link
                                 href={`/dashboard/crm/${relatedLead.id}`}
-                                className="inline-flex rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                                className="clara-button clara-button-secondary"
                               >
                                 Buka Lead
                               </Link>
                               {relatedLead.latest_conversation_id ? (
                                 <Link
                                   href={`/dashboard/sales/conversations/${relatedLead.latest_conversation_id}`}
-                                  className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                                  className="clara-button clara-button-primary"
                                 >
                                   Buka Conversation
                                 </Link>
@@ -1332,7 +1333,7 @@ export default function LeadDetailPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                  <div className="mt-5 rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-3">
                     Lead ini belum punya customer profile terpadu.
                   </div>
                 )}
@@ -1350,7 +1351,7 @@ export default function LeadDetailPage() {
                           ? "KPI dan Nilai Deal"
                           : "Deal Metrics"}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-clara-ink-2">
                       {isSalesWorkspace
                         ? "Isi nilai bisnis lead ini supaya progressnya bukan cuma status, tapi juga punya gambaran potensi deal."
                         : isHeadWorkspace
@@ -1374,7 +1375,7 @@ export default function LeadDetailPage() {
                 )}
 
                 {dealMetricsNeedsSync && (
-                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  <div className="mt-4 rounded-2xl border border-clara-line bg-clara-tint p-4 text-sm text-clara-gold">
                     Stage lead ini sudah{" "}
                     <span className="font-semibold uppercase">
                       {lead.current_stage}
@@ -1480,7 +1481,7 @@ export default function LeadDetailPage() {
                     />
                   </Field>
 
-                  <div className="rounded-[24px] bg-slate-50 p-4">
+                  <div className="rounded-2xl bg-clara-raised p-4">
                     <div className="grid gap-3 md:grid-cols-3">
                       <Metric
                         label="Expected value"
@@ -1522,7 +1523,7 @@ export default function LeadDetailPage() {
                           ? "Task yang Masih Berjalan"
                           : "Follow-up Tasks"}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="mt-1 text-sm text-clara-ink-2">
                       {isSalesWorkspace
                         ? "Simpan tugas yang benar-benar perlu dikerjakan supaya follow-up tidak hanya bergantung ke ingatan."
                         : isHeadWorkspace
@@ -1541,21 +1542,21 @@ export default function LeadDetailPage() {
 
                 <div className="mt-5 space-y-3">
                   {openTasks.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    <div className="rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-3">
                       Belum ada tugas terbuka untuk lead ini.
                     </div>
                   ) : (
                     openTasks.map((task) => (
                       <article
                         key={task.id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                        className="rounded-2xl border border-clara-line bg-clara-raised p-4"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <h3 className="text-sm font-semibold clara-text-primary">
                               {task.title}
                             </h3>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="mt-1 text-xs text-clara-ink-3">
                               Jatuh tempo: {formatDateTime(task.due_at)}
                             </p>
                           </div>
@@ -1578,7 +1579,7 @@ export default function LeadDetailPage() {
                           </select>
                         </div>
                         {task.description && (
-                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                          <p className="mt-3 text-sm leading-6 text-clara-ink-2">
                             {task.description}
                           </p>
                         )}
@@ -1589,7 +1590,7 @@ export default function LeadDetailPage() {
 
                 <form
                   onSubmit={(event) => void handleCreateTask(event)}
-                  className="mt-6 space-y-4 rounded-[24px] border border-slate-200 bg-white p-4"
+                  className="mt-6 space-y-4 rounded-2xl border border-clara-line bg-clara-raised p-4"
                 >
                   <Field label="Task title">
                     <input
@@ -1646,7 +1647,7 @@ export default function LeadDetailPage() {
                         ? "Riwayat Perubahan Lead"
                         : "Activity Timeline"}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-clara-ink-2">
                     {isSalesWorkspace
                       ? "Semua perubahan penting di lead ini dicatat di sini supaya sales bisa cepat lihat histori kerja dan perubahan status."
                       : isHeadWorkspace
@@ -1659,7 +1660,7 @@ export default function LeadDetailPage() {
 
                 <div className="mt-5 space-y-4">
                   {lead.timeline.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    <div className="rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-3">
                       Belum ada aktivitas yang tercatat untuk lead ini.
                     </div>
                   ) : (
@@ -1668,25 +1669,25 @@ export default function LeadDetailPage() {
                         {visibleTimeline.map((event) => (
                           <article
                             key={event.id}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            className="rounded-2xl border border-clara-line bg-clara-raised p-4"
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div>
                                 <h3 className="text-sm font-semibold clara-text-primary">
                                   {event.title}
                                 </h3>
-                                <p className="mt-1 text-xs text-slate-500">
+                                <p className="mt-1 text-xs text-clara-ink-3">
                                   {event.actor_user_name ?? "System"} ·{" "}
                                   {formatDateTime(event.created_at)}
                                 </p>
                               </div>
-                              <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              <span className="rounded-full bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-3">
                                 {event.event_type.replaceAll("_", " ")}
                               </span>
                             </div>
 
                             {event.description && (
-                              <p className="mt-3 text-sm leading-6 text-slate-600">
+                              <p className="mt-3 text-sm leading-6 text-clara-ink-2">
                                 {event.description}
                               </p>
                             )}
@@ -1708,8 +1709,8 @@ export default function LeadDetailPage() {
                       </div>
 
                       {lead.timeline.length > timelinePageSize ? (
-                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-                          <p className="text-sm text-slate-600">
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-clara-line bg-clara-raised p-4">
+                          <p className="text-sm text-clara-ink-2">
                             Halaman {effectiveTimelinePage} dari {timelineTotalPages} ·
                             menampilkan {visibleTimeline.length} dari{" "}
                             {lead.timeline.length} aktivitas.
@@ -1815,12 +1816,12 @@ function DetailSelect({
         aria-haspopup="listbox"
         disabled={disabled}
         onClick={() => setIsOpen((previous) => !previous)}
-        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-medium clara-text-primary outline-none transition hover:border-slate-300 focus-visible:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+        className="flex w-full items-center justify-between rounded-2xl border border-clara-line bg-clara-raised px-4 py-3 text-left text-sm font-medium clara-text-primary transition hover:border-clara-line disabled:cursor-not-allowed disabled:bg-clara-raised disabled:text-clara-ink-3"
       >
         <span>{getOptionLabel(value)}</span>
         <span
           aria-hidden="true"
-          className={`text-slate-500 transition-transform ${
+          className={`text-clara-ink-3 transition-transform ${
             isDropdownOpen ? "rotate-180" : ""
           }`}
         >
@@ -1863,7 +1864,7 @@ function DetailSelect({
                         onChange(option);
                       }
                     }}
-                    className={`flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-left text-sm transition ${
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition ${
                       isSelected
                         ? "bg-[#f0cb73] text-[#1a120b]"
                         : "text-[#fff0c9] hover:bg-[#2b2013] hover:text-[#fff8de]"
@@ -1871,7 +1872,7 @@ function DetailSelect({
                   >
                     <span className="capitalize">{getOptionLabel(option)}</span>
                     {isSelected ? (
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#5a3e16]">
+                      <span className="text-xs font-semibold text-[#5a3e16]">
                         Aktif
                       </span>
                     ) : null}

@@ -13,10 +13,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { canAccessAdminPages } from "@/lib/roles";
 import type { CurrentUser } from "@/types/dashboard";
+import { useConfirm } from "@/components/dashboard/ConfirmDialog";
 
 type PersonaVariant = "mini" | "reguler";
 type PersonaSectionKey =
@@ -79,6 +81,7 @@ const SECTIONS: {
 ];
 
 export default function AiPersonaConfigPage() {
+  const confirm = useConfirm();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [variant, setVariant] = useState<PersonaVariant>("mini");
@@ -163,24 +166,26 @@ export default function AiPersonaConfigPage() {
   }, [router]);
 
   async function changeVariant(nextVariant: PersonaVariant) {
-    if (
-      nextVariant === variant ||
-      (hasChanges &&
-        !window.confirm("Buang perubahan editor yang belum disimpan?"))
-    )
-      return;
+    if (nextVariant === variant) return;
+    if (hasChanges && !(await confirm({
+      title: "Buang perubahan yang belum disimpan?",
+      message: "Isi yang sedang kamu edit akan hilang kalau pindah sekarang.",
+      confirmLabel: "Buang perubahan",
+      tone: "danger",
+    }))) return;
     setVariant(nextVariant);
     setSuccessMessage("");
     await loadPersona(nextVariant);
   }
 
-  function changeSection(nextSection: PersonaSectionKey) {
-    if (
-      nextSection === sectionKey ||
-      (hasChanges &&
-        !window.confirm("Buang perubahan editor yang belum disimpan?"))
-    )
-      return;
+  async function changeSection(nextSection: PersonaSectionKey) {
+    if (nextSection === sectionKey) return;
+    if (hasChanges && !(await confirm({
+      title: "Buang perubahan yang belum disimpan?",
+      message: "Isi yang sedang kamu edit akan hilang kalau pindah sekarang.",
+      confirmLabel: "Buang perubahan",
+      tone: "danger",
+    }))) return;
     setSectionKey(nextSection);
     setContent(
       effectiveSections.find((item) => item.section_key === nextSection)
@@ -195,10 +200,13 @@ export default function AiPersonaConfigPage() {
       setErrorMessage("Isi persona tidak boleh kosong.");
       return;
     }
-    if (
-      !window.confirm("Simpan perubahan dan langsung gunakan untuk balasan AI?")
-    )
-      return;
+    const accepted = await confirm({
+      title: "Gunakan perubahan ini untuk balasan AI?",
+      message:
+        "Isi ini langsung dipakai Clara pada balasan berikutnya untuk semua pengguna. Kamu bisa kembali ke versi sebelumnya lewat riwayat versi.",
+      confirmLabel: "Simpan dan gunakan",
+    });
+    if (!accepted) return;
 
     setIsSubmitting(true);
     setErrorMessage("");
@@ -223,12 +231,12 @@ export default function AiPersonaConfigPage() {
   }
 
   async function rollbackVersion(version: PersonaVersion) {
-    if (
-      !window.confirm(
-        `Publikasikan kembali ${selectedSection.label} v${version.version_number}? Sistem akan membuat versi baru.`,
-      )
-    )
-      return;
+    const accepted = await confirm({
+      title: "Kembalikan ke versi lama?",
+      message: `${selectedSection.label} v${version.version_number} akan dipublikasikan lagi sebagai versi baru dan langsung dipakai Clara.`,
+      confirmLabel: "Kembalikan versi",
+    });
+    if (!accepted) return;
     setIsSubmitting(true);
     setErrorMessage("");
     setSuccessMessage("");
@@ -328,8 +336,8 @@ export default function AiPersonaConfigPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Superadmin"
-      title="AI Persona Clara"
+      eyebrow={NAV_GROUP_NAMES.admin}
+      title={`${PAGE_NAMES.persona} Clara`}
       description="Kendalikan instruction, guardrail, flow, dan gaya komunikasi Clara dalam satu workspace."
       backHref="/knowledge"
       backLabel="Knowledge Base"
@@ -362,7 +370,7 @@ export default function AiPersonaConfigPage() {
                 type="button"
                 onClick={() => void changeVariant(item)}
                 aria-pressed={variant === item}
-                className={`min-h-10 rounded-lg px-5 text-sm font-semibold ${variant === item ? "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-sm" : "clara-text-secondary hover:bg-[var(--color-surface-muted)]"}`}
+                className={`min-h-11 rounded-lg px-5 text-sm font-semibold ${variant === item ? "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-sm" : "clara-text-secondary hover:bg-[var(--color-surface-muted)]"}`}
               >
                 {item === "mini" ? "Mini" : "Reguler"}
               </button>

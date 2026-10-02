@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
+import { usePromptText } from "@/components/dashboard/ConfirmDialog";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import { canAccessManagerInsights, isHeadRole } from "@/lib/roles";
@@ -150,6 +152,7 @@ function getCoachingPriorityAction(item: {
 }
 
 export function ManagerInsightsPage() {
+  const promptText = usePromptText();
   const salesPageSize = 4;
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -475,8 +478,15 @@ export function ManagerInsightsPage() {
 
     try {
       let resolutionNote: string | null = null;
-      if (nextStatus === "skipped" && typeof window !== "undefined") {
-        resolutionNote = window.prompt("Alasan lewati action ini:", "")?.trim() ?? "";
+      if (nextStatus === "skipped") {
+        resolutionNote = await promptText({
+          title: "Lewati action ini?",
+          message: "Tulis alasannya supaya tim tahu kenapa action ini dilewati.",
+          label: "Alasan",
+          placeholder: "Contoh: sudah ditangani lewat telepon",
+          confirmLabel: "Lewati action",
+          required: true,
+        });
         if (!resolutionNote) {
           setActionStatusLoadingId(null);
           return;
@@ -506,12 +516,12 @@ export function ManagerInsightsPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={isHeadView ? "Ringkasan Head" : "Manager monitoring"}
-      title={isHeadView ? "Head Insight" : "Monitor Tim"}
+      eyebrow={NAV_GROUP_NAMES.monitoring}
+      title={PAGE_NAMES.teamMonitor}
       description={
         isHeadView
-          ? "Halaman ini dipakai Head untuk membaca ritme lintas tim, melihat area berisiko, lalu memutuskan intervensi tanpa tenggelam di detail operasional."
-          : "Halaman ini dipakai manager untuk melihat progres tim, hambatan follow-up, case yang perlu direview, dan area yang butuh arahan lebih dulu."
+          ? "Ritme kerja lintas tim, area berisiko, dan hal yang perlu kamu putuskan."
+          : "Progres tim, hambatan follow-up, dan review yang perlu arahan."
       }
       backHref="/dashboard"
       backLabel="Kembali ke beranda"
@@ -549,7 +559,7 @@ export function ManagerInsightsPage() {
       <div className="space-y-6">
         {isLoading && (
           <div role="status" className="clara-empty-state text-sm text-[#d6bb84]">
-            {isHeadView ? "Loading head insight..." : "Loading monitor tim..."}
+            Memuat monitor tim...
           </div>
         )}
 
@@ -564,10 +574,10 @@ export function ManagerInsightsPage() {
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_320px]">
               <section
                 data-onboarding-id="manager-insights-hero"
-                className="clara-card rounded-[32px] p-6"
+                className="clara-card rounded-3xl p-6"
               >
                 <div className="max-w-4xl">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
+                  <p className="text-xs font-semibold text-[#f0cb73]">
                     {isHeadView ? "Head insight" : "Prioritas monitor"}
                   </p>
                   <h2 className="mt-3 text-[clamp(2rem,3vw,2.6rem)] font-semibold leading-tight text-[#fff4d6]">
@@ -586,8 +596,8 @@ export function ManagerInsightsPage() {
 
                 <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-[24px] border border-[#f0cb73]/14 bg-[#1b140e] p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                    <div className="rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-5">
+                      <p className="text-xs font-semibold text-[#f0cb73]">
                         Scope aktif
                       </p>
                       <p className="mt-3 text-lg font-semibold text-[#fff0c9]">
@@ -598,8 +608,8 @@ export function ManagerInsightsPage() {
                       </p>
                     </div>
 
-                    <div className="rounded-[24px] border border-[#f0cb73]/14 bg-[#1b140e] p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                    <div className="rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-5">
+                      <p className="text-xs font-semibold text-[#f0cb73]">
                         Ringkasan cepat
                       </p>
                       <p className="mt-3 text-lg font-semibold text-[#fff0c9]">
@@ -615,8 +625,8 @@ export function ManagerInsightsPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-[#f0cb73]/14 bg-[#1b140e] p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                  <div className="rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-5">
+                    <p className="text-xs font-semibold text-[#f0cb73]">
                       Aksi cepat
                     </p>
                     <p className="mt-3 text-sm leading-6 text-[#d6bb84]">
@@ -634,7 +644,7 @@ export function ManagerInsightsPage() {
                       href={isHeadView ? "/dashboard/approvals" : "/dashboard/sales"}
                       className="clara-button clara-button-ghost mt-3 w-full justify-center px-5 py-3"
                     >
-                      {isHeadView ? "Buka Arahan Tim" : "Lihat Queue Sales"}
+                      {isHeadView ? "Buka Arahan Tim" : "Lihat Chat Masuk Sales"}
                     </Link>
                   </div>
                 </div>
@@ -642,9 +652,9 @@ export function ManagerInsightsPage() {
 
               <section
                 data-onboarding-id="manager-insights-steps"
-                className="clara-card rounded-[32px] p-6"
+                className="clara-card rounded-3xl p-6"
               >
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
+                <p className="text-xs font-semibold text-[#f0cb73]">
                   Urutan baca cepat
                 </p>
                 <div className="mt-5 space-y-4">
@@ -741,7 +751,7 @@ export function ManagerInsightsPage() {
                         data-onboarding-id={
                           index === 0 ? "manager-insights-alerts" : undefined
                         }
-                        className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
+                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
@@ -771,7 +781,7 @@ export function ManagerInsightsPage() {
                         {alert.target_href ? (
                           <Link
                             href={alert.target_href}
-                            className="mt-4 inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                            className="clara-button clara-button-secondary mt-4"
                           >
                             Buka area terkait
                           </Link>
@@ -857,7 +867,7 @@ export function ManagerInsightsPage() {
                     openActionItems.slice(0, 8).map((item) => (
                       <article
                         key={item.id}
-                        className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4"
+                        className="rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-4"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
@@ -883,7 +893,7 @@ export function ManagerInsightsPage() {
                               <button
                                 type="button"
                                 onClick={() => void handleActionStatusUpdate(item.id, "in_progress")}
-                                className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                                className="clara-button clara-button-secondary"
                               >
                                 {actionStatusLoadingId === item.id ? "Memproses..." : "Mulai"}
                               </button>
@@ -892,7 +902,7 @@ export function ManagerInsightsPage() {
                               <button
                                 type="button"
                                 onClick={() => void handleActionStatusUpdate(item.id, "done")}
-                                className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3 py-2 text-xs font-semibold text-[#140f08] hover:brightness-105"
+                                className="clara-button clara-button-primary"
                               >
                                 {actionStatusLoadingId === item.id ? "Memproses..." : "Selesai"}
                               </button>
@@ -901,7 +911,7 @@ export function ManagerInsightsPage() {
                               <button
                                 type="button"
                                 onClick={() => void handleActionStatusUpdate(item.id, "skipped")}
-                                className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                                className="clara-button clara-button-secondary"
                               >
                                 {actionStatusLoadingId === item.id ? "Memproses..." : "Lewati"}
                               </button>
@@ -917,8 +927,8 @@ export function ManagerInsightsPage() {
 
             {insights.historical_summary ? (
               <section>
-                <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                  <p className="text-xs font-semibold text-[#f0cb73]">
                     Ringkasan historis mingguan
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -957,7 +967,7 @@ export function ManagerInsightsPage() {
                       : "Pakai blok ini untuk review mingguan cepat tanpa bongkar semua kartu performa satu per satu."
                   }
                 >
-                  <div className="mb-4 rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-sm text-[#d6bb84]">
+                  <div className="mb-4 rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-sm text-[#d6bb84]">
                     Periode review:{" "}
                     <span className="font-semibold text-[#fff0c9]">
                       {formatWeekLabel(weeklyReview.review_start)} - {formatWeekLabel(weeklyReview.review_end)}
@@ -1028,7 +1038,7 @@ export function ManagerInsightsPage() {
                         weeklyReview.unresolved_actions.map((item) => (
                           <article
                             key={item.id}
-                            className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4"
+                            className="rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-4"
                           >
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-semibold text-[#fff0c9]">{item.title}</p>
@@ -1062,7 +1072,7 @@ export function ManagerInsightsPage() {
                       )}
                       <Link
                         href="/dashboard/notifications"
-                        className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                        className="clara-button clara-button-secondary"
                       >
                         Buka Notification Center
                       </Link>
@@ -1142,7 +1152,7 @@ export function ManagerInsightsPage() {
                 }
               >
                 <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
-                  <div className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-sm text-[#d6bb84]">
+                  <div className="rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-sm text-[#d6bb84]">
                     Periode aktif: <span className="font-semibold text-[#fff0c9]">{insights.sales_performance_summary.range_label}</span>
                     {" "}dibanding{" "}
                     <span className="font-semibold text-[#fff0c9]">
@@ -1161,8 +1171,8 @@ export function ManagerInsightsPage() {
                   </select>
                 </div>
 
-                <div className="mb-4 rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                <div className="mb-4 rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                  <p className="text-xs font-semibold text-[#f0cb73]">
                     Prioritas intervensi hari ini
                   </p>
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -1174,7 +1184,7 @@ export function ManagerInsightsPage() {
                           key={item.sales_user_id}
                           type="button"
                           onClick={() => void handleOpenSalesDetail(item.sales_user_id)}
-                          className="rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-left hover:border-[#f0cb73]/28"
+                          className="rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-left hover:border-[#f0cb73]/28"
                         >
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="font-semibold text-[#fff0c9]">{item.sales_name}</p>
@@ -1246,7 +1256,7 @@ export function ManagerInsightsPage() {
                   </select>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-[#f0cb73]/12 bg-[#1b140e] px-4 py-3 text-sm text-[#d6bb84]">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#f0cb73]/12 bg-[#1b140e] px-4 py-3 text-sm text-[#d6bb84]">
                   <p>
                     Menampilkan{" "}
                     <span className="font-semibold text-[#fff0c9]">
@@ -1263,7 +1273,7 @@ export function ManagerInsightsPage() {
                       type="button"
                       onClick={() => setSalesPage((current) => Math.max(1, current - 1))}
                       disabled={salesPage === 1}
-                      className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-1.5 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="clara-button clara-button-secondary"
                     >
                       Sebelumnya
                     </button>
@@ -1276,7 +1286,7 @@ export function ManagerInsightsPage() {
                         setSalesPage((current) => Math.min(salesPageCount, current + 1))
                       }
                       disabled={salesPage === salesPageCount}
-                      className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-1.5 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="clara-button clara-button-secondary"
                     >
                       Berikutnya
                     </button>
@@ -1289,13 +1299,13 @@ export function ManagerInsightsPage() {
                   ) : (
                     paginatedSalesPerformance.map((item) => (
                       <div key={item.sales_user_id} className="space-y-3">
-                        <article className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+                        <article className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                               <p className="text-base font-semibold text-[#fff0c9]">
                                 {item.sales_name}
                               </p>
-                              <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[#b89a62]">
+                              <p className="mt-1 text-xs text-[#b89a62]">
                                 {formatStatusLabel(item.role)}
                               </p>
                             </div>
@@ -1360,7 +1370,7 @@ export function ManagerInsightsPage() {
                             weeklyHistory={item.weekly_history}
                           />
 
-                          <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+                          <div className="mt-4 rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className={getFocusAreaClass()}>
                                 Fokus {formatStatusLabel(item.coaching_signal.focus_area)}
@@ -1381,7 +1391,7 @@ export function ManagerInsightsPage() {
                             <button
                               type="button"
                               onClick={() => void handleOpenSalesDetail(item.sales_user_id)}
-                              className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
+                              className="clara-button clara-button-primary"
                             >
                               {selectedSalesUserId === item.sales_user_id
                                 ? salesDetailLoadingId === item.sales_user_id
@@ -1392,7 +1402,7 @@ export function ManagerInsightsPage() {
                             <button
                               type="button"
                               onClick={() => openSalesActionDraft(item)}
-                              className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+                              className="clara-button clara-button-secondary"
                             >
                               Buat action
                             </button>
@@ -1413,7 +1423,7 @@ export function ManagerInsightsPage() {
                         {selectedSalesUserId === item.sales_user_id ? (
                           <>
                             {salesDetailLoadingId === item.sales_user_id ? (
-                              <div role="status" className="rounded-[22px] border border-[#f0cb73]/16 bg-[#1b140e] p-5 text-sm text-[#d6bb84]">
+                              <div role="status" className="rounded-2xl border border-[#f0cb73]/16 bg-[#1b140e] p-5 text-sm text-[#d6bb84]">
                                 Clara sedang memuat detail operasional sales ini...
                               </div>
                             ) : null}
@@ -1468,8 +1478,8 @@ export function ManagerInsightsPage() {
                           />
 
                           {isExpanded ? (
-                            <div className="rounded-[20px] border border-[#f0cb73]/12 bg-[#1a130d]/70 p-4">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                            <div className="rounded-2xl border border-[#f0cb73]/12 bg-[#1a130d]/70 p-4">
+                              <p className="text-xs font-semibold text-[#f0cb73]">
                                 Anggota tim
                               </p>
                               {row.members.length === 0 ? (
@@ -1481,14 +1491,14 @@ export function ManagerInsightsPage() {
                                   {row.members.map((member) => (
                                     <div
                                       key={member.id}
-                                      className="rounded-[16px] border border-[#f0cb73]/14 bg-[#1d150d] p-3"
+                                      className="rounded-xl border border-[#f0cb73]/14 bg-[#1d150d] p-3"
                                     >
                                       <div className="flex items-center justify-between gap-2">
                                         <p className="text-sm font-semibold text-[#fff0c9]">
                                           {member.name}
                                         </p>
                                         <span
-                                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                                             member.is_active
                                               ? "border border-[#f0cb73]/18 bg-[#f0cb73]/10 text-[#f0cb73]"
                                               : "border border-[#3c2c16] bg-[#22190f] text-[#c8ad75]"
@@ -1497,7 +1507,7 @@ export function ManagerInsightsPage() {
                                           {member.is_active ? "Active" : "Inactive"}
                                         </span>
                                       </div>
-                                      <p className="mt-2 text-xs uppercase tracking-[0.16em] text-[#b89a62]">
+                                      <p className="mt-2 text-xs text-[#b89a62]">
                                         {member.role}
                                       </p>
                                     </div>
@@ -1530,7 +1540,7 @@ export function ManagerInsightsPage() {
                     objectionTrends.slice(0, 6).map((item) => (
                       <div
                         key={item.objection}
-                        className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
+                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <p className="font-semibold text-[#fff0c9]">
@@ -1568,7 +1578,7 @@ function CoachingPriorityCard({
   return (
     <article
       data-onboarding-id={onboardingTargetId}
-      className="rounded-[22px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
+      className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-semibold text-[#fff0c9]">{item.lead_name}</p>
@@ -1585,7 +1595,7 @@ function CoachingPriorityCard({
         ) : null}
       </div>
 
-      <div className="mt-3 rounded-[18px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
+      <div className="mt-3 rounded-xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
         <p className="text-sm font-semibold text-[#fff0c9]">{action.title}</p>
         <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
           {action.description}
@@ -1610,14 +1620,14 @@ function CoachingPriorityCard({
         {action.primaryHref ? (
           <Link
             href={action.primaryHref}
-            className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105"
+            className="clara-button clara-button-primary"
           >
             {action.primaryLabel}
           </Link>
         ) : null}
         <Link
           href={`/dashboard/sales/conversations/${item.conversation_id}`}
-          className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+          className="clara-button clara-button-secondary"
         >
           Buka Conversation
         </Link>
@@ -1653,7 +1663,7 @@ function WeeklyReviewEntitySection({
         items.map((item) => (
           <article
             key={`${title}-${item.scope_type}-${item.sales_user_id ?? item.team_id ?? item.label}`}
-            className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4"
+            className="rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-4"
           >
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-[#fff0c9]">{item.label}</p>
@@ -1686,7 +1696,7 @@ function WeeklyReviewEntitySection({
             <button
               type="button"
               onClick={() => onAction(item)}
-              className="mt-4 inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+              className="clara-button clara-button-secondary mt-4"
             >
               {actionLabel}
             </button>
@@ -1703,7 +1713,7 @@ function WeeklyReviewAlertCard({
   item: WeeklyReviewAlertItem;
 }) {
   return (
-    <article className="rounded-[20px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+    <article className="rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-4">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-sm font-semibold text-[#fff0c9]">{item.title}</p>
         <span className={getCoachingPriorityClass(item.severity)}>
@@ -1720,7 +1730,7 @@ function WeeklyReviewAlertCard({
       {item.target_href ? (
         <Link
           href={item.target_href}
-          className="mt-4 inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+          className="clara-button clara-button-secondary mt-4"
         >
           Buka area terkait
         </Link>
@@ -1739,8 +1749,8 @@ function MetricCard({
   hint: string;
 }) {
   return (
-    <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#140f08]">{label}</p>
+    <article className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
+      <p className="text-xs font-semibold text-[#140f08]">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
         {value}
       </p>
@@ -1759,7 +1769,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="clara-card rounded-[28px] p-5">
+    <section className="clara-card rounded-3xl p-5">
       <h2 className="text-lg font-semibold text-[#fff0c9]">{title}</h2>
       <p className="mt-1 text-sm text-[#d6bb84]">{description}</p>
       <div className="mt-5">{children}</div>
@@ -1769,7 +1779,7 @@ function Panel({
 
 function EmptyText({ text }: { text: string }) {
   return (
-    <div className="rounded-[22px] border border-dashed border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 text-sm text-[#d6bb84]">
+    <div className="rounded-2xl border border-dashed border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 text-sm text-[#d6bb84]">
       {text}
     </div>
   );
@@ -1785,7 +1795,7 @@ function ManagerStepItem({
   description: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+    <div className="rounded-2xl border border-[#f0cb73]/14 bg-[#1b140e] p-4">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#f0cb73]/16 bg-[#f0cb73]/10 text-sm font-semibold text-[#f0cb73]">
           {step}
@@ -1813,7 +1823,7 @@ function TeamHealthCard({
   return (
     <article
       data-onboarding-id={onboardingTargetId}
-      className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+      className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -1832,7 +1842,7 @@ function TeamHealthCard({
           <button
             type="button"
             onClick={() => onToggle(row.team_id)}
-            className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+            className="clara-button clara-button-secondary"
           >
             {isExpanded ? "Sembunyikan anggota" : "Lihat anggota"}
           </button>
@@ -1875,8 +1885,8 @@ function TeamMiniMetric({
   hint: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[#f0cb73]/12 bg-[#1b140e] p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+    <div className="rounded-xl border border-[#f0cb73]/12 bg-[#1b140e] p-4">
+      <p className="text-xs font-semibold text-[#b89a62]">
         {label}
       </p>
       <p className="mt-2 text-xl font-semibold text-[#fff0c9]">{value}</p>
@@ -1899,9 +1909,9 @@ function HistoricalSummaryPanel({
   }
 
   return (
-    <div className={`rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 ${className}`.trim()}>
+    <div className={`rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4 ${className}`.trim()}>
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+        <p className="text-xs font-semibold text-[#f0cb73]">
           4 minggu terakhir
         </p>
         {summary ? (
@@ -1923,9 +1933,9 @@ function HistoricalSummaryPanel({
           weeklyHistory.map((item) => (
             <div
               key={`${item.snapshot_granularity}-${item.snapshot_date}`}
-              className="rounded-[16px] border border-[#f0cb73]/12 bg-[#17110b] p-3"
+              className="rounded-xl border border-[#f0cb73]/12 bg-[#17110b] p-3"
             >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+              <p className="text-xs font-semibold text-[#b89a62]">
                 {formatWeekLabel(item.snapshot_date)}
               </p>
               <div className="mt-2 space-y-1 text-sm text-[#d6bb84]">
@@ -1949,9 +1959,9 @@ function ScorecardPanel({
   className?: string;
 }) {
   return (
-    <div className={`rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 ${className}`.trim()}>
+    <div className={`rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4 ${className}`.trim()}>
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+        <p className="text-xs font-semibold text-[#f0cb73]">
           Scorecard operasional
         </p>
         <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
@@ -1974,12 +1984,12 @@ function ScorecardPanel({
         <MiniStat label="CRM hygiene" value={String(scorecard.crm_hygiene_score)} />
       </div>
 
-      <div className="mt-4 rounded-[16px] border border-[#f0cb73]/12 bg-[#17110b] p-4">
+      <div className="mt-4 rounded-xl border border-[#f0cb73]/12 bg-[#17110b] p-4">
         <p className="text-sm font-semibold text-[#fff0c9]">{scorecard.primary_reason}</p>
         {scorecard.secondary_reason ? (
           <p className="mt-2 text-sm text-[#d6bb84]">{scorecard.secondary_reason}</p>
         ) : null}
-        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+        <p className="mt-3 text-xs font-semibold text-[#b89a62]">
           Rekomendasi
         </p>
         <p className="mt-1 text-sm text-[#d6bb84]">{scorecard.recommended_action}</p>
@@ -1996,7 +2006,7 @@ function TeamPerformanceCard({
   onCreateAction: () => void;
 }) {
   return (
-    <article className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5">
+    <article className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -2064,7 +2074,7 @@ function TeamPerformanceCard({
         weeklyHistory={item.weekly_history}
       />
 
-      <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+      <div className="mt-4 rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className={getFocusAreaClass()}>
             Fokus {formatStatusLabel(item.coaching_signal.focus_area)}
@@ -2081,8 +2091,8 @@ function TeamPerformanceCard({
         </p>
       </div>
 
-      <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+      <div className="mt-4 rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+        <p className="text-xs font-semibold text-[#f0cb73]">
           Top contributor team
         </p>
         {item.top_sales_contributors.length === 0 ? (
@@ -2094,7 +2104,7 @@ function TeamPerformanceCard({
             {item.top_sales_contributors.map((contributor) => (
               <div
                 key={contributor.sales_user_id}
-                className="rounded-[16px] border border-[#f0cb73]/12 bg-[#17110b] p-3"
+                className="rounded-xl border border-[#f0cb73]/12 bg-[#17110b] p-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold text-[#fff0c9]">
@@ -2117,7 +2127,7 @@ function TeamPerformanceCard({
         <button
           type="button"
           onClick={onCreateAction}
-          className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3.5 py-2 text-sm font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+          className="clara-button clara-button-secondary"
         >
           Buat action tim
         </button>
@@ -2144,7 +2154,7 @@ function ActionDraftPanel({
   return (
     <form
       onSubmit={(event) => void onSubmit(event)}
-      className="rounded-[22px] border border-[#f0cb73]/16 bg-[#1b140e] p-4"
+      className="rounded-2xl border border-[#f0cb73]/16 bg-[#1b140e] p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -2156,7 +2166,7 @@ function ActionDraftPanel({
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-3 py-1.5 text-xs font-semibold text-[#e1c27c] hover:border-[#f0cb73]/28"
+          className="clara-button clara-button-secondary"
         >
           Tutup
         </button>
@@ -2230,7 +2240,7 @@ function ActionDraftPanel({
         <button
           type="submit"
           disabled={isSubmitting || !draft.assignedToUserId}
-          className="inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-3.5 py-2 text-sm font-semibold text-[#140f08] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+          className="clara-button clara-button-primary"
         >
           {isSubmitting ? "Menyimpan..." : "Simpan action"}
         </button>
@@ -2247,8 +2257,8 @@ function MiniStat({
   value: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[#f0cb73]/12 bg-[#1b140e] p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+    <div className="rounded-xl border border-[#f0cb73]/12 bg-[#1b140e] p-4">
+      <p className="text-xs font-semibold text-[#b89a62]">
         {label}
       </p>
       <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
@@ -2267,10 +2277,10 @@ function SalesPerformanceDetailPanel({
     .join(" • ");
 
   return (
-    <section className="rounded-[24px] border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(28,20,14,0.98)_0%,rgba(15,11,8,0.98)_100%)] p-5">
+    <section className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(28,20,14,0.98)_0%,rgba(15,11,8,0.98)_100%)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+          <p className="text-xs font-semibold text-[#f0cb73]">
             Drill-down performa sales
           </p>
           <h3 className="mt-3 text-2xl font-semibold text-[#fff0c9]">
@@ -2312,7 +2322,7 @@ function SalesPerformanceDetailPanel({
         />
       </div>
 
-      <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-sm text-[#d6bb84]">
+      <div className="mt-4 rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4 text-sm text-[#d6bb84]">
         Periode aktif: <span className="font-semibold text-[#fff0c9]">{summary.range_label}</span>
         {" "}dibanding{" "}
         <span className="font-semibold text-[#fff0c9]">{summary.previous_range_label}</span>.
@@ -2337,7 +2347,7 @@ function SalesPerformanceDetailPanel({
 
       <ScorecardPanel className="mt-4" scorecard={summary.scorecard} />
 
-      <div className="mt-4 rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4">
+      <div className="mt-4 rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className={getCoachingPriorityClass(summary.coaching_signal.priority_label)}>
             {formatStatusLabel(summary.coaching_signal.priority_label)}
@@ -2368,7 +2378,7 @@ function SalesPerformanceDetailPanel({
             <Link
               key={item.lead_id}
               href={item.target_href}
-              className="block rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 hover:border-[#f0cb73]/28"
+              className="block rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4 hover:border-[#f0cb73]/28"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold text-[#fff0c9]">{item.lead_name}</p>
@@ -2396,7 +2406,7 @@ function SalesPerformanceDetailPanel({
             <Link
               key={item.conversation_id}
               href={item.target_href}
-              className="block rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 hover:border-[#f0cb73]/28"
+              className="block rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4 hover:border-[#f0cb73]/28"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold text-[#fff0c9]">{item.conversation_title}</p>
@@ -2423,7 +2433,7 @@ function SalesPerformanceDetailPanel({
             <Link
               key={item.lead_id}
               href={item.target_href}
-              className="block rounded-[18px] border border-[#f0cb73]/14 bg-[#1b140e] p-4 hover:border-[#f0cb73]/28"
+              className="block rounded-xl border border-[#f0cb73]/14 bg-[#1b140e] p-4 hover:border-[#f0cb73]/28"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold text-[#fff0c9]">{item.lead_name}</p>
@@ -2452,7 +2462,7 @@ function DetailListPanel({
   items: React.ReactNode[];
 }) {
   return (
-    <section className="rounded-[20px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
+    <section className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
       <p className="text-sm font-semibold text-[#fff0c9]">{title}</p>
       <div className="mt-4 space-y-3">
         {items.length === 0 ? <EmptyText text={emptyText} /> : items}

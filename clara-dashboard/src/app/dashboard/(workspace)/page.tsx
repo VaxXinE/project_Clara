@@ -7,19 +7,22 @@ import {
   faChartLine,
   faComments,
   faTriangleExclamation,
-  faWandSparkles,
+  faCircleCheck,
+  faFlag,
+  faListCheck,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import {
   formatDateTime,
   formatStatusLabel,
 } from "@/lib/format";
-import { canAccessQueueAndActionCenter, isAdminLike } from "@/lib/roles";
+import { canAccessQueueAndActionCenter } from "@/lib/roles";
 import type {
   CurrentUser,
   KpiCommandCenterResponse,
@@ -61,6 +64,8 @@ const roleCopy: Record<string, { title: string; summary: string }> = {
     summary: "Ringkasan chat aktif dan follow-up.",
   },
 };
+
+const LOADING_VALUE = "__loading__";
 
 export default function DashboardHomePage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -166,7 +171,6 @@ export default function DashboardHomePage() {
   const isHeadWorkspace = currentUser?.role === "head";
   const shouldRenderLeadershipWorkspace =
     !isLoading && (!errorMessage || hasLeadershipData);
-  const canAccessInsights = currentUser !== null && isAdminLike(currentUser.role);
   const aiCoverage =
     metrics.inboxCount > 0
       ? `${metrics.analyzedCount}/${metrics.inboxCount}`
@@ -268,8 +272,8 @@ export default function DashboardHomePage() {
     ? `/sales/conversations/${latestConversation.conversation_id}`
     : "/upload";
   const latestActivityLabel = latestConversation
-    ? "Buka Conversation"
-    : "Buka Lead Capture";
+    ? "Buka Chat"
+    : "Buka Input Chat";
   const salesDailySummary = isLoading
     ? "Clara sedang menyiapkan ringkasan kerja hari ini."
     : pendingAiCount > 0 && openTaskCount > 0
@@ -330,8 +334,8 @@ export default function DashboardHomePage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Workspace overview"
-      title={currentUser ? `Halo, ${currentUser.name}.` : "SCC Workspace"}
+      eyebrow={NAV_GROUP_NAMES.daily}
+      title={currentUser ? `Halo, ${currentUser.name}.` : PAGE_NAMES.home}
       description={roleLabel?.summary ?? "Ringkasan kerja hari ini."}
     >
       <div className="space-y-6">
@@ -342,8 +346,8 @@ export default function DashboardHomePage() {
         )}
 
         {currentUser && !isSalesWorkspace && isLoading ? (
-          <div role="status" className="clara-empty-state text-sm text-slate-600">
-            Loading leadership overview...
+          <div role="status" className="clara-empty-state text-sm text-clara-ink-2">
+            Memuat ringkasan...
           </div>
         ) : null}
 
@@ -378,7 +382,7 @@ export default function DashboardHomePage() {
                 <div key={label} className="clara-card-soft p-4">
                   <p className="text-sm clara-text-secondary">{label}</p>
                   <p className="mt-1 text-2xl font-bold clara-text-primary">
-                    {isLoading ? "..." : value}
+                    {isLoading ? LOADING_VALUE : value}
                   </p>
                 </div>
               ))}
@@ -482,7 +486,7 @@ export default function DashboardHomePage() {
               </div>
               <nav aria-label="Jalur kerja Sales" className="flex flex-wrap gap-2">
                 <Link href="/dashboard/crm" className="clara-button clara-button-ghost">
-                  Leads
+                  Lead
                 </Link>
                 <Link
                   href="/dashboard/upload"
@@ -497,7 +501,7 @@ export default function DashboardHomePage() {
           <>
             <section
               data-onboarding-id="manager-home-summary"
-              className="clara-card rounded-[32px] p-6"
+              className="clara-card rounded-3xl p-6"
             >
               <p className="clara-kicker text-xs">Ringkasan hari ini</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -505,7 +509,7 @@ export default function DashboardHomePage() {
                   <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
                     Mulai dari bottleneck tim, lalu turun ke review sales
                   </h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                  <p className="mt-2 text-sm leading-7 text-clara-ink-2">
                     {managerDailySummary}
                   </p>
                 </div>
@@ -535,8 +539,8 @@ export default function DashboardHomePage() {
                   actionLabel={managerNextAction.label}
                   actionHref={managerNextAction.href}
                 >
-                <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5">
-                  <p className="text-sm leading-7 text-slate-600">
+                <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5">
+                  <p className="text-sm leading-7 text-clara-ink-2">
                     {managerNextAction.description}
                   </p>
                 </div>
@@ -554,7 +558,7 @@ export default function DashboardHomePage() {
                         ? "Mulai dari balasan sales yang paling perlu arahan supaya eksekusi tim tidak tertahan."
                         : "Kalau review aman, fokus bisa digeser ke monitor ritme follow-up tim."
                     }
-                    icon={faWandSparkles}
+                    icon={faListCheck}
                   />
                   <MiniInsightCard
                     label="Pantauan tim"
@@ -595,6 +599,7 @@ export default function DashboardHomePage() {
                 </PanelFrame>
               </div>
 
+              <div className="space-y-6">
               <div data-onboarding-id="manager-home-health">
                 <PanelFrame
                   eyebrow="Kondisi tim"
@@ -607,7 +612,7 @@ export default function DashboardHomePage() {
                     label="Tim dipantau"
                     value={
                       isLoading
-                        ? "..."
+                        ? LOADING_VALUE
                         : `${managerScopeTeamCount} tim • ${managerScopeMemberCount} sales`
                     }
                   />
@@ -624,7 +629,7 @@ export default function DashboardHomePage() {
                     value={String(managerInsights?.missing_or_stale_log_count ?? 0)}
                   />
                 </div>
-                <div className="mt-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4 text-sm leading-6 text-slate-600">
+                <div className="mt-4 rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4 text-sm leading-6 text-clara-ink-2">
                   {managerBoundaryAlertCount > 0
                     ? `Ada ${managerBoundaryAlertCount} alert tim yang perlu Anda lihat lebih dulu.`
                     : managerOverdueCount > 0
@@ -633,86 +638,38 @@ export default function DashboardHomePage() {
                 </div>
                 </PanelFrame>
               </div>
-            </section>
-
-            <section className="grid gap-6 xl:grid-cols-3">
-              <div data-onboarding-id="manager-home-quick-nav">
-                <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
-                <div className="grid gap-3">
-                  <Link
-                    href="/dashboard/approvals"
-                    className="clara-button clara-button-primary justify-center"
-                  >
-                    Review Sales
-                  </Link>
-                  <Link
-                    href="/dashboard/manager-insights"
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    Monitor Tim
-                  </Link>
-                  <Link
-                    href="/dashboard/crm"
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    Lead Tim
-                  </Link>
-                </div>
-                </PanelFrame>
-              </div>
-
-              <div data-onboarding-id="manager-home-priority">
-                <PanelFrame eyebrow="Prioritas kerja" title="Urutan kerja manager">
-                <div className="space-y-3">
-                  <ActionChecklistRow
-                    step="1"
-                    title="Cek review sales yang menunggu"
-                    description="Putuskan dulu balasan yang perlu arahan atau revisi."
-                  />
-                  <ActionChecklistRow
-                    step="2"
-                    title="Lihat monitor tim"
-                    description="Cari sales atau lead yang ritmenya mulai melambat."
-                  />
-                  <ActionChecklistRow
-                    step="3"
-                    title="Turun ke lead kalau perlu"
-                    description="Buka lead spesifik kalau butuh konteks lebih detail."
-                  />
-                </div>
-                </PanelFrame>
-              </div>
-
               <div data-onboarding-id="manager-home-metrics">
                 <PanelFrame eyebrow="Angka penting" title="Yang perlu dibaca cepat">
                 <div className="space-y-3">
                   <PulseRow
                     label="Lead aktif"
-                    value={isLoading ? "..." : String(managerInsights?.total_leads ?? 0)}
+                    value={isLoading ? LOADING_VALUE : String(managerInsights?.total_leads ?? 0)}
                   />
                   <PulseRow
                     label="Perlu review"
-                    value={isLoading ? "..." : String(managerReviewCount)}
+                    value={isLoading ? LOADING_VALUE : String(managerReviewCount)}
                   />
                   <PulseRow
                     label="Follow-up terlambat"
-                    value={isLoading ? "..." : String(managerOverdueCount)}
+                    value={isLoading ? LOADING_VALUE : String(managerOverdueCount)}
                   />
                 </div>
                 </PanelFrame>
               </div>
+              </div>
             </section>
+
           </>
         ) : isHeadWorkspace ? (
           <>
-            <section className="clara-card rounded-[32px] p-6">
+            <section className="clara-card rounded-3xl p-6">
               <p className="clara-kicker text-xs">Ringkasan hari ini</p>
               <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div className="max-w-3xl">
                   <h2 className="text-2xl font-bold tracking-[-0.04em] clara-text-primary">
                     Mulai dari sinyal lintas tim yang butuh keputusan Head
                   </h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                  <p className="mt-2 text-sm leading-7 text-clara-ink-2">
                     {headDailySummary}
                   </p>
                 </div>
@@ -737,14 +694,14 @@ export default function DashboardHomePage() {
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Tim Dipantau"
-                value={isLoading ? "..." : String(managerInsights?.scope_team_count ?? 0)}
+                value={isLoading ? LOADING_VALUE : String(managerInsights?.scope_team_count ?? 0)}
                 hint="Jumlah tim yang sedang masuk area pantau Head."
                 icon={faComments}
                 accent="from-[#f7dfa2] to-[#be8d2f]"
               />
               <MetricCard
                 label="Lead Aktif"
-                value={isLoading ? "..." : String(managerInsights?.total_leads ?? 0)}
+                value={isLoading ? LOADING_VALUE : String(managerInsights?.total_leads ?? 0)}
                 hint="Lead lintas tim yang masih perlu dijaga ritmenya."
                 icon={faBullseye}
                 accent="from-[#f3d48a] to-[#9f7121]"
@@ -753,20 +710,20 @@ export default function DashboardHomePage() {
                 label="Perlu Intervensi"
                 value={
                   isLoading
-                    ? "..."
+                    ? LOADING_VALUE
                     : String(
                         (managerInsights?.boundary_alerts.length ?? 0) +
                           (managerInsights?.open_coaching_case_count ?? 0),
                       )
                 }
                 hint="Area tim yang perlu arahan atau tekanan lebih dulu."
-                icon={faWandSparkles}
+                icon={faFlag}
                 accent="from-[#f1cf7a] to-[#7f5a1a]"
               />
               <MetricCard
                 label="Follow-up Terlambat"
                 value={
-                  isLoading ? "..." : String(managerInsights?.overdue_follow_up_count ?? 0)
+                  isLoading ? LOADING_VALUE : String(managerInsights?.overdue_follow_up_count ?? 0)
                 }
                 hint="Follow-up yang mulai bocor dan perlu segera dikawal."
                 icon={faTriangleExclamation}
@@ -782,8 +739,8 @@ export default function DashboardHomePage() {
                   actionLabel={headNextAction.label}
                   actionHref={headNextAction.href}
                 >
-                <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5">
-                  <p className="text-sm leading-7 text-slate-600">
+                <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5">
+                  <p className="text-sm leading-7 text-clara-ink-2">
                     {headNextAction.description}
                   </p>
                 </div>
@@ -871,7 +828,7 @@ export default function DashboardHomePage() {
                     value={String(managerInsights?.missing_or_stale_log_count ?? 0)}
                   />
                 </div>
-                <div className="mt-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4 text-sm leading-6 text-slate-600">
+                <div className="mt-4 rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4 text-sm leading-6 text-clara-ink-2">
                   {(managerInsights?.boundary_alerts.length ?? 0) > 0
                     ? `Ada ${managerInsights?.boundary_alerts.length ?? 0} area yang sudah cukup besar untuk masuk radar Head.`
                     : "Belum ada area tim yang sangat menonjol saat ini."}
@@ -880,101 +837,34 @@ export default function DashboardHomePage() {
               </div>
             </section>
 
-            <section className="grid gap-6 xl:grid-cols-3">
-              <div data-onboarding-id="head-home-quick-nav">
-                <PanelFrame eyebrow="Navigasi cepat" title="Masuk ke area kerja">
-                <div className="grid gap-3">
-                  <Link
-                    href="/dashboard/notifications"
-                    className="clara-button clara-button-primary justify-center"
-                  >
-                    Alert Tim
-                  </Link>
-                  <Link
-                    href="/dashboard/manager-insights"
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    Monitor Tim
-                  </Link>
-                  <Link
-                    href="/dashboard/approvals"
-                    className="clara-button clara-button-ghost justify-center"
-                  >
-                    Arahan Tim
-                  </Link>
-                </div>
-                </PanelFrame>
-              </div>
-
-              <div data-onboarding-id="head-home-priority">
-                <PanelFrame eyebrow="Urutan kerja" title="Cara baca beranda Head">
-                <div className="space-y-3">
-                  <ActionChecklistRow
-                    step="1"
-                    title="Lihat alert yang paling besar"
-                    description="Cari dulu tim atau area yang butuh keputusan cepat."
-                  />
-                  <ActionChecklistRow
-                    step="2"
-                    title="Baca pola monitor tim"
-                    description="Pastikan masalahnya hanya di satu case atau sudah mulai lintas tim."
-                  />
-                  <ActionChecklistRow
-                    step="3"
-                    title="Turunkan arahan yang jelas"
-                    description="Putuskan siapa yang harus bergerak: sales, manager, atau eskalasi lain."
-                  />
-                </div>
-                </PanelFrame>
-              </div>
-
-              <div data-onboarding-id="head-home-metrics">
-                <PanelFrame eyebrow="Angka penting" title="Yang perlu dibaca cepat">
-                <div className="space-y-3">
-                  <PulseRow
-                    label="Lead aktif lintas tim"
-                    value={isLoading ? "..." : String(managerInsights?.total_leads ?? 0)}
-                  />
-                  <PulseRow
-                    label="Case arahan"
-                    value={isLoading ? "..." : String(managerReviewCount)}
-                  />
-                  <PulseRow
-                    label="Follow-up terlambat"
-                    value={isLoading ? "..." : String(managerOverdueCount)}
-                  />
-                </div>
-                </PanelFrame>
-              </div>
-            </section>
           </>
         ) : (
           <>
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Percakapan Aktif"
-                value={isLoading ? "..." : String(metrics.inboxCount)}
+                value={isLoading ? LOADING_VALUE : String(metrics.inboxCount)}
                 hint="Chat aktif saat ini."
                 icon={faComments}
                 accent="from-[#f7dfa2] to-[#be8d2f]"
               />
               <MetricCard
                 label="Sudah Dianalisis"
-                value={isLoading ? "..." : String(metrics.analyzedCount)}
+                value={isLoading ? LOADING_VALUE : String(metrics.analyzedCount)}
                 hint="Chat yang sudah dibaca AI."
-                icon={faWandSparkles}
+                icon={faCircleCheck}
                 accent="from-[#f3d48a] to-[#9f7121]"
               />
               <MetricCard
                 label="Cakupan Insight"
-                value={isLoading ? "..." : String(metrics.insightConversationCount)}
+                value={isLoading ? LOADING_VALUE : String(metrics.insightConversationCount)}
                 hint="Chat yang masuk insight."
                 icon={faChartLine}
                 accent="from-[#f1cf7a] to-[#7f5a1a]"
               />
               <MetricCard
                 label="Risiko Tinggi"
-                value={isLoading ? "..." : String(metrics.highRiskCount)}
+                value={isLoading ? LOADING_VALUE : String(metrics.highRiskCount)}
                 hint="Chat yang perlu perhatian."
                 icon={faTriangleExclamation}
                 accent="from-[#f6dc9d] to-[#b67d27]"
@@ -982,16 +872,8 @@ export default function DashboardHomePage() {
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
-              <PanelFrame eyebrow="Summary Data" title="Snapshot hari ini">
-            <div className="grid gap-4 md:grid-cols-2">
-              <MiniInsightCard
-                label="Role aktif"
-                title={roleLabel?.title ?? "Workspace"}
-                description={
-                  roleLabel?.summary ??
-                  "Pusat kerja sesuai role."
-                }
-              />
+              <PanelFrame eyebrow="Ringkasan" title="Kondisi hari ini">
+            <div className="grid gap-4">
               <MiniInsightCard
                 label="Tekanan operasional"
                 title={
@@ -1008,14 +890,10 @@ export default function DashboardHomePage() {
               />
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <PulseRow label="Coverage AI" value={isLoading ? "..." : aiCoverage} />
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <PulseRow label="Chat dibaca AI" value={isLoading ? LOADING_VALUE : aiCoverage} />
               <PulseRow
-                label="Workspace view"
-                value={canAccessInsights ? "Extended" : "Operational"}
-              />
-              <PulseRow
-                label="Last update"
+                label="Update terakhir"
                 value={
                   latestConversation?.last_message_at
                     ? formatDateTime(latestConversation.last_message_at)
@@ -1025,9 +903,9 @@ export default function DashboardHomePage() {
             </div>
 
             {primaryObservation ? (
-              <div className="mt-4 rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(30,22,14,0.98)_0%,rgba(17,12,8,0.98)_100%)] p-4 text-white">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
-                  Observation
+              <div className="mt-4 rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(30,22,14,0.98)_0%,rgba(17,12,8,0.98)_100%)] p-4 text-clara-cream">
+                <p className="text-xs font-semibold text-[#f0cb73]">
+                  Catatan Clara
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[#f7e7b7]">
                   {primaryObservation}
@@ -1038,17 +916,17 @@ export default function DashboardHomePage() {
 
               <PanelFrame
                 eyebrow="Aktivitas"
-                title="Conversation terbaru"
+                title="Chat terbaru"
                 actionLabel={latestActivityLabel}
                 actionHref={latestActivityHref}
               >
                 {latestConversation ? (
                   <div className="space-y-4">
-                    <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
+                    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-4">
                       <p className="text-base font-semibold clara-text-primary">
                         {latestConversation.title}
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <p className="mt-2 text-sm leading-6 text-clara-ink-2">
                         {latestConversation.latest_message?.message_text ??
                           "Belum ada pesan terakhir yang bisa ditampilkan."}
                       </p>
@@ -1073,9 +951,9 @@ export default function DashboardHomePage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-[24px] border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-slate-600">
-                    Belum ada conversation yang tampil. Upload chat pertama untuk
-                    mulai mengisi summary operasional di beranda ini.
+                  <div className="rounded-2xl border border-dashed border-[#f0cb73]/26 bg-[linear-gradient(180deg,rgba(33,24,17,0.9)_0%,rgba(18,13,10,0.9)_100%)] p-5 text-sm text-clara-ink-2">
+                    Belum ada chat yang tampil. Input chat pertama untuk mulai
+                    mengisi ringkasan di beranda ini.
                   </div>
                 )}
               </PanelFrame>
@@ -1085,18 +963,18 @@ export default function DashboardHomePage() {
         {(topSales || topOrganization) && !isSalesWorkspace && (
           <section className="grid gap-6 xl:grid-cols-2">
             {topSales ? (
-              <PanelFrame eyebrow="Top Sales" title={topSales.user_name}>
+              <PanelFrame eyebrow="Sales teratas" title={topSales.user_name}>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <PulseRow
-                    label="Replies Sent"
+                    label="Balasan terkirim"
                     value={String(topSales.replies_sent)}
                   />
                   <PulseRow
-                    label="Closing Leads"
+                    label="Lead Closing"
                     value={String(topSales.closing_leads)}
                   />
                   <PulseRow
-                    label="Hot Leads"
+                    label="Lead Panas"
                     value={String(topSales.hot_leads)}
                   />
                 </div>
@@ -1105,20 +983,20 @@ export default function DashboardHomePage() {
 
             {topOrganization ? (
               <PanelFrame
-                eyebrow="Top Organization"
+                eyebrow="Organisasi teratas"
                 title={topOrganization.organization_name}
               >
                 <div className="grid gap-3 sm:grid-cols-3">
                   <PulseRow
-                    label="Hot Leads"
+                    label="Lead Panas"
                     value={String(topOrganization.hot_leads)}
                   />
                   <PulseRow
-                    label="Reply Rate"
+                    label="Tingkat balasan"
                     value={`${(topOrganization.reply_sent_rate * 100).toFixed(0)}%`}
                   />
                   <PulseRow
-                    label="Won Rate"
+                    label="Tingkat closing"
                     value={`${(topOrganizationWonRate * 100).toFixed(0)}%`}
                   />
                 </div>
@@ -1145,13 +1023,17 @@ function MetricCard({
   accent: string;
 }) {
   return (
-    <article className="clara-card rounded-[28px] p-5">
+    <article className="clara-card rounded-3xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="clara-kicker text-xs">{label}</p>
-          <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
-            {value}
-          </p>
+          {value === LOADING_VALUE ? (
+            <LoadingBar className="mt-3 h-9 w-20" />
+          ) : (
+            <p className="mt-3 text-3xl font-bold tracking-tight clara-text-primary">
+              {value}
+            </p>
+          )}
         </div>
         <span
           className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-[var(--color-text-inverse)]`}
@@ -1159,7 +1041,7 @@ function MetricCard({
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{hint}</p>
+      <p className="mt-3 text-sm leading-6 text-clara-ink-2">{hint}</p>
     </article>
   );
 }
@@ -1178,7 +1060,7 @@ function PanelFrame({
   actionLabel?: string;
 }) {
   return (
-    <section className="clara-card rounded-[32px] p-6">
+    <section className="clara-card rounded-3xl p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="clara-kicker text-xs">{eyebrow}</p>
@@ -1206,31 +1088,23 @@ function PanelFrame({
 function PulseRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="clara-card-soft flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
-      <span className="text-slate-600">{label}</span>
-      <span className="font-semibold clara-text-primary">{value}</span>
+      <span className="text-clara-ink-2">{label}</span>
+      {value === LOADING_VALUE ? (
+        <LoadingBar className="h-5 w-16" />
+      ) : (
+        <span className="font-semibold clara-text-primary">{value}</span>
+      )}
     </div>
   );
 }
 
-function ActionChecklistRow({
-  step,
-  title,
-  description,
-}: {
-  step: string;
-  title: string;
-  description: string;
-}) {
+function LoadingBar({ className }: { className: string }) {
   return (
-    <div className="clara-card-soft flex gap-4 rounded-2xl px-4 py-4">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-950 text-sm font-bold text-white">
-        {step}
-      </div>
-      <div>
-        <p className="text-sm font-semibold clara-text-primary">{title}</p>
-        <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
-      </div>
-    </div>
+    <span
+      role="status"
+      aria-label="Memuat"
+      className={`inline-block rounded-md bg-[var(--color-surface-overlay)] ${className}`}
+    />
   );
 }
 
@@ -1246,7 +1120,7 @@ function MiniInsightCard({
   icon?: IconDefinition;
 }) {
   return (
-    <div className="clara-card-soft rounded-[24px] p-4">
+    <div className="clara-card-soft rounded-2xl p-4">
       <div className="flex items-start gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08] shadow-[0_10px_22px_rgba(0,0,0,0.18)]">
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />
@@ -1254,7 +1128,7 @@ function MiniInsightCard({
         <div>
           <p className="clara-kicker text-xs">{label}</p>
           <h3 className="text-base font-semibold clara-text-primary">{title}</h3>
-          <p className="mt-1.5 text-sm leading-6 text-slate-600">
+          <p className="mt-1.5 text-sm leading-6 text-clara-ink-2">
             {description}
           </p>
         </div>

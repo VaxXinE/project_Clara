@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass, formatStatusLabel } from "@/lib/format";
 import {
@@ -312,7 +313,7 @@ export default function FollowUpPage() {
     }
 
     return {
-      focusLabel: "Queue follow-up sedang relatif aman.",
+      focusLabel: "Antrean tindak lanjut sedang relatif aman.",
       focusHelper: "Pakai halaman ini untuk cek item berikutnya dan menjaga ritme follow-up tetap rapi.",
     };
   }, [worklist]);
@@ -320,12 +321,12 @@ export default function FollowUpPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Tindak lanjut"
-      title={isSalesWorkspace ? "Kerjakan Tindak Lanjut" : "Tindak Lanjut"}
+      eyebrow={NAV_GROUP_NAMES.daily}
+      title={PAGE_NAMES.followUp}
       description={
         isSalesWorkspace
-          ? "Halaman ini dipakai untuk membereskan follow-up yang masih aktif. Fokusnya simpel: pilih lead, kerjakan aksi berikutnya, lalu tandai selesai."
-          : "Halaman ini dipakai untuk membereskan pekerjaan follow-up yang masih aktif. Fokusnya sederhana: mana yang perlu dikerjakan sekarang, kenapa, dan aksi berikutnya apa."
+          ? "Pilih lead, kerjakan aksi berikutnya, lalu tandai selesai."
+          : "Lihat pekerjaan yang perlu dikerjakan sekarang, alasannya, dan aksi berikutnya."
       }
       backHref="/dashboard"
       backLabel="Kembali ke beranda"
@@ -334,9 +335,9 @@ export default function FollowUpPage() {
           {!isSalesWorkspace ? (
             <Link
               href="/dashboard/notifications"
-              className="inline-flex rounded-full border border-[#f0cb73]/20 bg-[#f0cb73]/10 px-4 py-2.5 text-sm font-semibold text-[#f0cb73] hover:bg-[#f0cb73]/14"
+              className="clara-button clara-button-ghost"
             >
-              Alert Center
+              Alert
             </Link>
           ) : null}
           <Link
@@ -479,8 +480,8 @@ export default function FollowUpPage() {
 
               <div className="mt-5 space-y-5">
                 {filteredVisibleItems.length === 0 ? (
-                  <div className="clara-empty-state text-sm text-slate-500">
-                    Belum ada task prioritas. Inbox Anda sedang relatif aman.
+                  <div className="clara-empty-state text-sm text-clara-ink-3">
+                    Belum ada tindak lanjut prioritas hari ini. Kamu bisa lanjut ke Chat Masuk atau cek lead yang aktif.
                   </div>
                 ) : (
                   todaySections.map((section, sectionIndex) => (
@@ -542,8 +543,8 @@ export default function FollowUpPage() {
 
               <div className="mt-5 space-y-4">
                 {visibleUpcomingItems.length === 0 ? (
-                  <div className="clara-empty-state text-sm text-slate-500">
-                    Belum ada task future. Semua follow-up aktif Anda sudah masuk prioritas hari ini atau belum dibuat jadwal berikutnya.
+                  <div className="clara-empty-state text-sm text-clara-ink-3">
+                    Belum ada tindak lanjut terjadwal berikutnya. Semua tindak lanjut aktif sudah masuk prioritas hari ini, atau belum diberi jadwal.
                   </div>
                 ) : (
                   visibleUpcomingItems.map((item, index) => (
@@ -659,17 +660,17 @@ function WorklistRow({
           </div>
 
           <p className="mt-3 text-sm font-semibold clara-text-primary">{item.task_label}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{item.reason}</p>
+          <p className="mt-2 text-sm leading-6 text-clara-ink-2">{item.reason}</p>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="clara-card-soft rounded-2xl p-4">
-              <p className="clara-kicker text-[11px]">Aksi yang disarankan</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
+              <p className="clara-kicker text-xs">Aksi yang disarankan</p>
+              <p className="mt-2 text-sm leading-6 text-clara-ink-2">
                 {item.recommended_action}
               </p>
             </div>
 
-            <div className="clara-card-soft rounded-2xl p-4 text-sm text-slate-600">
+            <div className="clara-card-soft rounded-2xl p-4 text-sm text-clara-ink-2">
               <p>Kontak terakhir: {formatDateTime(item.last_contact_at)}</p>
               <p className="mt-2">
                 Follow-up berikutnya: {formatDateTime(item.next_follow_up_at)}
@@ -760,7 +761,7 @@ function WorklistRow({
                 onClick={() => {
                   void onTaskAction(item, buildPayload("snooze", "30m"));
                 }}
-                className="clara-button border border-amber-300 bg-amber-50 text-amber-800"
+                className="clara-button border border-clara-line bg-clara-tint text-clara-gold"
               >
                 Snooze 30m
               </button>
@@ -770,7 +771,7 @@ function WorklistRow({
                 onClick={() => {
                   void onTaskAction(item, buildPayload("snooze", "2h"));
                 }}
-                className="clara-button border border-amber-300 bg-amber-50 text-amber-800"
+                className="clara-button border border-clara-line bg-clara-tint text-clara-gold"
               >
                 Snooze 2h
               </button>
@@ -780,7 +781,7 @@ function WorklistRow({
                 onClick={() => {
                   void onTaskAction(item, buildPayload("snooze", "tomorrow"));
                 }}
-                className="clara-button border border-amber-300 bg-amber-50 text-amber-800"
+                className="clara-button border border-clara-line bg-clara-tint text-clara-gold"
               >
                 Snooze Besok
               </button>

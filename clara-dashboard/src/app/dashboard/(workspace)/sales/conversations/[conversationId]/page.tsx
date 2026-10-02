@@ -7,6 +7,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ConversationAiActions } from "@/components/dashboard/ConversationAiActions";
 import { ReplySuggestionActions } from "@/components/dashboard/ReplySuggestionActions";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import {
   formatChannelLabel,
@@ -90,9 +91,9 @@ function formatAccountCategory(value: string): string {
 function getAccountCategoryBadgeClass(value: string): string {
   switch (value) {
     case "mini":
-      return "bg-emerald-100 text-emerald-700";
+      return "bg-clara-success-surface text-clara-success";
     case "reguler":
-      return "bg-amber-100 text-amber-700";
+      return "bg-clara-tint text-clara-gold";
     default:
       return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
   }
@@ -562,7 +563,7 @@ export default function SalesConversationDetailPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Conversation detail"
+      eyebrow={NAV_GROUP_NAMES.daily}
       title={detail?.title ?? "Detail percakapan"}
       description="Baca timeline chat, cek hasil analisis AI, dan review draft balasan dari satu layar kerja yang konsisten."
       backHref={
@@ -836,7 +837,7 @@ function ConversationDetailHeader({
             </span>
 
             {isExperimentalChannel(detail.source_channel) ? (
-              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-700">
+              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-clara-gold">
                 Experimental
               </span>
             ) : null}
@@ -858,7 +859,7 @@ function ConversationDetailHeader({
                 {extraction.lead_temperature.toUpperCase()}
               </span>
             ) : (
-              <span className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+              <span className="rounded-full border border-clara-line bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-2">
                 Menunggu AI analysis
               </span>
             )}
@@ -874,7 +875,7 @@ function ConversationDetailHeader({
             ) : null}
 
             {suggestion ? (
-              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+              <span className="rounded-full bg-clara-info-surface px-3 py-1 text-xs font-semibold text-clara-info">
                 {formatStatusLabel(suggestion.approval_status)}
               </span>
             ) : (
@@ -884,20 +885,20 @@ function ConversationDetailHeader({
             )}
 
             {analysisStale ? (
-              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+              <span className="rounded-full bg-clara-tint px-3 py-1 text-xs font-semibold text-clara-gold">
                 Analysis perlu diperbarui
               </span>
             ) : null}
 
             {suggestionStale ? (
-              <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800">
+              <span className="rounded-full bg-clara-warning-surface px-3 py-1 text-xs font-semibold text-clara-warning">
                 Draft lama
               </span>
             ) : null}
           </div>
 
           <article className="clara-card-soft mt-5 min-w-0 p-4">
-            <p className="clara-kicker text-[11px]">
+            <p className="clara-kicker text-xs">
               Pesan customer terbaru
             </p>
             {latestCustomerMessage ? (
@@ -1193,14 +1194,14 @@ function ConversationDetailContent({
 
             <section
               data-onboarding-id="sales-conversation-workspace"
-              className="clara-card rounded-[30px] p-5 xl:sticky xl:top-28"
+              className="clara-card rounded-3xl p-5 xl:sticky xl:top-28"
             >
               <div>
                 <p className="clara-kicker">Area kerja sales</p>
                 <h3 className="mt-2 text-lg font-semibold clara-text-primary">
                   Baca konteks lalu pilih aksi
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-clara-ink-2">
                   Fokus ke timeline chat, hasil baca Clara, lalu lanjut pilih jawaban atau cek riwayat kirim.
                 </p>
               </div>
@@ -1232,7 +1233,7 @@ function ConversationDetailContent({
 
                     <div
                       data-onboarding-id="sales-conversation-ai-summary"
-                      className="rounded-[26px] border border-slate-200 bg-white p-5"
+                      className="rounded-2xl border border-clara-line bg-clara-raised p-5"
                     >
                       <p className="clara-kicker">Ringkasan Clara</p>
                       <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
@@ -1244,18 +1245,18 @@ function ConversationDetailContent({
                             detail.source_channel,
                           )}`}
                         >
-                          Tone channel: {formatChannelLabel(detail.source_channel)}
+                          Channel: {formatChannelLabel(detail.source_channel)}
                         </span>
                         <span
                           className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getProviderBadgeClass(
                             provider,
                           )}`}
                         >
-                          Suggestion source: {formatProviderLabel(provider)}
+                          Sumber draft: {formatProviderLabel(provider)}
                         </span>
                       </div>
                       {isExperimentalChannel(detail.source_channel) ? (
-                        <p className="mt-3 text-xs leading-6 text-slate-500">
+                        <p className="mt-3 text-xs leading-6 text-clara-ink-3">
                           Channel ini masih experimental. Untuk Instagram dan TikTok, baca ulang konteks sebelum pakai draft mentah.
                         </p>
                       ) : null}
@@ -1267,15 +1268,15 @@ function ConversationDetailContent({
                             value={formatStatusLabel(extraction.pipeline_stage)}
                           />
                           <InfoBlock
-                            label="Buying intent"
+                            label="Minat beli"
                             value={formatStatusLabel(extraction.buying_intent)}
                           />
                           <InfoBlock
                             label="Sentimen"
                             value={formatStatusLabel(extraction.sentiment)}
                           />
-                          <div className="clara-card-soft rounded-[22px] p-4">
-                            <p className="clara-kicker text-[11px]">
+                          <div className="clara-card-soft rounded-2xl p-4">
+                            <p className="clara-kicker text-xs">
                               Objection utama
                             </p>
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -1283,13 +1284,13 @@ function ConversationDetailContent({
                                 extraction.main_objections.map((objection) => (
                                   <span
                                     key={objection}
-                                    className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                                    className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-medium text-clara-ink-2"
                                   >
                                     {objection}
                                   </span>
                                 ))
                               ) : (
-                                <p className="text-slate-600">
+                                <p className="text-clara-ink-2">
                                   Belum ada objection utama yang menonjol.
                                 </p>
                               )}
@@ -1300,12 +1301,12 @@ function ConversationDetailContent({
                             value={extraction.next_best_action}
                           />
                           <InfoBlock
-                            label="Confidence AI"
+                            label="Tingkat keyakinan Clara"
                             value={`${(extraction.confidence_score * 100).toFixed(0)}%`}
                           />
                         </div>
                       ) : (
-                        <div className="clara-card-outline mt-4 rounded-[24px] p-4 text-sm text-slate-600">
+                        <div className="clara-card-outline mt-4 rounded-2xl p-4 text-sm text-clara-ink-2">
                           Percakapan ini belum dibaca AI. Jalankan analisis dulu supaya Clara bisa bantu menyiapkan arah balasan.
                         </div>
                       )}
@@ -1325,11 +1326,11 @@ function ConversationDetailContent({
                           onUpdated={onUpdated}
                         />
                       ) : (
-                        <div className="clara-card-outline rounded-[30px] p-5">
+                        <div className="clara-card-outline rounded-3xl p-5">
                           <h2 className="text-lg font-semibold clara-text-primary">
                             Belum ada jawaban terbaik
                           </h2>
-                          <p className="mt-2 text-sm text-slate-600">
+                          <p className="mt-2 text-sm text-clara-ink-2">
                             Setelah chat dibaca AI, lanjut buat jawaban terbaik supaya kamu tinggal review dan pakai.
                           </p>
                         </div>
@@ -1339,7 +1340,7 @@ function ConversationDetailContent({
                 ) : null}
 
                 {activePanel === "sent_logs" ? (
-                  <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+                  <div className="rounded-2xl border border-clara-line bg-clara-raised p-5">
                     <p className="clara-kicker">Riwayat kirim</p>
                     <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                       Balasan yang sudah ditandai terkirim
@@ -1354,12 +1355,12 @@ function ConversationDetailContent({
                         {detail.sent_messages.map((sentMessage) => (
                           <div
                             key={sentMessage.id}
-                            className="rounded-[22px] border border-green-200/80 bg-green-50/88 p-4 text-sm text-green-900"
+                            className="rounded-2xl border border-clara-success-line bg-clara-success-surface p-4 text-sm text-clara-success"
                           >
                             <p className="font-semibold">
                               Dikirim oleh {sentMessage.sent_by_name}
                             </p>
-                            <p className="mt-1 text-xs text-green-700">
+                            <p className="mt-1 text-xs text-clara-success">
                               {formatDateTime(sentMessage.sent_at)} &bull;{" "}
                               {sentMessage.send_mode}
                             </p>
@@ -1370,7 +1371,7 @@ function ConversationDetailContent({
                         ))}
                       </div>
                     ) : (
-                      <p className="mt-3 text-sm text-slate-600">
+                      <p className="mt-3 text-sm text-clara-ink-2">
                         Belum ada balasan yang ditandai terkirim untuk percakapan ini.
                       </p>
                     )}
@@ -1381,7 +1382,7 @@ function ConversationDetailContent({
           </>
         ) : (
           <>
-            <section className="clara-card rounded-[30px] p-5">
+            <section className="clara-card rounded-3xl p-5">
           <div>
             <p className="clara-kicker">Workspace Panel</p>
             <h3 className="mt-2 text-lg font-semibold clara-text-primary">
@@ -1424,7 +1425,7 @@ function ConversationDetailContent({
                   onUpdated={onUpdated}
                 />
 
-                <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+                <div className="rounded-2xl border border-clara-line bg-clara-raised p-5">
                   <p className="clara-kicker">AI Analysis</p>
                   <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                     Hasil pembacaan Clara
@@ -1437,15 +1438,15 @@ function ConversationDetailContent({
                         value={formatStatusLabel(extraction.pipeline_stage)}
                       />
                       <InfoBlock
-                        label="Buying intent"
+                        label="Minat beli"
                         value={formatStatusLabel(extraction.buying_intent)}
                       />
                       <InfoBlock
                         label="Sentiment"
                         value={formatStatusLabel(extraction.sentiment)}
                       />
-                      <div className="clara-card-soft rounded-[22px] p-4">
-                        <p className="clara-kicker text-[11px]">
+                      <div className="clara-card-soft rounded-2xl p-4">
+                        <p className="clara-kicker text-xs">
                           Main objections
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -1453,13 +1454,13 @@ function ConversationDetailContent({
                             extraction.main_objections.map((objection) => (
                               <span
                                 key={objection}
-                                className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                                className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-medium text-clara-ink-2"
                               >
                                 {objection}
                               </span>
                             ))
                           ) : (
-                            <p className="text-slate-600">
+                            <p className="text-clara-ink-2">
                               Tidak ada objection.
                             </p>
                           )}
@@ -1475,7 +1476,7 @@ function ConversationDetailContent({
                       />
                     </div>
                   ) : (
-                    <div className="clara-card-outline mt-4 rounded-[24px] p-4 text-sm text-slate-600">
+                    <div className="clara-card-outline mt-4 rounded-2xl p-4 text-sm text-clara-ink-2">
                       Conversation ini belum dianalisis AI.
                     </div>
                   )}
@@ -1494,11 +1495,11 @@ function ConversationDetailContent({
                     onUpdated={onUpdated}
                   />
                 ) : (
-                  <div className="clara-card-outline rounded-[30px] p-5">
+                  <div className="clara-card-outline rounded-3xl p-5">
                     <h2 className="text-lg font-semibold clara-text-primary">
                       Belum ada reply suggestion
                     </h2>
-                    <p className="mt-2 text-sm text-slate-600">
+                    <p className="mt-2 text-sm text-clara-ink-2">
                       Generate reply suggestion dulu, lalu review approval
                       status sebelum memutuskan kirim balasan.
                     </p>
@@ -1508,26 +1509,26 @@ function ConversationDetailContent({
             ) : null}
 
             {activePanel === "coaching" ? (
-              <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+              <div className="rounded-2xl border border-clara-line bg-clara-raised p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="clara-kicker">Coaching Review</p>
                     <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                       Review case manusia untuk manager dan head
                     </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-clara-ink-2">
                       Gunakan section ini untuk memberi label coaching, menunjuk
                       reviewer, dan menyimpan manager note yang persisten per
                       conversation.
                     </p>
                   </div>
                   {reviewCase ? (
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    <span className="rounded-full bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-2">
                       {formatReviewCaseStatus(reviewCase.status)} ·{" "}
                       {formatReviewCaseLabel(reviewCase.review_label)}
                     </span>
                   ) : (
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                    <span className="rounded-full bg-clara-tint px-3 py-1 text-xs font-semibold text-clara-gold">
                       Belum ada review case
                     </span>
                   )}
@@ -1561,14 +1562,14 @@ function ConversationDetailContent({
                 {canManage ? (
                   <form onSubmit={onSaveReviewCase} className="mt-5 space-y-4">
                     <div className="grid gap-4 md:grid-cols-3">
-                      <label className="space-y-2 text-sm font-medium text-slate-700">
+                      <label className="space-y-2 text-sm font-medium text-clara-ink-2">
                         <span>Status review</span>
                         <select
                           value={reviewStatusInput}
                           onChange={(event) =>
                             onReviewStatusChange(event.target.value)
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                          className="clara-select"
                         >
                           {CHAT_REVIEW_STATUS_OPTIONS.map((option) => (
                             <option key={option} value={option}>
@@ -1578,14 +1579,14 @@ function ConversationDetailContent({
                         </select>
                       </label>
 
-                      <label className="space-y-2 text-sm font-medium text-slate-700">
+                      <label className="space-y-2 text-sm font-medium text-clara-ink-2">
                         <span>Label coaching</span>
                         <select
                           value={reviewLabelInput}
                           onChange={(event) =>
                             onReviewLabelChange(event.target.value)
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                          className="clara-select"
                         >
                           {CHAT_REVIEW_LABEL_OPTIONS.map((option) => (
                             <option key={option} value={option}>
@@ -1595,14 +1596,14 @@ function ConversationDetailContent({
                         </select>
                       </label>
 
-                      <label className="space-y-2 text-sm font-medium text-slate-700">
+                      <label className="space-y-2 text-sm font-medium text-clara-ink-2">
                         <span>Reviewer</span>
                         <select
                           value={reviewerUserInput}
                           onChange={(event) =>
                             onReviewerUserChange(event.target.value)
                           }
-                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                          className="clara-select"
                         >
                           <option value="">Belum ditunjuk</option>
                           {reviewerCandidates.map((candidate) => (
@@ -1614,7 +1615,7 @@ function ConversationDetailContent({
                       </label>
                     </div>
 
-                    <label className="block space-y-2 text-sm font-medium text-slate-700">
+                    <label className="block space-y-2 text-sm font-medium text-clara-ink-2">
                       <span>Ringkasan review</span>
                       <textarea
                         value={reviewSummaryInput}
@@ -1622,12 +1623,12 @@ function ConversationDetailContent({
                           onReviewSummaryChange(event.target.value)
                         }
                         rows={3}
-                        className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                        className="clara-textarea"
                         placeholder="Tulis konteks singkat percakapan dan alasan kenapa case ini perlu coaching."
                       />
                     </label>
 
-                    <label className="block space-y-2 text-sm font-medium text-slate-700">
+                    <label className="block space-y-2 text-sm font-medium text-clara-ink-2">
                       <span>Fokus coaching</span>
                       <textarea
                         value={coachingFocusInput}
@@ -1635,12 +1636,12 @@ function ConversationDetailContent({
                           onCoachingFocusChange(event.target.value)
                         }
                         rows={3}
-                        className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                        className="clara-textarea"
                         placeholder="Contoh: handling objection legalitas, tone closing, atau cara mengarahkan next step."
                       />
                     </label>
 
-                    <label className="block space-y-2 text-sm font-medium text-slate-700">
+                    <label className="block space-y-2 text-sm font-medium text-clara-ink-2">
                       <span>Recommended action</span>
                       <textarea
                         value={recommendedActionInput}
@@ -1648,7 +1649,7 @@ function ConversationDetailContent({
                           onRecommendedActionChange(event.target.value)
                         }
                         rows={3}
-                        className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                        className="clara-textarea"
                         placeholder="Jelaskan apa yang sales harus lakukan setelah coaching ini dibaca."
                       />
                     </label>
@@ -1659,7 +1660,7 @@ function ConversationDetailContent({
                           type="button"
                           onClick={() => void onPrefillReviewCase()}
                           disabled={isPrefillingReviewCase}
-                          className="inline-flex rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                          className="clara-button clara-button-secondary"
                         >
                           {isPrefillingReviewCase
                             ? "Clara sedang mengisi..."
@@ -1668,7 +1669,7 @@ function ConversationDetailContent({
                         <button
                           type="submit"
                           disabled={isSavingReviewCase}
-                          className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                          className="clara-button clara-button-primary"
                         >
                           {isSavingReviewCase
                             ? "Menyimpan review..."
@@ -1678,7 +1679,7 @@ function ConversationDetailContent({
                     </div>
                   </form>
                 ) : reviewCase ? (
-                  <div className="mt-5 space-y-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <div className="mt-5 space-y-3 rounded-2xl border border-clara-line bg-clara-raised p-4 text-sm text-clara-ink-2">
                     <InfoBlock
                       label="Reviewer"
                       value={reviewCase.reviewer_user_name ?? "Belum ditunjuk"}
@@ -1697,7 +1698,7 @@ function ConversationDetailContent({
                     />
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <div className="mt-5 rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-2">
                     Belum ada review case coaching untuk percakapan ini.
                   </div>
                 )}
@@ -1730,7 +1731,7 @@ function ConversationDetailContent({
                           <button
                             type="submit"
                             disabled={isAddingReviewNote || !reviewCase}
-                            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="clara-button clara-button-secondary"
                           >
                             {isAddingReviewNote
                               ? "Menyimpan note..."
@@ -1745,14 +1746,14 @@ function ConversationDetailContent({
                         {reviewCase.notes.map((note) => (
                           <article
                             key={note.id}
-                            className="rounded-[22px] border border-slate-200 bg-white p-4"
+                            className="rounded-2xl border border-clara-line bg-clara-raised p-4"
                           >
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                              <span className="font-semibold text-slate-700">
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-clara-ink-3">
+                              <span className="font-semibold text-clara-ink-2">
                                 {note.author_user_name ?? "System"}
                               </span>
                               <span>{formatDateTime(note.created_at)}</span>
-                              <span className="rounded-full bg-slate-100 px-2.5 py-1 font-semibold text-slate-600">
+                              <span className="rounded-full bg-clara-raised px-2.5 py-1 font-semibold text-clara-ink-2">
                                 {formatReviewCaseLabel(note.note_type)}
                               </span>
                             </div>
@@ -1763,7 +1764,7 @@ function ConversationDetailContent({
                         ))}
                       </div>
                     ) : (
-                      <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                      <div className="rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-3">
                         Belum ada manager note di review case ini.
                       </div>
                     )}
@@ -1773,14 +1774,14 @@ function ConversationDetailContent({
             ) : null}
 
             {activePanel === "knowledge" ? (
-              <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+              <div className="rounded-2xl border border-clara-line bg-clara-raised p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="clara-kicker">Knowledge Update Queue</p>
+                    <p className="clara-kicker">Antrean Update Knowledge</p>
                     <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                       Usulan knowledge dari kasus lapangan
                     </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-clara-ink-2">
                       Setelah coaching case jelas, naikkan insight penting jadi
                       proposal knowledge supaya bisa dikoreksi, dieskalasi ke
                       superadmin, lalu dipublish ke knowledge base resmi bila
@@ -1788,18 +1789,18 @@ function ConversationDetailContent({
                     </p>
                   </div>
                   {knowledgeProposal ? (
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    <span className="rounded-full bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-2">
                       {formatKnowledgeProposalStatus(knowledgeProposal.status)}
                     </span>
                   ) : (
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                    <span className="rounded-full bg-clara-tint px-3 py-1 text-xs font-semibold text-clara-gold">
                       Belum ada proposal
                     </span>
                   )}
                 </div>
 
                 {!reviewCase ? (
-                  <div className="mt-5 rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <div className="mt-5 rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-4 text-sm text-clara-ink-2">
                     Buat dan simpan coaching review dulu. Proposal knowledge
                     Tahap 4 sengaja diikat ke review case supaya audit trail-nya
                     jelas.
@@ -1831,7 +1832,7 @@ function ConversationDetailContent({
                         className="mt-5 space-y-4"
                       >
                         <div className="grid gap-4 md:grid-cols-2">
-                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                          <label className="space-y-2 text-sm font-medium text-clara-ink-2">
                             <span>Judul proposal</span>
                             <input
                               value={knowledgeProposalTitleInput}
@@ -1840,11 +1841,11 @@ function ConversationDetailContent({
                                   event.target.value,
                                 )
                               }
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                              className="clara-input"
                               placeholder="Contoh: Playbook handling objection legalitas"
                             />
                           </label>
-                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                          <label className="space-y-2 text-sm font-medium text-clara-ink-2">
                             <span>Kategori</span>
                             <input
                               value={knowledgeProposalCategoryInput}
@@ -1853,14 +1854,14 @@ function ConversationDetailContent({
                                   event.target.value,
                                 )
                               }
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                              className="clara-input"
                               placeholder="legalitas / objection / trust"
                             />
                           </label>
                         </div>
 
                         <div className="grid gap-4 md:grid-cols-2">
-                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                          <label className="space-y-2 text-sm font-medium text-clara-ink-2">
                             <span>Source type</span>
                             <input
                               value={knowledgeProposalSourceTypeInput}
@@ -1869,11 +1870,11 @@ function ConversationDetailContent({
                                   event.target.value,
                                 )
                               }
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                              className="clara-input"
                               placeholder="coaching_case"
                             />
                           </label>
-                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                          <label className="space-y-2 text-sm font-medium text-clara-ink-2">
                             <span>Status proposal</span>
                             <select
                               value={knowledgeProposalStatusInput}
@@ -1882,7 +1883,7 @@ function ConversationDetailContent({
                                   event.target.value,
                                 )
                               }
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
+                              className="clara-select"
                             >
                               {KNOWLEDGE_PROPOSAL_STATUS_OPTIONS.map(
                                 (option) => (
@@ -1895,7 +1896,7 @@ function ConversationDetailContent({
                           </label>
                         </div>
 
-                        <label className="block space-y-2 text-sm font-medium text-slate-700">
+                        <label className="block space-y-2 text-sm font-medium text-clara-ink-2">
                           <span>Rationale</span>
                           <textarea
                             value={knowledgeProposalRationaleInput}
@@ -1905,12 +1906,12 @@ function ConversationDetailContent({
                               )
                             }
                             rows={3}
-                            className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                            className="clara-textarea"
                             placeholder="Jelaskan kenapa kasus ini layak dinaikkan ke knowledge base."
                           />
                         </label>
 
-                        <label className="block space-y-2 text-sm font-medium text-slate-700">
+                        <label className="block space-y-2 text-sm font-medium text-clara-ink-2">
                           <span>Isi knowledge yang diusulkan</span>
                           <textarea
                             value={knowledgeProposalContentInput}
@@ -1921,10 +1922,10 @@ function ConversationDetailContent({
                               )
                             }
                             rows={8}
-                            className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                            className="clara-textarea"
                             placeholder="Tulis knowledge final yang nantinya akan dipublish ke product knowledge."
                           />
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-clara-ink-3">
                             {knowledgeProposalContentInput.length.toLocaleString(
                               "id-ID",
                             )} / 50.000 karakter
@@ -1944,7 +1945,7 @@ function ConversationDetailContent({
                               knowledgeProposalSourceTypeInput.trim().length ===
                                 0
                             }
-                            className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="clara-button clara-button-primary"
                           >
                             {isSavingKnowledgeProposal
                               ? "Menyimpan proposal..."
@@ -1957,7 +1958,7 @@ function ConversationDetailContent({
                     ) : null}
 
                     {knowledgeProposal ? (
-                      <div className="mt-5 space-y-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                      <div className="mt-5 space-y-3 rounded-2xl border border-clara-line bg-clara-raised p-4 text-sm text-clara-ink-2">
                         <InfoBlock
                           label="Pengusul"
                           value={knowledgeProposal.proposed_by_user_name ?? "-"}
@@ -1981,8 +1982,8 @@ function ConversationDetailContent({
                     ) : null}
 
                     {canReviewProposal && knowledgeProposal ? (
-                      <div className="mt-5 space-y-3 rounded-[24px] border border-amber-200 bg-amber-50/70 p-4">
-                        <label className="block space-y-2 text-sm font-medium text-slate-700">
+                      <div className="mt-5 space-y-3 rounded-2xl border border-clara-line bg-clara-tint p-4">
+                        <label className="block space-y-2 text-sm font-medium text-clara-ink-2">
                           <span>Catatan keputusan approval</span>
                           <textarea
                             value={knowledgeProposalDecisionNoteInput}
@@ -1992,7 +1993,7 @@ function ConversationDetailContent({
                               )
                             }
                             rows={3}
-                            className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-800 outline-none"
+                            className="clara-textarea"
                             placeholder="Tulis alasan approve/reject atau catatan revisi."
                           />
                         </label>
@@ -2003,7 +2004,7 @@ function ConversationDetailContent({
                             onClick={() =>
                               void onReviewKnowledgeProposal("rejected")
                             }
-                            className="inline-flex rounded-full border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 hover:border-red-300 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="clara-button clara-button-danger"
                           >
                             {isReviewingKnowledgeProposal
                               ? "Memproses..."
@@ -2015,7 +2016,7 @@ function ConversationDetailContent({
                             onClick={() =>
                               void onReviewKnowledgeProposal("approved")
                             }
-                            className="inline-flex rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-70"
+                            className="clara-button clara-button-success"
                           >
                             {isReviewingKnowledgeProposal
                               ? "Memproses..."
@@ -2030,7 +2031,7 @@ function ConversationDetailContent({
             ) : null}
 
             {activePanel === "sent_logs" ? (
-              <div className="rounded-[26px] border border-slate-200 bg-white p-5">
+              <div className="rounded-2xl border border-clara-line bg-clara-raised p-5">
                 <p className="clara-kicker">Sent Messages</p>
                 <h2 className="mt-2 text-xl font-bold tracking-[-0.04em] clara-text-primary">
                   Balasan yang ditandai terkirim
@@ -2045,12 +2046,12 @@ function ConversationDetailContent({
                     {detail.sent_messages.map((sentMessage) => (
                       <div
                         key={sentMessage.id}
-                        className="rounded-[22px] border border-green-200/80 bg-green-50/88 p-4 text-sm text-green-900"
+                        className="rounded-2xl border border-clara-success-line bg-clara-success-surface p-4 text-sm text-clara-success"
                       >
                         <p className="font-semibold">
                           Sent by {sentMessage.sent_by_name}
                         </p>
-                        <p className="mt-1 text-xs text-green-700">
+                        <p className="mt-1 text-xs text-clara-success">
                           {formatDateTime(sentMessage.sent_at)} &bull;{" "}
                           {sentMessage.send_mode}
                         </p>
@@ -2061,7 +2062,7 @@ function ConversationDetailContent({
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-slate-600">
+                  <p className="mt-3 text-sm text-clara-ink-2">
                     Belum ada pesan yang ditandai terkirim. Kalau balasan sudah
                     benar-benar dikirim, pastikan status ini ikut tercatat.
                   </p>
@@ -2093,10 +2094,10 @@ function PanelTab({
       type="button"
       onClick={onClick}
       aria-pressed={isActive}
-      className={`w-full rounded-2xl px-3.5 py-2.5 text-center text-sm font-semibold transition ${
+      className={`min-h-11 w-full rounded-2xl px-3.5 py-2.5 text-center text-sm font-semibold transition ${
         isActive
-          ? "bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
-          : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+          ? "bg-clara-deep text-clara-cream shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
+          : "border border-clara-line bg-clara-raised text-clara-ink-2 hover:border-clara-line"
       }`}
     >
       {label}
@@ -2123,9 +2124,9 @@ function MetaPill({
 
 function InfoBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="clara-card-soft rounded-[22px] p-4">
-      <p className="clara-kicker text-[11px]">{label}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
+    <div className="clara-card-soft rounded-2xl p-4">
+      <p className="clara-kicker text-xs">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-clara-ink-2">{value}</p>
     </div>
   );
 }

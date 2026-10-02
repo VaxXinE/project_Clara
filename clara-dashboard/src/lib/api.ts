@@ -40,6 +40,167 @@ function isUnsafeMethod(method: string): boolean {
   return !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
 }
 
+export class ApiError extends Error {
+  readonly status: number;
+  readonly detail: string;
+
+  constructor(message: string, status: number, detail = "") {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+const NETWORK_ERROR_MESSAGE =
+  "Tidak bisa terhubung ke Clara. Cek koneksi internet kamu, lalu coba lagi. Kalau masih gagal, hubungi admin.";
+const SERVER_ERROR_MESSAGE =
+  "Clara sedang bermasalah di sisi server. Coba lagi beberapa saat. Kalau berulang, hubungi admin.";
+const UNREACHABLE_MESSAGE =
+  "Clara belum bisa dijangkau. Coba lagi beberapa saat. Kalau berulang, hubungi admin.";
+
+const KNOWN_DETAIL_TRANSLATIONS: Record<string, string> = {
+  "user not found.": "Pengguna tidak ditemukan.",
+  "conversation not found.": "Percakapan tidak ditemukan.",
+  "chat text cannot be empty.": "Isi chat tidak boleh kosong.",
+  "only .txt files are allowed.": "Hanya file .txt yang bisa diunggah.",
+  "file too large. maximum size is 5mb.":
+    "Ukuran file terlalu besar. Maksimal 5MB.",
+  "file must be utf-8 encoded text.":
+    "File harus berupa teks UTF-8. Simpan ulang file chat dalam format UTF-8.",
+  "text too large. maximum size is 5mb.":
+    "Teks terlalu panjang. Maksimal 5MB.",
+  "you cannot delete your own account.":
+    "Kamu tidak bisa menghapus akunmu sendiri.",
+  "you cannot deactivate your own account.":
+    "Kamu tidak bisa menonaktifkan akunmu sendiri.",
+  "you cannot change your own role.":
+    "Kamu tidak bisa mengubah role akunmu sendiri.",
+  "head has no organization assigned.":
+    "Akun ini belum terhubung ke organisasi. Hubungi admin.",
+  "user has no organization assigned.":
+    "Akun ini belum terhubung ke organisasi. Hubungi admin.",
+  "organization scope is required.": "Pilih organisasi terlebih dahulu.",
+  "invalid user id.": "ID pengguna tidak valid.",
+  "user with this email already exists.":
+    "Email ini sudah terdaftar untuk pengguna lain.",
+  "too many login attempts. please try again later.":
+    "Terlalu banyak percobaan masuk. Tunggu beberapa menit lalu coba lagi.",
+  "snapshot messages cannot be empty.":
+    "Belum ada pesan yang bisa dibaca dari chat ini.",
+  "current password is incorrect.": "Password saat ini salah.",
+  "assigned user is invalid or inactive.":
+    "Pengguna yang dipilih tidak valid atau sedang nonaktif.",
+  "assigned user must belong to the same organization.":
+    "Pengguna yang dipilih harus berasal dari organisasi yang sama.",
+  "effective-until must be after effective-from.":
+    "Tanggal berakhir harus setelah tanggal mulai.",
+  "conversation has no messages.": "Percakapan ini belum punya pesan.",
+  "conversation is not available.": "Percakapan ini tidak tersedia.",
+  "expired effective period cannot be activated.":
+    "Periode berlaku yang sudah lewat tidak bisa diaktifkan.",
+  "conflicting active support article exists.":
+    "Sudah ada artikel aktif untuk topik ini. Nonaktifkan yang lama dulu.",
+  "blocked suggestion cannot be approved.":
+    "Draft ini diblokir sistem dan tidak bisa disetujui.",
+  "blocked suggestion cannot be sent.":
+    "Draft ini diblokir sistem dan tidak bisa ditandai terkirim.",
+};
+
+const INDONESIAN_HINT =
+  /\b(belum|tidak|harus|wajib|terlalu|maksimum|maksimal|gagal|sudah|silakan|tersedia|ditemukan|mohon|akun|anda|kamu)\b/i;
+
+function isLoginRequest(path: string): boolean {
+  return path.startsWith("/auth/login");
+}
+
+function describeInvalidFields(detail: unknown): string {
+  if (!Array.isArray(detail)) {
+    return "";
+  }
+
+  const fields = detail
+    .map((item) => {
+      if (item && typeof item === "object" && Array.isArray(item.loc)) {
+        const last = item.loc[item.loc.length - 1];
+        return typeof last === "string" ? last.replaceAll("_", " ") : "";
+      }
+      return "";
+    })
+    .filter(Boolean);
+
+  return Array.from(new Set(fields)).join(", ");
+}
+
+function toFriendlyMessage(
+  status: number,
+  path: string,
+  rawDetail: string,
+  invalidFields: string,
+): string {
+  if (status === 401) {
+    if (isLoginRequest(path)) {
+      return /nonaktif|inactive|deactivated/i.test(rawDetail)
+        ? "Akun ini sedang nonaktif. Hubungi admin tim kamu."
+        : "Email atau password salah. Periksa lagi lalu coba masuk kembali.";
+    }
+    return "Sesi kamu sudah berakhir. Silakan masuk lagi.";
+  }
+
+  if (status === 403) {
+    return "Kamu tidak punya akses untuk melakukan ini. Hubungi admin kalau kamu memerlukannya.";
+  }
+
+  if (status === 429) {
+    return (
+      KNOWN_DETAIL_TRANSLATIONS[rawDetail.trim().toLowerCase()] ??
+      "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi."
+    );
+  }
+
+  if (status === 413) {
+    return "Ukuran data terlalu besar. Kecilkan ukurannya lalu coba lagi.";
+  }
+
+  if (status === 409) {
+    return "Data ini baru saja diubah. Muat ulang halaman lalu coba lagi.";
+  }
+
+  if (status === 422 && isLoginRequest(path)) {
+    return "Email atau password salah. Periksa lagi lalu coba masuk kembali.";
+  }
+
+  if (status === 422 && invalidFields) {
+    return `Ada isian yang belum benar: ${invalidFields}. Periksa lalu coba lagi.`;
+  }
+
+  if (status >= 500) {
+    return SERVER_ERROR_MESSAGE;
+  }
+
+  const translated = KNOWN_DETAIL_TRANSLATIONS[rawDetail.trim().toLowerCase()];
+  if (translated) {
+    return translated;
+  }
+
+  if (status === 404) {
+    return "Data yang dicari tidak ditemukan. Mungkin sudah dihapus atau dipindahkan.";
+  }
+
+  if (rawDetail && INDONESIAN_HINT.test(rawDetail)) {
+    return rawDetail;
+  }
+
+  const isShortReadableDetail =
+    rawDetail.length > 0 &&
+    rawDetail.length <= 160 &&
+    !/[{}<>]|https?:\/\//.test(rawDetail);
+
+  return isShortReadableDetail
+    ? `Permintaan belum bisa diproses. Keterangan: ${rawDetail}`
+    : "Permintaan belum bisa diproses. Periksa data yang dikirim lalu coba lagi.";
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestOptions = {}
@@ -62,75 +223,89 @@ export async function apiFetch<T>(
     }
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers,
-    body: requestBody,
-    cache: "no-store",
-    credentials: "include",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: requestBody,
+      cache: "no-store",
+      credentials: "include",
+    });
+  } catch (networkError) {
+    console.warn(
+      `[apiFetch] ${method} ${path} gagal terhubung ke ${BACKEND_BASE_URL}`,
+      networkError,
+    );
+    throw new ApiError(NETWORK_ERROR_MESSAGE, 0, "network_error");
+  }
 
   if (!response.ok) {
-    let message = `Request failed with status ${response.status}`;
+    let rawDetail = "";
+    let invalidFields = "";
     let responseText = "";
 
     try {
-      const errorBody = await response.json();
-      const detail = errorBody.detail;
-      if (typeof detail === "string") {
-        message = detail;
-      } else if (Array.isArray(detail)) {
-        message = detail
-          .map((item) => {
-            if (typeof item === "string") {
-              return item;
-            }
-            if (item && typeof item === "object") {
-              const fieldPath = Array.isArray(item.loc)
-                ? item.loc.join(".")
-                : "field";
-              const reason =
-                typeof item.msg === "string" ? item.msg : JSON.stringify(item);
-              return `${fieldPath}: ${reason}`;
-            }
-            return String(item);
-          })
-          .join(" | ");
-      } else if (detail && typeof detail === "object") {
-        message = JSON.stringify(detail);
-      }
+      responseText = await response.text();
     } catch {
-      try {
-        responseText = await response.text();
-      } catch {
-        // Ignore plain text parse error too.
-      }
+      // Body unreadable; fall back to status-based message.
     }
 
-    if (
-      response.status >= 500 &&
-      message === `Request failed with status ${response.status}`
-    ) {
+    try {
+      const detail = responseText ? JSON.parse(responseText)?.detail : undefined;
+      if (typeof detail === "string") {
+        rawDetail = detail;
+      } else if (Array.isArray(detail)) {
+        invalidFields = describeInvalidFields(detail);
+        rawDetail = detail
+          .map((item) =>
+            typeof item === "string" ? item : JSON.stringify(item),
+          )
+          .join(" | ");
+      } else if (detail && typeof detail === "object") {
+        rawDetail = JSON.stringify(detail);
+      }
+    } catch {
+      // Not JSON (for example a proxy error page); responseText is still used below.
+    }
+
+    let message = toFriendlyMessage(
+      response.status,
+      path,
+      rawDetail,
+      invalidFields,
+    );
+
+    if (response.status >= 500 && !rawDetail) {
       const lowerText = responseText.toLowerCase();
       if (
         lowerText.includes("failed to proxy") ||
         lowerText.includes("aggregateerror") ||
-        lowerText.includes("ecconnrefused") ||
+        lowerText.includes("econnrefused") ||
         lowerText.includes("econnreset") ||
         lowerText.includes("socket hang up")
       ) {
-        message = `Clara backend belum bisa dijangkau. Pastikan service backend aktif di ${BACKEND_BASE_URL}.`;
-      } else {
-        message =
-          "Server Clara sedang bermasalah. Coba beberapa saat lagi atau cek service backend.";
+        console.warn(
+          `[apiFetch] backend tidak bisa dijangkau di ${BACKEND_BASE_URL}`,
+        );
+        message = UNREACHABLE_MESSAGE;
       }
     }
 
-    if (response.status === 401 && typeof window !== "undefined") {
+    if (
+      response.status === 401 &&
+      !isLoginRequest(path) &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/login"
+    ) {
       window.location.href = "/login";
     }
 
-    throw new Error(message);
+    throw new ApiError(
+      message,
+      response.status,
+      rawDetail || `status ${response.status}`,
+    );
   }
 
   if (response.status === 204) {

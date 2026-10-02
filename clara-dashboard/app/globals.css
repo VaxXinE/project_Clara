@@ -1,15 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --font-manrope:
-    "Manrope",
-    "Avenir Next",
-    "Segoe UI",
-    "Helvetica Neue",
-    Arial,
-    sans-serif;
   --font-plex-mono:
-    "IBM Plex Mono",
     "SFMono-Regular",
     Consolas,
     "Liberation Mono",
@@ -67,6 +59,38 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-manrope);
   --font-mono: var(--font-plex-mono);
+
+  /* Warna semantik Clara sebagai utility Tailwind (bg-clara-raised, text-clara-ink, ...). */
+  --color-clara-surface: var(--color-surface-base);
+  --color-clara-raised: var(--color-surface-raised);
+  --color-clara-sunken: var(--color-surface-muted);
+  --color-clara-overlay: var(--color-surface-overlay);
+  --color-clara-line: var(--color-border-default);
+  --color-clara-line-subtle: var(--color-border-subtle);
+  --color-clara-ink: var(--color-text-primary);
+  --color-clara-ink-2: var(--color-text-secondary);
+  --color-clara-ink-3: var(--color-text-muted);
+  --color-clara-gold: #f0cb73;
+  --color-clara-gold-bright: #fff5d9;
+  --color-clara-cream: #fff3d0;
+  --color-clara-deep: #17120d;
+  --color-clara-deeper: #21180f;
+  --color-clara-tint: rgba(58, 41, 15, 0.5);
+  --color-clara-glass: rgba(28, 22, 16, 0.8);
+  --color-clara-wash: rgba(255, 222, 155, 0.08);
+  --color-clara-dashed: rgba(230, 188, 92, 0.32);
+  --color-clara-success: var(--color-success);
+  --color-clara-success-surface: var(--color-success-surface);
+  --color-clara-success-line: color-mix(in srgb, var(--color-success) 45%, transparent);
+  --color-clara-danger: var(--color-danger);
+  --color-clara-danger-surface: var(--color-danger-surface);
+  --color-clara-danger-line: color-mix(in srgb, var(--color-danger) 45%, transparent);
+  --color-clara-warning: var(--color-warning);
+  --color-clara-warning-surface: var(--color-warning-surface);
+  --color-clara-warning-line: color-mix(in srgb, var(--color-warning) 45%, transparent);
+  --color-clara-info: var(--color-info);
+  --color-clara-info-surface: var(--color-info-surface);
+  --color-clara-info-line: color-mix(in srgb, var(--color-info) 45%, transparent);
 }
 
 * {
@@ -92,7 +116,7 @@ body {
       transparent 58%,
       rgba(5, 4, 3, 0.28) 100%
     ),
-    url("/assets/background.png");
+    url("/assets/background.jpg");
 
   background-attachment: fixed;
   background-position: center;
@@ -222,10 +246,9 @@ textarea:focus-visible {
 
 .clara-kicker {
   color: var(--color-accent);
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 
 .clara-chip {
@@ -462,164 +485,6 @@ textarea:focus-visible {
 
 .clara-scrollbar::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, rgba(251, 236, 190, 0.98) 0%, rgba(223, 184, 102, 0.9) 100%);
-}
-
-.theme-black-gold .text-slate-950,
-.theme-black-gold .text-slate-900,
-.theme-black-gold .text-slate-800 {
-  color: var(--color-text-primary) !important;
-}
-
-.theme-black-gold .text-slate-700,
-.theme-black-gold .text-slate-600 {
-  color: var(--color-text-secondary) !important;
-}
-
-.theme-black-gold .text-slate-500,
-.theme-black-gold .text-slate-400,
-.theme-black-gold .text-slate-300,
-.theme-black-gold .text-slate-200,
-.theme-black-gold .text-slate-100 {
-  color: var(--color-text-muted) !important;
-}
-
-.theme-black-gold .bg-white,
-.theme-black-gold .bg-slate-50,
-.theme-black-gold .bg-slate-100,
-.theme-black-gold .bg-\[linear-gradient\(180deg\,\#ffffff_0\%\,\#f8fafc_100\%\)\],
-.theme-black-gold .bg-\[linear-gradient\(180deg\,\#ffffff_0\%\,\#f8fbff_100\%\)\],
-.theme-black-gold .bg-\[linear-gradient\(135deg\,\#f8fafc_0\%\,\#ffffff_45\%\,\#eff6ff_100\%\)\] {
-  background: var(--color-surface-raised) !important;
-}
-
-.theme-black-gold .bg-white\/90,
-.theme-black-gold .bg-white\/70,
-.theme-black-gold .bg-white\/80 {
-  background: rgba(28, 22, 16, 0.8) !important;
-}
-
-.theme-black-gold .bg-white\/6,
-.theme-black-gold .bg-white\/7,
-.theme-black-gold .bg-white\/8,
-.theme-black-gold .bg-white\/10 {
-  background: rgba(255, 222, 155, 0.08) !important;
-}
-
-.theme-black-gold .text-white {
-  color: #fff3d0 !important;
-}
-
-.theme-black-gold .border-slate-200,
-.theme-black-gold .border-slate-300,
-.theme-black-gold .border-slate-400,
-.theme-black-gold .border-amber-200,
-.theme-black-gold .border-amber-300,
-.theme-black-gold .border-amber-400,
-.theme-black-gold .border-white\/10,
-.theme-black-gold .border-white\/80 {
-  border-color: var(--color-border-default) !important;
-}
-
-.theme-black-gold .border-dashed.border-slate-200,
-.theme-black-gold .border-dashed.border-slate-300 {
-  border-color: rgba(230, 188, 92, 0.32) !important;
-}
-
-.theme-black-gold .bg-amber-50,
-.theme-black-gold .bg-amber-50\/70,
-.theme-black-gold .bg-amber-100 {
-  background: rgba(58, 41, 15, 0.5) !important;
-}
-
-.theme-black-gold .text-amber-50 {
-  color: #fff5d9 !important;
-}
-
-.theme-black-gold .text-amber-700,
-.theme-black-gold .text-amber-900,
-.theme-black-gold .text-amber-950 {
-  color: #f0cb73 !important;
-}
-
-.theme-black-gold .bg-green-50,
-.theme-black-gold .bg-green-50\/88,
-.theme-black-gold .bg-green-100,
-.theme-black-gold .bg-emerald-50,
-.theme-black-gold .bg-emerald-100,
-.theme-black-gold .bg-emerald-600,
-.theme-black-gold .bg-emerald-700 {
-  background: var(--color-success-surface) !important;
-}
-
-.theme-black-gold .bg-red-50,
-.theme-black-gold .bg-red-100,
-.theme-black-gold .bg-red-500\/6,
-.theme-black-gold .bg-red-500\/8 {
-  background: var(--color-danger-surface) !important;
-}
-
-.theme-black-gold .bg-sky-50,
-.theme-black-gold .bg-sky-100,
-.theme-black-gold .bg-blue-100 {
-  background: var(--color-info-surface) !important;
-}
-
-.theme-black-gold .bg-yellow-100,
-.theme-black-gold .bg-orange-100 {
-  background: var(--color-warning-surface) !important;
-}
-
-.theme-black-gold .text-green-700,
-.theme-black-gold .text-green-800,
-.theme-black-gold .text-green-900,
-.theme-black-gold .text-emerald-700 {
-  color: var(--color-success) !important;
-}
-
-.theme-black-gold .text-red-100,
-.theme-black-gold .text-red-700 {
-  color: var(--color-danger) !important;
-}
-
-.theme-black-gold .text-blue-700,
-.theme-black-gold .text-sky-700 {
-  color: var(--color-info) !important;
-}
-
-.theme-black-gold .text-yellow-800,
-.theme-black-gold .text-orange-700 {
-  color: var(--color-warning) !important;
-}
-
-.theme-black-gold .border-green-200,
-.theme-black-gold .border-green-200\/80,
-.theme-black-gold .border-emerald-200 {
-  border-color: color-mix(in srgb, var(--color-success) 45%, transparent) !important;
-}
-
-.theme-black-gold .border-red-200,
-.theme-black-gold .border-red-300,
-.theme-black-gold .border-red-500\/10,
-.theme-black-gold .border-red-500\/16 {
-  border-color: color-mix(in srgb, var(--color-danger) 45%, transparent) !important;
-}
-
-.theme-black-gold .border-sky-200,
-.theme-black-gold .border-blue-200 {
-  border-color: color-mix(in srgb, var(--color-info) 45%, transparent) !important;
-}
-
-.theme-black-gold .border-yellow-200,
-.theme-black-gold .border-orange-200 {
-  border-color: color-mix(in srgb, var(--color-warning) 45%, transparent) !important;
-}
-
-.theme-black-gold .bg-slate-950 {
-  background: #17120d !important;
-}
-
-.theme-black-gold .bg-slate-800 {
-  background: #21180f !important;
 }
 
 @media (max-width: 767px) {

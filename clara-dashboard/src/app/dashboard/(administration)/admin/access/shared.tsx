@@ -136,7 +136,7 @@ export function InfoCard({
   description: string;
 }) {
   return (
-    <article className="flex h-full flex-col rounded-[24px] border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#d1a44b_52%,#a06d20_100%)] p-5 text-[#140f08] shadow-[0_18px_48px_rgba(0,0,0,0.24)]">
+    <article className="flex h-full flex-col rounded-2xl border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#d1a44b_52%,#a06d20_100%)] p-5 text-[#140f08] shadow-[0_18px_48px_rgba(0,0,0,0.24)]">
       <p className="clara-kicker text-xs text-[#5c3a12]">{label}</p>
       <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
         {value}
@@ -162,7 +162,7 @@ export function Panel({
   contentClassName?: string;
 }) {
   return (
-    <section className={`clara-card rounded-[28px] p-5 ${className ?? ""}`.trim()}>
+    <section className={`clara-card rounded-3xl p-5 ${className ?? ""}`.trim()}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-[#fff0c9]">{title}</h2>
@@ -263,7 +263,7 @@ export function PasswordStrengthHint({
   return (
     <div className="clara-card-soft rounded-xl border border-[#f0cb73]/14 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+        <p className="text-xs font-semibold text-[#b89a62]">
           Password Strength
         </p>
         <span
@@ -300,7 +300,7 @@ export function MetricIcon({
   value: string;
 }) {
   return (
-    <div className="clara-card-soft rounded-[22px] p-4">
+    <div className="clara-card-soft rounded-2xl p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="clara-kicker text-xs">{label}</p>
@@ -326,7 +326,7 @@ export function RouteCard({
   cta: string;
 }) {
   return (
-    <article className="clara-card flex h-full flex-col justify-between rounded-[28px] p-5">
+    <article className="clara-card flex h-full flex-col justify-between rounded-3xl p-5">
       <div>
         <p className="clara-kicker text-xs text-[#f0cb73]">Access flow</p>
         <h3 className="mt-3 text-xl font-semibold text-[#fff0c9]">{title}</h3>

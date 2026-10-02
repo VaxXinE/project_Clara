@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import { canLeadSalesTeam, isOwnerLike } from "@/lib/roles";
@@ -24,8 +25,10 @@ import {
   getUserTeamDisplay,
   Panel,
 } from "./shared";
+import { useConfirm } from "@/components/dashboard/ConfirmDialog";
 
 export default function AdminAccessPage() {
+  const confirm = useConfirm();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
@@ -111,14 +114,15 @@ export default function AdminAccessPage() {
   }, [router]);
 
   async function handleToggleActive(user: CurrentUser) {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(
-        `${user.is_active ? "Nonaktifkan" : "Aktifkan"} user ${user.email}?`,
-      )
-    ) {
-      return;
-    }
+    const accepted = await confirm({
+      title: user.is_active ? "Nonaktifkan akun ini?" : "Aktifkan akun ini?",
+      message: user.is_active
+        ? `${user.email} tidak bisa masuk ke Clara sampai akunnya diaktifkan lagi.`
+        : `${user.email} bisa masuk ke Clara lagi.`,
+      confirmLabel: user.is_active ? "Nonaktifkan" : "Aktifkan",
+      tone: user.is_active ? "danger" : "default",
+    });
+    if (!accepted) return;
 
     setActionUserId(user.id);
     setErrorMessage("");
@@ -145,12 +149,13 @@ export default function AdminAccessPage() {
   }
 
   async function handleDeleteUser(user: CurrentUser) {
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(`Hapus user ${user.email}? Aksi ini tidak bisa dibatalkan.`)
-    ) {
-      return;
-    }
+    const accepted = await confirm({
+      title: "Hapus akun ini?",
+      message: `${user.email} akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.`,
+      confirmLabel: "Hapus akun",
+      tone: "danger",
+    });
+    if (!accepted) return;
 
     setActionUserId(user.id);
     setErrorMessage("");
@@ -262,14 +267,12 @@ export default function AdminAccessPage() {
         users.find((user) => user.id === editingTeamForm.manager_user_id)?.email ??
         "tanpa manager";
 
-      if (
-        typeof window !== "undefined" &&
-        !window.confirm(
-          `Ubah manager team ${team.name} dari ${previousManager} menjadi ${nextManager}?`,
-        )
-      ) {
-        return;
-      }
+      const accepted = await confirm({
+        title: "Ubah manager tim?",
+        message: `Manager tim ${team.name} berubah dari ${previousManager} menjadi ${nextManager}.`,
+        confirmLabel: "Ubah manager",
+      });
+      if (!accepted) return;
     }
 
     setStructureActionKey(`team:${teamId}`);
@@ -345,9 +348,9 @@ export default function AdminAccessPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Access management"
-      title="User & Organization Setup"
-      description="Halaman index untuk membaca boundary akses, struktur organisasi, dan daftar user. Aksi create dan edit dipisah ke halaman khusus."
+      eyebrow={NAV_GROUP_NAMES.admin}
+      title={PAGE_NAMES.users}
+      description="Lihat struktur organisasi dan daftar pengguna. Buat atau ubah akun dari sini."
       backHref="/workspace"
       backLabel="Kembali ke overview"
       actions={
@@ -364,7 +367,7 @@ export default function AdminAccessPage() {
       <div className="mx-auto space-y-6">
         {isLoading ? (
           <div role="status" className="clara-empty-state text-sm text-[#d6bb84]">
-            Loading access management...
+            Memuat pengguna dan akses...
           </div>
         ) : null}
 
@@ -410,7 +413,7 @@ export default function AdminAccessPage() {
                         {editingOrganizationId === organization.id ? (
                           <div className="space-y-3">
                             <div>
-                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                              <label className="text-xs font-semibold text-[#f0cb73]">
                                 Organization Name
                               </label>
                               <input
@@ -426,7 +429,7 @@ export default function AdminAccessPage() {
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                              <label className="text-xs font-semibold text-[#f0cb73]">
                                 Slug
                               </label>
                               <input
@@ -514,7 +517,7 @@ export default function AdminAccessPage() {
                         {editingUnitId === unit.id ? (
                           <div className="space-y-3">
                             <div>
-                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                              <label className="text-xs font-semibold text-[#f0cb73]">
                                 Unit Name
                               </label>
                               <input
@@ -530,7 +533,7 @@ export default function AdminAccessPage() {
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                              <label className="text-xs font-semibold text-[#f0cb73]">
                                 Unit Code
                               </label>
                               <input
@@ -615,7 +618,7 @@ export default function AdminAccessPage() {
                         {editingTeamId === team.id ? (
                           <div className="space-y-3">
                             <div>
-                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                              <label className="text-xs font-semibold text-[#f0cb73]">
                                 Team Name
                               </label>
                               <input
@@ -631,7 +634,7 @@ export default function AdminAccessPage() {
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                              <label className="text-xs font-semibold text-[#f0cb73]">
                                 Team Code
                               </label>
                               <input
@@ -647,7 +650,7 @@ export default function AdminAccessPage() {
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                              <label className="text-xs font-semibold text-[#f0cb73]">
                                 Unit
                               </label>
                               <select
@@ -671,7 +674,7 @@ export default function AdminAccessPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                              <label className="text-xs font-semibold text-[#f0cb73]">
                                 Manager
                               </label>
                               <select
@@ -748,7 +751,7 @@ export default function AdminAccessPage() {
 
             <section>
               <Panel
-                title="Manage Users"
+                title="Daftar Pengguna"
                 description="Halaman index hanya menampilkan daftar user, status, dan link ke halaman edit."
                 action={
                   <Link href="/admin/access/create/user" className="clara-button clara-button-primary">
@@ -760,10 +763,10 @@ export default function AdminAccessPage() {
                   <EmptyText text="Belum ada user." />
                 ) : (
                   <div className="space-y-4">
-                    <div className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-4">
+                    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-4">
                       <div className="grid gap-3 md:grid-cols-3">
                         <div>
-                          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                          <label className="text-xs font-semibold text-[#f0cb73]">
                             Search User
                           </label>
                           <input
@@ -778,7 +781,7 @@ export default function AdminAccessPage() {
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                          <label className="text-xs font-semibold text-[#f0cb73]">
                             Filter Role
                           </label>
                           <select
@@ -798,7 +801,7 @@ export default function AdminAccessPage() {
                         </div>
 
                         <div>
-                          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+                          <label className="text-xs font-semibold text-[#f0cb73]">
                             Filter Status
                           </label>
                           <select
@@ -829,7 +832,7 @@ export default function AdminAccessPage() {
                     {filteredUsers.length === 0 ? (
                       <EmptyText text="Tidak ada user yang cocok dengan filter saat ini." />
                     ) : (
-                      <div className="overflow-hidden rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)]">
+                      <div className="overflow-hidden rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)]">
                         <div className="overflow-x-auto">
                           <table className="min-w-full text-left text-sm">
                             <thead className="bg-[#1d150d] text-[#b89a62]">
@@ -902,7 +905,7 @@ export default function AdminAccessPage() {
                                           type="button"
                                           onClick={() => void handleToggleActive(user)}
                                           disabled={actionUserId === user.id || isSelf}
-                                          className={`rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+                                          className={`min-h-11 rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
                                             user.is_active
                                               ? "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
                                               : "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08]"

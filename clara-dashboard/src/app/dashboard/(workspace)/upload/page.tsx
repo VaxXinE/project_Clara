@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { WhatsAppUploadForm } from "@/components/dashboard/WhatsAppUploadForm";
 import { apiFetch } from "@/lib/api";
 import { isAdminLike, normalizeWorkspaceRole } from "@/lib/roles";
@@ -30,12 +31,12 @@ export default function UploadWhatsAppPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Input chat"
-      title={isSalesWorkspace ? "Masukkan Chat Baru" : "Lead Capture"}
+      eyebrow={NAV_GROUP_NAMES.daily}
+      title={PAGE_NAMES.intake}
       description={
         isSalesWorkspace
-          ? "Masukkan chat customer dari file .txt atau paste langsung. Setelah diproses, chat akan masuk ke Clara sebagai percakapan baru atau lanjutan yang siap ditindak."
-          : "Masukkan export chat dalam format .txt atau paste chat langsung. Ini adalah pintu masuk utama untuk membuat conversation dan lead baru yang siap dianalisis Clara."
+          ? "Masukkan chat customer dari file .txt atau paste langsung. Setelah diproses, chat muncul di Chat Masuk dan siap dibalas."
+          : "Masukkan export chat .txt atau paste langsung untuk membuat percakapan dan lead baru yang siap dianalisis Clara."
       }
       backHref="/dashboard/sales"
       backLabel="Kembali ke chat masuk"
@@ -125,7 +126,7 @@ export default function UploadWhatsAppPage() {
             Untuk tahap ini, parser Clara paling aman membaca export TXT yang jelas nama pengirim, waktu, dan isi pesannya.
           </p>
 
-          <pre className="mt-4 overflow-x-auto rounded-2xl bg-[#10172d] p-4 font-mono text-sm leading-7 text-slate-100">
+          <pre className="mt-4 overflow-x-auto rounded-2xl bg-[#10172d] p-4 font-mono text-sm leading-7 text-clara-ink-3">
             {`{Whatsapp}
 12/04/26, 09.12 - Customer: Kak, ini programnya legal nggak?
 12/04/26, 09.13 - Sales Ani: Legal kak, nanti saya kirim dokumen resminya.

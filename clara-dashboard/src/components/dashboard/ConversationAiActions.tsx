@@ -39,7 +39,7 @@ export function ConversationAiActions({
       await onUpdated();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Analyze failed."
+        error instanceof Error ? error.message : "Gagal membaca percakapan."
       );
     } finally {
       setIsAnalyzing(false);
@@ -58,7 +58,7 @@ export function ConversationAiActions({
       await onUpdated();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Generate reply failed."
+        error instanceof Error ? error.message : "Gagal membuat jawaban."
       );
     } finally {
       setIsGeneratingReply(false);

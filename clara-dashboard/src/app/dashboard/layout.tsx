@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { ConfirmProvider } from "@/components/dashboard/ConfirmDialog";
 import { DashboardUserProvider } from "@/components/dashboard/DashboardUserProvider";
 
 const AUTH_COOKIE_NAME =
@@ -20,5 +21,9 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return <DashboardUserProvider>{children}</DashboardUserProvider>;
+  return (
+    <DashboardUserProvider>
+      <ConfirmProvider>{children}</ConfirmProvider>
+    </DashboardUserProvider>
+  );
 }

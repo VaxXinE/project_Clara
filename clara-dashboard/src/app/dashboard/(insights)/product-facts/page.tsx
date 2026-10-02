@@ -16,9 +16,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import type { CurrentUser, ProductFactItem } from "@/types/dashboard";
+import { useConfirm } from "@/components/dashboard/ConfirmDialog";
 
 const FACT_KEYS = [
   "account.minimum_opening_amount",
@@ -76,6 +78,7 @@ function statusTone(status: string) {
 }
 
 export default function ProductFactsPage() {
+  const confirm = useConfirm();
   const [items, setItems] = useState<ProductFactItem[]>([]);
   const [me, setMe] = useState<CurrentUser | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -209,13 +212,23 @@ export default function ProductFactsPage() {
   }
 
   async function transition(item: ProductFactItem, action: string) {
-    if (
-      action === "revoke" &&
-      !window.confirm(
-        `Nonaktifkan ${item.fact_key} revisi ${item.revision}? Histori tetap tersimpan.`,
-      )
-    )
-      return;
+    if (action === "revoke") {
+      const accepted = await confirm({
+        title: "Nonaktifkan fakta ini?",
+        message: `${item.fact_key} revisi ${item.revision} tidak lagi dipakai Clara untuk menjawab. Histori tetap tersimpan.`,
+        confirmLabel: "Nonaktifkan",
+        tone: "danger",
+      });
+      if (!accepted) return;
+    }
+    if (action === "activate") {
+      const accepted = await confirm({
+        title: "Aktifkan fakta ini?",
+        message: `${item.fact_key} revisi ${item.revision} akan langsung dipakai Clara untuk menjawab customer. Pastikan nilainya sudah diverifikasi.`,
+        confirmLabel: "Aktifkan",
+      });
+      if (!accepted) return;
+    }
     setBusy(item.id);
     setError("");
     setMessage("");
@@ -414,8 +427,8 @@ export default function ProductFactsPage() {
   return (
     <WorkspaceShell
       currentUser={me}
-      eyebrow="Product fact governance"
-      title="Product Fact Registry"
+      eyebrow={NAV_GROUP_NAMES.analysis}
+      title={PAGE_NAMES.productFacts}
       description="Kelola fakta customer-facing dengan sumber, freshness, dan lifecycle yang bisa diaudit."
       backHref="/knowledge"
       backLabel="Knowledge Base"
@@ -514,7 +527,7 @@ export default function ProductFactsPage() {
                         {item.fact_key}
                       </p>
                       <span
-                        className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ${statusTone(item.lifecycle_status)}`}
+                        className={`shrink-0 rounded-full border px-2 py-1 text-xs font-bold ${statusTone(item.lifecycle_status)}`}
                       >
                         {item.lifecycle_status}
                       </span>
@@ -664,7 +677,7 @@ export default function ProductFactsPage() {
                 <div
                   className={`rounded-xl border p-4 ${statusTone(selected.lifecycle_status)}`}
                 >
-                  <p className="text-xs font-bold uppercase tracking-wider">
+                  <p className="text-xs font-bold">
                     Status saat ini
                   </p>
                   <p className="mt-1 font-bold">{selected.lifecycle_status}</p>

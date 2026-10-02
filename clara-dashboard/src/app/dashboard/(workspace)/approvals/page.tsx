@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import {
   formatChannelLabel,
@@ -40,9 +41,9 @@ function formatAccountCategory(value: string): string {
 function getAccountCategoryBadgeClass(value: string): string {
   switch (value) {
     case "mini":
-      return "bg-emerald-100 text-emerald-700";
+      return "bg-clara-success-surface text-clara-success";
     case "reguler":
-      return "bg-amber-100 text-amber-700";
+      return "bg-clara-tint text-clara-gold";
     default:
       return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
   }
@@ -200,7 +201,7 @@ export default function ChatReviewCenterPage() {
     : isHeadView
       ? decisionCount > 0 || escalationCount > 0
         ? `Ada ${decisionCount} item yang perlu keputusan Head dan ${escalationCount} item yang sudah naik eskalasi.`
-        : "Antrian arahan tim relatif aman. Kalau perlu, lanjut cek Head Insight atau Lead Tim yang mulai melambat."
+        : "Antrian arahan tim relatif aman. Kalau perlu, lanjut cek Monitor Tim atau Lead Tim yang mulai melambat."
       : decisionCount > 0 || draftPrepCount > 0
         ? `Saat ini ada ${decisionCount} item yang butuh keputusan manager dan ${draftPrepCount} item yang masih butuh dipersiapkan dulu.`
         : "Antrian review sales relatif aman. Anda bisa cek item stale atau item yang siap dikirim."
@@ -238,19 +239,19 @@ export default function ChatReviewCenterPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={isHeadView ? "Arahan Tim" : "Review workflow"}
-      title={isHeadView ? "Arahan Tim" : "Review Sales"}
+      eyebrow={NAV_GROUP_NAMES.daily}
+      title={isHeadView ? PAGE_NAMES.teamDirection : PAGE_NAMES.reviewSales}
       description={
         isHeadView
-          ? "Satu layar untuk membaca kasus yang perlu keputusan Head, melihat bottleneck follow-up, lalu menurunkan arahan yang jelas ke tim."
+          ? "Kasus yang perlu keputusan Head dan arahan yang bisa kamu turunkan ke tim."
           : isManagerView
-            ? "Satu layar untuk melihat balasan sales yang perlu keputusan, rework, atau eskalasi tanpa harus tenggelam di detail percakapan."
-            : "Satu layar untuk mengecek balasan Sales yang perlu dilihat ulang, perlu draft baru, atau butuh keputusan sebelum lanjut."
+            ? "Balasan Sales yang perlu keputusan, revisi, atau eskalasi."
+            : "Balasan Sales yang perlu dicek ulang, dibuat ulang, atau diputuskan."
       }
       backHref={fallbackHref}
       backLabel={
         canAccessQueue
-          ? "Kembali ke Queue"
+          ? "Kembali ke Chat Masuk"
           : isHeadView
             ? "Kembali ke Alert Tim"
             : "Kembali ke Monitor Tim"
@@ -267,7 +268,7 @@ export default function ChatReviewCenterPage() {
           className="clara-button clara-button-primary"
         >
           {canAccessQueue
-            ? "Buka Action Center"
+            ? "Buka Tindak Lanjut"
             : isHeadView
               ? "Buka Lead Tim"
               : "Buka Monitor Tim"}
@@ -277,7 +278,7 @@ export default function ChatReviewCenterPage() {
       <div className="space-y-6">
         {isLoading && (
           <div role="status" className="clara-empty-state text-sm text-[#d6bb84]">
-            Loading review sales...
+            Memuat review sales...
           </div>
         )}
 
@@ -291,7 +292,7 @@ export default function ChatReviewCenterPage() {
           <>
             <section
               data-onboarding-id="manager-approvals-summary"
-              className="clara-card rounded-[32px] p-6"
+              className="clara-card rounded-3xl p-6"
             >
               <p className="clara-kicker text-xs">
                 {isHeadView ? "Ringkasan arahan" : "Ringkasan review"}
@@ -303,7 +304,7 @@ export default function ChatReviewCenterPage() {
                       ? "Mulai dari kasus tim yang paling butuh keputusan Head"
                       : "Mulai dari balasan sales yang paling butuh keputusan"}
                   </h2>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                  <p className="mt-2 text-sm leading-7 text-clara-ink-2">
                     {reviewDailySummary}
                   </p>
                 </div>
@@ -319,7 +320,7 @@ export default function ChatReviewCenterPage() {
                     href={isHeadView ? "/dashboard/manager-insights" : "/dashboard/crm"}
                     className="clara-button clara-button-ghost justify-center"
                   >
-                    {isHeadView ? "Buka Head Insight" : "Buka Lead Tim"}
+                    {isHeadView ? "Buka Monitor Tim" : "Buka Lead Tim"}
                   </Link>
                 </div>
               </div>
@@ -366,10 +367,10 @@ export default function ChatReviewCenterPage() {
             <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_320px]">
               <div
                 data-onboarding-id="manager-approvals-filters"
-                className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
+                className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
               >
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#f0cb73]">
+                  <p className="text-xs font-semibold text-[#f0cb73]">
                     {isHeadView ? "Saring daftar arahan" : "Saring daftar review"}
                   </p>
                   <p className="mt-2 max-w-3xl text-sm leading-7 text-[#d6bb84]">
@@ -378,7 +379,7 @@ export default function ChatReviewCenterPage() {
                       : "Pakai filter kalau item review sudah mulai banyak. Kalau belum, mulai saja dari item prioritas tertinggi di daftar bawah."}
                   </p>
                 </div>
-                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[20px] border border-[#f0cb73]/12 bg-[#1b140e] px-4 py-3">
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#f0cb73]/12 bg-[#1b140e] px-4 py-3">
                   <span className="text-sm text-[#d8bc84]">
                     Menampilkan{" "}
                     <span className="font-semibold text-[#f0cb73]">
@@ -397,7 +398,7 @@ export default function ChatReviewCenterPage() {
                     <select
                       value={reviewBucketFilter}
                       onChange={(event) => setReviewBucketFilter(event.target.value)}
-                      className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
+                      className="clara-select"
                     >
                       <option value="all">Semua bucket</option>
                       <option value="needs_analysis">Butuh AI analysis</option>
@@ -415,7 +416,7 @@ export default function ChatReviewCenterPage() {
                     <select
                       value={riskLevelFilter}
                       onChange={(event) => setRiskLevelFilter(event.target.value)}
-                      className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
+                      className="clara-select"
                     >
                       <option value="all">Semua risk</option>
                       <option value="high">High</option>
@@ -429,7 +430,7 @@ export default function ChatReviewCenterPage() {
                     <select
                       value={ageBucketFilter}
                       onChange={(event) => setAgeBucketFilter(event.target.value)}
-                      className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
+                      className="clara-select"
                     >
                       <option value="all">Semua age</option>
                       <option value="fresh">Fresh (&lt;24 jam)</option>
@@ -443,7 +444,7 @@ export default function ChatReviewCenterPage() {
                     <select
                       value={sourceChannelFilter}
                       onChange={(event) => setSourceChannelFilter(event.target.value)}
-                      className="w-full rounded-2xl border border-[#4a3618] bg-[#22190f] px-4 py-3 text-sm text-[#efd59e] outline-none ring-0"
+                      className="clara-select"
                     >
                       <option value="all">Semua channel</option>
                       <option value="whatsapp">WhatsApp</option>
@@ -488,7 +489,7 @@ export default function ChatReviewCenterPage() {
 
             <section
               data-onboarding-id="manager-approvals-guide"
-              className="clara-card rounded-[28px] p-5"
+              className="clara-card rounded-3xl p-5"
             >
                 <p className="clara-kicker text-xs">Urutan kerja cepat</p>
                 <div className="mt-4 space-y-3">
@@ -520,7 +521,7 @@ export default function ChatReviewCenterPage() {
                     }
                   />
                 </div>
-                <div className="mt-4 rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <div className="mt-4 rounded-2xl border border-clara-line bg-clara-raised px-4 py-3 text-sm text-clara-ink-2">
                   {isHeadView ? "Sudah relatif aman:" : "Siap dikirim:"}
                   <span className="ml-2 font-semibold clara-text-primary">
                     {readyToSendCount} item
@@ -532,7 +533,7 @@ export default function ChatReviewCenterPage() {
             <section className="space-y-4">
               {queue.items.length === 0 ? (
                 <div className="clara-empty-state text-sm text-[#d6bb84]">
-                  Tidak ada item review yang cocok dengan filter saat ini. Halaman ini hanya memuat chat yang benar-benar perlu analisis, draft, approval, escalation, atau sudah stale.
+                  Tidak ada item review yang cocok dengan filter ini. Halaman ini hanya memuat chat yang perlu dibaca ulang, dibuatkan draft, disetujui, dieskalasi, atau sudah lama tidak diperbarui.
                 </div>
               ) : (
                 queue.items.map((item, index) => (
@@ -630,7 +631,7 @@ function ReviewCard({
   return (
     <article
       data-onboarding-id={onboardingTargetId}
-      className="clara-card rounded-[28px] p-6"
+      className="clara-card rounded-3xl p-6"
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
@@ -683,7 +684,7 @@ function ReviewCard({
               {formatChannelLabel(item.source_channel)}
             </span>
             {isExperimentalChannel(item.source_channel) ? (
-              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700">
+              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-clara-gold">
                 Experimental
               </span>
             ) : null}
@@ -694,7 +695,7 @@ function ReviewCard({
             &bull; {item.source_label}
           </p>
           <p className="mt-2 text-xs text-[#b89a62]">
-            Owner: {item.sales_owner_name ?? "-"} &bull; Queue since:{" "}
+            Owner: {item.sales_owner_name ?? "-"} &bull; Di antrean sejak:{" "}
             {formatDateTime(item.queue_since_at)}
           </p>
         </div>
@@ -734,7 +735,7 @@ function ReviewCard({
               {reviewerFocus}
             </p>
             <div className="mt-3 rounded-2xl border border-[#f0cb73]/12 bg-[#1c150f] px-3 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b9924b]">
+              <p className="text-xs font-semibold text-[#b9924b]">
                 Langkah berikutnya
               </p>
               <p className="mt-2 text-sm font-medium leading-6 text-[#f3d89a]">
@@ -839,8 +840,8 @@ function QueueMetric({
   hint: string;
 }) {
   return (
-    <article className="rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#140f08]">{label}</p>
+    <article className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
+      <p className="text-xs font-semibold text-[#140f08]">{label}</p>
       <p className="mt-3 text-3xl font-bold text-[#140f08]">{value}</p>
       <p className="mt-2 text-sm text-[#2f210f]">{hint}</p>
     </article>
@@ -850,7 +851,7 @@ function QueueMetric({
 function MetaCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-4">
-      <p className="clara-kicker text-[11px]">{label}</p>
+      <p className="clara-kicker text-xs">{label}</p>
       <p className="mt-2 text-sm font-semibold text-[#fff0c9]">{value}</p>
     </div>
   );
@@ -867,12 +868,12 @@ function StepHint({
 }) {
   return (
     <div className="clara-card-soft flex gap-3 rounded-2xl px-4 py-4">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-950 text-xs font-bold text-white">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-clara-deep text-xs font-bold text-clara-cream">
         {number}
       </div>
       <div>
         <p className="text-sm font-semibold clara-text-primary">{title}</p>
-        <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+        <p className="mt-1 text-sm leading-6 text-clara-ink-2">{description}</p>
       </div>
     </div>
   );

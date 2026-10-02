@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { isHeadRole, isManagerRole, normalizeWorkspaceRole } from "@/lib/roles";
@@ -80,16 +81,12 @@ export default function CustomerListPage() {
   const customersNeedingAttention = customers.filter(
     (item) => item.hot_lead_count > 0 || item.active_lead_count > 2,
   ).length;
-  const pageTitle = isSalesWorkspace
-    ? "Daftar Customer"
-    : isLeadershipWorkspace
-      ? "Customer Monitor"
-      : "Customer List";
+  const pageTitle = PAGE_NAMES.customers;
   const pageDescription = isSalesWorkspace
-    ? "Halaman ini dipakai untuk melihat customer yang sudah dikenali Clara, lalu masuk ke profil atau lead yang paling relevan tanpa harus cari manual dari awal."
+    ? "Customer yang sudah dikenali Clara. Buka profilnya untuk melihat lead dan percakapan terkait."
     : isLeadershipWorkspace
-      ? "Halaman manager untuk membaca customer mana yang punya aktivitas tinggi, hot lead, atau beban follow-up paling padat, lalu turun ke profil customer saat memang perlu."
-      : "Daftar ini dipakai untuk melihat semua customer yang sudah dikenali Clara. Dari sini user bisa cari customer, cek ringkasan singkatnya, lalu masuk ke detail customer.";
+      ? "Customer dengan aktivitas tinggi, lead panas, atau beban tindak lanjut terbanyak. Buka profilnya saat perlu."
+      : "Semua customer yang sudah dikenali Clara. Cari, cek ringkasannya, lalu buka detailnya.";
   const topCustomerSummary = topCustomer
     ? isLeadershipWorkspace
       ? `${topCustomer.display_name} sekarang paling layak dicek karena punya ${topCustomer.active_lead_count} lead aktif dan ${topCustomer.hot_lead_count} hot lead. Mulai dari profil customer, lalu lihat apakah owner dan ritme follow-up-nya sudah sehat.`
@@ -105,7 +102,7 @@ export default function CustomerListPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Daftar customer"
+      eyebrow={NAV_GROUP_NAMES.daily}
       title={pageTitle}
       description={pageDescription}
     >
@@ -251,7 +248,7 @@ export default function CustomerListPage() {
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             customer.status === "active"
                               ? "bg-emerald-500/14 text-emerald-200"
-                              : "bg-white/8 text-[#d7bb7e]"
+                              : "bg-clara-wash text-[#d7bb7e]"
                           }`}
                         >
                           {customer.status === "active" ? "Aktif" : "Tidak aktif"}
@@ -313,7 +310,7 @@ export default function CustomerListPage() {
                         {customer.source_labels.map((label) => (
                           <span
                             key={label}
-                            className="rounded-full bg-white/7 px-3 py-1 text-xs font-semibold text-[#e5c98b]"
+                            className="rounded-full bg-clara-wash px-3 py-1 text-xs font-semibold text-[#e5c98b]"
                           >
                             {label}
                           </span>
@@ -334,8 +331,8 @@ export default function CustomerListPage() {
                         value={String(customer.conversation_count)}
                       />
                       {isLeadershipWorkspace ? (
-                        <div className="rounded-[22px] border border-[#f0cb73]/16 bg-[rgba(255,255,255,0.04)] p-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#caa45c]">
+                        <div className="rounded-2xl border border-[#f0cb73]/16 bg-[rgba(255,255,255,0.04)] p-4">
+                          <p className="text-xs font-semibold text-[#caa45c]">
                             Fokus manager
                           </p>
                           <p className="mt-2 text-sm font-semibold leading-6 text-[#fff0c9]">

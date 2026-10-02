@@ -52,7 +52,7 @@ export function ReplySuggestionActions({
       await onUpdated();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to approve reply."
+        error instanceof Error ? error.message : "Gagal menyetujui draft balasan."
       );
     } finally {
       setIsSubmitting(false);
@@ -75,7 +75,7 @@ export function ReplySuggestionActions({
       await onUpdated();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to reject reply."
+        error instanceof Error ? error.message : "Gagal menolak draft balasan."
       );
     } finally {
       setIsSubmitting(false);
@@ -97,7 +97,7 @@ export function ReplySuggestionActions({
       await onUpdated();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Failed to mark as sent."
+        error instanceof Error ? error.message : "Gagal menandai balasan terkirim."
       );
     } finally {
       setIsMarkingSent(false);

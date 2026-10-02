@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { RoleBasedStartGuide } from "@/components/dashboard/RoleBasedStartGuide";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import {
   canAccessQueueAndActionCenter,
@@ -36,9 +37,9 @@ export default function StartHerePage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Onboarding flow"
-      title="Workflow Guide"
-      description="Panduan singkat alur Sales, Manager, dan Head."
+      eyebrow={NAV_GROUP_NAMES.guide}
+      title={PAGE_NAMES.guide}
+      description="Panduan singkat alur kerja untuk Sales, Manager, dan Head."
       backHref="/dashboard"
       backLabel="Kembali ke beranda"
       actions={
@@ -54,14 +55,14 @@ export default function StartHerePage() {
                   ? "/dashboard/manager-insights"
                   : "/dashboard/follow-up";
             const label = isSuperadminRole(currentUser?.role)
-              ? "Buka Ops Dashboard"
+              ? "Buka Dashboard Operasional"
               : isHeadRole(currentUser?.role)
                 ? "Buka Monitor Tim"
                 : currentUser &&
                     isManagerRole(currentUser.role) &&
                     !canAccessQueueAndActionCenter(currentUser.role)
                   ? "Buka Monitor Tim"
-                  : "Buka Action Center";
+                  : "Buka Tindak Lanjut";
             const secondaryHref = isSuperadminRole(currentUser?.role)
               ? "/dashboard/marketing"
               : isHeadRole(currentUser?.role)
@@ -70,24 +71,24 @@ export default function StartHerePage() {
                   ? "/dashboard/approvals"
                   : "/dashboard/upload";
             const secondaryLabel = isSuperadminRole(currentUser?.role)
-              ? "Buka Chat Insight"
+              ? "Buka Insight Pasar"
               : isHeadRole(currentUser?.role)
                 ? "Buka Arahan Tim"
                 : isManagerRole(currentUser?.role)
                   ? "Buka Review Sales"
-                  : "Buka Lead Capture";
+                  : "Buka Input Chat";
 
             return (
               <>
                 <Link
                   href={href}
-                  className="inline-flex rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] hover:bg-slate-800"
+                  className="clara-button clara-button-primary"
                 >
                   {label}
                 </Link>
                 <Link
                   href={secondaryHref}
-                  className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400"
+                  className="clara-button clara-button-secondary"
                 >
                   {secondaryLabel}
                 </Link>
@@ -99,7 +100,7 @@ export default function StartHerePage() {
     >
       <div className="space-y-6">
         {errorMessage ? (
-          <section className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+          <section className="rounded-2xl border border-clara-danger-line bg-clara-danger-surface p-5 text-sm text-clara-danger">
             {errorMessage}
           </section>
         ) : null}

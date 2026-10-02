@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  faBuildingShield,
+  faUserShield,
   faCloudArrowDown,
   faCloudArrowUp,
   faEnvelope,
@@ -11,6 +11,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getPasswordStrength } from "@/lib/format";
 import { canAccessAdminPages, getRoleDisplayLabel } from "@/lib/roles";
@@ -196,8 +197,8 @@ export default function ProfilePage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Account profile"
-      title="Profile"
+      eyebrow={NAV_GROUP_NAMES.account}
+      title={PAGE_NAMES.profile}
       description="Kelola identitas akun aktif dan perbarui password dari satu halaman."
       backHref="/workspace"
       backLabel="Kembali ke beranda"
@@ -205,7 +206,7 @@ export default function ProfilePage() {
       <div className="space-y-6">
         {isLoading ? (
           <section className="clara-empty-state text-sm text-[#d6bb84]">
-            Loading profile...
+            Memuat profil...
           </section>
         ) : null}
 
@@ -231,7 +232,7 @@ export default function ProfilePage() {
                 hint="Email login untuk akun ini."
               />
               <ProfileStat
-                icon={faBuildingShield}
+                icon={faUserShield}
                 label="Role"
                 value={getRoleDisplayLabel(currentUser.role)}
                 hint={currentUser.is_active ? "Akun aktif" : "Akun tidak aktif"}
@@ -293,7 +294,7 @@ export default function ProfilePage() {
                   <button
                     type="submit"
                     disabled={isSavingProfile}
-                    className="rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_12px_28px_rgba(0,0,0,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="clara-button clara-button-primary"
                   >
                     {isSavingProfile ? "Saving..." : "Save Profile"}
                   </button>
@@ -351,7 +352,7 @@ export default function ProfilePage() {
                   <button
                     type="submit"
                     disabled={isSavingPassword}
-                    className="rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="clara-button clara-button-secondary"
                   >
                     {isSavingPassword ? "Saving..." : "Update Password"}
                   </button>
@@ -375,11 +376,11 @@ export default function ProfilePage() {
 
                 <article
                   data-onboarding-id="profile-extension-download"
-                  className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                  className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d6737]">
+                      <p className="text-xs font-semibold text-[#8d6737]">
                         Package Global
                       </p>
                       <p className="mt-2 text-lg font-semibold text-[#fff0c9]">
@@ -407,7 +408,7 @@ export default function ProfilePage() {
                   {extensionBuild?.available ? (
                     <a
                       href="/api/dashboard/extension-builds/download"
-                      className="mt-4 inline-flex rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08]"
+                      className="clara-button clara-button-primary mt-4"
                     >
                       Download Extension
                     </a>
@@ -415,7 +416,7 @@ export default function ProfilePage() {
                     <button
                       type="button"
                       disabled
-                      className="mt-4 inline-flex rounded-full border border-[#3c2c16] bg-[#22190f] px-4 py-2.5 text-sm font-semibold text-[#8d6737] disabled:cursor-not-allowed"
+                      className="clara-button clara-button-secondary mt-4"
                     >
                       Belum bisa didownload
                     </button>
@@ -449,14 +450,14 @@ export default function ProfilePage() {
                           setExtensionUploadFile(event.target.files?.[0] ?? null)
                         }
                         type="file"
-                        className="mt-2 block w-full rounded-2xl border border-[#f0cb73]/20 bg-[#17120d]/90 px-4 py-3 text-sm text-[#f7e7b7] outline-none file:mr-4 file:rounded-full file:border-0 file:bg-[#f0cb73] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#140f08]"
+                        className="clara-file-input mt-2"
                       />
                     </div>
 
                     <button
                       type="submit"
                       disabled={isUploadingExtension}
-                      className="inline-flex items-center gap-2 rounded-full border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2.5 text-sm font-semibold text-[#140f08] shadow-[0_12px_28px_rgba(0,0,0,0.22)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="clara-button clara-button-primary"
                     >
                       <FontAwesomeIcon icon={faCloudArrowUp} className="h-4 w-4" />
                       {isUploadingExtension ? "Uploading..." : "Upload Package"}
@@ -484,7 +485,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section data-onboarding-id={onboardingId} className="clara-card rounded-[30px] p-6">
+    <section data-onboarding-id={onboardingId} className="clara-card rounded-3xl p-6">
       <p className="clara-kicker text-xs">{eyebrow}</p>
       <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] clara-text-primary">
         {title}
@@ -506,7 +507,7 @@ function ProfileStat({
   hint: string;
 }) {
   return (
-    <article className="clara-card rounded-[28px] p-5">
+    <article className="clara-card rounded-3xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="clara-kicker text-xs">{label}</p>
@@ -518,15 +519,15 @@ function ProfileStat({
           <FontAwesomeIcon icon={icon} className="h-4 w-4" />
         </span>
       </div>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{hint}</p>
+      <p className="mt-3 text-sm leading-6 text-clara-ink-2">{hint}</p>
     </article>
   );
 }
 
 function ProfileField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="clara-card-soft rounded-[22px] px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8d6737]">
+    <div className="clara-card-soft rounded-2xl px-4 py-3">
+      <p className="text-xs font-semibold text-[#8d6737]">
         {label}
       </p>
       <p className="mt-1.5 text-sm font-semibold clara-text-primary">{value}</p>
@@ -554,7 +555,7 @@ function InputField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         type={type}
-        className="mt-2 w-full rounded-2xl border border-[#f0cb73]/20 bg-[#17120d]/90 px-4 py-3 text-sm text-[#f7e7b7] outline-none focus:border-[#f0cb73]"
+        className="clara-input mt-2"
         placeholder={placeholder}
       />
     </div>
@@ -569,7 +570,7 @@ function PasswordStrengthHint({
   return (
     <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(33,24,17,0.92)_0%,rgba(18,13,10,0.92)_100%)] p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8d6737]">
+        <p className="text-xs font-semibold text-[#8d6737]">
           Password Strength
         </p>
         <span

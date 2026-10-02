@@ -4,20 +4,23 @@ import type { IconDefinition } from "@fortawesome/fontawesome-svg-core";
 import {
   faArrowTrendUp,
   faBars,
+  faAddressBook,
   faBookOpen,
   faBriefcase,
-  faBuildingShield,
   faBullhorn,
   faCalendarCheck,
   faChartColumn,
   faChartLine,
+  faClipboardCheck,
+  faClipboardList,
   faCloudArrowUp,
+  faFlag,
   faComments,
   faGaugeHigh,
-  faRobot,
+  faShareNodes,
+  faSliders,
   faTriangleExclamation,
   faUsersGear,
-  faWandSparkles,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -29,6 +32,12 @@ import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
 import { resetDashboardOnboardingState } from "@/components/dashboard/SalesOnboardingTour";
 import { apiFetch } from "@/lib/api";
 import {
+  NAV_GROUP_NAMES,
+  PAGE_NAMES,
+  SITE_NAME,
+  formatNotificationSource,
+} from "@/lib/labels";
+import {
   canAccessQueueAndActionCenter,
   getRoleDisplayLabel,
   normalizeWorkspaceRole,
@@ -39,7 +48,7 @@ import type {
   OpsNotificationResponse,
 } from "@/types/dashboard";
 
-const SITE_TITLE = "SCC Workspace";
+const SITE_TITLE = SITE_NAME;
 
 type WorkspaceShellProps = {
   currentUser?: CurrentUser | null;
@@ -78,29 +87,32 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   const workspaceItems: NavItem[] = [
     {
       href: "/workspace",
-      label: "Beranda",
+      label: PAGE_NAMES.home,
       icon: faGaugeHigh,
       description: isSalesRole ? "Prioritas kerja hari ini" : "Ringkasan kerja",
     },
     {
       href: "/crm",
-      label: "Leads",
+      label:
+        isManagerScopedRole || isHeadScopedRole
+          ? PAGE_NAMES.leadsTeam
+          : PAGE_NAMES.leads,
       icon: faBriefcase,
       description: isSalesRole
-        ? "Progres prospect yang sedang ditangani"
+        ? "Prospect yang sedang kamu tangani"
         : isHeadMonitorRole
-          ? "Status dan progres lead lintas tim"
+          ? "Progres lead semua tim"
         : isManagerMonitorRole
-          ? "Status dan progres lead tim"
-        : "Status dan progres lead",
+          ? "Progres lead timmu"
+        : "Progres lead",
     },
   ];
 
   if (isSalesRole || isSuperadminScopedRole) {
     workspaceItems.push({
       href: "/customers",
-      label: "Customers",
-      icon: faBuildingShield,
+      label: PAGE_NAMES.customers,
+      icon: faAddressBook,
       description: isSalesRole ? "Ringkasan customer aktif" : "Data customer",
     });
   }
@@ -111,17 +123,27 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
       0,
       {
         href: "/sales",
-        label: "Chat",
+        label: PAGE_NAMES.inbox,
         icon: faComments,
         description: isSalesRole ? "Tempat mulai balas chat" : "Chat masuk Sales",
       },
+      ...(isSalesRole
+        ? [
+            {
+              href: "/upload",
+              label: PAGE_NAMES.intake,
+              icon: faCloudArrowUp,
+              description: "Tambah chat baru ke Clara",
+            },
+          ]
+        : []),
       {
         href: "/follow-up",
-        label: "Follow-up",
+        label: PAGE_NAMES.followUp,
         icon: faCalendarCheck,
         description: isSalesRole
           ? "Pekerjaan follow-up yang belum selesai"
-          : "Prioritas follow-up",
+          : "Prioritas tindak lanjut",
       },
     );
   }
@@ -132,7 +154,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   if (currentUser && (isHeadScopedRole || isSuperadminScopedRole)) {
     workspaceItems.push({
       href: "/notifications",
-      label: "Alerts",
+      label: isHeadScopedRole ? PAGE_NAMES.alertsTeam : PAGE_NAMES.alerts,
       icon: faTriangleExclamation,
       description: isHeadScopedRole
         ? "Sinyal follow-up tim yang perlu perhatian"
@@ -143,8 +165,8 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   if (currentUser && isSuperadminScopedRole) {
     workspaceItems.push({
       href: "/channels",
-      label: "Channels",
-      icon: faBars,
+      label: PAGE_NAMES.channels,
+      icon: faShareNodes,
       description: "Sumber channel",
     });
   }
@@ -156,9 +178,9 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     workspaceItems.push({
       href: "/approvals",
       label: isHeadScopedRole
-        ? "Arahan Tim"
-        : "Review",
-      icon: faWandSparkles,
+        ? PAGE_NAMES.teamDirection
+        : PAGE_NAMES.reviewSales,
+      icon: faClipboardCheck,
       description: isHeadScopedRole
         ? "Keputusan dan arahan tindak lanjut tim"
         : isManagerMonitorRole
@@ -167,7 +189,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     });
     insightItems.push({
       href: "/manager-insights",
-      label: "Team Monitor",
+      label: PAGE_NAMES.teamMonitor,
       icon: faChartLine,
       description: isHeadScopedRole
         ? "Pantau progres, risiko, dan hambatan tim"
@@ -181,21 +203,19 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     insightItems.push(
       {
         href: "/knowledge",
-        label: "Knowledge",
+        label: PAGE_NAMES.knowledge,
         icon: faBookOpen,
-        description: "Jawaban resmi",
+        description: "Jawaban resmi Clara",
       },
       {
         href: "/marketing",
-        label: isHeadMonitorRole ? "Insight Pasar" : "Marketing Insights",
+        label: PAGE_NAMES.marketing,
         icon: faBullhorn,
-        description: isHeadMonitorRole
-          ? "Pola objection dan sinyal dari lapangan"
-          : "Analisis sinyal marketing",
+        description: "Keberatan customer dan sinyal pasar",
       },
       {
         href: "/kpi",
-        label: "Ops Dashboard",
+        label: PAGE_NAMES.opsDashboard,
         icon: faChartColumn,
         description: "Kinerja operasional",
       },
@@ -207,46 +227,54 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     adminItems.push(
       {
         href: "/admin/access",
-        label: "Users & Access",
+        label: PAGE_NAMES.users,
         icon: faUsersGear,
-        description: "Role dan akses",
+        description: "Akun, role, dan tim",
       },
       {
         href: "/admin/ops",
-        label: "Audit Logs",
-        icon: faBuildingShield,
+        label: PAGE_NAMES.audit,
+        icon: faClipboardList,
         description: "Jejak audit dan status sistem",
       },
       {
         href: "/admin/ai-config",
-        label: "AI Persona",
-        icon: faRobot,
-        description: "Prompt dan perilaku Clara",
+        label: PAGE_NAMES.persona,
+        icon: faSliders,
+        description: "Gaya dan aturan jawaban Clara",
       },
     );
   }
 
-  const groups: NavGroup[] = [{ title: "Workspace", items: workspaceItems }];
+  if (currentUser) {
+    workspaceItems.push({
+      href: "/complaints",
+      label: PAGE_NAMES.complaints,
+      icon: faFlag,
+      description: "Keluhan customer yang perlu ditinjau",
+    });
+  }
+
+  const groups: NavGroup[] = [
+    { title: NAV_GROUP_NAMES.daily, items: workspaceItems },
+  ];
 
   if (currentUser && isSalesRole) {
-    workspaceItems.push({
-      href: "/upload",
-      label: "Input Chat",
-      icon: faCloudArrowUp,
-      description: "Masukkan chat baru ke Clara",
-    });
     return groups;
   }
 
   if (insightItems.length > 0) {
     groups.push({
-      title: isManagerMonitorRole || isHeadMonitorRole ? "Monitoring" : "Insights",
+      title:
+        isManagerMonitorRole || isHeadMonitorRole
+          ? NAV_GROUP_NAMES.monitoring
+          : NAV_GROUP_NAMES.analysis,
       items: insightItems,
     });
   }
 
   if (adminItems.length > 0) {
-    groups.push({ title: "Administration", items: adminItems });
+    groups.push({ title: NAV_GROUP_NAMES.admin, items: adminItems });
   }
 
   return groups;
@@ -607,10 +635,13 @@ export function WorkspaceShell({
             aria-label="Menu workspace"
           >
             {navGroups.map((group) => (
-              <section key={group.title} aria-labelledby={`nav-${group.title}`}>
+              <section
+                key={group.title}
+                aria-labelledby={`nav-${group.title.replaceAll(" ", "-")}`}
+              >
                 <h2
-                  id={`nav-${group.title}`}
-                  className="clara-text-muted px-3 text-xs font-semibold uppercase tracking-[0.16em]"
+                  id={`nav-${group.title.replaceAll(" ", "-")}`}
+                  className="clara-text-muted px-3 text-xs font-semibold"
                 >
                   {group.title}
                 </h2>
@@ -636,7 +667,18 @@ export function WorkspaceShell({
                             className="h-4 w-4"
                           />
                         </span>
-                        <span className="min-w-0 truncate">{item.label}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate">{item.label}</span>
+                          <span
+                            className={`block text-xs font-normal leading-4 ${
+                              active
+                                ? "text-[var(--color-text-secondary)]"
+                                : "text-[var(--color-text-muted)]"
+                            }`}
+                          >
+                            {item.description}
+                          </span>
+                        </span>
                       </Link>
                     );
                   })}
@@ -737,6 +779,12 @@ export function WorkspaceShell({
                         >
                           Profil
                         </Link>
+                        <Link
+                          href="/start"
+                          className="block min-h-11 rounded-lg px-3 py-3 text-sm font-medium hover:bg-[var(--color-surface-muted)]"
+                        >
+                          {PAGE_NAMES.guide}
+                        </Link>
                         {normalizedRole === "sales" ||
                         normalizedRole === "manager" ||
                         normalizedRole === "head" ? (
@@ -770,7 +818,7 @@ export function WorkspaceShell({
                   {backHref && backLabel ? (
                     <Link
                       href={backHref}
-                      className="clara-text-secondary mb-3 inline-flex min-h-10 max-w-full items-center rounded-lg px-2 text-sm font-medium hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)]"
+                      className="clara-text-secondary mb-3 inline-flex min-h-11 max-w-full items-center rounded-lg px-2 text-sm font-medium hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)]"
                     >
                       <span aria-hidden="true" className="mr-2">
                         ←
@@ -778,7 +826,6 @@ export function WorkspaceShell({
                       <span className="truncate">{backLabel}</span>
                     </Link>
                   ) : null}
-                  <p className="clara-kicker">{eyebrow}</p>
                   <h1 className="clara-page-title mt-2 break-words">
                     {title}
                   </h1>
@@ -819,7 +866,7 @@ export function WorkspaceShell({
                               : "Perlu tindakan"}
                           </span>
                           <span className="text-xs font-medium text-[var(--color-warning)]">
-                            {notification.source_type.replaceAll("_", " ")}
+                            {formatNotificationSource(notification.source_type)}
                           </span>
                         </div>
                         <p className="mt-2 text-sm font-semibold">
@@ -838,14 +885,14 @@ export function WorkspaceShell({
                           >
                             {normalizedRole === "head"
                               ? "Buka follow-up tim"
-                              : "Buka data yang belum sinkron"}
+                              : "Buka detailnya"}
                           </Link>
                         ) : null}
                         <Link
-                          href="/dashboard/notifications"
+                          href="/notifications"
                           className="clara-button clara-button-secondary max-w-full px-3 py-2 text-sm"
                         >
-                          Lihat semua notifikasi
+                          Lihat semua alert
                         </Link>
                         <button
                           type="button"

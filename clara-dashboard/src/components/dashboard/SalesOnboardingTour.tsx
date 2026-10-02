@@ -81,7 +81,7 @@ const TOUR_ROUTES: TourRoute[] = [
   },
   {
     path: "/crm",
-    title: "Leads",
+    title: "Lead",
     steps: [
       {
         id: "sales-crm-hero",
@@ -117,7 +117,7 @@ const TOUR_ROUTES: TourRoute[] = [
   },
   {
     path: "/customers",
-    title: "Daftar Customer",
+    title: "Customer",
     steps: [
       {
         id: "sales-customers-hero",
@@ -331,18 +331,6 @@ const MANAGER_TOUR_ROUTES: TourRoute[] = [
         title: "Kondisi tim singkat",
         description:
           "Blok ini merangkum kesehatan ritme tim: kepatuhan follow-up, lead yang mulai macet, dan jumlah catatan yang belum rapi.",
-      },
-      {
-        id: "manager-home-quick-nav",
-        title: "Navigasi cepat manager",
-        description:
-          "Shortcut ini dipakai untuk lompat ke area kerja paling sering setelah membaca beranda.",
-      },
-      {
-        id: "manager-home-priority",
-        title: "Urutan kerja manager",
-        description:
-          "Bagian ini menjelaskan urutan kerja yang paling aman: review sales dulu, cek monitor tim, lalu turun ke lead spesifik kalau perlu.",
       },
       {
         id: "manager-home-metrics",
@@ -605,24 +593,6 @@ const HEAD_TOUR_ROUTES: TourRoute[] = [
         description:
           "Bagian ini dipakai untuk melihat kesehatan follow-up lintas tim secara cepat tanpa membuka halaman monitor penuh.",
       },
-      {
-        id: "head-home-quick-nav",
-        title: "Navigasi cepat head",
-        description:
-          "Shortcut ini membantu head langsung masuk ke area kerja strategis yang paling sering dipakai.",
-      },
-      {
-        id: "head-home-priority",
-        title: "Cara baca beranda head",
-        description:
-          "Blok ini menjelaskan urutan kerja yang aman untuk head: alert besar dulu, pola monitor tim, lalu turunkan arahan.",
-      },
-      {
-        id: "head-home-metrics",
-        title: "Angka penting head",
-        description:
-          "Kartu angka ini dipakai untuk membaca tekanan lintas tim dengan cepat tanpa tenggelam di semua detail.",
-      },
     ],
   },
   {
@@ -657,7 +627,7 @@ const HEAD_TOUR_ROUTES: TourRoute[] = [
   },
   {
     path: "/manager-insights",
-    title: "Head Insight",
+    title: "Monitor Tim",
     steps: [
       {
         id: "manager-insights-hero",
@@ -1291,7 +1261,7 @@ export function SalesOnboardingTour() {
 
       {targetRect ? (
         <div
-          className="pointer-events-none fixed z-[71] rounded-[24px] border-[3px] border-[#f6d98c] bg-transparent shadow-[0_0_0_2px_rgba(255,243,207,0.42),0_0_28px_rgba(240,203,115,0.38),0_0_0_9999px_rgba(0,0,0,0.14)] transition-all motion-reduce:transition-none"
+          className="pointer-events-none fixed z-[71] rounded-2xl border-[3px] border-[#f6d98c] bg-transparent shadow-[0_0_0_2px_rgba(255,243,207,0.42),0_0_28px_rgba(240,203,115,0.38),0_0_0_9999px_rgba(0,0,0,0.14)] transition-all motion-reduce:transition-none"
           style={{
             left: highlightLeft,
             top: highlightTop,
@@ -1303,7 +1273,7 @@ export function SalesOnboardingTour() {
 
       <div
         aria-labelledby="sales-onboarding-title"
-        className="fixed z-[72] w-[340px] max-w-[calc(100vw-2rem)] rounded-[24px] border border-[#f6d98c]/40 bg-[linear-gradient(180deg,rgba(43,31,19,0.99)_0%,rgba(20,14,10,0.99)_100%)] p-5 text-[#fff4d6] shadow-[0_28px_64px_rgba(0,0,0,0.58),0_0_0_1px_rgba(246,217,140,0.18)]"
+        className="fixed z-[72] w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-[#f6d98c]/40 bg-[linear-gradient(180deg,rgba(43,31,19,0.99)_0%,rgba(20,14,10,0.99)_100%)] p-5 text-[#fff4d6] shadow-[0_28px_64px_rgba(0,0,0,0.58),0_0_0_1px_rgba(246,217,140,0.18)]"
         ref={popupRef}
         role="dialog"
         style={{
@@ -1313,7 +1283,7 @@ export function SalesOnboardingTour() {
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#f6d98c]">
+            <p className="text-xs font-bold text-[#f6d98c]">
               {currentTourRole === "manager"
                 ? "Onboarding Manager"
                 : currentTourRole === "head"
@@ -1330,7 +1300,7 @@ export function SalesOnboardingTour() {
           <button
             type="button"
             onClick={handleSkip}
-            className="rounded-full border border-[#f6d98c]/28 bg-[rgba(246,217,140,0.08)] px-3 py-1.5 text-xs font-semibold text-[#f6d98c] hover:bg-[rgba(246,217,140,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6d98c]"
+            className="clara-button clara-button-ghost"
           >
             Lewati
           </button>
@@ -1358,7 +1328,7 @@ export function SalesOnboardingTour() {
           <button
             type="button"
             onClick={handleNext}
-            className="rounded-full bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] px-4 py-2 text-sm font-semibold text-[#140f08] shadow-[0_10px_24px_rgba(0,0,0,0.2)] hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f6d98c] focus-visible:ring-offset-2 focus-visible:ring-offset-[#140f08]"
+            className="clara-button clara-button-primary"
           >
             {isLastStepOnRoute
               ? isLastRoute

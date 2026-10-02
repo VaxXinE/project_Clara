@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { canAccessStrategicInsights } from "@/lib/roles";
@@ -234,16 +235,16 @@ export default function KpiCommandCenterPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="KPI foundation"
-      title="Ops Dashboard"
+      eyebrow={NAV_GROUP_NAMES.analysis}
+      title={PAGE_NAMES.opsDashboard}
       description="Superadmin dan head bisa membaca kesehatan pipeline, produktivitas sales, dan performa organization dari data conversation yang benar-benar sudah ada."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
         <div className="flex flex-wrap items-center gap-3">
           {kpi ? (
-            <div className="rounded-[20px] border border-[#f0cb73]/18 bg-[#1d150d] px-4 py-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#b89a62]">
+            <div className="rounded-2xl border border-[#f0cb73]/18 bg-[#1d150d] px-4 py-3">
+              <p className="text-xs font-semibold text-[#b89a62]">
                 Snapshot terakhir
               </p>
               <p className="mt-1 text-sm text-[#fff0c9]">
@@ -267,7 +268,7 @@ export default function KpiCommandCenterPage() {
       <div className="space-y-8">
         {isLoading ? (
           <div role="status" className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
-            Loading KPI command center...
+            Memuat dashboard operasional...
           </div>
         ) : null}
 
@@ -303,7 +304,7 @@ export default function KpiCommandCenterPage() {
                     tone={kpi.summary.overdue_follow_ups > 0 ? "highlight" : "default"}
                   />
                   <MetricCard
-                    label="Hot Leads"
+                    label="Lead Panas"
                     value={String(kpi.summary.hot_leads)}
                     hint="Prospect yang harus dijaga momentumnya."
                     tone="highlight"
@@ -321,8 +322,8 @@ export default function KpiCommandCenterPage() {
                 </div>
 
                 <div className="mt-6 grid gap-5 lg:grid-cols-[1.08fr_0.92fr]">
-                  <div className="rounded-[24px] border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(26,19,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] p-5">
-                    <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
+                  <div className="rounded-2xl border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(26,19,13,0.98)_0%,rgba(16,12,9,0.98)_100%)] p-5">
+                    <p className="text-sm font-semibold text-[#f0cb73]">
                       Prioritas Utama
                     </p>
                     <p className="mt-2 text-sm leading-6 text-[#b89a62]">
@@ -356,10 +357,10 @@ export default function KpiCommandCenterPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-[24px] border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(25,18,13,0.94)_0%,rgba(16,12,9,0.96)_100%)] p-5">
+                  <div className="rounded-2xl border border-[#f0cb73]/12 bg-[linear-gradient(180deg,rgba(25,18,13,0.94)_0%,rgba(16,12,9,0.96)_100%)] p-5">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
+                        <p className="text-sm font-semibold text-[#f0cb73]">
                           Bacaan Cepat
                         </p>
                         <p className="mt-2 text-sm leading-6 text-[#b89a62]">
@@ -405,7 +406,7 @@ export default function KpiCommandCenterPage() {
                 >
                   <div className="space-y-5">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#f0cb73]">
+                      <p className="text-xs font-semibold text-[#f0cb73]">
                         Source Channel
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -458,7 +459,7 @@ export default function KpiCommandCenterPage() {
                       />
                       <QuickLink
                         href="/dashboard/marketing"
-                        label="Buka Marketing Insights"
+                        label="Buka Insight Pasar"
                         description="Bandingkan output marketing terhadap performa pipeline."
                       />
                       <QuickLink
@@ -511,7 +512,7 @@ export default function KpiCommandCenterPage() {
                     urgentLiveAlerts.map((alert) => (
                       <article
                         key={`${alert.severity}-${alert.title}`}
-                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.16)]"
+                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.16)]"
                       >
                         <div className="flex flex-wrap items-center gap-3">
                           <StatusBadge
@@ -526,7 +527,7 @@ export default function KpiCommandCenterPage() {
                           {alert.description}
                         </p>
                         <div className="mt-4 rounded-2xl bg-[#1d150d] p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
+                          <p className="text-xs font-semibold text-[#f0cb73]">
                             Recommended action
                           </p>
                           <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
@@ -559,7 +560,7 @@ export default function KpiCommandCenterPage() {
                     topRecommendations.map((recommendation) => (
                       <article
                         key={`${recommendation.owner_role}-${recommendation.title}`}
-                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.16)]"
+                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.16)]"
                       >
                         <div className="flex flex-wrap items-center gap-3">
                           <Badge label={recommendation.owner_role} />
@@ -571,7 +572,7 @@ export default function KpiCommandCenterPage() {
                           {recommendation.rationale}
                         </p>
                         <div className="mt-4 rounded-2xl bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-4 text-[#fff0c9]">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
+                          <p className="text-xs font-semibold text-[#f0cb73]">
                             Next step
                           </p>
                           <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
@@ -642,11 +643,11 @@ export default function KpiCommandCenterPage() {
                     topSales.map((row, index) => (
                       <article
                         key={row.user_id}
-                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                       >
                         <div className="flex flex-wrap items-start justify-between gap-4">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+                            <p className="text-xs font-semibold text-[#b89a62]">
                               Rank {index + 1}
                             </p>
                             <h3 className="mt-1 text-lg font-semibold text-[#fff0c9]">
@@ -657,7 +658,7 @@ export default function KpiCommandCenterPage() {
                             </p>
                           </div>
                           <div className="rounded-2xl bg-[linear-gradient(180deg,rgba(28,21,14,0.96)_0%,rgba(16,12,9,0.98)_100%)] px-4 py-3 text-right text-[#fff0c9]">
-                            <p className="text-xs uppercase tracking-[0.16em] text-[#f0cb73]">
+                            <p className="text-xs text-[#f0cb73]">
                               Replies Sent
                             </p>
                             <p className="mt-1 text-2xl font-bold">
@@ -668,19 +669,19 @@ export default function KpiCommandCenterPage() {
 
                         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                           <SummaryTile
-                            label="Assigned Leads"
+                            label="Lead Ditugaskan"
                             value={String(row.assigned_leads)}
                           />
                           <SummaryTile
-                            label="Hot Leads"
+                            label="Lead Panas"
                             value={String(row.hot_leads)}
                           />
                           <SummaryTile
-                            label="Closing Leads"
+                            label="Lead Closing"
                             value={String(row.closing_leads)}
                           />
                           <SummaryTile
-                            label="Won Leads"
+                            label="Lead Closing"
                             value={String(row.won_leads)}
                           />
                           <SummaryTile
@@ -721,13 +722,13 @@ export default function KpiCommandCenterPage() {
               >
                 <div className="grid gap-3 sm:grid-cols-2">
                   <SummaryTile
-                    label="Leads Generated"
+                    label="Lead Masuk"
                     value={String(
                       kpi.marketing_execution_summary.leads_generated,
                     )}
                   />
                   <SummaryTile
-                    label="Won Leads"
+                    label="Lead Closing"
                     value={String(kpi.marketing_execution_summary.won_leads)}
                   />
                   <SummaryTile
@@ -763,7 +764,7 @@ export default function KpiCommandCenterPage() {
                     topSources.map((row) => (
                       <article
                         key={row.source_key}
-                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
@@ -775,7 +776,7 @@ export default function KpiCommandCenterPage() {
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <Badge label={`Leads ${row.lead_count}`} />
+                            <Badge label={`Lead ${row.lead_count}`} />
                             <Badge label={`Conv ${row.conversation_count}`} />
                             <Badge label={`Hot ${row.hot_leads}`} />
                           </div>
@@ -832,7 +833,7 @@ export default function KpiCommandCenterPage() {
                     activeAlerts.map((alert) => (
                       <article
                         key={alert.id}
-                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex flex-wrap items-center gap-3">
@@ -858,7 +859,7 @@ export default function KpiCommandCenterPage() {
                           {alert.description}
                         </p>
                         <div className="mt-4 rounded-2xl bg-[#1d150d] p-4">
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
+                          <p className="text-xs font-semibold text-[#f0cb73]">
                             Recommended action
                           </p>
                           <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
@@ -867,7 +868,7 @@ export default function KpiCommandCenterPage() {
                         </div>
                         {alert.resolution_note ? (
                           <div className="mt-4 rounded-2xl border border-[#f0cb73]/16 bg-[#1d150d] p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0cb73]">
+                            <p className="text-xs font-semibold text-[#f0cb73]">
                               Resolution note
                             </p>
                             <p className="mt-2 text-sm leading-6 text-[#fff0c9]">
@@ -887,7 +888,7 @@ export default function KpiCommandCenterPage() {
                                 }));
                               }}
                               placeholder="Catatan resolusi opsional sebelum alert ditutup..."
-                              className="min-h-[96px] w-full rounded-2xl border border-[#4a3618] bg-[#1a130d] px-4 py-3 text-sm leading-6 text-[#f7e7b7] outline-none transition placeholder:text-[#907953] focus:border-[#f0cb73]/28"
+                              className="clara-textarea min-h-[96px]"
                             />
                             <div className="flex flex-wrap gap-3">
                               {alert.status === "active" ? (
@@ -956,11 +957,11 @@ export default function KpiCommandCenterPage() {
                     latestSnapshots.map((snapshot, index) => (
                       <article
                         key={snapshot.id}
-                        className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                        className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b89a62]">
+                            <p className="text-xs font-semibold text-[#b89a62]">
                               Snapshot {latestSnapshots.length - index}
                             </p>
                             <h3 className="mt-1 text-base font-semibold text-[#fff0c9]">
@@ -972,11 +973,11 @@ export default function KpiCommandCenterPage() {
 
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                           <SummaryTile
-                            label="Total Leads"
+                            label="Total Lead"
                             value={String(snapshot.metrics_json.total_leads)}
                           />
                           <SummaryTile
-                            label="Hot Leads"
+                            label="Lead Panas"
                             value={String(snapshot.metrics_json.hot_leads)}
                           />
                           <SummaryTile
@@ -1018,7 +1019,7 @@ export default function KpiCommandCenterPage() {
                   href="/dashboard/marketing"
                   className="clara-button clara-button-ghost"
                 >
-                  Buka Marketing Insights
+                  Buka Insight Pasar
                 </Link>
               }
             >
@@ -1029,14 +1030,14 @@ export default function KpiCommandCenterPage() {
                   topOrganizations.map((row) => (
                     <article
                       key={row.organization_id}
-                      className="rounded-[24px] border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                      className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <h3 className="text-lg font-semibold text-[#fff0c9]">
                           {row.organization_name}
                         </h3>
                         <div className="flex flex-wrap gap-2">
-                          <Badge label={`Leads ${row.total_leads}`} />
+                          <Badge label={`Lead ${row.total_leads}`} />
                           <Badge label={`Hot ${row.hot_leads}`} />
                           <Badge label={`Closing ${row.closing_leads}`} />
                         </div>
@@ -1052,7 +1053,7 @@ export default function KpiCommandCenterPage() {
                           value={String(row.analyzed_conversations)}
                         />
                         <SummaryTile
-                          label="Won Leads"
+                          label="Lead Closing"
                           value={String(row.won_leads)}
                         />
                         <SummaryTile
@@ -1157,7 +1158,7 @@ function buildOpsPriorities(
       description:
         "Setelah tahu area yang mendesak, baru lihat apakah hambatannya datang dari tim tertentu, source tertentu, atau pola market yang lebih luas.",
       href: "/dashboard/marketing",
-      cta: "Buka Marketing Insights",
+      cta: "Buka Insight Pasar",
       tone: "good" as const,
     },
   ];
@@ -1182,11 +1183,11 @@ function SectionPanel({
 }) {
   return (
     <section
-      className={`flex flex-col rounded-[28px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)] ${className ?? ""}`.trim()}
+      className={`flex flex-col rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_14px_34px_rgba(0,0,0,0.22)] ${className ?? ""}`.trim()}
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#f0cb73]">
+          <p className="text-sm font-semibold text-[#f0cb73]">
             {eyebrow}
           </p>
           <h2 className="mt-2 text-xl font-bold tracking-tight text-[#fff0c9]">
@@ -1219,8 +1220,8 @@ function MetricCard({
 }) {
   if (tone === "highlight") {
     return (
-      <article className="rounded-[24px] border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#140f08]">
+      <article className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-5 shadow-[0_12px_28px_rgba(0,0,0,0.2)]">
+        <p className="text-xs font-semibold text-[#140f08]">
           {label}
         </p>
         <p className="mt-3 text-3xl font-bold tracking-tight text-[#140f08]">
@@ -1232,8 +1233,8 @@ function MetricCard({
   }
 
   return (
-    <article className="clara-card rounded-[24px] p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#f0cb73]">
+    <article className="clara-card rounded-2xl p-5">
+      <p className="text-xs font-semibold text-[#f0cb73]">
         {label}
       </p>
       <p className="mt-3 text-3xl font-bold tracking-tight text-[#fff0c9]">
@@ -1276,7 +1277,7 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="block rounded-[22px] border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.98)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.12)] hover:border-[#f0cb73]/26"
+      className="block rounded-2xl border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(27,20,14,0.94)_0%,rgba(18,13,10,0.98)_100%)] p-4 shadow-[0_10px_24px_rgba(0,0,0,0.12)] hover:border-[#f0cb73]/26"
     >
       <p className="text-sm font-semibold text-[#fff0c9]">{label}</p>
       <p className="mt-1 text-sm leading-6 text-[#d6bb84]">{description}</p>
@@ -1305,12 +1306,12 @@ function StatusBadge({
       : tone === "warning"
         ? "border border-amber-400/30 bg-amber-500/12 text-amber-100"
         : tone === "critical"
-          ? "border border-red-400/30 bg-red-500/12 text-red-100"
+          ? "border border-red-400/30 bg-red-500/12 text-clara-danger"
           : "border border-[#f0cb73]/18 bg-[#22190f] text-[#f0cb73]";
 
   return (
     <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${className}`}
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${className}`}
     >
       {label}
     </span>

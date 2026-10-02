@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatStatusLabel } from "@/lib/format";
 import { canAccessStrategicInsights } from "@/lib/roles";
@@ -246,15 +247,15 @@ export default function MarketingInsightsPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Strategic intelligence"
-      title="Marketing Insights"
+      eyebrow={NAV_GROUP_NAMES.analysis}
+      title={PAGE_NAMES.marketing}
       description="Ringkasan yang membantu superadmin dan head membaca kebutuhan pasar, area resistensi, dan prioritas konten berikutnya tanpa harus membongkar seluruh chat customer."
       backHref="/dashboard"
       backLabel="Kembali ke overview"
       actions={
         insights ? (
           <>
-            <div className="rounded-full border border-[#f0cb73]/18 bg-[#1f1810] px-4 py-2.5 text-sm text-slate-200">
+            <div className="rounded-full border border-[#f0cb73]/18 bg-[#1f1810] px-4 py-2.5 text-sm text-clara-ink-3">
               Snapshot: {formatDateTime(insights.generated_at)}
             </div>
             <button
@@ -272,8 +273,8 @@ export default function MarketingInsightsPage() {
       <div className="space-y-6">
 
         {isLoading && (
-          <div role="status" className="clara-empty-state text-sm text-slate-300">
-            Loading marketing insights...
+          <div role="status" className="clara-empty-state text-sm text-clara-ink-3">
+            Memuat insight pasar...
           </div>
         )}
 
@@ -285,7 +286,7 @@ export default function MarketingInsightsPage() {
 
         {insights && !isLoading && (
           <>
-            <p className="text-sm leading-6 text-slate-400">
+            <p className="text-sm leading-6 text-clara-ink-3">
               Sinyal dan outcome membantu menentukan prioritas; korelasi data
               tidak otomatis membuktikan sebab-akibat.
             </p>
@@ -319,12 +320,12 @@ export default function MarketingInsightsPage() {
                 tone="slate"
               />
               <MetricCard
-                label="Leads Generated"
+                label="Lead Masuk"
                 value={String(insights.execution_summary.leads_generated)}
                 tone="blue"
               />
               <MetricCard
-                label="Won Leads"
+                label="Lead Closing"
                 value={String(insights.execution_summary.won_leads)}
                 tone="green"
               />
@@ -348,13 +349,13 @@ export default function MarketingInsightsPage() {
                       {insights.top_objections.map((item) => (
                         <article
                           key={item.topic}
-                          className="clara-card-soft rounded-[20px] p-4"
+                          className="clara-card-soft rounded-2xl p-4"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-slate-100">
+                            <p className="text-sm font-semibold text-clara-ink-3">
                               {item.topic}
                             </p>
-                            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">
+                            <span className="rounded-full bg-clara-deep px-2.5 py-1 text-xs font-semibold text-clara-cream">
                               {item.count}
                             </span>
                           </div>
@@ -375,10 +376,10 @@ export default function MarketingInsightsPage() {
                       {insights.top_content_recommendations.map((item) => (
                         <article
                           key={`${item.title}-${item.suggested_format}`}
-                          className="clara-card-soft rounded-[22px] p-4"
+                          className="clara-card-soft rounded-2xl p-4"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-100">
+                            <h3 className="text-base font-semibold text-clara-ink-3">
                               {item.title}
                             </h3>
                             <span
@@ -391,13 +392,13 @@ export default function MarketingInsightsPage() {
                               {item.priority}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm text-slate-300">
+                          <p className="mt-2 text-sm text-clara-ink-3">
                             {item.rationale}
                           </p>
-                          <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          <p className="mt-3 text-xs font-semibold text-clara-ink-3">
                             Suggested format
                           </p>
-                          <p className="mt-1 text-sm text-slate-100">
+                          <p className="mt-1 text-sm text-clara-ink-3">
                             {formatStatusLabel(item.suggested_format)}
                           </p>
                         </article>
@@ -417,10 +418,10 @@ export default function MarketingInsightsPage() {
                       {insights.content_briefs.map((brief) => (
                         <article
                           key={`${brief.title}-${brief.suggested_format}`}
-                          className="clara-card rounded-[24px] p-5"
+                          className="clara-card rounded-2xl p-5"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-100">
+                            <h3 className="text-base font-semibold text-clara-ink-3">
                               {brief.title}
                             </h3>
                             <span
@@ -454,10 +455,10 @@ export default function MarketingInsightsPage() {
                           </div>
 
                           <div className="mt-4 rounded-2xl bg-[rgba(31,24,17,0.9)] p-4">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            <p className="text-xs font-semibold text-clara-ink-3">
                               Key message
                             </p>
-                            <p className="mt-2 text-sm leading-6 text-slate-200">
+                            <p className="mt-2 text-sm leading-6 text-clara-ink-3">
                               {brief.key_message}
                             </p>
                           </div>
@@ -477,7 +478,7 @@ export default function MarketingInsightsPage() {
                                 })
                               }
                               disabled={isCreatingExecutionItem}
-                              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                              className="clara-button clara-button-primary"
                             >
                               {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan Execution Item"}
                             </button>
@@ -499,13 +500,13 @@ export default function MarketingInsightsPage() {
                       {insights.execution_items.map((item) => (
                         <article
                           key={item.id}
-                          className="clara-card rounded-[24px] p-5"
+                          className="clara-card rounded-2xl p-5"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-100">
+                            <h3 className="text-base font-semibold text-clara-ink-3">
                               {item.title}
                             </h3>
-                            <span className="rounded-full bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-slate-100">
+                            <span className="rounded-full bg-clara-sunken px-2.5 py-1 text-xs font-semibold text-clara-ink-3">
                               {formatStatusLabel(item.item_type)}
                             </span>
                             <span className="rounded-full bg-amber-600/15 px-2.5 py-1 text-xs font-semibold text-amber-200">
@@ -513,20 +514,20 @@ export default function MarketingInsightsPage() {
                             </span>
                           </div>
 
-                          <p className="mt-3 text-sm leading-6 text-slate-300">
+                          <p className="mt-3 text-sm leading-6 text-clara-ink-3">
                             {item.summary}
                           </p>
 
                           <div className="mt-4 grid gap-4 md:grid-cols-2">
                             <SignalBlock label="Recommended action" value={item.recommended_action} />
                             <div className="rounded-2xl bg-[rgba(31,24,17,0.9)] p-4">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              <p className="text-xs font-semibold text-clara-ink-3">
                                 Ownership
                               </p>
-                              <p className="mt-2 text-sm text-slate-300">
+                              <p className="mt-2 text-sm text-clara-ink-3">
                                 Dibuat oleh {item.created_by_user_name ?? "System"}
                               </p>
-                              <p className="mt-1 text-sm text-slate-300">
+                              <p className="mt-1 text-sm text-clara-ink-3">
                                 PIC: {item.assigned_user_name ?? "Belum di-assign"}
                               </p>
                             </div>
@@ -534,7 +535,7 @@ export default function MarketingInsightsPage() {
 
                           <div className="mt-4 grid gap-3 md:grid-cols-2">
                             <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
                                 Status
                               </span>
                               <select
@@ -545,7 +546,7 @@ export default function MarketingInsightsPage() {
                                   })
                                 }
                                 disabled={updatingExecutionItemId === item.id}
-                                className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
+                                className="clara-select"
                               >
                                 {EXECUTION_STATUS_OPTIONS.map((option) => (
                                   <option key={option} value={option}>
@@ -556,7 +557,7 @@ export default function MarketingInsightsPage() {
                             </label>
 
                             <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
                                 Assign PIC
                               </span>
                               <select
@@ -567,7 +568,7 @@ export default function MarketingInsightsPage() {
                                   })
                                 }
                                 disabled={updatingExecutionItemId === item.id}
-                                className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
+                                className="clara-select"
                               >
                                 <option value="">Belum di-assign</option>
                                 {users.map((user) => (
@@ -581,7 +582,7 @@ export default function MarketingInsightsPage() {
 
                           <div className="mt-4 grid gap-3 md:grid-cols-2">
                             <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
                                 Campaign Name
                               </span>
                               <input
@@ -596,12 +597,12 @@ export default function MarketingInsightsPage() {
                                     },
                                   }))
                                 }
-                                className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
+                                className="clara-input"
                               />
                             </label>
 
                             <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
                                 Published At
                               </span>
                               <input
@@ -616,14 +617,14 @@ export default function MarketingInsightsPage() {
                                     },
                                   }))
                                 }
-                                className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
+                                className="clara-input"
                               />
                             </label>
                           </div>
 
                           <div className="mt-4 grid gap-3 md:grid-cols-3">
                             <OutcomeNumberField
-                              label="Leads Generated"
+                              label="Lead Masuk"
                               value={outcomeDrafts[item.id]?.leads_generated ?? "0"}
                               onChange={(value) =>
                                 setOutcomeDrafts((current) => ({
@@ -633,7 +634,7 @@ export default function MarketingInsightsPage() {
                               }
                             />
                             <OutcomeNumberField
-                              label="Qualified Leads"
+                              label="Lead Terkualifikasi"
                               value={outcomeDrafts[item.id]?.qualified_leads ?? "0"}
                               onChange={(value) =>
                                 setOutcomeDrafts((current) => ({
@@ -643,7 +644,7 @@ export default function MarketingInsightsPage() {
                               }
                             />
                             <OutcomeNumberField
-                              label="Won Leads"
+                              label="Lead Closing"
                               value={outcomeDrafts[item.id]?.won_leads ?? "0"}
                               onChange={(value) =>
                                 setOutcomeDrafts((current) => ({
@@ -697,7 +698,7 @@ export default function MarketingInsightsPage() {
                           </div>
 
                           <label className="mt-4 block">
-                            <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
                               Result Notes
                             </span>
                             <textarea
@@ -712,7 +713,7 @@ export default function MarketingInsightsPage() {
                                 }))
                               }
                               rows={3}
-                              className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
+                              className="clara-textarea"
                             />
                           </label>
 
@@ -752,7 +753,7 @@ export default function MarketingInsightsPage() {
                                   ),
                                 })
                               }
-                              className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                              className="rounded-full bg-clara-success-surface px-4 py-2 text-sm font-semibold text-clara-cream disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {updatingExecutionItemId === item.id
                                 ? "Menyimpan..."
@@ -762,10 +763,10 @@ export default function MarketingInsightsPage() {
 
                           {item.notes && (
                             <div className="mt-4 rounded-2xl bg-[rgba(31,24,17,0.9)] p-4">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              <p className="text-xs font-semibold text-clara-ink-3">
                                 Notes
                               </p>
-                              <p className="mt-2 text-sm leading-6 text-slate-300">
+                              <p className="mt-2 text-sm leading-6 text-clara-ink-3">
                                 {item.notes}
                               </p>
                             </div>
@@ -787,18 +788,18 @@ export default function MarketingInsightsPage() {
                       {snapshots.map((snapshot) => (
                         <article
                           key={snapshot.id}
-                          className="clara-card-soft rounded-[22px] p-4"
+                          className="clara-card-soft rounded-2xl p-4"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <h3 className="text-sm font-semibold text-slate-100">
+                              <h3 className="text-sm font-semibold text-clara-ink-3">
                                 {formatDateTime(snapshot.created_at)}
                               </h3>
-                              <p className="mt-1 text-xs text-slate-500">
+                              <p className="mt-1 text-xs text-clara-ink-3">
                                 Period: {snapshot.period_start} s/d {snapshot.period_end}
                               </p>
                             </div>
-                            <span className="rounded-full bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-slate-100">
+                            <span className="rounded-full bg-clara-sunken px-2.5 py-1 text-xs font-semibold text-clara-ink-3">
                               {snapshot.scope_type}
                             </span>
                           </div>
@@ -854,7 +855,7 @@ export default function MarketingInsightsPage() {
                 </Panel>
 
                 <Panel
-                  title="Operational KPI"
+                  title="KPI Operasional"
                   description="KPI pendukung untuk membaca kesehatan pipeline analysis dan workflow balasan tim."
                 >
                   <div className="grid gap-3">
@@ -894,10 +895,10 @@ export default function MarketingInsightsPage() {
                       {insights.ads_signals.map((signal) => (
                         <article
                           key={`${signal.title}-${signal.budget_shift}`}
-                          className="clara-card rounded-[24px] p-5"
+                          className="clara-card rounded-2xl p-5"
                         >
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-slate-100">
+                            <h3 className="text-base font-semibold text-clara-ink-3">
                               {signal.title}
                             </h3>
                             <span
@@ -940,7 +941,7 @@ export default function MarketingInsightsPage() {
                                 })
                               }
                               disabled={isCreatingExecutionItem}
-                              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                              className="clara-button clara-button-primary"
                             >
                               {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan Execution Item"}
                             </button>
@@ -962,27 +963,27 @@ export default function MarketingInsightsPage() {
                       {insights.monthly_content_plan.map((item) => (
                         <article
                           key={`${item.window_label}-${item.theme}`}
-                          className="clara-card-soft rounded-[22px] p-4"
+                          className="clara-card-soft rounded-2xl p-4"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            <h3 className="text-sm font-semibold text-clara-ink-3">
                               {item.window_label}
                             </h3>
-                            <span className="rounded-full bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-slate-100">
+                            <span className="rounded-full bg-clara-sunken px-2.5 py-1 text-xs font-semibold text-clara-ink-3">
                               {formatStatusLabel(item.suggested_format)}
                             </span>
                           </div>
-                          <p className="mt-3 text-base font-semibold text-slate-100">
+                          <p className="mt-3 text-base font-semibold text-clara-ink-3">
                             {item.theme}
                           </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-300">
+                          <p className="mt-2 text-sm leading-6 text-clara-ink-3">
                             {item.objective}
                           </p>
                           <div className="mt-4 rounded-2xl bg-[rgba(31,24,17,0.9)] px-4 py-3">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <p className="text-xs font-semibold text-clara-ink-3">
                               Primary metric
                             </p>
-                            <p className="mt-1 text-sm font-medium text-slate-100">
+                            <p className="mt-1 text-sm font-medium text-clara-ink-3">
                               {item.primary_metric}
                             </p>
                           </div>
@@ -1010,9 +1011,9 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="clara-card rounded-[28px] p-5">
+    <section className="clara-card rounded-3xl p-5">
       <h2 className="text-lg font-semibold clara-text-primary">{title}</h2>
-      <p className="mt-1 text-sm text-slate-300">{description}</p>
+      <p className="mt-1 text-sm text-clara-ink-3">{description}</p>
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -1035,9 +1036,9 @@ function MetricCard({
   }[tone];
 
   return (
-    <div className={`clara-card rounded-[24px] p-5 ${toneClass}`}>
-      <p className="text-sm font-medium text-slate-200">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-white">{value}</p>
+    <div className={`clara-card rounded-2xl p-5 ${toneClass}`}>
+      <p className="text-sm font-medium text-clara-ink-3">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-clara-cream">{value}</p>
     </div>
   );
 }
@@ -1051,7 +1052,7 @@ function BreakdownGroup({
 }) {
   return (
     <div className="mt-4 first:mt-0">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-semibold text-clara-ink-3">
         {title}
       </p>
       {items.length === 0 ? (
@@ -1063,7 +1064,7 @@ function BreakdownGroup({
               key={`${title}-${item.label}`}
               className="clara-card-soft flex items-center justify-between rounded-xl px-3 py-2"
             >
-              <span className="text-sm text-slate-300">
+              <span className="text-sm text-clara-ink-3">
                 {formatStatusLabel(item.label)}
               </span>
               <span className="text-sm font-semibold clara-text-primary">
@@ -1080,23 +1081,23 @@ function BreakdownGroup({
 function KpiRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="clara-card-soft flex items-center justify-between rounded-xl px-4 py-3">
-      <span className="text-sm text-slate-300">{label}</span>
-      <span className="text-sm font-semibold text-slate-100">{value}</span>
+      <span className="text-sm text-clara-ink-3">{label}</span>
+      <span className="text-sm font-semibold text-clara-ink-3">{value}</span>
     </div>
   );
 }
 
 function EmptyText({ text }: { text: string }) {
-  return <p className="text-sm text-slate-300">{text}</p>;
+  return <p className="text-sm text-clara-ink-3">{text}</p>;
 }
 
 function BriefRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="clara-card-soft rounded-2xl px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-semibold text-clara-ink-3">
         {label}
       </p>
-      <p className="mt-1 text-sm leading-6 text-slate-200">{value}</p>
+      <p className="mt-1 text-sm leading-6 text-clara-ink-3">{value}</p>
     </div>
   );
 }
@@ -1104,10 +1105,10 @@ function BriefRow({ label, value }: { label: string; value: string }) {
 function SignalBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="clara-card-soft rounded-2xl p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <p className="text-xs font-semibold text-clara-ink-3">
         {label}
       </p>
-      <p className="mt-2 text-sm leading-6 text-slate-200">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-clara-ink-3">{value}</p>
     </div>
   );
 }
@@ -1130,17 +1131,17 @@ function TrendRow({
   return (
     <div className="clara-card-soft rounded-xl px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-slate-300">{label}</span>
-        <span className="text-sm font-semibold text-slate-100">{value}</span>
+        <span className="text-sm text-clara-ink-3">{label}</span>
+        <span className="text-sm font-semibold text-clara-ink-3">{value}</span>
       </div>
       {hasDelta && (
         <p
           className={`mt-2 text-xs font-medium ${
             positive
-              ? "text-green-700"
+              ? "text-clara-success"
               : negative
-                ? "text-red-700"
-                : "text-slate-500"
+                ? "text-clara-danger"
+                : "text-clara-ink-3"
           }`}
         >
           Delta: {delta > 0 ? "+" : ""}
@@ -1162,7 +1163,7 @@ function OutcomeNumberField({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
         {label}
       </span>
       <input
@@ -1171,7 +1172,7 @@ function OutcomeNumberField({
         step="1"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-2xl border border-[#4b3c24] bg-[#120d08] px-4 py-3 text-sm text-slate-100 outline-none focus:border-[#7dd3fc]/50"
+        className="clara-input"
       />
     </label>
   );

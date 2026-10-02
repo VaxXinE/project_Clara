@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, getLeadBadgeClass } from "@/lib/format";
 import { isHeadRole, isManagerRole, normalizeWorkspaceRole } from "@/lib/roles";
@@ -17,6 +18,7 @@ import type {
   ProcessStateEventItem,
   ProcessStateTransitionResponse,
 } from "@/types/dashboard";
+import { useConfirm } from "@/components/dashboard/ConfirmDialog";
 
 const PROCESS_STATES = [
   "UNKNOWN",
@@ -33,6 +35,7 @@ const PROCESS_STATES = [
 ] as const;
 
 export default function CustomerProfilePage() {
+  const confirm = useConfirm();
   const params = useParams<{ customerId: string }>();
   const customerId = params.customerId;
 
@@ -260,7 +263,7 @@ export default function CustomerProfilePage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Profil customer"
+      eyebrow={NAV_GROUP_NAMES.daily}
       title={profile?.display_name ?? "Profil Customer"}
       description={
         isSalesWorkspace
@@ -354,7 +357,7 @@ export default function CustomerProfilePage() {
             >
               <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
                 <div className="max-w-3xl">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">
+                  <p className="text-xs font-semibold text-clara-ink-3">
                     Mulai dari sini
                   </p>
                   <p className="mt-3 text-sm leading-7 clara-text-secondary">
@@ -468,7 +471,7 @@ export default function CustomerProfilePage() {
                     </button>
                       </>
                     ) : (
-                      <p className="mt-4 text-sm leading-6 text-slate-600">
+                      <p className="mt-4 text-sm leading-6 text-clara-ink-2">
                         State di atas DATA_SUBMITTED hanya dapat dikonfirmasi atau dikoreksi oleh manager, head, atau superadmin.
                       </p>
                     )}
@@ -478,20 +481,20 @@ export default function CustomerProfilePage() {
                     <h3 className="font-semibold clara-text-primary">Riwayat keputusan</h3>
                     <div className="mt-4 max-h-80 space-y-3 overflow-y-auto">
                       {processHistory.length ? processHistory.map((event) => (
-                        <div key={event.id} className="rounded-2xl border border-slate-200 bg-white p-3 text-sm">
+                        <div key={event.id} className="rounded-2xl border border-clara-line bg-clara-raised p-3 text-sm">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="font-semibold clara-text-primary">{event.decision}</span>
-                            <span className="text-xs text-slate-500">{formatDateTime(event.created_at)}</span>
+                            <span className="text-xs text-clara-ink-3">{formatDateTime(event.created_at)}</span>
                           </div>
-                          <p className="mt-2 text-slate-600">
+                          <p className="mt-2 text-clara-ink-2">
                             {formatProcessState(event.previous_state)} → {formatProcessState(event.proposed_state)}
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="mt-1 text-xs text-clara-ink-3">
                             {event.source_type} • {event.source_trust_level} • {event.reason_codes.join(", ") || "-"}
                           </p>
                         </div>
                       )) : (
-                        <p className="text-sm text-slate-500">Belum ada observasi atau transisi.</p>
+                        <p className="text-sm text-clara-ink-3">Belum ada observasi atau transisi.</p>
                       )}
                     </div>
                   </div>
@@ -511,7 +514,7 @@ export default function CustomerProfilePage() {
                         ? "Status Customer"
                         : "Data Customer"}
                     </h2>
-                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                    <p className="mt-2 text-sm leading-7 text-clara-ink-2">
                       {isLeadershipWorkspace
                         ? "Manager cukup cek apakah identitas customer, status, suhu, dan kategori akun sudah terbaca masuk akal oleh Clara."
                         : "Ringkasan dan edit data customer disatukan di sini supaya tim bisa langsung cek identitas, lalu rapikan datanya kalau memang perlu."}
@@ -550,7 +553,7 @@ export default function CustomerProfilePage() {
                 </div>
 
                 <div className="clara-card-soft mt-4 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  <p className="text-xs font-semibold text-clara-ink-3">
                     Alamat
                   </p>
                   <p className="mt-3 text-base leading-7 clara-text-primary">
@@ -559,7 +562,7 @@ export default function CustomerProfilePage() {
                 </div>
 
                 <div className="clara-card-soft mt-5 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+                  <p className="text-xs font-semibold text-clara-ink-3">
                     Cakupan channel
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -572,30 +575,30 @@ export default function CustomerProfilePage() {
                       </span>
                     ))}
                   </div>
-                  <p className="mt-4 text-sm leading-7 text-slate-600">
+                  <p className="mt-4 text-sm leading-7 text-clara-ink-2">
                     Bagian ini membantu tim melihat customer ini muncul dari channel mana saja. Kalau channel-nya banyak, pastikan konteksnya tetap dibaca sebagai satu customer yang sama.
                   </p>
                 </div>
 
                 {isEditingProfile ? (
-                  <div className="mt-6 border-t border-slate-200 pt-6">
+                  <div className="mt-6 border-t border-clara-line pt-6">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="max-w-2xl">
                         <h3 className="text-lg font-semibold clara-text-primary">Edit data customer</h3>
-                        <p className="mt-2 text-sm leading-7 text-slate-600">
+                        <p className="mt-2 text-sm leading-7 text-clara-ink-2">
                           Isi seperlunya. Fokus ke nama, telepon, status customer, dan kategori akun supaya pembacaan tim tetap rapi.
                         </p>
-                        <p className="mt-2 text-sm leading-7 text-slate-600">
+                        <p className="mt-2 text-sm leading-7 text-clara-ink-2">
                           Kategori akun dibaca otomatis dari lead terkait. Kalau hasil ringkasannya terasa campuran, Anda bisa set manual di form ini untuk menyelaraskan pembacaan tim.
                         </p>
                       </div>
-                      <div className="rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 lg:max-w-sm">
+                      <div className="rounded-2xl border border-clara-line bg-clara-tint px-4 py-3 text-sm text-clara-gold lg:max-w-sm">
                         Jangan isi data palsu. Kalau belum yakin nomor, email, atau alamatnya benar, lebih baik kosongkan dulu.
                       </div>
                     </div>
 
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
-                      <label htmlFor="customer-display-name" className="space-y-2 text-sm text-slate-700">
+                      <label htmlFor="customer-display-name" className="space-y-2 text-sm text-clara-ink-2">
                         <span className="font-semibold clara-text-primary">Nama Customer</span>
                         <input
                           id="customer-display-name"
@@ -610,7 +613,7 @@ export default function CustomerProfilePage() {
                           placeholder="Masukkan nama customer"
                         />
                       </label>
-                      <label htmlFor="customer-phone" className="space-y-2 text-sm text-slate-700">
+                      <label htmlFor="customer-phone" className="space-y-2 text-sm text-clara-ink-2">
                         <span className="font-semibold clara-text-primary">Telepon</span>
                         <input
                           id="customer-phone"
@@ -625,7 +628,7 @@ export default function CustomerProfilePage() {
                           placeholder="08xxxx atau +62xxxx"
                         />
                       </label>
-                      <label htmlFor="customer-email" className="space-y-2 text-sm text-slate-700">
+                      <label htmlFor="customer-email" className="space-y-2 text-sm text-clara-ink-2">
                         <span className="font-semibold clara-text-primary">Email</span>
                         <input
                           id="customer-email"
@@ -641,7 +644,7 @@ export default function CustomerProfilePage() {
                           placeholder="customer@email.com"
                         />
                       </label>
-                      <label htmlFor="customer-status" className="space-y-2 text-sm text-slate-700">
+                      <label htmlFor="customer-status" className="space-y-2 text-sm text-clara-ink-2">
                         <span className="font-semibold clara-text-primary">Status Customer</span>
                         <select
                           id="customer-status"
@@ -658,7 +661,7 @@ export default function CustomerProfilePage() {
                           <option value="inactive">Tidak aktif</option>
                         </select>
                       </label>
-                      <label htmlFor="customer-temperature" className="space-y-2 text-sm text-slate-700">
+                      <label htmlFor="customer-temperature" className="space-y-2 text-sm text-clara-ink-2">
                         <span className="font-semibold clara-text-primary">Temperature Customer</span>
                         <select
                           id="customer-temperature"
@@ -677,7 +680,7 @@ export default function CustomerProfilePage() {
                           <option value="hot">Hot</option>
                         </select>
                       </label>
-                      <label htmlFor="customer-account-category" className="space-y-2 text-sm text-slate-700">
+                      <label htmlFor="customer-account-category" className="space-y-2 text-sm text-clara-ink-2">
                         <span className="font-semibold clara-text-primary">Kategori Akun</span>
                         <select
                           id="customer-account-category"
@@ -697,7 +700,7 @@ export default function CustomerProfilePage() {
                       </label>
                     </div>
 
-                    <label htmlFor="customer-address" className="mt-4 block space-y-2 text-sm text-slate-700">
+                    <label htmlFor="customer-address" className="mt-4 block space-y-2 text-sm text-clara-ink-2">
                       <span className="font-semibold clara-text-primary">Alamat</span>
                       <textarea
                         id="customer-address"
@@ -721,7 +724,7 @@ export default function CustomerProfilePage() {
                         onClick={() => {
                           void handleProfileSave();
                         }}
-                        className="inline-flex rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        className="clara-button clara-button-primary"
                       >
                         {isSavingProfile ? "Menyimpan..." : "Simpan Data Customer"}
                       </button>
@@ -794,7 +797,7 @@ export default function CustomerProfilePage() {
                     <h2 className="text-xl font-semibold clara-text-primary">
                       Merge Candidates
                     </h2>
-                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                    <p className="mt-2 text-sm leading-7 text-clara-ink-2">
                       Clara menampilkan kandidat profil customer lain yang kemungkinan adalah orang yang sama. Head atau superadmin bisa merge manual kalau identity otomatis masih pecah.
                     </p>
                     <p className="clara-alert clara-alert-danger mt-3">
@@ -819,7 +822,7 @@ export default function CustomerProfilePage() {
 
                 <div className="mt-5 space-y-4">
                   {profile.merge_candidates.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-500">
+                    <div className="rounded-2xl border border-dashed border-clara-dashed bg-clara-raised p-5 text-sm text-clara-ink-3">
                       Belum ada kandidat merge yang cukup kuat untuk profil ini.
                     </div>
                   ) : (
@@ -832,14 +835,14 @@ export default function CustomerProfilePage() {
                           <h3 className="text-base font-semibold clara-text-primary">
                             {candidate.display_name}
                           </h3>
-                          <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                          <span className="rounded-full bg-clara-info-surface px-2.5 py-1 text-xs font-semibold text-clara-info">
                             Match {Math.round(candidate.match_score * 100)}%
                           </span>
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                          <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                             Confidence {Math.round(candidate.identity_confidence * 100)}%
                           </span>
                         </div>
-                        <p className="mt-3 text-sm leading-7 text-slate-600">
+                        <p className="mt-3 text-sm leading-7 text-clara-ink-2">
                           {candidate.overlap_reason}
                         </p>
                         <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -857,7 +860,7 @@ export default function CustomerProfilePage() {
                           {candidate.source_labels.map((label) => (
                             <span
                               key={label}
-                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                              className="rounded-full bg-clara-raised px-3 py-1 text-xs font-semibold text-clara-ink-2"
                             >
                               {label}
                             </span>
@@ -868,20 +871,31 @@ export default function CustomerProfilePage() {
                             <button
                               type="button"
                               disabled={mergingCandidateId !== null}
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    `Gabungkan ${candidate.display_name} ke ${profile.display_name}? Relasi kandidat akan dipindahkan ke profil ini.`,
-                                  )
-                                ) {
+                              onClick={async () => {
+                                const accepted = await confirm({
+                                  title: "Gabungkan profil customer?",
+                                  message: (
+                                    <>
+                                      Lead dan percakapan milik{" "}
+                                      <strong>{candidate.display_name}</strong>{" "}
+                                      akan dipindahkan ke profil{" "}
+                                      <strong>{profile.display_name}</strong>.
+                                      Pastikan keduanya memang customer yang
+                                      sama.
+                                    </>
+                                  ),
+                                  confirmLabel: "Gabungkan",
+                                  tone: "danger",
+                                });
+                                if (accepted) {
                                   void handleMerge(candidate.id);
                                 }
                               }}
                               className="clara-button clara-button-danger disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {mergingCandidateId === candidate.id
-                                ? "Merging..."
-                                : "Merge ke Profile Ini"}
+                                ? "Menggabungkan..."
+                                : "Gabungkan ke Profil Ini"}
                             </button>
                           </div>
                         ) : null}
@@ -903,7 +917,7 @@ export default function CustomerProfilePage() {
                         : "Bagian ini menunjukkan semua lead yang masih dianggap milik customer yang sama. Jangan buka semuanya sekaligus. Mulai dari yang paling prioritas, lalu turun ke lead lain kalau memang perlu."}
                     </p>
                   </div>
-                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <div className="rounded-2xl border border-clara-line bg-clara-raised px-4 py-3 text-sm text-clara-ink-2">
                     Prioritas baca:
                     <span className="ml-2 font-semibold clara-text-primary">
                       hot &gt; warm &gt; kontak terbaru
@@ -917,7 +931,7 @@ export default function CustomerProfilePage() {
                       className="clara-card-outline p-4"
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[11px] font-semibold text-white">
+                        <span className="rounded-full bg-clara-deep px-2.5 py-1 text-xs font-semibold text-clara-cream">
                           Prioritas {index + 1}
                         </span>
                         <h3 className="text-base font-semibold clara-text-primary">{lead.display_name}</h3>
@@ -928,7 +942,7 @@ export default function CustomerProfilePage() {
                         >
                           {formatTemperatureLabel(lead.lead_temperature)}
                         </span>
-                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                        <span className="rounded-full bg-clara-tint px-2.5 py-1 text-xs font-semibold text-clara-gold">
                           {formatStageLabel(lead.current_stage)}
                         </span>
                         <span
@@ -938,11 +952,11 @@ export default function CustomerProfilePage() {
                         >
                           {formatAccountCategory(lead.account_category)}
                         </span>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                           {lead.source_label}
                         </span>
                       </div>
-                      <p className="mt-3 text-sm leading-7 text-slate-600">
+                      <p className="mt-3 text-sm leading-7 text-clara-ink-2">
                         {buildLeadReadingHint(lead)}
                       </p>
                       <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -959,7 +973,7 @@ export default function CustomerProfilePage() {
                         {lead.latest_conversation_id ? (
                           <Link
                             href={`/dashboard/sales/conversations/${lead.latest_conversation_id}`}
-                            className="inline-flex rounded-full bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                            className="clara-button clara-button-primary"
                           >
                             Buka Percakapan
                           </Link>
@@ -990,7 +1004,7 @@ function ActionHint({ title, description }: { title: string; description: string
   return (
     <div className="clara-card-soft p-4">
       <p className="text-sm font-semibold clara-text-primary">{title}</p>
-      <p className="mt-2 text-sm leading-7 text-slate-600">{description}</p>
+      <p className="mt-2 text-sm leading-7 text-clara-ink-2">{description}</p>
     </div>
   );
 }
@@ -1115,10 +1129,10 @@ function formatAccountCategory(value: string) {
 
 function getAccountCategoryBadgeClass(value: string) {
   if (value === "mini") {
-    return "bg-emerald-100 text-emerald-700";
+    return "bg-clara-success-surface text-clara-success";
   }
   if (value === "reguler") {
-    return "bg-amber-100 text-amber-700";
+    return "bg-clara-tint text-clara-gold";
   }
   return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
 }

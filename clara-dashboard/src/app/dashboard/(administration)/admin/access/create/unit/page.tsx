@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { isOwnerLike } from "@/lib/roles";
 import type {
@@ -77,9 +78,9 @@ export default function AdminAccessCreateUnitPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Access management"
-      title="Create Sales Unit"
-      description="Form khusus untuk membuat sales unit baru."
+      eyebrow={NAV_GROUP_NAMES.admin}
+      title="Buat Unit Sales"
+      description="Isi data berikut untuk membuat unit sales baru."
       backHref="/admin/access"
       backLabel="Kembali ke index access"
       actions={
@@ -91,7 +92,7 @@ export default function AdminAccessCreateUnitPage() {
       <div className="mx-auto max-w-3xl space-y-6">
         {isLoading ? (
           <div className="clara-empty-state text-sm text-[#d6bb84]">
-            Loading create unit...
+            Memuat form unit...
           </div>
         ) : null}
 
@@ -100,7 +101,7 @@ export default function AdminAccessCreateUnitPage() {
         ) : null}
 
         {!isLoading ? (
-          <form onSubmit={handleSubmit} className="clara-card space-y-5 rounded-[30px] p-5">
+          <form onSubmit={handleSubmit} className="clara-card space-y-5 rounded-3xl p-5">
             <div>
               <h2 className="text-lg font-semibold text-[#fff0c9]">Create Sales Unit</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">

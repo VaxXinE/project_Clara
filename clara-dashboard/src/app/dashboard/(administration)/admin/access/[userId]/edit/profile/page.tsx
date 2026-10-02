@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { getRoleDisplayLabel, isOwnerLike } from "@/lib/roles";
 import type {
@@ -102,9 +103,9 @@ export default function AdminAccessEditProfilePage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Access management"
-      title="Edit Profile User"
-      description="Halaman khusus untuk mengubah profil user."
+      eyebrow={NAV_GROUP_NAMES.admin}
+      title="Ubah Profil Pengguna"
+      description="Ubah nama, role, dan penempatan pengguna ini."
       backHref="/admin/access"
       backLabel="Kembali ke index access"
       actions={
@@ -116,7 +117,7 @@ export default function AdminAccessEditProfilePage() {
       <div className="mx-auto max-w-4xl space-y-6">
         {isLoading ? (
           <div className="clara-empty-state text-sm text-[#d6bb84]">
-            Loading edit profile...
+            Memuat form profil...
           </div>
         ) : null}
 
@@ -125,7 +126,7 @@ export default function AdminAccessEditProfilePage() {
         ) : null}
 
         {targetUser && !isLoading ? (
-          <form onSubmit={handleSubmit} className="clara-card space-y-5 rounded-[30px] p-5">
+          <form onSubmit={handleSubmit} className="clara-card space-y-5 rounded-3xl p-5">
             <div>
               <h2 className="text-lg font-semibold text-[#fff0c9]">Edit Profile User</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">

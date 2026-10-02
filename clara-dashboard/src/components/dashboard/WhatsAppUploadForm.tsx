@@ -246,7 +246,7 @@ export function WhatsAppUploadForm() {
       </div>
 
       {isContinueMode ? (
-        <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-2xl border border-clara-line bg-clara-tint p-4 text-sm text-clara-gold">
           <p className="font-semibold">Mode chat lanjutan aktif.</p>
           <p className="mt-2 leading-6">
             Paste atau upload chat terbaru customer untuk melanjutkan

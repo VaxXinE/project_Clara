@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import {
   formatChannelLabel,
@@ -77,9 +78,9 @@ function formatAccountCategory(value: string): string {
 function getAccountCategoryBadgeClass(value: string): string {
   switch (value) {
     case "mini":
-      return "bg-emerald-100 text-emerald-700";
+      return "bg-clara-success-surface text-clara-success";
     case "reguler":
-      return "bg-amber-100 text-amber-700";
+      return "bg-clara-tint text-clara-gold";
     default:
       return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
   }
@@ -229,7 +230,7 @@ export default function SalesInboxPage() {
       } catch (error) {
         if (!isCancelled) {
           setErrorMessage(
-            error instanceof Error ? error.message : "Failed to load inbox.",
+            error instanceof Error ? error.message : "Gagal memuat daftar chat.",
           );
         }
       } finally {
@@ -246,13 +247,6 @@ export default function SalesInboxPage() {
     };
   }, [archiveScope, router, sourceChannelFilter]);
 
-  const canAccessMarketing =
-    currentUser !== null && ["superadmin", "head"].includes(currentUser.role);
-  const canAccessKnowledge =
-    currentUser !== null && currentUser.role === "superadmin";
-  const canAccessAdminOps =
-    currentUser !== null && currentUser.role === "superadmin";
-  const isSalesWorkspace = currentUser?.role === "sales";
 
   const analyzedCount = inboxItems.filter(
     (item) => item.latest_ai_extraction !== null,
@@ -326,16 +320,6 @@ export default function SalesInboxPage() {
     }));
   }
 
-  async function handleLogout() {
-    try {
-      await apiFetch<void>("/auth/logout", { method: "POST" });
-    } catch {
-      // Ignore logout API error and still force the user back to login.
-    } finally {
-      window.location.href = "/login";
-    }
-  }
-
   async function handleAnalyze(conversationId: string) {
     setActionConversationId(conversationId);
     setErrorMessage("");
@@ -383,80 +367,18 @@ export default function SalesInboxPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow="Operational inbox"
-      title="Chat Masuk"
-      description="Tempat paling cepat untuk lihat chat yang harus dibaca, dianalisis, lalu dibalas."
+      eyebrow={NAV_GROUP_NAMES.daily}
+      title={PAGE_NAMES.inbox}
+      description="Pilih chat yang perlu dibalas, baca konteksnya, lalu buat jawaban dengan bantuan Clara."
       backHref="/dashboard"
       backLabel="Kembali ke beranda"
       actions={
-        <>
-          {canAccessMarketing && !isSalesWorkspace && (
-            <Link
-              href="/dashboard/marketing"
-              className="clara-button clara-button-ghost"
-            >
-              Marketing Insights
-            </Link>
-          )}
-          <Link
-            href="/dashboard/crm"
-            className="clara-button clara-button-ghost"
-          >
-            Leads
-          </Link>
-          <Link
-            href="/dashboard/follow-up"
-            className="clara-button clara-button-ghost"
-          >
-            Tindak Lanjut
-          </Link>
-          {!isSalesWorkspace && (
-            <Link
-              href="/dashboard/approvals"
-              className="clara-button clara-button-ghost"
-            >
-              Chat Review Center
-            </Link>
-          )}
-          {canAccessKnowledge && !isSalesWorkspace && (
-            <Link
-              href="/dashboard/knowledge"
-              className="clara-button clara-button-ghost"
-            >
-              Product Knowledge
-            </Link>
-          )}
-          {canAccessAdminOps && (
-            <Link href="/admin/ops" className="clara-button clara-button-ghost">
-              Admin Ops
-            </Link>
-          )}
-          {canAccessAdminOps && (
-            <Link
-              href="/admin/access"
-              className="clara-button clara-button-ghost"
-            >
-              Manage Users
-            </Link>
-          )}
-          <Link
-            href="/dashboard/upload"
-            className="clara-button clara-button-primary"
-          >
-            Input Chat
-          </Link>
-          {!isSalesWorkspace && (
-            <button
-              type="button"
-              onClick={() => {
-                void handleLogout();
-              }}
-              className="clara-button clara-button-ghost"
-            >
-              Logout
-            </button>
-          )}
-        </>
+        <Link
+          href="/dashboard/upload"
+          className="clara-button clara-button-primary"
+        >
+          {PAGE_NAMES.intake}
+        </Link>
       }
     >
       <div className="space-y-6">
@@ -617,23 +539,23 @@ export default function SalesInboxPage() {
                   <h2 className="text-xl font-semibold clara-text-primary">
                     {inboxItems.length === 0
                       ? archiveScope === "archived"
-                        ? "Belum ada conversation archived"
-                        : "Belum ada conversation"
-                      : "Tidak ada conversation yang cocok dengan filter ini"}
+                        ? "Belum ada chat di arsip"
+                        : "Belum ada chat"
+                      : "Tidak ada chat yang cocok dengan filter ini"}
                   </h2>
                   <p className="mt-2 text-sm leading-6 clara-text-secondary">
                     {inboxItems.length === 0
                       ? archiveScope === "archived"
-                        ? "Chat lama yang tidak aktif akan muncul di tab ini setelah melewati batas inactivity yang ditentukan sistem."
-                        : "Workspace ini akan mulai terasa hidup setelah chat pertama dari WhatsApp, Instagram, TikTok, atau upload manual masuk ke conversation."
-                      : "Coba longgarkan pencarian atau ganti bucket kerja supaya conversation yang relevan muncul lagi."}
+                        ? "Chat yang sudah lama tidak aktif dipindahkan ke arsip dan muncul di sini. Datanya tidak hilang."
+                        : "Chat dari WhatsApp, Instagram, TikTok, atau input manual akan muncul di sini."
+                      : "Coba ubah kata pencarian atau filter supaya chat yang kamu cari muncul lagi."}
                   </p>
                   {inboxItems.length === 0 && archiveScope !== "archived" && (
                     <Link
                       href="/dashboard/upload"
                       className="clara-button clara-button-primary mt-5"
                     >
-                      Upload Chat Pertama
+                      Input Chat Pertama
                     </Link>
                   )}
                 </div>
@@ -770,12 +692,12 @@ export default function SalesInboxPage() {
                                     </span>
 
                                     {isExperimentalChannel(item.source_channel) ? (
-                                      <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                      <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-clara-gold">
                                         Experimental
                                       </span>
                                     ) : null}
 
-                                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                    <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                                       {section.config.label}
                                     </span>
 
@@ -810,36 +732,36 @@ export default function SalesInboxPage() {
                                     )}
 
                                     {item.ui_status === "reply_sent" && (
-                                      <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-700">
+                                      <span className="rounded-full bg-clara-success-surface px-2.5 py-1 text-xs font-semibold text-clara-success">
                                         SENT
                                       </span>
                                     )}
 
                                     {item.is_archived && (
-                                      <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                      <span className="rounded-full bg-clara-sunken px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                                         ARCHIVED
                                       </span>
                                     )}
                                   </div>
 
-                                  <p className="text-sm leading-6 text-slate-600 line-clamp-3">
+                                  <p className="text-sm leading-6 text-clara-ink-2 line-clamp-3">
                                     {item.latest_message
                                       ? item.latest_message.message_text
                                       : "Belum ada pesan."}
                                   </p>
 
-                                  <div className="grid gap-2 text-xs text-slate-500">
+                                  <div className="grid gap-2 text-xs text-clara-ink-3">
                                     <div className="flex flex-wrap gap-x-2 gap-y-1">
                                       <span>
                                         Sumber:{" "}
-                                        <span className="font-semibold text-slate-700">
+                                        <span className="font-semibold text-clara-ink-2">
                                           {item.source_label}
                                         </span>
                                       </span>
                                       {shouldShowOwnership ? (
                                         <span>
                                           Owner:{" "}
-                                          <span className="font-semibold text-slate-700">
+                                          <span className="font-semibold text-clara-ink-2">
                                             {item.sales_owner_name ??
                                               "Belum ada owner"}
                                           </span>
@@ -866,25 +788,25 @@ export default function SalesInboxPage() {
                                 </div>
 
                                 <div className="clara-card-soft p-4">
-                                  <p className="clara-kicker text-[11px]">
+                                  <p className="clara-kicker text-xs">
                                     Langkah berikutnya
                                   </p>
-                                  <p className="mt-2 text-sm leading-6 text-slate-700 line-clamp-3">
+                                  <p className="mt-2 text-sm leading-6 text-clara-ink-2 line-clamp-3">
                                     {extraction?.next_best_action ??
                                       "Belum dianalisis. Jalankan AI analysis dulu."}
                                   </p>
                                   <div className="mt-3 flex flex-wrap gap-2">
-                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                    <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                                       {formatStatusLabel(item.ui_status)}
                                     </span>
                                     {shouldShowOwnership &&
                                     item.sales_owner_name ? (
-                                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                      <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                                         {item.sales_owner_name}
                                       </span>
                                     ) : null}
                                     {archiveScope === "all" ? (
-                                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                      <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
                                         {item.is_archived ? "Arsip" : "Aktif"}
                                       </span>
                                     ) : null}
