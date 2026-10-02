@@ -13,6 +13,11 @@ import {
 const OPENAI_PROXY_URL = getConfiguredProxyUrl()
 const PENDING_REPLIES_STORAGE_KEY = "clara.pendingReplies"
 const CHATGPT_FRAME_EMBED_RULE_ID = 1001
+// Harus sama dengan flag di sidepanel.tsx: rule pencopot header hanya aktif jika tab ChatGPT dinyalakan.
+const ENABLE_CHATGPT_WORKSPACE =
+  (process.env.PLASMO_PUBLIC_CLARA_ENABLE_CHATGPT_WORKSPACE || "")
+    .trim()
+    .toLowerCase() === "true"
 const CHATGPT_EMBED_RULE: chrome.declarativeNetRequest.Rule = {
   action: {
     responseHeaders: [
@@ -32,6 +37,8 @@ const CHATGPT_EMBED_RULE: chrome.declarativeNetRequest.Rule = {
     type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS
   },
   condition: {
+    // Hanya iframe yang dibuka dari halaman extension ini, bukan dari tab/situs lain.
+    initiatorDomains: [chrome.runtime.id],
     requestDomains: ["chatgpt.com", "chat.openai.com"],
     resourceTypes: [chrome.declarativeNetRequest.ResourceType.SUB_FRAME]
   },
@@ -70,7 +77,7 @@ const ensureChatGptEmbedRules = () => {
 
   chrome.declarativeNetRequest
     .updateDynamicRules({
-      addRules: [CHATGPT_EMBED_RULE],
+      addRules: ENABLE_CHATGPT_WORKSPACE ? [CHATGPT_EMBED_RULE] : [],
       removeRuleIds: [CHATGPT_FRAME_EMBED_RULE_ID]
     })
     .catch(() => {
