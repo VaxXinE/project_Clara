@@ -9,6 +9,23 @@ export function formatDateTime(value: string | null): string {
   }).format(new Date(value));
 }
 
+/** "25 menit lalu", "3 jam lalu", "kemarin"; lewat seminggu tampil sebagai tanggal. */
+export function formatRelativeTime(value: string | null, now: Date = new Date()): string {
+  if (!value) return "-";
+
+  const then = new Date(value);
+  const seconds = Math.round((now.getTime() - then.getTime()) / 1000);
+
+  if (Number.isNaN(seconds)) return "-";
+  if (seconds < 60) return "baru saja";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} menit lalu`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} jam lalu`;
+  if (seconds < 172800) return "kemarin";
+  if (seconds < 7 * 86400) return `${Math.floor(seconds / 86400)} hari lalu`;
+
+  return new Intl.DateTimeFormat("id-ID", { dateStyle: "medium" }).format(then);
+}
+
 export function formatStatusLabel(value: string): string {
   const normalizedRole = normalizeWorkspaceRole(value);
 

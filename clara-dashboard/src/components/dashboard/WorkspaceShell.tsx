@@ -51,7 +51,8 @@ const SITE_TITLE = SITE_NAME;
 
 type WorkspaceShellProps = {
   currentUser?: CurrentUser | null;
-  eyebrow: string;
+  /** Tidak lagi ditampilkan; posisi halaman kini ditunjukkan breadcrumb di top bar. */
+  eyebrow?: string;
   title: string;
   description: string;
   backHref?: string;

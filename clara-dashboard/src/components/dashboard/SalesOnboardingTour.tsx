@@ -63,19 +63,19 @@ const TOUR_ROUTES: TourRoute[] = [
         id: "sales-inbox-filters",
         title: "Temukan chat",
         description:
-          "Cari customer atau saring status, channel, dan prioritas untuk menemukan chat yang perlu dikerjakan.",
+          "Cari nama customer, pilih kelompok chat (misalnya Siap dibalas), atau saring berdasarkan channel.",
       },
       {
         id: "sales-inbox-queue",
         title: "Baca status dan alasan",
         description:
-          "Antrean dikelompokkan berdasarkan tindakan: analisis, siapkan draft, balas, tunggu customer, atau arsip.",
+          "Chat dikelompokkan menurut langkah yang perlu kamu ambil: baca dengan Clara, buat draft, balas, atau tunggu customer.",
       },
       {
         id: "sales-inbox-upcoming-actions",
         title: "Lakukan aksi berikutnya",
         description:
-          "Pilih analisis, buat draft, atau buka percakapan sesuai langkah berikutnya yang tertulis.",
+          "Tombol di kanan tiap chat selalu langkah berikutnya: Baca dengan Clara, Buat draft jawaban, atau Buka dan balas.",
       },
     ],
   },

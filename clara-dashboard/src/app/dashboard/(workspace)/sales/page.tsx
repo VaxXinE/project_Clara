@@ -4,18 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
+import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
+import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import {
   formatChannelLabel,
-  formatDateTime,
   formatProviderLabel,
-  formatStatusLabel,
-  getChannelBadgeClass,
-  getLeadBadgeClass,
-  getProviderBadgeClass,
-  getRiskBadgeClass,
+  formatRelativeTime,
   inferProviderFromSource,
   isExperimentalChannel,
 } from "@/lib/format";
@@ -24,10 +21,11 @@ import {
   isManagerLike,
   normalizeWorkspaceRole,
 } from "@/lib/roles";
+import { ACCOUNT_CATEGORY, REPLY_STATE, TEMPERATURE, labelOf } from "@/lib/vocab";
 import type { CurrentUser, SalesInboxItem } from "@/types/dashboard";
 
 const SOURCE_CHANNEL_OPTIONS = [
-  { value: "all", label: "Semua Channel" },
+  { value: "all", label: "Semua channel" },
   { value: "whatsapp", label: "WhatsApp" },
   { value: "instagram", label: "Instagram DM" },
   { value: "tiktok", label: "TikTok DM" },
@@ -35,23 +33,12 @@ const SOURCE_CHANNEL_OPTIONS = [
 ] as const;
 
 const ARCHIVE_SCOPE_OPTIONS = [
-  { value: "active", label: "Aktif" },
-  { value: "archived", label: "Archived" },
-  { value: "all", label: "Semua" },
+  { value: "active", label: "Chat aktif" },
+  { value: "archived", label: "Chat lama (arsip)" },
+  { value: "all", label: "Semua chat" },
 ] as const;
 
-const QUEUE_BUCKET_OPTIONS = [
-  { value: "all", label: "Semua queue" },
-  { value: "reply_now", label: "Perlu dibalas" },
-  { value: "waiting_customer", label: "Menunggu customer" },
-  { value: "needs_analysis", label: "Perlu analisis" },
-  { value: "needs_draft", label: "Perlu draft" },
-  { value: "pending_review", label: "Menunggu review" },
-  { value: "high_risk", label: "Risiko tinggi" },
-  { value: "archived", label: "Archived" },
-] as const;
-
-const QUEUE_SECTION_PAGE_SIZE = 8;
+const VISIBLE_STEP = 8;
 
 type QueueBucketKey =
   | "reply_now"
@@ -62,34 +49,55 @@ type QueueBucketKey =
   | "high_risk"
   | "archived";
 
-function formatAccountCategory(value: string): string {
-  switch (value) {
-    case "mini":
-      return "Mini";
-    case "reguler":
-      return "Reguler";
-    case "unknown":
-      return "Belum ditentukan";
-    default:
-      return value.replaceAll("_", " ");
-  }
-}
+/** Urutan kerja: yang paling butuh perhatian di atas. */
+const BUCKET_ORDER: QueueBucketKey[] = [
+  "high_risk",
+  "needs_analysis",
+  "needs_draft",
+  "pending_review",
+  "reply_now",
+  "waiting_customer",
+];
 
-function getAccountCategoryBadgeClass(value: string): string {
-  switch (value) {
-    case "mini":
-      return "bg-clara-success-surface text-clara-success";
-    case "reguler":
-      return "bg-clara-tint text-clara-gold";
-    default:
-      return "border border-[#d9bf87] bg-[#f7ebc9] text-[#6a4a17]";
-  }
-}
+const BUCKETS: Record<QueueBucketKey, { label: string; chip: string; description: string }> = {
+  high_risk: {
+    label: "Risiko tinggi",
+    chip: "Risiko tinggi",
+    description: "Topiknya sensitif. Baca dengan teliti sebelum membalas.",
+  },
+  needs_analysis: {
+    label: "Belum dibaca Clara",
+    chip: "Belum dibaca Clara",
+    description: "Minta Clara membaca chat ini supaya bisa menyarankan jawaban.",
+  },
+  needs_draft: {
+    label: "Belum ada draft jawaban",
+    chip: "Belum ada draft",
+    description: "Chat sudah dibaca. Minta Clara menyusun draft jawaban.",
+  },
+  pending_review: {
+    label: "Menunggu persetujuan",
+    chip: "Menunggu persetujuan",
+    description: "Draft jawabannya masih menunggu keputusan reviewer.",
+  },
+  reply_now: {
+    label: "Siap dibalas",
+    chip: "Siap dibalas",
+    description: "Draft sudah ada. Cek, ubah kalau perlu, lalu kirim sendiri dari WhatsApp.",
+  },
+  waiting_customer: {
+    label: "Menunggu balasan customer",
+    chip: "Menunggu customer",
+    description: "Kamu sudah membalas. Tidak perlu dibalas lagi sampai customer menjawab.",
+  },
+  archived: {
+    label: "Chat lama (arsip)",
+    chip: "Arsip",
+    description: "Chat yang sudah lama tidak aktif. Datanya tetap aman.",
+  },
+};
 
-function buildInboxPath(
-  sourceChannelFilter: string,
-  archiveScope: string,
-): string {
+function buildInboxPath(sourceChannelFilter: string, archiveScope: string): string {
   const params = new URLSearchParams();
 
   if (sourceChannelFilter !== "all") {
@@ -133,51 +141,43 @@ function getQueueBucket(item: SalesInboxItem): QueueBucketKey {
   return "reply_now";
 }
 
-function getQueueBucketConfig(bucket: QueueBucketKey) {
-  switch (bucket) {
-    case "needs_analysis":
-      return {
-        label: "Perlu Analisis",
-        description:
-          "Chat ini belum punya ringkasan AI. Analisis dulu sebelum memutuskan balas, approval, atau follow-up.",
-      };
-    case "needs_draft":
-      return {
-        label: "Perlu Draft",
-        description:
-          "Analisis sudah ada, tapi balasan belum dibuat. Generate draft agar user tidak mulai dari nol.",
-      };
-    case "waiting_customer":
-      return {
-        label: "Menunggu Customer",
-        description:
-          "Balasan sales sudah dikirim. Untuk sementara tidak perlu membalas lagi sampai customer merespons atau ada konteks baru.",
-      };
-    case "pending_review":
-      return {
-        label: "Menunggu Review",
-        description:
-          "Draft atau kasusnya masih perlu keputusan reviewer manusia sebelum dianggap aman ditindaklanjuti.",
-      };
-    case "high_risk":
-      return {
-        label: "Risiko Tinggi",
-        description:
-          "Prioritaskan item berisiko tinggi lebih dulu supaya tidak terjadi mis-selling atau jawaban sensitif tanpa review.",
-      };
-    case "archived":
-      return {
-        label: "Archived",
-        description:
-          "Conversation yang sudah keluar dari ritme kerja aktif dan biasanya hanya dibuka saat ada konteks lanjutan.",
-      };
-    default:
-      return {
-        label: "Perlu Dibalas",
-        description:
-          "Conversation yang relatif siap ditindaklanjuti tanpa langkah persiapan yang panjang.",
-      };
+function emptyMessage(
+  totalItems: number,
+  archiveScope: string,
+  channel: string,
+): { title: string; body: string; showIntake: boolean } {
+  if (totalItems > 0) {
+    return {
+      title: "Tidak ada chat yang cocok",
+      body: "Ubah kata pencarian atau filter supaya chat yang kamu cari muncul lagi.",
+      showIntake: false,
+    };
   }
+
+  if (channel === "instagram" || channel === "tiktok") {
+    const name = channel === "instagram" ? "Instagram DM" : "TikTok DM";
+    const page = channel === "instagram" ? "Instagram DM" : "TikTok Messages";
+
+    return {
+      title: `Belum ada percakapan dari ${name}`,
+      body: `Buka Clara Extension di halaman ${page} untuk mulai menyinkronkan chat.`,
+      showIntake: false,
+    };
+  }
+
+  if (archiveScope === "archived") {
+    return {
+      title: "Belum ada chat di arsip",
+      body: "Chat yang lama tidak aktif dipindahkan ke sini. Datanya tidak hilang.",
+      showIntake: false,
+    };
+  }
+
+  return {
+    title: "Belum ada chat",
+    body: "Chat dari WhatsApp, Instagram, TikTok, atau input manual akan muncul di sini.",
+    showIntake: true,
+  };
 }
 
 export default function SalesInboxPage() {
@@ -186,16 +186,14 @@ export default function SalesInboxPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [sourceChannelFilter, setSourceChannelFilter] = useState("all");
   const [archiveScope, setArchiveScope] = useState("active");
-  const [queueBucketFilter, setQueueBucketFilter] = useState("all");
-  const [queueSectionPages, setQueueSectionPages] = useState<
-    Partial<Record<QueueBucketKey, number>>
-  >({});
+  const [bucketFilter, setBucketFilter] = useState<"all" | QueueBucketKey>("all");
+  const [visibleCounts, setVisibleCounts] = useState<Partial<Record<QueueBucketKey, number>>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [actionConversationId, setActionConversationId] = useState<
-    string | null
-  >(null);
+  const [actionConversationId, setActionConversationId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let isCancelled = false;
@@ -230,7 +228,7 @@ export default function SalesInboxPage() {
       } catch (error) {
         if (!isCancelled) {
           setErrorMessage(
-            error instanceof Error ? error.message : "Gagal memuat daftar chat.",
+            error instanceof Error ? error.message : "Daftar chat belum bisa dimuat.",
           );
         }
       } finally {
@@ -245,27 +243,25 @@ export default function SalesInboxPage() {
     return () => {
       isCancelled = true;
     };
-  }, [archiveScope, router, sourceChannelFilter]);
+  }, [archiveScope, reloadKey, router, sourceChannelFilter]);
 
-
-  const analyzedCount = inboxItems.filter(
-    (item) => item.latest_ai_extraction !== null,
-  ).length;
-  const sentCount = inboxItems.filter(
-    (item) => item.latest_sent_message,
-  ).length;
-  const highRiskCount = inboxItems.filter(
-    (item) => item.latest_ai_extraction?.risk_level === "high",
-  ).length;
   const shouldShowOwnership = isManagerLike(currentUser?.role);
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
+  const bucketCounts = useMemo(() => {
+    const counts: Partial<Record<QueueBucketKey, number>> = {};
+
+    for (const item of inboxItems) {
+      const bucket = getQueueBucket(item);
+      counts[bucket] = (counts[bucket] ?? 0) + 1;
+    }
+
+    return counts;
+  }, [inboxItems]);
+
   const filteredInboxItems = useMemo(() => {
     return inboxItems.filter((item) => {
-      if (
-        queueBucketFilter !== "all" &&
-        getQueueBucket(item) !== queueBucketFilter
-      ) {
+      if (bucketFilter !== "all" && getQueueBucket(item) !== bucketFilter) {
         return false;
       }
 
@@ -277,224 +273,92 @@ export default function SalesInboxPage() {
         item.title,
         item.latest_message?.message_text ?? "",
         item.sales_owner_name ?? "",
-        item.source_label,
         item.latest_ai_extraction?.next_best_action ?? "",
       ]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearchQuery);
     });
-  }, [inboxItems, normalizedSearchQuery, queueBucketFilter]);
+  }, [bucketFilter, inboxItems, normalizedSearchQuery]);
 
-  const queueSections = useMemo(() => {
-    const orderedBuckets: QueueBucketKey[] =
-      archiveScope === "archived"
-        ? ["archived"]
-        : [
-            "high_risk",
-            "needs_analysis",
-            "needs_draft",
-            "pending_review",
-            "reply_now",
-            "waiting_customer",
-          ];
+  const sections = useMemo(() => {
+    const order: QueueBucketKey[] = archiveScope === "archived" ? ["archived"] : BUCKET_ORDER;
 
-    return orderedBuckets
+    return order
       .map((bucket) => ({
         bucket,
-        config: getQueueBucketConfig(bucket),
-        items: filteredInboxItems.filter(
-          (item) => getQueueBucket(item) === bucket,
-        ),
+        items: filteredInboxItems.filter((item) => getQueueBucket(item) === bucket),
       }))
       .filter((section) => section.items.length > 0);
   }, [archiveScope, filteredInboxItems]);
 
-  function handleQueueSectionPageChange(
-    bucket: QueueBucketKey,
-    nextPage: number,
-  ) {
-    setQueueSectionPages((current) => ({
-      ...current,
-      [bucket]: nextPage,
-    }));
+  async function refreshInbox() {
+    const data = await apiFetch<SalesInboxItem[]>(
+      buildInboxPath(sourceChannelFilter, archiveScope),
+    );
+    setInboxItems(data);
   }
 
-  async function handleAnalyze(conversationId: string) {
+  async function runAction(conversationId: string, path: string, failureMessage: string) {
     setActionConversationId(conversationId);
-    setErrorMessage("");
+    setActionError("");
 
     try {
-      await apiFetch(`/conversations/${conversationId}/analyze`, {
-        method: "POST",
-      });
-      const data = await apiFetch<SalesInboxItem[]>(
-        buildInboxPath(sourceChannelFilter, archiveScope),
-      );
-      setInboxItems(data);
+      await apiFetch(path, { method: "POST" });
+      await refreshInbox();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal menjalankan AI analysis.",
-      );
+      setActionError(error instanceof Error ? error.message : failureMessage);
     } finally {
       setActionConversationId(null);
     }
   }
 
-  async function handleGenerateDraft(conversationId: string) {
-    setActionConversationId(conversationId);
-    setErrorMessage("");
-
-    try {
-      await apiFetch(`/conversations/${conversationId}/reply-suggestions`, {
-        method: "POST",
-      });
-      const data = await apiFetch<SalesInboxItem[]>(
-        buildInboxPath(sourceChannelFilter, archiveScope),
-      );
-      setInboxItems(data);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat draft balasan.",
-      );
-    } finally {
-      setActionConversationId(null);
-    }
-  }
+  const chipBuckets = BUCKET_ORDER.filter(
+    (bucket) => (bucketCounts[bucket] ?? 0) > 0 || bucket === bucketFilter,
+  );
+  const empty = emptyMessage(inboxItems.length, archiveScope, sourceChannelFilter);
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.daily}
       title={PAGE_NAMES.inbox}
-      description="Pilih chat yang perlu dibalas, baca konteksnya, lalu buat jawaban dengan bantuan Clara."
+      description="Chat customer yang perlu kamu tangani. Buka satu chat, baca ringkasan Clara, lalu kirim jawaban yang disarankan dari WhatsApp."
       backHref="/dashboard"
       backLabel="Kembali ke beranda"
       actions={
-        <Link
-          href="/dashboard/upload"
-          className="clara-button clara-button-primary"
-        >
+        <Link href="/upload" className="clara-button clara-button-primary">
           {PAGE_NAMES.intake}
         </Link>
       }
     >
-      <div className="space-y-6">
-        {isLoading && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="clara-empty-state text-sm clara-text-secondary"
-          >
-            Memuat antrean chat...
-          </div>
-        )}
+      <div className="space-y-5">
+        {isLoading ? <LoadingState message="Memuat daftar chat..." /> : null}
 
-        {errorMessage && (
-          <div role="alert" className="clara-alert clara-alert-danger">
-            <p>{errorMessage}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                className="clara-button clara-button-secondary"
-              >
-                Coba lagi
-              </button>
-              <Link href="/login" className="clara-button clara-button-ghost">
-                Login ulang
-              </Link>
-            </div>
-          </div>
-        )}
+        {!isLoading && errorMessage ? (
+          <ErrorState message={errorMessage} onRetry={() => setReloadKey((key) => key + 1)} />
+        ) : null}
 
-        {!isLoading && !errorMessage && (
+        {!isLoading && !errorMessage ? (
           <>
             <section
-              data-onboarding-id="sales-inbox-hero"
-              className="clara-card p-5 sm:p-6"
-            >
-              <p className="clara-kicker text-xs">Status antrean</p>
-              <h2 className="mt-2 text-xl font-bold tracking-[-0.03em] clara-text-primary sm:text-2xl">
-                Kerjakan chat yang paling butuh respons
-              </h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 clara-text-secondary">
-                {highRiskCount > 0
-                  ? `${highRiskCount} chat risiko tinggi berada di urutan pertama.`
-                  : analyzedCount < inboxItems.length
-                    ? `${inboxItems.length - analyzedCount} chat masih perlu dianalisis sebelum dibalas.`
-                    : "Antrean aktif sudah siap diproses berdasarkan prioritas di bawah."}
-              </p>
-            </section>
-
-            <section
-              data-onboarding-id="sales-inbox-metrics"
-              className="grid gap-3 sm:grid-cols-3"
-            >
-              <OverviewTile
-                label="Perlu Analisis"
-                value={String(inboxItems.length - analyzedCount)}
-                tone="blue"
-              />
-              <OverviewTile
-                label="Risiko Tinggi"
-                value={String(highRiskCount)}
-                tone="amber"
-              />
-              <OverviewTile
-                label="Menunggu Customer"
-                value={String(sentCount)}
-                tone="green"
-              />
-            </section>
-
-            <section
               data-onboarding-id="sales-inbox-filters"
-              className="clara-card p-4 sm:p-5"
+              aria-label="Cari dan saring chat"
+              className="clara-card space-y-4 p-4 sm:p-5"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-semibold clara-text-primary">
-                  Cari dan filter
-                </h2>
-                <p className="text-sm clara-text-secondary">
-                  {filteredInboxItems.length} dari {inboxItems.length} chat
-                </p>
-              </div>
-
-              <div className="mt-4 grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
-                <div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="col-span-2 md:col-span-1">
                   <label htmlFor="sales-search" className="clara-label">
                     Cari chat
                   </label>
                   <input
                     id="sales-search"
+                    type="search"
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Cari nama atau isi pesan..."
+                    placeholder="Nama customer atau isi pesan"
                     className="clara-input mt-2 w-full"
                   />
                 </div>
-
-                <div>
-                  <label htmlFor="sales-archive" className="clara-label">
-                    Status chat
-                  </label>
-                  <select
-                    id="sales-archive"
-                    value={archiveScope}
-                    onChange={(event) => setArchiveScope(event.target.value)}
-                    className="clara-select mt-2 w-full"
-                  >
-                    {ARCHIVE_SCOPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 <div>
                   <label htmlFor="sales-channel" className="clara-label">
                     Channel
@@ -512,18 +376,17 @@ export default function SalesInboxPage() {
                     ))}
                   </select>
                 </div>
-
                 <div>
-                  <label htmlFor="sales-priority" className="clara-label">
-                    Prioritas
+                  <label htmlFor="sales-archive" className="clara-label">
+                    Tampilkan
                   </label>
                   <select
-                    id="sales-priority"
-                    value={queueBucketFilter}
-                    onChange={(event) => setQueueBucketFilter(event.target.value)}
+                    id="sales-archive"
+                    value={archiveScope}
+                    onChange={(event) => setArchiveScope(event.target.value)}
                     className="clara-select mt-2 w-full"
                   >
-                    {QUEUE_BUCKET_OPTIONS.map((option) => (
+                    {ARCHIVE_SCOPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -531,360 +394,254 @@ export default function SalesInboxPage() {
                   </select>
                 </div>
               </div>
-            </section>
 
-            <section className="grid gap-4">
-              {filteredInboxItems.length === 0 ? (
-                <div className="clara-empty-state">
-                  <h2 className="text-xl font-semibold clara-text-primary">
-                    {inboxItems.length === 0
-                      ? archiveScope === "archived"
-                        ? "Belum ada chat di arsip"
-                        : "Belum ada chat"
-                      : "Tidak ada chat yang cocok dengan filter ini"}
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
-                    {inboxItems.length === 0
-                      ? archiveScope === "archived"
-                        ? "Chat yang sudah lama tidak aktif dipindahkan ke arsip dan muncul di sini. Datanya tidak hilang."
-                        : "Chat dari WhatsApp, Instagram, TikTok, atau input manual akan muncul di sini."
-                      : "Coba ubah kata pencarian atau filter supaya chat yang kamu cari muncul lagi."}
-                  </p>
-                  {inboxItems.length === 0 && archiveScope !== "archived" && (
-                    <Link
-                      href="/dashboard/upload"
-                      className="clara-button clara-button-primary mt-5"
-                    >
-                      Input Chat Pertama
-                    </Link>
-                  )}
+              {archiveScope !== "archived" && inboxItems.length > 0 ? (
+                <div
+                  data-onboarding-id="sales-inbox-metrics"
+                  role="group"
+                  aria-label="Kelompok chat"
+                  className="flex flex-wrap gap-2"
+                >
+                  <GroupChip
+                    active={bucketFilter === "all"}
+                    onClick={() => setBucketFilter("all")}
+                    label={`Semua (${inboxItems.length})`}
+                  />
+                  {chipBuckets.map((bucket) => (
+                    <GroupChip
+                      key={bucket}
+                      active={bucketFilter === bucket}
+                      onClick={() => setBucketFilter(bucket)}
+                      label={`${BUCKETS[bucket].chip} (${bucketCounts[bucket] ?? 0})`}
+                    />
+                  ))}
                 </div>
-              ) : (
-                queueSections.map((section, sectionIndex) => {
-                  const requestedPage = queueSectionPages[section.bucket] ?? 1;
-                  const totalPages = Math.max(
-                    1,
-                    Math.ceil(section.items.length / QUEUE_SECTION_PAGE_SIZE),
-                  );
-                  const currentPage = Math.min(
-                    Math.max(requestedPage, 1),
-                    totalPages,
-                  );
-                  const paginatedItems = section.items.slice(
-                    (currentPage - 1) * QUEUE_SECTION_PAGE_SIZE,
-                    currentPage * QUEUE_SECTION_PAGE_SIZE,
-                  );
+              ) : null}
 
-                  return (
-                    <section
-                      key={section.bucket}
-                      data-onboarding-id={
-                        sectionIndex === 0 ? "sales-inbox-queue" : undefined
-                      }
-                      className="clara-card p-4 sm:p-5"
-                    >
-                      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                        <div>
-                          <p className="text-sm font-semibold clara-text-primary">
-                            {section.config.label}
-                          </p>
-                          <h2 className="mt-1 text-lg font-bold clara-text-primary">
-                            {section.items.length} chat
-                          </h2>
-                        </div>
-                        <p className="max-w-xl text-sm leading-6 clara-text-secondary">
-                          {section.config.description}
-                        </p>
-                      </div>
-
-                      {totalPages > 1 ? (
-                        <div className="clara-card-soft mt-4 flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-                          <p className="text-sm clara-text-secondary">
-                            Menampilkan{" "}
-                            <span className="font-semibold clara-text-primary">
-                              {paginatedItems.length}
-                            </span>{" "}
-                            dari{" "}
-                            <span className="font-semibold clara-text-primary">
-                              {section.items.length}
-                            </span>{" "}
-                            conversation
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <button
-                              type="button"
-                              disabled={currentPage === 1}
-                              onClick={() =>
-                                handleQueueSectionPageChange(
-                                  section.bucket,
-                                  currentPage - 1,
-                                )
-                              }
-                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-45"
-                            >
-                              Sebelumnya
-                            </button>
-                            <span className="px-1 text-sm clara-text-secondary">
-                              Halaman {currentPage} / {totalPages}
-                            </span>
-                            <button
-                              type="button"
-                              disabled={currentPage === totalPages}
-                              onClick={() =>
-                                handleQueueSectionPageChange(
-                                  section.bucket,
-                                  currentPage + 1,
-                                )
-                              }
-                              className="clara-button clara-button-ghost disabled:cursor-not-allowed disabled:opacity-45"
-                            >
-                              Berikutnya
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      <div className="mt-4 grid gap-3">
-                        {paginatedItems.map((item, itemIndex) => {
-                          const extraction = item.latest_ai_extraction;
-                          const provider = inferProviderFromSource(item.source);
-                          const canAnalyze = extraction === null;
-                          const canGenerateDraft =
-                            extraction !== null &&
-                            item.latest_reply_suggestion === null &&
-                            item.ui_status !== "reply_sent";
-                          const isActing =
-                            actionConversationId === item.conversation_id;
-
-                          return (
-                            <article
-                              key={item.conversation_id}
-                              data-onboarding-id={
-                                sectionIndex === 0 && itemIndex === 0
-                                  ? "sales-inbox-upcoming-actions"
-                                  : undefined
-                              }
-                              className="clara-card-outline p-4 sm:p-5"
-                            >
-                              <div className="flex h-full flex-col gap-4">
-                                <div className="min-w-0 space-y-4">
-                                  <div className="flex flex-wrap items-center gap-2.5">
-                                    <h3 className="min-w-0 break-words text-lg font-semibold leading-6 clara-text-primary">
-                                      {item.title}
-                                    </h3>
-                                  </div>
-
-                                  <div className="flex flex-wrap gap-2">
-                                    <span
-                                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getChannelBadgeClass(
-                                        item.source_channel,
-                                      )}`}
-                                    >
-                                      {formatChannelLabel(item.source_channel)}
-                                    </span>
-
-                                    <span
-                                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getProviderBadgeClass(
-                                        provider,
-                                      )}`}
-                                    >
-                                      {formatProviderLabel(provider)}
-                                    </span>
-
-                                    {isExperimentalChannel(item.source_channel) ? (
-                                      <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-clara-gold">
-                                        Experimental
-                                      </span>
-                                    ) : null}
-
-                                    <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
-                                      {section.config.label}
-                                    </span>
-
-                                    <span
-                                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getAccountCategoryBadgeClass(
-                                        item.account_category,
-                                      )}`}
-                                    >
-                                      {formatAccountCategory(
-                                        item.account_category,
-                                      )}
-                                    </span>
-
-                                    {extraction && (
-                                      <span
-                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getLeadBadgeClass(
-                                          extraction.lead_temperature,
-                                        )}`}
-                                      >
-                                        {extraction.lead_temperature.toUpperCase()}
-                                      </span>
-                                    )}
-
-                                    {extraction && (
-                                      <span
-                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getRiskBadgeClass(
-                                          extraction.risk_level,
-                                        )}`}
-                                      >
-                                        Risk {extraction.risk_level}
-                                      </span>
-                                    )}
-
-                                    {item.ui_status === "reply_sent" && (
-                                      <span className="rounded-full bg-clara-success-surface px-2.5 py-1 text-xs font-semibold text-clara-success">
-                                        SENT
-                                      </span>
-                                    )}
-
-                                    {item.is_archived && (
-                                      <span className="rounded-full bg-clara-sunken px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
-                                        ARCHIVED
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <p className="text-sm leading-6 text-clara-ink-2 line-clamp-3">
-                                    {item.latest_message
-                                      ? item.latest_message.message_text
-                                      : "Belum ada pesan."}
-                                  </p>
-
-                                  <div className="grid gap-2 text-xs text-clara-ink-3">
-                                    <div className="flex flex-wrap gap-x-2 gap-y-1">
-                                      <span>
-                                        Sumber:{" "}
-                                        <span className="font-semibold text-clara-ink-2">
-                                          {item.source_label}
-                                        </span>
-                                      </span>
-                                      {shouldShowOwnership ? (
-                                        <span>
-                                          Owner:{" "}
-                                          <span className="font-semibold text-clara-ink-2">
-                                            {item.sales_owner_name ??
-                                              "Belum ada owner"}
-                                          </span>
-                                        </span>
-                                      ) : null}
-                                      <span>
-                                        Pesan terakhir:{" "}
-                                        {formatDateTime(item.last_message_at)}
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-x-2 gap-y-1">
-                                      <span>Priority: {item.priority_score}</span>
-                                      <span>
-                                        Status:{" "}
-                                        {formatStatusLabel(item.ui_status)}
-                                      </span>
-                                      {archiveScope === "all" ? (
-                                        <span>
-                                          {item.is_archived ? "Arsip" : "Aktif"}
-                                        </span>
-                                      ) : null}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="clara-card-soft p-4">
-                                  <p className="clara-kicker text-xs">
-                                    Langkah berikutnya
-                                  </p>
-                                  <p className="mt-2 text-sm leading-6 text-clara-ink-2 line-clamp-3">
-                                    {extraction?.next_best_action ??
-                                      "Belum dianalisis. Jalankan AI analysis dulu."}
-                                  </p>
-                                  <div className="mt-3 flex flex-wrap gap-2">
-                                    <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
-                                      {formatStatusLabel(item.ui_status)}
-                                    </span>
-                                    {shouldShowOwnership &&
-                                    item.sales_owner_name ? (
-                                      <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
-                                        {item.sales_owner_name}
-                                      </span>
-                                    ) : null}
-                                    {archiveScope === "all" ? (
-                                      <span className="rounded-full bg-clara-raised px-2.5 py-1 text-xs font-semibold text-clara-ink-2">
-                                        {item.is_archived ? "Arsip" : "Aktif"}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </div>
-
-                                <div className="mt-auto flex flex-wrap gap-2 pt-1">
-                                  {canAnalyze ? (
-                                    <button
-                                      type="button"
-                                      disabled={isActing}
-                                      onClick={() => {
-                                        void handleAnalyze(
-                                          item.conversation_id,
-                                        );
-                                      }}
-                                      className="clara-button clara-button-secondary disabled:cursor-not-allowed disabled:opacity-70"
-                                    >
-                                      {isActing ? "Menganalisis..." : "Analisis AI"}
-                                    </button>
-                                  ) : null}
-
-                                  {canGenerateDraft ? (
-                                    <button
-                                      type="button"
-                                      disabled={isActing}
-                                      onClick={() => {
-                                        void handleGenerateDraft(
-                                          item.conversation_id,
-                                        );
-                                      }}
-                                      className="clara-button clara-button-secondary disabled:cursor-not-allowed disabled:opacity-70"
-                                    >
-                                      {isActing
-                                        ? "Membuat..."
-                                        : "Buat Draft"}
-                                    </button>
-                                  ) : null}
-
-                                  <Link
-                                    href={`/dashboard/sales/conversations/${item.conversation_id}`}
-                                    className="clara-button clara-button-primary"
-                                  >
-                                    Buka Percakapan
-                                  </Link>
-                                </div>
-                              </div>
-                            </article>
-                          );
-                        })}
-                      </div>
-                    </section>
-                  );
-                })
-              )}
+              <p role="status" aria-live="polite" className="text-sm clara-text-secondary">
+                {filteredInboxItems.length === inboxItems.length
+                  ? `${inboxItems.length} chat`
+                  : `${filteredInboxItems.length} dari ${inboxItems.length} chat`}
+              </p>
             </section>
+
+            {actionError ? (
+              <div role="alert" className="clara-alert clara-alert-danger">
+                <p>{actionError}</p>
+              </div>
+            ) : null}
+
+            {filteredInboxItems.length === 0 ? (
+              <EmptyState
+                title={empty.title}
+                description={empty.body}
+                actionHref={empty.showIntake ? "/upload" : undefined}
+                actionLabel={empty.showIntake ? "Masukkan chat pertama" : undefined}
+              />
+            ) : (
+              sections.map((section, sectionIndex) => {
+                const visible = visibleCounts[section.bucket] ?? VISIBLE_STEP;
+                const shownItems = section.items.slice(0, visible);
+                const hiddenCount = section.items.length - shownItems.length;
+                const config = BUCKETS[section.bucket];
+
+                return (
+                  <section
+                    key={section.bucket}
+                    aria-labelledby={`bucket-${section.bucket}`}
+                    data-onboarding-id={sectionIndex === 0 ? "sales-inbox-queue" : undefined}
+                    className="space-y-3"
+                  >
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                      <h2
+                        id={`bucket-${section.bucket}`}
+                        className="text-base font-semibold clara-text-primary"
+                      >
+                        {config.label}{" "}
+                        <span className="font-normal clara-text-muted">({section.items.length})</span>
+                      </h2>
+                      <p className="text-sm clara-text-secondary">{config.description}</p>
+                    </div>
+
+                    <ul className="space-y-3">
+                      {shownItems.map((item, itemIndex) => (
+                        <InboxRow
+                          key={item.conversation_id}
+                          item={item}
+                          bucket={section.bucket}
+                          showOwner={shouldShowOwnership}
+                          isActing={actionConversationId === item.conversation_id}
+                          markFirst={sectionIndex === 0 && itemIndex === 0}
+                          onAnalyze={() =>
+                            void runAction(
+                              item.conversation_id,
+                              `/conversations/${item.conversation_id}/analyze`,
+                              "Clara belum bisa membaca chat ini. Coba lagi sebentar lagi.",
+                            )
+                          }
+                          onDraft={() =>
+                            void runAction(
+                              item.conversation_id,
+                              `/conversations/${item.conversation_id}/reply-suggestions`,
+                              "Clara belum bisa menyusun draft. Coba lagi sebentar lagi.",
+                            )
+                          }
+                        />
+                      ))}
+                    </ul>
+
+                    {hiddenCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setVisibleCounts((current) => ({
+                            ...current,
+                            [section.bucket]: visible + VISIBLE_STEP,
+                          }))
+                        }
+                        className="clara-button clara-button-ghost"
+                      >
+                        Tampilkan {Math.min(hiddenCount, VISIBLE_STEP)} chat lagi ({hiddenCount} tersisa)
+                      </button>
+                    ) : null}
+                  </section>
+                );
+              })
+            )}
           </>
-        )}
+        ) : null}
       </div>
     </WorkspaceShell>
   );
 }
 
-function OverviewTile({
+function GroupChip({
+  active,
   label,
-  value,
-  tone,
+  onClick,
 }: {
+  active: boolean;
   label: string;
-  value: string;
-  tone: "slate" | "blue" | "green" | "amber";
+  onClick: () => void;
 }) {
   return (
-    <article data-tone={tone} className="clara-card-soft p-4">
-      <p className="text-sm clara-text-secondary">{label}</p>
-      <p className="mt-1 text-2xl font-bold tracking-tight clara-text-primary">
-        {value}
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
+        active
+          ? "border-clara-gold bg-clara-gold text-clara-deep"
+          : "border-clara-line bg-clara-sunken text-clara-ink-2 hover:border-clara-gold hover:text-clara-ink"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+type InboxRowProps = {
+  item: SalesInboxItem;
+  bucket: QueueBucketKey;
+  showOwner: boolean;
+  isActing: boolean;
+  markFirst: boolean;
+  onAnalyze: () => void;
+  onDraft: () => void;
+};
+
+function InboxRow({ item, bucket, showOwner, isActing, markFirst, onAnalyze, onDraft }: InboxRowProps) {
+  const extraction = item.latest_ai_extraction;
+  const provider = inferProviderFromSource(item.source);
+  const canAnalyze = extraction === null;
+  const canGenerateDraft =
+    extraction !== null && item.latest_reply_suggestion === null && item.ui_status !== "reply_sent";
+  const detailHref = `/sales/conversations/${item.conversation_id}`;
+  const channelLabel = formatChannelLabel(item.source_channel);
+  const sourceText = provider === "manual" || provider === "unknown"
+    ? channelLabel
+    : `${channelLabel} · ${formatProviderLabel(provider)}`;
+  const category = item.account_category && item.account_category !== "unknown"
+    ? labelOf(ACCOUNT_CATEGORY, item.account_category)
+    : null;
+
+  return (
+    <li
+      data-onboarding-id={markFirst ? "sales-inbox-upcoming-actions" : undefined}
+      className="relative rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 hover:border-clara-line focus-within:border-clara-gold sm:p-5"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="break-words text-base font-semibold clara-text-primary">
+            <Link
+              href={detailHref}
+              className="rounded after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none"
+            >
+              {item.title}
+            </Link>
+          </h3>
+          <p className="mt-0.5 text-xs clara-text-muted">
+            {sourceText} · {formatRelativeTime(item.last_message_at)}
+            {showOwner ? ` · ${item.sales_owner_name ?? "Belum ada owner"}` : ""}
+          </p>
+        </div>
+
+        <div className="relative z-10 shrink-0">
+          {canAnalyze ? (
+            <button
+              type="button"
+              disabled={isActing}
+              onClick={onAnalyze}
+              className="clara-button clara-button-secondary w-full sm:w-auto"
+            >
+              {isActing ? "Clara sedang membaca..." : "Baca dengan Clara"}
+            </button>
+          ) : canGenerateDraft ? (
+            <button
+              type="button"
+              disabled={isActing}
+              onClick={onDraft}
+              className="clara-button clara-button-secondary w-full sm:w-auto"
+            >
+              {isActing ? "Menyusun draft..." : "Buat draft jawaban"}
+            </button>
+          ) : (
+            <Link
+              href={detailHref}
+              className={`clara-button w-full sm:w-auto ${
+                bucket === "waiting_customer" || bucket === "archived"
+                  ? "clara-button-secondary"
+                  : "clara-button-primary"
+              }`}
+            >
+              {bucket === "waiting_customer" || bucket === "archived" ? "Buka chat" : "Buka dan balas"}
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <p className="mt-3 line-clamp-2 text-sm clara-text-secondary">
+        {item.latest_message ? item.latest_message.message_text : "Belum ada pesan."}
       </p>
-    </article>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {extraction ? <ValueTag table={TEMPERATURE} value={extraction.lead_temperature} /> : null}
+        {extraction && extraction.risk_level !== "low" ? (
+          <Tag tone={extraction.risk_level === "high" ? "danger" : "warn"}>
+            {extraction.risk_level === "high" ? "Risiko tinggi" : "Risiko sedang"}
+          </Tag>
+        ) : null}
+        <ValueTag table={REPLY_STATE} value={item.ui_status} />
+        {category ? <Tag>{category}</Tag> : null}
+        {isExperimentalChannel(item.source_channel) ? <Tag tone="warn">Eksperimental</Tag> : null}
+      </div>
+
+      {extraction?.next_best_action ? (
+        <p className="mt-3 text-sm clara-text-secondary">
+          <span className="font-semibold clara-text-primary">Langkah berikutnya: </span>
+          {extraction.next_best_action}
+        </p>
+      ) : null}
+    </li>
   );
 }

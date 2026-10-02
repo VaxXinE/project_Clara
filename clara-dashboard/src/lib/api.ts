@@ -107,6 +107,19 @@ const KNOWN_DETAIL_TRANSLATIONS: Record<string, string> = {
     "Draft ini diblokir sistem dan tidak bisa ditandai terkirim.",
 };
 
+const AI_UNAVAILABLE_MESSAGE =
+  "Clara belum bisa membantu saat ini. Coba lagi sebentar lagi. Kalau masih gagal, hubungi admin.";
+
+/** Jalur yang memanggil AI. Kegagalannya hampir selalu karena layanan AI, bukan isian user. */
+function isAiRequest(path: string): boolean {
+  return /\/(analyze|reply-suggestions|ai)(\/|\?|$)/.test(path);
+}
+
+/** Nama variabel environment, kelas error, atau URL tidak boleh sampai ke layar user. */
+function looksInternal(detail: string): boolean {
+  return /\b[A-Z][A-Z0-9]*(_[A-Z0-9]+)+\b|https?:\/\/|Traceback|Exception|[{}<>]/.test(detail);
+}
+
 const INDONESIAN_HINT =
   /\b(belum|tidak|harus|wajib|terlalu|maksimum|maksimal|gagal|sudah|silakan|tersedia|ditemukan|mohon|akun|anda|kamu)\b/i;
 
@@ -174,6 +187,10 @@ function toFriendlyMessage(
     return `Ada isian yang belum benar: ${invalidFields}. Periksa lalu coba lagi.`;
   }
 
+  if (isAiRequest(path) && status >= 400) {
+    return AI_UNAVAILABLE_MESSAGE;
+  }
+
   if (status >= 500) {
     return SERVER_ERROR_MESSAGE;
   }
@@ -187,18 +204,12 @@ function toFriendlyMessage(
     return "Data yang dicari tidak ditemukan. Mungkin sudah dihapus atau dipindahkan.";
   }
 
-  if (rawDetail && INDONESIAN_HINT.test(rawDetail)) {
+  if (rawDetail && INDONESIAN_HINT.test(rawDetail) && !looksInternal(rawDetail)) {
     return rawDetail;
   }
 
-  const isShortReadableDetail =
-    rawDetail.length > 0 &&
-    rawDetail.length <= 160 &&
-    !/[{}<>]|https?:\/\//.test(rawDetail);
-
-  return isShortReadableDetail
-    ? `Permintaan belum bisa diproses. Keterangan: ${rawDetail}`
-    : "Permintaan belum bisa diproses. Periksa data yang dikirim lalu coba lagi.";
+  // Detail berbahasa Inggris dari backend tidak ditampilkan: tidak membantu dan bisa membocorkan internal.
+  return "Permintaan belum bisa diproses. Periksa data yang dikirim lalu coba lagi. Kalau berulang, hubungi admin.";
 }
 
 export async function apiFetch<T>(
