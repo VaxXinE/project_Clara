@@ -1,3 +1,4 @@
+import secrets
 from collections.abc import Callable
 from uuid import UUID
 
@@ -125,7 +126,10 @@ def require_sgcc_integration(request: Request) -> str:
             detail="Missing SGCC integration key.",
         )
 
-    if presented_key != configured_key:
+    # Bandingkan sebagai bytes: compare_digest pada str gagal untuk karakter non-ASCII.
+    if not secrets.compare_digest(
+        presented_key.encode("utf-8"), configured_key.encode("utf-8")
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid SGCC integration key.",

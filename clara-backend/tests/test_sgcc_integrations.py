@@ -578,3 +578,25 @@ def test_sgcc_kpi_enrichment_returns_alerts_and_recommendations(
     ).all()
     assert len(audit_logs) == 1
     assert audit_logs[0].metadata_json["health_status"] == "critical"
+
+
+def test_sgcc_integration_rejects_wrong_and_non_ascii_keys_with_401(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "sgcc_integration_api_key", "test-sgcc-key")
+
+    wrong = client.post(
+        "/integrations/sgcc/conversation-analysis",
+        json={"messages": sample_messages()},
+        headers={"X-Clara-Integration-Key": "wrong-key"},
+    )
+    non_ascii = client.post(
+        "/integrations/sgcc/conversation-analysis",
+        json={"messages": sample_messages()},
+        headers={"X-Clara-Integration-Key": "kunci-é".encode("latin-1")},
+    )
+
+    assert wrong.status_code == 401, wrong.text
+    assert wrong.json()["detail"] == "Invalid SGCC integration key."
+    assert non_ascii.status_code == 401, non_ascii.text
