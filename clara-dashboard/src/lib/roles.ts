@@ -72,13 +72,13 @@ export function canAccessAdminPages(role?: string | null): boolean {
 export function getRoleDisplayLabel(role?: string | null): string {
   switch (normalizeWorkspaceRole(role)) {
     case "sales":
-      return "customer sales";
+      return "Sales";
     case "manager":
-      return "manager";
+      return "Manager";
     case "head":
-      return "head";
+      return "Head";
     case "superadmin":
-      return "superadmin";
+      return "Superadmin";
     default:
       return (role ?? "").replaceAll("_", " ");
   }

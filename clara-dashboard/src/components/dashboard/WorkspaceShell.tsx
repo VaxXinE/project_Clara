@@ -17,6 +17,7 @@ import {
   faFlag,
   faComments,
   faGaugeHigh,
+  faMagnifyingGlass,
   faShareNodes,
   faSliders,
   faTriangleExclamation,
@@ -26,10 +27,11 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
 import { resetDashboardOnboardingState } from "@/components/dashboard/SalesOnboardingTour";
+import { TaskFinder } from "@/components/dashboard/TaskFinder";
 import { apiFetch } from "@/lib/api";
 import {
   NAV_GROUP_NAMES,
@@ -37,11 +39,8 @@ import {
   SITE_NAME,
   formatNotificationSource,
 } from "@/lib/labels";
-import {
-  canAccessQueueAndActionCenter,
-  getRoleDisplayLabel,
-  normalizeWorkspaceRole,
-} from "@/lib/roles";
+import { getRoleDisplayLabel, normalizeWorkspaceRole } from "@/lib/roles";
+import { tasksForUser } from "@/lib/tasks";
 import type {
   CurrentUser,
   OpsNotificationItem,
@@ -74,210 +73,218 @@ type NavGroup = {
 };
 
 function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
-  const normalizedRole = normalizeWorkspaceRole(currentUser?.role);
-  const isSalesRole = normalizedRole === "sales";
-  const isManagerScopedRole = normalizedRole === "manager";
-  const isHeadScopedRole = normalizedRole === "head";
-  const isSuperadminScopedRole = normalizedRole === "superadmin";
-  const isManagerMonitorRole =
-    isManagerScopedRole && !canAccessQueueAndActionCenter(currentUser?.role);
-  const isHeadMonitorRole =
-    isHeadScopedRole && !canAccessQueueAndActionCenter(currentUser?.role);
+  const role = normalizeWorkspaceRole(currentUser?.role);
 
-  const workspaceItems: NavItem[] = [
-    {
-      href: "/workspace",
-      label: PAGE_NAMES.home,
-      icon: faGaugeHigh,
-      description: isSalesRole ? "Prioritas kerja hari ini" : "Ringkasan kerja",
-    },
-    {
-      href: "/crm",
-      label:
-        isManagerScopedRole || isHeadScopedRole
-          ? PAGE_NAMES.leadsTeam
-          : PAGE_NAMES.leads,
-      icon: faBriefcase,
-      description: isSalesRole
-        ? "Prospect yang sedang kamu tangani"
-        : isHeadMonitorRole
-          ? "Progres lead semua tim"
-        : isManagerMonitorRole
-          ? "Progres lead timmu"
-        : "Progres lead",
-    },
-  ];
-
-  if (isSalesRole || isSuperadminScopedRole) {
-    workspaceItems.push({
-      href: "/customers",
-      label: PAGE_NAMES.customers,
-      icon: faAddressBook,
-      description: isSalesRole ? "Ringkasan customer aktif" : "Data customer",
-    });
+  if (!currentUser) {
+    return [];
   }
 
-  if (currentUser && canAccessQueueAndActionCenter(currentUser.role)) {
-    workspaceItems.splice(
-      1,
-      0,
+  const home = (description: string): NavItem => ({
+    href: "/workspace",
+    label: PAGE_NAMES.home,
+    icon: faGaugeHigh,
+    description,
+  });
+  const complaints: NavItem = {
+    href: "/complaints",
+    label: PAGE_NAMES.complaints,
+    icon: faFlag,
+    description: "Keluhan customer yang perlu ditinjau",
+  };
+  const inbox = (description: string): NavItem => ({
+    href: "/sales",
+    label: PAGE_NAMES.inbox,
+    icon: faComments,
+    description,
+  });
+  const followUp = (description: string): NavItem => ({
+    href: "/follow-up",
+    label: PAGE_NAMES.followUp,
+    icon: faCalendarCheck,
+    description,
+  });
+  const leads = (label: string, description: string): NavItem => ({
+    href: "/crm",
+    label,
+    icon: faBriefcase,
+    description,
+  });
+  const teamMonitor = (description: string): NavItem => ({
+    href: "/manager-insights",
+    label: PAGE_NAMES.teamMonitor,
+    icon: faChartLine,
+    description,
+  });
+  const knowledge: NavItem = {
+    href: "/knowledge",
+    label: PAGE_NAMES.knowledge,
+    icon: faBookOpen,
+    description: "Jawaban resmi yang dipakai Clara",
+  };
+  const marketing: NavItem = {
+    href: "/marketing",
+    label: PAGE_NAMES.marketing,
+    icon: faBullhorn,
+    description: "Keberatan customer dan sinyal pasar",
+  };
+  const opsDashboard: NavItem = {
+    href: "/kpi",
+    label: PAGE_NAMES.opsDashboard,
+    icon: faChartColumn,
+    description: "Kinerja operasional",
+  };
+
+  if (role === "sales") {
+    return [
       {
-        href: "/sales",
-        label: PAGE_NAMES.inbox,
-        icon: faComments,
-        description: isSalesRole ? "Tempat mulai balas chat" : "Chat masuk Sales",
+        title: NAV_GROUP_NAMES.daily,
+        items: [
+          home("Prioritas kerja hari ini"),
+          inbox("Tempat mulai balas chat"),
+          {
+            href: "/upload",
+            label: PAGE_NAMES.intake,
+            icon: faCloudArrowUp,
+            description: "Tambah chat baru ke Clara",
+          },
+          followUp("Pekerjaan follow-up yang belum selesai"),
+          leads(PAGE_NAMES.leads, "Prospect yang sedang kamu tangani"),
+          {
+            href: "/customers",
+            label: PAGE_NAMES.customers,
+            icon: faAddressBook,
+            description: "Ringkasan customer aktif",
+          },
+          complaints,
+        ],
       },
-      ...(isSalesRole
-        ? [
-            {
-              href: "/upload",
-              label: PAGE_NAMES.intake,
-              icon: faCloudArrowUp,
-              description: "Tambah chat baru ke Clara",
-            },
-          ]
-        : []),
+    ];
+  }
+
+  if (role === "manager") {
+    return [
       {
-        href: "/follow-up",
-        label: PAGE_NAMES.followUp,
-        icon: faCalendarCheck,
-        description: isSalesRole
-          ? "Pekerjaan follow-up yang belum selesai"
-          : "Prioritas tindak lanjut",
-      },
-    );
-  }
-
-  const insightItems: NavItem[] = [];
-  const adminItems: NavItem[] = [];
-
-  if (currentUser && (isHeadScopedRole || isSuperadminScopedRole)) {
-    workspaceItems.push({
-      href: "/notifications",
-      label: isHeadScopedRole ? PAGE_NAMES.alertsTeam : PAGE_NAMES.alerts,
-      icon: faTriangleExclamation,
-      description: isHeadScopedRole
-        ? "Sinyal follow-up tim yang perlu perhatian"
-        : "Alert operasional",
-    });
-  }
-
-  if (currentUser && isSuperadminScopedRole) {
-    workspaceItems.push({
-      href: "/channels",
-      label: PAGE_NAMES.channels,
-      icon: faShareNodes,
-      description: "Sumber channel",
-    });
-  }
-
-  if (
-    currentUser &&
-    (isManagerScopedRole || isHeadScopedRole || isSuperadminScopedRole)
-  ) {
-    workspaceItems.push({
-      href: "/approvals",
-      label: isHeadScopedRole
-        ? PAGE_NAMES.teamDirection
-        : PAGE_NAMES.reviewSales,
-      icon: faClipboardCheck,
-      description: isHeadScopedRole
-        ? "Keputusan dan arahan tindak lanjut tim"
-        : isManagerMonitorRole
-          ? "Cek balasan dan arahkan Sales"
-        : "Review jawaban Sales",
-    });
-    insightItems.push({
-      href: "/manager-insights",
-      label: PAGE_NAMES.teamMonitor,
-      icon: faChartLine,
-      description: isHeadScopedRole
-        ? "Pantau progres, risiko, dan hambatan tim"
-        : isManagerMonitorRole
-          ? "Pantau progres dan hambatan tim"
-        : "Progres prospect Sales",
-    });
-  }
-
-  if (currentUser && (isHeadScopedRole || isSuperadminScopedRole)) {
-    insightItems.push(
-      {
-        href: "/knowledge",
-        label: PAGE_NAMES.knowledge,
-        icon: faBookOpen,
-        description: "Jawaban resmi Clara",
+        title: NAV_GROUP_NAMES.daily,
+        items: [
+          home("Ringkasan kerja hari ini"),
+          {
+            href: "/approvals",
+            label: PAGE_NAMES.reviewSales,
+            icon: faClipboardCheck,
+            description: "Cek balasan dan arahkan Sales",
+          },
+          leads(PAGE_NAMES.leadsTeam, "Progres lead timmu"),
+          complaints,
+        ],
       },
       {
-        href: "/marketing",
-        label: PAGE_NAMES.marketing,
-        icon: faBullhorn,
-        description: "Keberatan customer dan sinyal pasar",
+        title: NAV_GROUP_NAMES.team,
+        items: [teamMonitor("Pantau progres dan hambatan tim")],
+      },
+    ];
+  }
+
+  if (role === "head") {
+    return [
+      {
+        title: NAV_GROUP_NAMES.daily,
+        items: [
+          home("Ringkasan kerja hari ini"),
+          {
+            href: "/notifications",
+            label: PAGE_NAMES.alertsTeam,
+            icon: faTriangleExclamation,
+            description: "Sinyal follow-up tim yang perlu perhatian",
+          },
+          {
+            href: "/approvals",
+            label: PAGE_NAMES.teamDirection,
+            icon: faClipboardCheck,
+            description: "Keputusan dan arahan tindak lanjut tim",
+          },
+          leads(PAGE_NAMES.leadsTeam, "Progres lead semua tim"),
+          complaints,
+        ],
       },
       {
-        href: "/kpi",
-        label: PAGE_NAMES.opsDashboard,
-        icon: faChartColumn,
-        description: "Kinerja operasional",
+        title: NAV_GROUP_NAMES.team,
+        items: [teamMonitor("Pantau progres, risiko, dan hambatan tim"), opsDashboard],
       },
-    );
-
+      { title: NAV_GROUP_NAMES.knowledge, items: [knowledge, marketing] },
+    ];
   }
 
-  if (currentUser && isSuperadminScopedRole) {
-    adminItems.push(
+  if (role === "superadmin") {
+    return [
       {
-        href: "/admin/access",
-        label: PAGE_NAMES.users,
-        icon: faUsersGear,
-        description: "Akun, role, dan tim",
+        title: NAV_GROUP_NAMES.daily,
+        items: [
+          home("Ringkasan kerja hari ini"),
+          inbox("Chat masuk Sales"),
+          followUp("Prioritas tindak lanjut"),
+          leads(PAGE_NAMES.leads, "Progres lead"),
+          {
+            href: "/customers",
+            label: PAGE_NAMES.customers,
+            icon: faAddressBook,
+            description: "Data customer",
+          },
+          complaints,
+        ],
       },
       {
-        href: "/admin/ops",
-        label: PAGE_NAMES.audit,
-        icon: faClipboardList,
-        description: "Jejak audit dan status sistem",
+        title: NAV_GROUP_NAMES.team,
+        items: [
+          {
+            href: "/notifications",
+            label: PAGE_NAMES.alerts,
+            icon: faTriangleExclamation,
+            description: "Alert operasional",
+          },
+          {
+            href: "/approvals",
+            label: PAGE_NAMES.reviewSales,
+            icon: faClipboardCheck,
+            description: "Review jawaban Sales",
+          },
+          teamMonitor("Progres prospect Sales"),
+          opsDashboard,
+        ],
       },
+      { title: NAV_GROUP_NAMES.knowledge, items: [knowledge, marketing] },
       {
-        href: "/admin/ai-config",
-        label: PAGE_NAMES.persona,
-        icon: faSliders,
-        description: "Gaya dan aturan jawaban Clara",
+        title: NAV_GROUP_NAMES.settings,
+        items: [
+          {
+            href: "/admin/access",
+            label: PAGE_NAMES.users,
+            icon: faUsersGear,
+            description: "Akun, role, dan tim",
+          },
+          {
+            href: "/channels",
+            label: PAGE_NAMES.channels,
+            icon: faShareNodes,
+            description: "Sumber chat: WhatsApp, Instagram, TikTok",
+          },
+          {
+            href: "/admin/ai-config",
+            label: PAGE_NAMES.persona,
+            icon: faSliders,
+            description: "Gaya dan aturan jawaban Clara",
+          },
+          {
+            href: "/admin/ops",
+            label: PAGE_NAMES.audit,
+            icon: faClipboardList,
+            description: "Jejak audit dan status sistem",
+          },
+        ],
       },
-    );
+    ];
   }
 
-  if (currentUser) {
-    workspaceItems.push({
-      href: "/complaints",
-      label: PAGE_NAMES.complaints,
-      icon: faFlag,
-      description: "Keluhan customer yang perlu ditinjau",
-    });
-  }
-
-  const groups: NavGroup[] = [
-    { title: NAV_GROUP_NAMES.daily, items: workspaceItems },
-  ];
-
-  if (currentUser && isSalesRole) {
-    return groups;
-  }
-
-  if (insightItems.length > 0) {
-    groups.push({
-      title:
-        isManagerMonitorRole || isHeadMonitorRole
-          ? NAV_GROUP_NAMES.monitoring
-          : NAV_GROUP_NAMES.analysis,
-      items: insightItems,
-    });
-  }
-
-  if (adminItems.length > 0) {
-    groups.push({ title: NAV_GROUP_NAMES.admin, items: adminItems });
-  }
-
-  return groups;
+  return [{ title: NAV_GROUP_NAMES.daily, items: [home("Ringkasan kerja hari ini")] }];
 }
 
 function isNavItemActive(pathname: string, href: string): boolean {
@@ -329,7 +336,6 @@ function getGlobalAlertNotifications(
 
 export function WorkspaceShell({
   currentUser,
-  eyebrow,
   title,
   description,
   backHref,
@@ -346,6 +352,8 @@ export function WorkspaceShell({
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
   const accountMenuContainerRef = useRef<HTMLDivElement>(null);
   const accountMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const finderTriggerRef = useRef<HTMLButtonElement>(null);
+  const [finderOpen, setFinderOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [accountMenuPathname, setAccountMenuPathname] = useState(pathname);
@@ -359,6 +367,42 @@ export function WorkspaceShell({
   const normalizedRole = normalizeWorkspaceRole(resolvedCurrentUser?.role);
   const isAccountMenuVisible =
     accountMenuOpen && accountMenuPathname === pathname;
+
+  const allNavItems = navGroups.flatMap((group) => group.items);
+  const activeNavItem = allNavItems
+    .filter((item) => isNavItemActive(pathname, item.href))
+    .sort((left, right) => right.href.length - left.href.length)[0];
+  const finderItems = useMemo(() => {
+    const pageLabels = new Map(allNavItems.map((item) => [item.href, item.label]));
+    pageLabels.set("/profile", "Profil");
+    pageLabels.set("/start", PAGE_NAMES.guide);
+
+    return tasksForUser(
+      normalizedRole,
+      new Set(allNavItems.map((item) => item.href)),
+    ).map((task) => ({
+      goal: task.goal,
+      href: task.href,
+      keywords: task.keywords,
+      pageLabel: pageLabels.get(task.href) ?? task.href,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedRole, navGroups.length, resolvedCurrentUser?.id]);
+
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setMobileNavOpen(false);
+        setAccountMenuOpen(false);
+        setFinderOpen((current) => !current);
+      }
+    }
+
+    document.addEventListener("keydown", handleShortcut);
+
+    return () => document.removeEventListener("keydown", handleShortcut);
+  }, []);
 
   useEffect(() => {
     if (!currentUser) {
@@ -706,10 +750,52 @@ export function WorkspaceShell({
                 >
                   <FontAwesomeIcon icon={faBars} className="h-4 w-4" />
                 </button>
-                <p className="clara-text-secondary truncate text-sm font-medium">
-                  {eyebrow}
-                </p>
+                <nav aria-label="Posisi halaman" className="min-w-0">
+                  <ol className="flex min-w-0 items-center gap-2 text-sm">
+                    {activeNavItem && pathname !== activeNavItem.href ? (
+                      <>
+                        <li className="shrink-0">
+                          <Link
+                            href={activeNavItem.href}
+                            className="clara-text-secondary rounded px-1 font-medium hover:text-[var(--color-text-primary)]"
+                          >
+                            {activeNavItem.label}
+                          </Link>
+                        </li>
+                        <li aria-hidden="true" className="clara-text-muted shrink-0">
+                          /
+                        </li>
+                        <li aria-current="page" className="min-w-0 truncate font-semibold">
+                          {title}
+                        </li>
+                      </>
+                    ) : (
+                      <li aria-current="page" className="min-w-0 truncate font-semibold">
+                        {activeNavItem?.label ?? title}
+                      </li>
+                    )}
+                  </ol>
+                </nav>
               </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+              <button
+                ref={finderTriggerRef}
+                type="button"
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  setAccountMenuOpen(false);
+                  setFinderOpen(true);
+                }}
+                aria-label="Saya mau... (cari menu)"
+                className="flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-[var(--color-border-default)] px-3 text-sm font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text-primary)]"
+              >
+                <FontAwesomeIcon icon={faMagnifyingGlass} className="h-4 w-4" />
+                <span className="hidden md:inline">Saya mau...</span>
+                <kbd className="hidden rounded border border-[var(--color-border-subtle)] px-1.5 text-xs text-[var(--color-text-muted)] lg:inline">
+                  Ctrl K
+                </kbd>
+              </button>
 
               <div ref={accountMenuContainerRef} className="relative shrink-0">
                   <button
@@ -808,8 +894,18 @@ export function WorkspaceShell({
                     </div>
                   ) : null}
               </div>
+              </div>
             </div>
           </div>
+
+          <TaskFinder
+            open={finderOpen}
+            items={finderItems}
+            onClose={() => {
+              setFinderOpen(false);
+              finderTriggerRef.current?.focus();
+            }}
+          />
 
           <div className="space-y-4">
             <header className="clara-page-hero border-b border-[var(--color-border-default)] px-4 pb-5 pt-4 sm:px-5">
@@ -883,17 +979,9 @@ export function WorkspaceShell({
                             href={notification.target_href}
                             className="clara-button clara-button-primary max-w-full px-3 py-2 text-sm"
                           >
-                            {normalizedRole === "head"
-                              ? "Buka follow-up tim"
-                              : "Buka detailnya"}
+                            Lihat sekarang
                           </Link>
                         ) : null}
-                        <Link
-                          href="/notifications"
-                          className="clara-button clara-button-secondary max-w-full px-3 py-2 text-sm"
-                        >
-                          Lihat semua alert
-                        </Link>
                         <button
                           type="button"
                           onClick={() =>
@@ -904,7 +992,7 @@ export function WorkspaceShell({
                         >
                           {resolvingNotificationId === notification.id
                             ? "Menutup..."
-                            : "Tutup"}
+                            : "Sudah ditangani"}
                         </button>
                       </div>
                     </div>

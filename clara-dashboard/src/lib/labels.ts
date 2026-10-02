@@ -11,6 +11,9 @@ export const NAV_GROUP_NAMES = {
   analysis: "Analisis",
   monitoring: "Pemantauan",
   admin: "Administrasi",
+  team: "Pantau Tim",
+  knowledge: "Pengetahuan & Pasar",
+  settings: "Pengaturan Sistem",
   account: "Akun",
   guide: "Panduan",
 } as const;
@@ -45,6 +48,7 @@ export const PAGE_NAMES = {
 /** Nama sumber notifikasi dari backend yang ditampilkan ke user. */
 const NOTIFICATION_SOURCE_NAMES: Record<string, string> = {
   deal_metrics_sync: "Data deal belum sinkron",
+  approval_queue: "Chat perlu keputusan",
   operational_alert: "Alert operasional",
   extension_build_update: "Update extension",
   follow_up_overdue: "Tindak lanjut terlambat",
