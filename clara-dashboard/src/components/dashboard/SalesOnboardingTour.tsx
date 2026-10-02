@@ -174,22 +174,16 @@ const TOUR_ROUTES: TourRoute[] = [
     title: "Input Chat",
     steps: [
       {
-        id: "sales-upload-steps",
-        title: "Alur input tercepat",
-        description:
-          "Kotak ini menjelaskan urutan paling singkat untuk memasukkan chat baru ke Clara tanpa banyak langkah tambahan.",
-      },
-      {
         id: "sales-upload-form",
         title: "Form input chat",
         description:
-          "Isi seperlunya saja: channel, nama customer, lalu file atau isi chat. Setelah diproses, Clara akan langsung bikin atau lanjutkan conversation.",
+          "Isi nama customer, pilih file atau tempel teks chat, lalu klik Proses chat. Percakapannya langsung terbuka.",
       },
       {
         id: "sales-upload-example",
         title: "Contoh format chat",
         description:
-          "Kalau ragu format mana yang paling aman, lihat contoh ini dulu supaya parser Clara tidak salah membaca isi percakapan.",
+          "Kalau ragu bentuk chat yang bisa dibaca Clara, buka bagian ini untuk melihat contohnya.",
       },
     ],
   },
