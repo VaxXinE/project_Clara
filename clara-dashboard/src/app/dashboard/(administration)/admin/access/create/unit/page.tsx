@@ -45,7 +45,7 @@ export default function AdminAccessCreateUnitPage() {
         }));
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Gagal memuat halaman create unit.",
+          error instanceof Error ? error.message : "Halaman ini belum bisa dimuat. Muat ulang.",
         );
       } finally {
         setIsLoading(false);
@@ -68,7 +68,7 @@ export default function AdminAccessCreateUnitPage() {
       router.replace("/admin/access");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat sales unit.",
+        error instanceof Error ? error.message : "Unit belum bisa dibuat. Coba lagi.",
       );
     } finally {
       setIsSubmitting(false);
@@ -80,9 +80,9 @@ export default function AdminAccessCreateUnitPage() {
       currentUser={currentUser}
       eyebrow={NAV_GROUP_NAMES.admin}
       title="Buat Unit Sales"
-      description="Isi data berikut untuk membuat unit sales baru."
+      description="Isi data unit sales yang baru."
       backHref="/admin/access"
-      backLabel="Kembali ke index access"
+      backLabel="Kembali ke Pengguna & Akses"
       actions={
         <Link href="/admin/access/create/team" className="clara-button clara-button-ghost">
           Buka Create Team
@@ -103,20 +103,20 @@ export default function AdminAccessCreateUnitPage() {
         {!isLoading ? (
           <form onSubmit={handleSubmit} className="clara-card space-y-5 rounded-3xl p-5">
             <div>
-              <h2 className="text-lg font-semibold text-[#fff0c9]">Create Sales Unit</h2>
+              <h2 className="text-lg font-semibold text-[#fff0c9]">Buat unit sales</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">
                 Strukturkan cabang, area, atau business cluster sebelum team dibuat.
               </p>
             </div>
 
             <SelectField
-              label="Organization"
+              label="Organisasi"
               value={unitForm.organization_id ?? ""}
               onChange={(value) =>
                 setUnitForm((current) => ({ ...current, organization_id: value || null }))
               }
               options={[
-                { value: "", label: "Pilih organization" },
+                { value: "", label: "Pilih organisasi" },
                 ...organizations.map((organization) => ({
                   value: organization.id,
                   label: `${organization.name} (${organization.slug})`,
@@ -125,14 +125,14 @@ export default function AdminAccessCreateUnitPage() {
             />
 
             <InputField
-              label="Unit Name"
+              label="Nama unit"
               value={unitForm.name}
               onChange={(value) => setUnitForm((current) => ({ ...current, name: value }))}
               placeholder="Contoh: Jakarta Timur"
             />
 
             <InputField
-              label="Unit Code"
+              label="Kode unit"
               value={unitForm.code}
               onChange={(value) => setUnitForm((current) => ({ ...current, code: value }))}
               placeholder="jkt-timur"
@@ -143,7 +143,7 @@ export default function AdminAccessCreateUnitPage() {
               disabled={isSubmitting}
               className="clara-button clara-button-primary"
             >
-              {isSubmitting ? "Creating unit..." : "Create Unit"}
+              {isSubmitting ? "Membuat unit..." : "Buat unit"}
             </button>
           </form>
         ) : null}

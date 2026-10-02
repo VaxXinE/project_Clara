@@ -328,7 +328,7 @@ export function RouteCard({
   return (
     <article className="clara-card flex h-full flex-col justify-between rounded-3xl p-5">
       <div>
-        <p className="clara-kicker text-xs text-[#f0cb73]">Access flow</p>
+        <p className="clara-kicker text-xs text-[#f0cb73]">Urutan membuat akses</p>
         <h3 className="mt-3 text-xl font-semibold text-[#fff0c9]">{title}</h3>
         <p className="mt-2 text-sm leading-6 text-[#d6bb84]">{description}</p>
       </div>

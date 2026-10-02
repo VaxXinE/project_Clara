@@ -41,7 +41,7 @@ export default function AdminAccessCreateOrganizationPage() {
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : "Gagal memuat halaman create organization.",
+            : "Halaman ini belum bisa dimuat. Muat ulang.",
         );
       } finally {
         setIsLoading(false);
@@ -64,7 +64,7 @@ export default function AdminAccessCreateOrganizationPage() {
       router.replace("/admin/access");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat organization.",
+        error instanceof Error ? error.message : "Organisasi belum bisa dibuat. Coba lagi.",
       );
     } finally {
       setIsSubmitting(false);
@@ -76,9 +76,9 @@ export default function AdminAccessCreateOrganizationPage() {
       currentUser={currentUser}
       eyebrow={NAV_GROUP_NAMES.admin}
       title="Buat Organisasi"
-      description="Isi data berikut untuk membuat organisasi baru."
+      description="Isi data organisasi yang baru."
       backHref="/admin/access"
-      backLabel="Kembali ke index access"
+      backLabel="Kembali ke Pengguna & Akses"
       actions={
         <Link href="/admin/access/create/user" className="clara-button clara-button-ghost">
           Buka Create User
@@ -108,7 +108,7 @@ export default function AdminAccessCreateOrganizationPage() {
             </div>
 
             <InputField
-              label="Name"
+              label="Nama"
               value={organizationForm.name}
               onChange={(value) =>
                 setOrganizationForm((current) => ({ ...current, name: value }))
@@ -117,7 +117,7 @@ export default function AdminAccessCreateOrganizationPage() {
             />
 
             <InputField
-              label="Slug"
+              label="Alamat singkat (slug)"
               value={organizationForm.slug}
               onChange={(value) =>
                 setOrganizationForm((current) => ({ ...current, slug: value }))
@@ -136,7 +136,7 @@ export default function AdminAccessCreateOrganizationPage() {
               disabled={!canManageOrganizations || isSubmitting}
               className="clara-button clara-button-primary"
             >
-              {isSubmitting ? "Creating organization..." : "Create Organization"}
+              {isSubmitting ? "Membuat organisasi..." : "Buat organisasi"}
             </button>
           </form>
         ) : null}

@@ -55,7 +55,7 @@ export default function AdminAccessCreateTeamPage() {
         }));
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Gagal memuat halaman create team.",
+          error instanceof Error ? error.message : "Halaman ini belum bisa dimuat. Muat ulang.",
         );
       } finally {
         setIsLoading(false);
@@ -78,7 +78,7 @@ export default function AdminAccessCreateTeamPage() {
       router.replace("/admin/access");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal membuat sales team.",
+        error instanceof Error ? error.message : "Tim belum bisa dibuat. Coba lagi.",
       );
     } finally {
       setIsSubmitting(false);
@@ -90,9 +90,9 @@ export default function AdminAccessCreateTeamPage() {
       currentUser={currentUser}
       eyebrow={NAV_GROUP_NAMES.admin}
       title="Buat Tim Sales"
-      description="Isi data berikut untuk membuat tim sales baru."
+      description="Isi data tim sales yang baru."
       backHref="/admin/access"
-      backLabel="Kembali ke index access"
+      backLabel="Kembali ke Pengguna & Akses"
       actions={
         <Link href="/admin/access/create/unit" className="clara-button clara-button-ghost">
           Buka Create Unit
@@ -113,14 +113,14 @@ export default function AdminAccessCreateTeamPage() {
         {!isLoading ? (
           <form onSubmit={handleSubmit} className="clara-card space-y-5 rounded-3xl p-5">
             <div>
-              <h2 className="text-lg font-semibold text-[#fff0c9]">Create Sales Team</h2>
+              <h2 className="text-lg font-semibold text-[#fff0c9]">Buat tim sales</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">
                 Team selalu terikat ke organization dan bisa dipetakan ke unit serta manager.
               </p>
             </div>
 
             <SelectField
-              label="Organization"
+              label="Organisasi"
               value={teamForm.organization_id ?? ""}
               onChange={(value) =>
                 setTeamForm((current) => ({
@@ -131,7 +131,7 @@ export default function AdminAccessCreateTeamPage() {
                 }))
               }
               options={[
-                { value: "", label: "Pilih organization" },
+                { value: "", label: "Pilih organisasi" },
                 ...organizations.map((organization) => ({
                   value: organization.id,
                   label: `${organization.name} (${organization.slug})`,
@@ -141,13 +141,13 @@ export default function AdminAccessCreateTeamPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <InputField
-                label="Team Name"
+                label="Nama tim"
                 value={teamForm.name}
                 onChange={(value) => setTeamForm((current) => ({ ...current, name: value }))}
                 placeholder="Team A"
               />
               <InputField
-                label="Team Code"
+                label="Kode tim"
                 value={teamForm.code}
                 onChange={(value) => setTeamForm((current) => ({ ...current, code: value }))}
                 placeholder="team-a"
@@ -162,7 +162,7 @@ export default function AdminAccessCreateTeamPage() {
                   setTeamForm((current) => ({ ...current, unit_id: value || null }))
                 }
                 options={[
-                  { value: "", label: "Tanpa unit spesifik" },
+                  { value: "", label: "Tanpa unit" },
                   ...units
                     .filter((unit) => unit.organization_id === teamForm.organization_id)
                     .map((unit) => ({
@@ -198,7 +198,7 @@ export default function AdminAccessCreateTeamPage() {
               disabled={isSubmitting}
               className="clara-button clara-button-primary"
             >
-              {isSubmitting ? "Creating team..." : "Create Team"}
+              {isSubmitting ? "Membuat tim..." : "Buat tim"}
             </button>
           </form>
         ) : null}

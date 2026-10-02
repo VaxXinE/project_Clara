@@ -50,14 +50,14 @@ export default function AdminAccessEditPasswordPage() {
         const nextTargetUser = userData.find((user) => user.id === userId) ?? null;
 
         if (!nextTargetUser) {
-          setErrorMessage("User tidak ditemukan.");
+          setErrorMessage("Pengguna tidak ditemukan.");
           return;
         }
 
         setTargetUser(nextTargetUser);
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Gagal memuat halaman reset password.",
+          error instanceof Error ? error.message : "Halaman ini belum bisa dimuat. Muat ulang.",
         );
       } finally {
         setIsLoading(false);
@@ -80,7 +80,7 @@ export default function AdminAccessEditPasswordPage() {
       router.replace("/admin/access");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal mengubah password user.",
+        error instanceof Error ? error.message : "Password belum bisa diubah. Coba lagi.",
       );
     } finally {
       setIsSaving(false);
@@ -92,9 +92,9 @@ export default function AdminAccessEditPasswordPage() {
       currentUser={currentUser}
       eyebrow={NAV_GROUP_NAMES.admin}
       title="Reset Password Pengguna"
-      description="Atur password baru untuk pengguna ini."
+      description="Buat password baru untuk pengguna ini. Sampaikan password-nya langsung ke yang bersangkutan."
       backHref="/admin/access"
-      backLabel="Kembali ke index access"
+      backLabel="Kembali ke Pengguna & Akses"
       actions={
         <Link href={`/admin/access/${userId}/edit/profile`} className="clara-button clara-button-ghost">
           Buka Edit Profile
@@ -115,7 +115,7 @@ export default function AdminAccessEditPasswordPage() {
         {!isLoading ? (
           <div className="clara-card space-y-5 rounded-3xl p-5">
             <div>
-              <h2 className="text-lg font-semibold text-[#fff0c9]">Reset Password</h2>
+              <h2 className="text-lg font-semibold text-[#fff0c9]">Reset password</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">
                 Hanya superadmin yang bisa mengganti password user dari halaman ini.
               </p>
@@ -124,10 +124,10 @@ export default function AdminAccessEditPasswordPage() {
             {canResetPassword ? (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <InputField
-                  label="New Password"
+                  label="Password baru"
                   value={passwordForm.password}
                   onChange={(value) => setPasswordForm({ password: value })}
-                  placeholder="Minimum 8 karakter"
+                  placeholder="Minimal 8 karakter"
                   type="password"
                 />
                 <PasswordStrengthHint
@@ -139,7 +139,7 @@ export default function AdminAccessEditPasswordPage() {
                   disabled={isSaving}
                   className="clara-button clara-button-primary"
                 >
-                  {isSaving ? "Saving..." : "Save New Password"}
+                  {isSaving ? "Menyimpan..." : "Simpan password baru"}
                 </button>
               </form>
             ) : (

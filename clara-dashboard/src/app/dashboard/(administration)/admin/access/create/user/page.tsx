@@ -56,7 +56,7 @@ export default function AdminAccessCreateUserPage() {
         }));
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Gagal memuat halaman create user.",
+          error instanceof Error ? error.message : "Halaman ini belum bisa dimuat. Muat ulang.",
         );
       } finally {
         setIsLoading(false);
@@ -78,7 +78,7 @@ export default function AdminAccessCreateUserPage() {
       });
       router.replace("/admin/access");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal membuat user.");
+      setErrorMessage(error instanceof Error ? error.message : "Pengguna belum bisa dibuat. Coba lagi.");
     } finally {
       setIsSubmitting(false);
     }
@@ -89,9 +89,9 @@ export default function AdminAccessCreateUserPage() {
       currentUser={currentUser}
       eyebrow={NAV_GROUP_NAMES.admin}
       title="Buat Pengguna"
-      description="Isi data berikut untuk membuat akun pengguna baru."
+      description="Isi data akun yang baru."
       backHref="/admin/access"
-      backLabel="Kembali ke index access"
+      backLabel="Kembali ke Pengguna & Akses"
       actions={
         <Link href="/admin/access/create/team" className="clara-button clara-button-ghost">
           Buka Create Team
@@ -112,14 +112,14 @@ export default function AdminAccessCreateUserPage() {
         {!isLoading ? (
           <form onSubmit={handleSubmit} className="clara-card space-y-5 rounded-3xl p-5">
             <div>
-              <h2 className="text-lg font-semibold text-[#fff0c9]">Create User</h2>
+              <h2 className="text-lg font-semibold text-[#fff0c9]">Buat pengguna</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">
                 Hanya superadmin yang bisa membuat user dari halaman ini.
               </p>
             </div>
 
             <InputField
-              label="Name"
+              label="Nama"
               value={userForm.name}
               onChange={(value) => setUserForm((current) => ({ ...current, name: value }))}
               placeholder="Sales A"
@@ -140,11 +140,11 @@ export default function AdminAccessCreateUserPage() {
                 onChange={(value) =>
                   setUserForm((current) => ({ ...current, password: value }))
                 }
-                placeholder="Minimum 8 karakter"
+                placeholder="Minimal 8 karakter"
                 type="password"
               />
               <SelectField
-                label="Role"
+                label="Peran"
                 value={userForm.role}
                 onChange={(value) => setUserForm((current) => ({ ...current, role: value }))}
                 options={[
@@ -159,7 +159,7 @@ export default function AdminAccessCreateUserPage() {
             </div>
 
             <SelectField
-              label="Organization"
+              label="Organisasi"
               value={userForm.organization_id ?? ""}
               onChange={(value) =>
                 setUserForm((current) => ({
@@ -169,7 +169,7 @@ export default function AdminAccessCreateUserPage() {
                 }))
               }
               options={[
-                { value: "", label: "Pilih organization" },
+                { value: "", label: "Pilih organisasi" },
                 ...organizations.map((organization) => ({
                   value: organization.id,
                   label: `${organization.name} (${organization.slug})`,
@@ -178,13 +178,13 @@ export default function AdminAccessCreateUserPage() {
             />
 
             <SelectField
-              label="Sales Team"
+              label="Tim Sales"
               value={userForm.team_id ?? ""}
               onChange={(value) =>
                 setUserForm((current) => ({ ...current, team_id: value || null }))
               }
               options={[
-                { value: "", label: "Belum di-assign" },
+                { value: "", label: "Belum ditentukan" },
                 ...getTeamOptions(userForm.organization_id, teams).map((team) => ({
                   value: team.id,
                   label: `${team.name}${team.unit_name ? ` / ${team.unit_name}` : ""}`,
@@ -197,7 +197,7 @@ export default function AdminAccessCreateUserPage() {
               disabled={isSubmitting}
               className="clara-button clara-button-primary"
             >
-              {isSubmitting ? "Creating user..." : "Create User"}
+              {isSubmitting ? "Membuat pengguna..." : "Buat pengguna"}
             </button>
           </form>
         ) : null}

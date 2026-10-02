@@ -24,7 +24,7 @@ export default function AdminAccessCreateHubPage() {
         router.replace("/admin/access/create/user");
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Gagal memuat halaman create access.",
+          error instanceof Error ? error.message : "Halaman ini belum bisa dimuat. Muat ulang.",
         );
       }
     }

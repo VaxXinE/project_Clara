@@ -27,14 +27,14 @@ export default function AdminAccessEditHubPage() {
         const userData = await apiFetch<CurrentUser[]>("/auth/users");
         const nextTargetUser = userData.find((user) => user.id === userId) ?? null;
         if (!nextTargetUser) {
-          setErrorMessage("User tidak ditemukan.");
+          setErrorMessage("Pengguna tidak ditemukan.");
           return;
         }
 
         router.replace(`/admin/access/${userId}/edit/profile`);
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Gagal memuat halaman edit user.",
+          error instanceof Error ? error.message : "Halaman ini belum bisa dimuat. Muat ulang.",
         );
       }
     }

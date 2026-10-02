@@ -58,7 +58,7 @@ export default function AdminAccessEditProfilePage() {
 
         const nextTargetUser = userData.find((user) => user.id === userId) ?? null;
         if (!nextTargetUser) {
-          setErrorMessage("User tidak ditemukan.");
+          setErrorMessage("Pengguna tidak ditemukan.");
           return;
         }
 
@@ -72,7 +72,7 @@ export default function AdminAccessEditProfilePage() {
         });
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : "Gagal memuat halaman edit profile.",
+          error instanceof Error ? error.message : "Halaman ini belum bisa dimuat. Muat ulang.",
         );
       } finally {
         setIsLoading(false);
@@ -94,7 +94,7 @@ export default function AdminAccessEditProfilePage() {
       });
       router.replace("/admin/access");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal update user.");
+      setErrorMessage(error instanceof Error ? error.message : "Pengguna belum bisa diubah. Coba lagi.");
     } finally {
       setIsSaving(false);
     }
@@ -107,7 +107,7 @@ export default function AdminAccessEditProfilePage() {
       title="Ubah Profil Pengguna"
       description="Ubah nama, role, dan penempatan pengguna ini."
       backHref="/admin/access"
-      backLabel="Kembali ke index access"
+      backLabel="Kembali ke Pengguna & Akses"
       actions={
         <Link href={`/admin/access/${userId}/edit/password`} className="clara-button clara-button-ghost">
           Buka Reset Password
@@ -128,7 +128,7 @@ export default function AdminAccessEditProfilePage() {
         {targetUser && !isLoading ? (
           <form onSubmit={handleSubmit} className="clara-card space-y-5 rounded-3xl p-5">
             <div>
-              <h2 className="text-lg font-semibold text-[#fff0c9]">Edit Profile User</h2>
+              <h2 className="text-lg font-semibold text-[#fff0c9]">Ubah profil pengguna</h2>
               <p className="mt-1 text-sm text-[#d6bb84]">
                 Ubah nama, email, role, organization, dan team user dari halaman khusus.
               </p>
@@ -136,12 +136,12 @@ export default function AdminAccessEditProfilePage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <InputField
-                label="Name"
+                label="Nama"
                 value={editForm.name ?? ""}
                 onChange={(value) =>
                   setEditForm((current) => ({ ...current, name: value }))
                 }
-                placeholder="Name"
+                placeholder="Nama"
               />
               <InputField
                 label="Email"
@@ -156,7 +156,7 @@ export default function AdminAccessEditProfilePage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <SelectField
-                label="Role"
+                label="Peran"
                 value={editForm.role ?? "sales"}
                 onChange={(value) =>
                   setEditForm((current) => ({ ...current, role: value }))
@@ -172,7 +172,7 @@ export default function AdminAccessEditProfilePage() {
                 disabled={currentUser?.id === targetUser.id}
               />
               <SelectField
-                label="Organization"
+                label="Organisasi"
                 value={editForm.organization_id ?? ""}
                 onChange={(value) =>
                   setEditForm((current) => ({
@@ -182,7 +182,7 @@ export default function AdminAccessEditProfilePage() {
                   }))
                 }
                 options={[
-                  { value: "", label: "Pilih organization" },
+                  { value: "", label: "Pilih organisasi" },
                   ...organizations.map((organization) => ({
                     value: organization.id,
                     label: `${organization.name} (${organization.slug})`,
@@ -192,13 +192,13 @@ export default function AdminAccessEditProfilePage() {
             </div>
 
             <SelectField
-              label="Sales Team"
+              label="Tim Sales"
               value={editForm.team_id ?? ""}
               onChange={(value) =>
                 setEditForm((current) => ({ ...current, team_id: value || null }))
               }
               options={[
-                { value: "", label: "Belum di-assign" },
+                { value: "", label: "Belum ditentukan" },
                 ...getTeamOptions(editForm.organization_id ?? null, teams).map((team) => ({
                   value: team.id,
                   label: `${team.name}${team.unit_name ? ` / ${team.unit_name}` : ""}`,
@@ -211,7 +211,7 @@ export default function AdminAccessEditProfilePage() {
               disabled={isSaving}
               className="clara-button clara-button-primary"
             >
-              {isSaving ? "Saving..." : "Save Changes"}
+              {isSaving ? "Menyimpan..." : "Simpan perubahan"}
             </button>
           </form>
         ) : null}

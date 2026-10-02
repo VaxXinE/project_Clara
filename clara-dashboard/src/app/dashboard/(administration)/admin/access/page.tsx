@@ -102,7 +102,7 @@ export default function AdminAccessPage() {
         setErrorMessage(
           error instanceof Error
             ? error.message
-            : "Gagal memuat halaman user management.",
+            : "Halaman ini belum bisa dimuat. Muat ulang.",
         );
       } finally {
         setIsLoading(false);
@@ -135,13 +135,13 @@ export default function AdminAccessPage() {
       );
       setSuccessMessage(
         user.is_active
-          ? "User berhasil dinonaktifkan."
-          : "User berhasil diaktifkan.",
+          ? "Pengguna dinonaktifkan."
+          : "Pengguna diaktifkan.",
       );
       await loadPageData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal mengubah status user.",
+        error instanceof Error ? error.message : "Status pengguna belum bisa diubah. Coba lagi.",
       );
     } finally {
       setActionUserId(null);
@@ -165,11 +165,11 @@ export default function AdminAccessPage() {
       await apiFetch<void>(`/auth/users/${user.id}`, {
         method: "DELETE",
       });
-      setSuccessMessage("User berhasil dihapus.");
+      setSuccessMessage("Pengguna dihapus.");
       await loadPageData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal menghapus user.",
+        error instanceof Error ? error.message : "Pengguna belum bisa dihapus. Coba lagi.",
       );
     } finally {
       setActionUserId(null);
@@ -218,14 +218,14 @@ export default function AdminAccessPage() {
         method: "PATCH",
         body: editingOrganizationForm,
       });
-      setSuccessMessage("Organization berhasil diperbarui.");
+      setSuccessMessage("Organisasi diperbarui.");
       setEditingOrganizationId(null);
       await loadPageData();
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Gagal memperbarui organization.",
+          : "Organisasi belum bisa diperbarui. Coba lagi.",
       );
     } finally {
       setStructureActionKey(null);
@@ -242,12 +242,12 @@ export default function AdminAccessPage() {
         method: "PATCH",
         body: editingUnitForm,
       });
-      setSuccessMessage("Sales unit berhasil diperbarui.");
+      setSuccessMessage("Unit sales diperbarui.");
       setEditingUnitId(null);
       await loadPageData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memperbarui sales unit.",
+        error instanceof Error ? error.message : "Unit belum bisa diperbarui. Coba lagi.",
       );
     } finally {
       setStructureActionKey(null);
@@ -270,7 +270,7 @@ export default function AdminAccessPage() {
       const accepted = await confirm({
         title: "Ubah manager tim?",
         message: `Manager tim ${team.name} berubah dari ${previousManager} menjadi ${nextManager}.`,
-        confirmLabel: "Ubah manager",
+        confirmLabel: "Ganti manager",
       });
       if (!accepted) return;
     }
@@ -284,12 +284,12 @@ export default function AdminAccessPage() {
         method: "PATCH",
         body: editingTeamForm,
       });
-      setSuccessMessage("Sales team berhasil diperbarui.");
+      setSuccessMessage("Tim sales diperbarui.");
       setEditingTeamId(null);
       await loadPageData();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memperbarui sales team.",
+        error instanceof Error ? error.message : "Tim belum bisa diperbarui. Coba lagi.",
       );
     } finally {
       setStructureActionKey(null);
@@ -350,16 +350,16 @@ export default function AdminAccessPage() {
       currentUser={currentUser}
       eyebrow={NAV_GROUP_NAMES.admin}
       title={PAGE_NAMES.users}
-      description="Lihat struktur organisasi dan daftar pengguna. Buat atau ubah akun dari sini."
+      description="Atur siapa yang bisa masuk ke Clara, perannya, dan timnya."
       backHref="/workspace"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/access/create/user" className="clara-button clara-button-primary">
-            Create User
+            Buat pengguna
           </Link>
           <Link href="/admin/ops" className="clara-button clara-button-ghost">
-            Buka System Ops
+            Buka Audit & Status Sistem
           </Link>
         </div>
       }
@@ -389,20 +389,20 @@ export default function AdminAccessPage() {
           <>
             <section className="grid gap-6 lg:grid-cols-3">
               <Panel
-                title="Available Organizations"
-                description="Organization yang terdaftar di Clara dan bisa dikelola penuh oleh superadmin."
+                title="Organisasi"
+                description="Organisasi yang memakai Clara. Hanya superadmin yang bisa mengubahnya."
                 className="h-full"
                 contentClassName="h-full"
                 action={
                   isOwnerLike(currentUser.role) ? (
                     <Link href="/admin/access/create/organization" className="clara-button clara-button-ghost">
-                      Create
+                      Buat
                     </Link>
                   ) : null
                 }
               >
                 {organizations.length === 0 ? (
-                  <EmptyText text="Belum ada organization." />
+                  <EmptyText text="Belum ada organisasi." />
                 ) : (
                   <div className="space-y-3">
                     {organizations.map((organization) => (
@@ -425,12 +425,12 @@ export default function AdminAccessPage() {
                                   }))
                                 }
                                 className="clara-input mt-2"
-                                placeholder="Organization name"
+                                placeholder="Nama organisasi"
                               />
                             </div>
                             <div>
                               <label className="text-xs font-semibold text-[#f0cb73]">
-                                Slug
+                                Alamat singkat (slug)
                               </label>
                               <input
                                 value={editingOrganizationForm.slug ?? ""}
@@ -441,7 +441,7 @@ export default function AdminAccessPage() {
                                   }))
                                 }
                                 className="clara-input mt-2"
-                                placeholder="organization-slug"
+                                placeholder="nama-organisasi"
                               />
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -452,8 +452,8 @@ export default function AdminAccessPage() {
                                 className="clara-button clara-button-primary"
                               >
                                 {structureActionKey === `organization:${organization.id}`
-                                  ? "Saving..."
-                                  : "Save"}
+                                  ? "Menyimpan..."
+                                  : "Simpan"}
                               </button>
                               <button
                                 type="button"
@@ -470,10 +470,10 @@ export default function AdminAccessPage() {
                               {organization.name}
                             </p>
                             <p className="mt-1 text-xs text-[#b89a62]">
-                              slug: {organization.slug}
+                              alamat singkat: {organization.slug}
                             </p>
                             <p className="mt-1 text-xs text-[#b89a62]">
-                              created: {formatDateTime(organization.created_at)}
+                              dibuat: {formatDateTime(organization.created_at)}
                             </p>
                             {isOwnerLike(currentUser.role) ? (
                               <div className="mt-3">
@@ -482,7 +482,7 @@ export default function AdminAccessPage() {
                                   onClick={() => beginEditOrganization(organization)}
                                   className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
                                 >
-                                  Edit
+                                  Ubah
                                 </button>
                               </div>
                             ) : null}
@@ -495,18 +495,18 @@ export default function AdminAccessPage() {
               </Panel>
 
               <Panel
-                title="Sales Units"
-                description="Baseline hierarchy untuk laporan cabang, cluster, atau area kerja."
+                title="Unit Sales"
+                description="Pengelompokan Sales per cabang atau area kerja, dipakai di laporan."
                 className="h-full"
                 contentClassName="h-full"
                 action={
                   <Link href="/admin/access/create/unit" className="clara-button clara-button-ghost">
-                    Create
+                    Buat
                   </Link>
                 }
               >
                 {units.length === 0 ? (
-                  <EmptyText text="Belum ada sales unit." />
+                  <EmptyText text="Belum ada unit sales." />
                 ) : (
                   <div className="space-y-3">
                     {units.map((unit) => (
@@ -518,7 +518,7 @@ export default function AdminAccessPage() {
                           <div className="space-y-3">
                             <div>
                               <label className="text-xs font-semibold text-[#f0cb73]">
-                                Unit Name
+                                Nama unit
                               </label>
                               <input
                                 value={editingUnitForm.name ?? ""}
@@ -529,12 +529,12 @@ export default function AdminAccessPage() {
                                   }))
                                 }
                                 className="clara-input mt-2"
-                                placeholder="Unit name"
+                                placeholder="Nama unit"
                               />
                             </div>
                             <div>
                               <label className="text-xs font-semibold text-[#f0cb73]">
-                                Unit Code
+                                Kode unit
                               </label>
                               <input
                                 value={editingUnitForm.code ?? ""}
@@ -545,7 +545,7 @@ export default function AdminAccessPage() {
                                   }))
                                 }
                                 className="clara-input mt-2"
-                                placeholder="unit-code"
+                                placeholder="kode-unit"
                               />
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -555,7 +555,7 @@ export default function AdminAccessPage() {
                                 disabled={structureActionKey === `unit:${unit.id}`}
                                 className="clara-button clara-button-primary"
                               >
-                                {structureActionKey === `unit:${unit.id}` ? "Saving..." : "Save"}
+                                {structureActionKey === `unit:${unit.id}` ? "Menyimpan..." : "Simpan"}
                               </button>
                               <button
                                 type="button"
@@ -571,12 +571,12 @@ export default function AdminAccessPage() {
                             <p className="text-sm font-semibold text-[#fff0c9]">
                               {unit.name}
                             </p>
-                            <p className="mt-1 text-xs text-[#b89a62]">code: {unit.code}</p>
+                            <p className="mt-1 text-xs text-[#b89a62]">kode: {unit.code}</p>
                             <p className="mt-1 text-xs text-[#b89a62]">
-                              org: {unit.organization_name ?? unit.organization_id}
+                              organisasi: {unit.organization_name ?? unit.organization_id}
                             </p>
                             <p className="mt-1 text-xs text-[#b89a62]">
-                              teams: {unit.team_count}
+                              jumlah tim: {unit.team_count}
                             </p>
                             <div className="mt-3">
                               <button
@@ -584,7 +584,7 @@ export default function AdminAccessPage() {
                                 onClick={() => beginEditUnit(unit)}
                                 className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
                               >
-                                Edit
+                                Ubah
                               </button>
                             </div>
                           </>
@@ -596,18 +596,18 @@ export default function AdminAccessPage() {
               </Panel>
 
               <Panel
-                title="Sales Teams"
-                description="Team jadi boundary assignment user dan titik awal manager scope per unit."
+                title="Tim Sales"
+                description="Tim menentukan siapa melapor ke manager mana."
                 className="h-full"
                 contentClassName="h-full"
                 action={
                   <Link href="/admin/access/create/team" className="clara-button clara-button-ghost">
-                    Create
+                    Buat
                   </Link>
                 }
               >
                 {teams.length === 0 ? (
-                  <EmptyText text="Belum ada sales team." />
+                  <EmptyText text="Belum ada tim sales." />
                 ) : (
                   <div className="space-y-3">
                     {teams.map((team) => (
@@ -619,7 +619,7 @@ export default function AdminAccessPage() {
                           <div className="space-y-3">
                             <div>
                               <label className="text-xs font-semibold text-[#f0cb73]">
-                                Team Name
+                                Nama tim
                               </label>
                               <input
                                 value={editingTeamForm.name ?? ""}
@@ -630,12 +630,12 @@ export default function AdminAccessPage() {
                                   }))
                                 }
                                 className="clara-input mt-2"
-                                placeholder="Team name"
+                                placeholder="Nama tim"
                               />
                             </div>
                             <div>
                               <label className="text-xs font-semibold text-[#f0cb73]">
-                                Team Code
+                                Kode tim
                               </label>
                               <input
                                 value={editingTeamForm.code ?? ""}
@@ -646,7 +646,7 @@ export default function AdminAccessPage() {
                                   }))
                                 }
                                 className="clara-input mt-2"
-                                placeholder="team-code"
+                                placeholder="kode-tim"
                               />
                             </div>
                             <div>
@@ -663,7 +663,7 @@ export default function AdminAccessPage() {
                                 }
                                 className="clara-select mt-2"
                               >
-                                <option value="">Tanpa unit spesifik</option>
+                                <option value="">Tanpa unit</option>
                                 {units
                                   .filter((unit) => unit.organization_id === team.organization_id)
                                   .map((unit) => (
@@ -708,7 +708,7 @@ export default function AdminAccessPage() {
                                 disabled={structureActionKey === `team:${team.id}`}
                                 className="clara-button clara-button-primary"
                               >
-                                {structureActionKey === `team:${team.id}` ? "Saving..." : "Save"}
+                                {structureActionKey === `team:${team.id}` ? "Menyimpan..." : "Simpan"}
                               </button>
                               <button
                                 type="button"
@@ -725,11 +725,11 @@ export default function AdminAccessPage() {
                               {team.name}
                             </p>
                             <div className="mt-1 space-y-1 text-xs text-[#b89a62]">
-                              <p>code: {team.code}</p>
-                              <p>org: {team.organization_name ?? team.organization_id}</p>
+                              <p>kode: {team.code}</p>
+                              <p>organisasi: {team.organization_name ?? team.organization_id}</p>
                               <p>unit: {team.unit_name ?? "-"}</p>
                               <p>manager: {team.manager_user_name ?? "-"}</p>
-                              <p>members: {team.member_count}</p>
+                              <p>anggota: {team.member_count}</p>
                             </div>
                             <div className="mt-3">
                               <button
@@ -737,7 +737,7 @@ export default function AdminAccessPage() {
                                 onClick={() => beginEditTeam(team)}
                                 className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
                               >
-                                Edit
+                                Ubah
                               </button>
                             </div>
                           </>
@@ -752,22 +752,22 @@ export default function AdminAccessPage() {
             <section>
               <Panel
                 title="Daftar Pengguna"
-                description="Halaman index hanya menampilkan daftar user, status, dan link ke halaman edit."
+                description="Cari pengguna, ubah datanya, atau nonaktifkan akunnya."
                 action={
                   <Link href="/admin/access/create/user" className="clara-button clara-button-primary">
-                    Create User
+                    Buat pengguna
                   </Link>
                 }
               >
                 {users.length === 0 ? (
-                  <EmptyText text="Belum ada user." />
+                  <EmptyText text="Belum ada pengguna." />
                 ) : (
                   <div className="space-y-4">
                     <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-4">
                       <div className="grid gap-3 md:grid-cols-3">
                         <div>
                           <label className="text-xs font-semibold text-[#f0cb73]">
-                            Search User
+                            Cari pengguna
                           </label>
                           <input
                             value={userSearchQuery}
@@ -775,14 +775,14 @@ export default function AdminAccessPage() {
                               setUserSearchQuery(event.target.value);
                               setUserPage(1);
                             }}
-                            placeholder="Cari nama, email, team, unit..."
+                            placeholder="Cari nama, email, tim, atau unit"
                             className="clara-input mt-2"
                           />
                         </div>
 
                         <div>
                           <label className="text-xs font-semibold text-[#f0cb73]">
-                            Filter Role
+                            Peran
                           </label>
                           <select
                             value={userRoleFilter}
@@ -792,7 +792,7 @@ export default function AdminAccessPage() {
                             }}
                             className="clara-select mt-2"
                           >
-                            <option value="all">Semua role</option>
+                            <option value="all">Semua peran</option>
                             <option value="sales">sales</option>
                             <option value="manager">manager</option>
                             <option value="head">head</option>
@@ -802,7 +802,7 @@ export default function AdminAccessPage() {
 
                         <div>
                           <label className="text-xs font-semibold text-[#f0cb73]">
-                            Filter Status
+                            Status
                           </label>
                           <select
                             value={userStatusFilter}
@@ -813,15 +813,15 @@ export default function AdminAccessPage() {
                             className="clara-select mt-2"
                           >
                             <option value="all">Semua status</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
+                            <option value="active">Aktif</option>
+                            <option value="inactive">Nonaktif</option>
                           </select>
                         </div>
                       </div>
 
                       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-[#d6bb84]">
                         <p>
-                          Menampilkan {paginatedUsers.length} dari {filteredUsers.length} user
+                          Menampilkan {paginatedUsers.length} dari {filteredUsers.length} pengguna
                         </p>
                         <p>
                           Halaman {effectiveUserPage} dari {totalUserPages}
@@ -830,19 +830,19 @@ export default function AdminAccessPage() {
                     </div>
 
                     {filteredUsers.length === 0 ? (
-                      <EmptyText text="Tidak ada user yang cocok dengan filter saat ini." />
+                      <EmptyText text="Tidak ada pengguna yang cocok. Ubah pencarian atau filter." />
                     ) : (
                       <div className="overflow-hidden rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)]">
                         <div className="overflow-x-auto">
                           <table className="min-w-full text-left text-sm">
                             <thead className="bg-[#1d150d] text-[#b89a62]">
                               <tr>
-                                <th className="px-4 py-3 font-medium">User</th>
-                                <th className="px-4 py-3 font-medium">Role</th>
+                                <th className="px-4 py-3 font-medium">Pengguna</th>
+                                <th className="px-4 py-3 font-medium">Peran</th>
                                 <th className="px-4 py-3 font-medium">Status</th>
-                                <th className="px-4 py-3 font-medium">Org / Team</th>
-                                <th className="px-4 py-3 font-medium">Created</th>
-                                <th className="px-4 py-3 font-medium text-right">Actions</th>
+                                <th className="px-4 py-3 font-medium">Organisasi / Tim</th>
+                                <th className="px-4 py-3 font-medium">Dibuat</th>
+                                <th className="px-4 py-3 font-medium text-right">Aksi</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -876,7 +876,7 @@ export default function AdminAccessPage() {
                                             : "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
                                         }`}
                                       >
-                                        {user.is_active ? "active" : "inactive"}
+                                        {user.is_active ? "aktif" : "nonaktif"}
                                       </span>
                                     </td>
                                     <td className="px-4 py-3 text-xs text-[#d6bb84]">
@@ -899,7 +899,7 @@ export default function AdminAccessPage() {
                                           href={`/admin/access/${user.id}/edit/profile`}
                                           className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
                                         >
-                                          Edit
+                                          Ubah
                                         </Link>
                                         <button
                                           type="button"
@@ -914,8 +914,8 @@ export default function AdminAccessPage() {
                                           {actionUserId === user.id
                                             ? "..."
                                             : user.is_active
-                                              ? "Deactivate"
-                                              : "Activate"}
+                                              ? "Nonaktifkan"
+                                              : "Aktifkan"}
                                         </button>
                                         <button
                                           type="button"
@@ -923,7 +923,7 @@ export default function AdminAccessPage() {
                                           disabled={actionUserId === user.id || isSelf}
                                           className="rounded-xl border border-[#6a421b] bg-[#2a170d] px-3 py-2 text-sm font-semibold text-[#f0cb73] disabled:cursor-not-allowed disabled:opacity-50"
                                         >
-                                          {actionUserId === user.id ? "..." : "Delete"}
+                                          {actionUserId === user.id ? "..." : "Hapus"}
                                         </button>
                                       </div>
                                     </td>
@@ -938,7 +938,7 @@ export default function AdminAccessPage() {
 
                     {filteredUsers.length > userPageSize ? (
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)] p-4">
-                        <p className="text-sm text-[#d6bb84]">Navigasi daftar user</p>
+                        <p className="text-sm text-[#d6bb84]">Halaman daftar pengguna</p>
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
