@@ -21,4 +21,10 @@ COPY clara-backend/ ./
 COPY clara_knowledge/ /app/clara_knowledge/
 COPY infra/docker/ /app/infra/docker/
 
+# Jalan sebagai user non-root. /app harus writable untuk storage/extension-builds dan cache uv.
+RUN useradd --create-home --uid 10001 clara \
+    && chown -R clara:clara /app
+
+USER clara
+
 EXPOSE 8000
