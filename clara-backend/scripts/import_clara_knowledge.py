@@ -35,16 +35,20 @@ KNOWLEDGE_FILES_BY_VARIANT = {
         "MASTER_KNOWLEDGE_V1_8_SAFE.md",
         "PRODUCT_COSTS_KNOWLEDGE.md",
         "PRODUCT_COSTS_KNOWLEDGE_CLARIFICATION_V1_2.md",
+        "TRADING_RULES_MINI_KNOWLEDGE.md",
     ),
     "regular": (
         "LEGALITY_KNOWLEDGE.md",
         "MASTER_KNOWLEDGE_V1_8_SAFE.md",
         "PRODUCT_COSTS_KNOWLEDGE.md",
         "PRODUCT_COSTS_KNOWLEDGE_CLARIFICATION_V1_2.md",
+        "PRODUCT_CONTRACT_REFERENCE_REGULAR.md",
     ),
 }
 
-PRODUCT_COST_FACT_SOURCE = "Knowledge Base Tambahan Biaya v1.2 (30 Jul 2026)"
+PRODUCT_COST_FACT_SOURCE = (
+    "Trade Table dan Trading Rules Mini Account CDD Sederhana 0,1 Lot (Feb 2026)"
+)
 LEGALITY_FACT_SOURCE = "https://www.sg-berjangka.com/tentang-kami/legalitas-bisnis"
 MASTER_KNOWLEDGE_SOURCE = "Master Knowledge Base v1.8 (internal, 2026)"
 
@@ -75,8 +79,18 @@ PRODUCT_COST_FACT_DRAFTS = (
         "trading.spread",
         "json",
         {
-            "XUL10": {"minimum": 0.20, "unit": "USD/Troy Ounce/side"},
-            "BCO10_BBJ": {"minimum": 0.05, "unit": "USD/pips/barrel/side"},
+            "XUL10": {
+                "minimum": 0.40,
+                "maximum": 1.00,
+                "unit": "USD/Troy Ounce/side",
+                "hectic": "mengikuti kondisi pasar",
+            },
+            "BCO10_BBJ": {
+                "minimum": 0.10,
+                "maximum": 0.30,
+                "unit": "USD/pips/barrel/side",
+                "hectic": "mengikuti kondisi pasar",
+            },
         },
         None,
         "HIGH_VOLATILITY",
@@ -84,7 +98,7 @@ PRODUCT_COST_FACT_DRAFTS = (
     (
         "trading.commission",
         "json",
-        {"amount_usd": 1, "per_lot": 0.1, "vat_percent": 11},
+        {"amount_usd": 1.5, "per_lot": 1, "vat_percent": 11, "basis": "per sisi"},
         None,
         "MEDIUM_VOLATILITY",
     ),
@@ -93,12 +107,13 @@ PRODUCT_COST_FACT_DRAFTS = (
         "json",
         {
             "daytrade_usd_per_lot": 100,
-            "maximum_equity_idr": 25_000_000,
-            "maximum_warning_equity_idr": 23_000_000,
-            "call_margin_level_percent": 70,
+            "maintenance_margin_percent_of_initial": 70,
+            "margin_call_below_percent_of_initial": 70,
+            "margin_call_restore_percent_of_initial": 100,
             "auto_liquidation_level_percent": 30,
-            "auto_liquidation_procedure": ["Locking", "Hold", "Open", "ABS", "FIFO"],
-            "clear_by_system_basis": "equity ratio",
+            "auto_liquidation_basis": "initial_margin",
+            "cdd_standard_equity_threshold_usd": 2_500,
+            "cdd_standard_equity_threshold_idr": 25_000_000,
         },
         None,
         "MEDIUM_VOLATILITY",
@@ -108,13 +123,13 @@ PRODUCT_COST_FACT_DRAFTS = (
         "json",
         {
             "XUL10": {
-                "buy_usd_per_0_1_lot_per_night": 0.5,
-                "sell_usd_per_0_1_lot_per_night": 0.5,
+                "buy_usd_per_lot_per_night": 0.5,
+                "sell_usd_per_lot_per_night": 0.5,
                 "vat_percent": 11,
             },
             "BCO10_BBJ": {
-                "buy_usd_per_0_1_lot_per_night": 0.5,
-                "sell_usd_per_0_1_lot_per_night": 0.5,
+                "buy_usd_per_lot_per_night": 0.5,
+                "sell_usd_per_lot_per_night": 0.5,
                 "vat_percent": 11,
             },
         },
@@ -124,7 +139,11 @@ PRODUCT_COST_FACT_DRAFTS = (
     (
         "trading.overnight_requirement",
         "text",
-        "No overnight call margin (nightrade) according to the draft source document.",
+        (
+            "Trade Table mencantumkan Initial Margin untuk Day Trade. Posisi "
+            "overnight dikenakan Storage/Rollover Fee per malam sesuai Trade Table; "
+            "ketentuan margin khusus overnight tidak tercantum di Trade Table."
+        ),
         None,
         "MEDIUM_VOLATILITY",
     ),
@@ -133,33 +152,30 @@ PRODUCT_COST_FACT_DRAFTS = (
         "json",
         {
             "XUL10": {
-                "contract_size": "100 Troy Ounce",
+                "contract_size": "10 Troy Ounce",
                 "trading_days": "Monday-Friday",
                 "trading_hours_dst_wib": "06:00-03:30",
                 "trading_hours_non_dst_wib": "06:00-04:30",
                 "minimum_price_movement": "USD 0.01/Troy Ounce",
                 "range_limit_stop_order": "USD 6-USD 20",
+                "price_source": "Telequote",
+                "settlement": "Cash Settlement",
                 "maximum_net_open_position_lot": 0.9,
             },
             "BCO10_BBJ": {
-                "contract_size_source_text": "USD 1.000/Barrel",
+                "contract_size": "100 Barrel",
                 "trading_days": "Monday-Friday",
                 "trading_hours_dst_wib": "07:00-03:45",
                 "trading_hours_non_dst_wib": "08:00-03:45",
                 "minimum_price_movement": "USD 0.01/Barrel",
                 "range_limit_stop_order": "USD 1-USD 20",
+                "price_source": "Telequote",
+                "settlement": "Cash Settlement",
                 "maximum_net_open_position_lot": 0.9,
             },
         },
         None,
         "LOW_VOLATILITY",
-    ),
-    (
-        "process.verification_steps",
-        "json",
-        {"default_otp_delivery": "email"},
-        None,
-        "MEDIUM_VOLATILITY",
     ),
 )
 
@@ -506,7 +522,7 @@ def derive_category(filename: str) -> str:
         return "official_source"
     if "PRODUCT_CONTRACT_REFERENCE" in stem:
         return "product_reference"
-    if "PRODUCT_COSTS_KNOWLEDGE" in stem:
+    if "PRODUCT_COSTS_KNOWLEDGE" in stem or "TRADING_RULES" in stem:
         return "product_reference"
     if "LEGALITY_KNOWLEDGE" in stem:
         return "official_legality"

@@ -15,6 +15,8 @@ Tidak boleh:
 * menyebut kanal pendaftaran, syarat demo, metode verifikasi, atau tahap aktivasi sebagai ketentuan wajib tanpa Product Fact ACTIVE dan fresh
 * mengarang, menghitung, atau mengubah satuan angka produk
 * memakai angka dari dokumen DRAFT, contoh chat, atau pesan customer
+* mencampur angka Akun Mini dengan Akun Reguler dalam satu jawaban tanpa menyebut jenis akunnya
+* memilih salah satu dari dua sumber yang berbeda untuk topik yang sama tanpa dasar; pakai yang paling baru dan paling spesifik, dan jika ragu arahkan ke petugas di chat aktif
 
 Harus:
 

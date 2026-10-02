@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 
@@ -51,6 +52,10 @@ def test_derive_category_maps_new_solid_prime_files() -> None:
         == "training_examples"
     )
     assert derive_category("MASTER_KNOWLEDGE_V1_8_SAFE.md") == "general"
+    assert derive_category("TRADING_RULES_MINI_KNOWLEDGE.md") == "product_reference"
+    assert (
+        derive_category("PRODUCT_CONTRACT_REFERENCE_REGULAR.md") == "product_reference"
+    )
 
 
 def test_master_runtime_knowledge_quarantines_unverified_process_claims() -> None:
@@ -89,6 +94,62 @@ def test_build_import_items_only_includes_customer_knowledge_files() -> None:
     assert all(
         item.category not in {"instruction", "training_examples"} for item, _ in items
     )
+
+
+def test_import_includes_trading_rules_and_regular_product_reference() -> None:
+    knowledge_root = Path(__file__).resolve().parents[2] / "clara_knowledge"
+
+    titles = {item.title for item, _ in build_import_items(knowledge_root)}
+
+    assert "Mini | Trading Rules Mini Knowledge" in titles
+    assert "Regular | Product Contract Reference Regular" in titles
+
+
+def test_trading_knowledge_documents_do_not_carry_fixed_product_numbers() -> None:
+    knowledge_root = Path(__file__).resolve().parents[2] / "clara_knowledge"
+    documents = (
+        knowledge_root / "clara_knowledge_mini" / "TRADING_RULES_MINI_KNOWLEDGE.md",
+        knowledge_root
+        / "clara_knowledge_regular"
+        / "PRODUCT_CONTRACT_REFERENCE_REGULAR.md",
+    )
+
+    for document in documents:
+        content = document.read_text(encoding="utf-8")
+        assert "Product Fact ACTIVE dan fresh" in content
+        assert not re.search(r"\bUSD\s?\d|\bRp\s?\d|\d\s?%|\bT\+\d", content)
+
+
+def test_priority_override_is_defined_for_both_variants_before_opening() -> None:
+    knowledge_root = Path(__file__).resolve().parents[2] / "clara_knowledge"
+
+    for variant in ("mini", "regular"):
+        flow = (
+            knowledge_root / f"clara_knowledge_{variant}" / "FLOW.md"
+        ).read_text(encoding="utf-8")
+
+        assert flow.startswith("0. Priority Override")
+        assert flow.index("High-Risk") < flow.index("1. Opening")
+        assert "Complaint" in flow and "Market-Seeker" in flow
+
+
+def test_product_cost_drafts_follow_trade_table() -> None:
+    drafts = {key: value for key, _, value, _, _ in PRODUCT_COST_FACT_DRAFTS}
+
+    assert drafts["trading.spread"]["XUL10"]["minimum"] == 0.40
+    assert drafts["trading.spread"]["XUL10"]["maximum"] == 1.00
+    assert drafts["trading.spread"]["BCO10_BBJ"]["minimum"] == 0.10
+    assert drafts["trading.spread"]["BCO10_BBJ"]["maximum"] == 0.30
+    assert drafts["trading.commission"] == {
+        "amount_usd": 1.5,
+        "per_lot": 1,
+        "vat_percent": 11,
+        "basis": "per sisi",
+    }
+    assert drafts["trading.storage_fee"]["XUL10"]["buy_usd_per_lot_per_night"] == 0.5
+    assert drafts["trading.instruments"]["XUL10"]["contract_size"] == "10 Troy Ounce"
+    assert drafts["trading.instruments"]["BCO10_BBJ"]["contract_size"] == "100 Barrel"
+    assert "Trade Table" in PRODUCT_COST_FACT_SOURCE
 
 
 def test_normalize_knowledge_title_handles_case_and_spacing() -> None:

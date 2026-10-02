@@ -412,7 +412,11 @@ def _format_fact(result: ResolvedProductFact) -> str:
                 continue
             minimum = str(details["minimum"]).replace(".", ",")
             unit = str(details.get("unit", "")).replace("/side", " per sisi")
-            products.append(f"{product_code}: minimum {minimum} {unit}".strip())
+            line = f"{product_code}: minimum {minimum} {unit}".strip()
+            if details.get("maximum") is not None:
+                maximum = f"{float(details['maximum']):g}".replace(".", ",")
+                line += f", maksimum {maximum}"
+            products.append(line)
         if products:
             return f"- Spread: {'; '.join(products)}."
     if result.fact_key == "trading.commission" and isinstance(result.value, dict):
@@ -421,8 +425,10 @@ def _format_fact(result: ResolvedProductFact) -> str:
         vat = result.value.get("vat_percent")
         if amount is not None and lot is not None and vat is not None:
             lot_text = str(lot).replace(".", ",")
+            basis = result.value.get("basis")
+            basis_text = f" {basis}" if basis else ""
             return (
-                f"- Komisi: USD {amount} per {lot_text} lot + PPN {vat}%. "
+                f"- Komisi: USD {amount} per {lot_text} lot{basis_text} + PPN {vat}%. "
                 "Kutip komponen ini apa adanya; jangan menghitung total sendiri."
             )
     if result.fact_key == "trading.margin" and isinstance(result.value, dict):
@@ -431,8 +437,29 @@ def _format_fact(result: ResolvedProductFact) -> str:
         details = []
         if daytrade is not None:
             details.append(f"daytrade USD {daytrade} per lot")
+        maintenance = result.value.get("maintenance_margin_percent_of_initial")
+        margin_call_restore = result.value.get("margin_call_restore_percent_of_initial")
+        cdd_threshold = result.value.get("cdd_standard_equity_threshold_usd")
+        if maintenance is not None:
+            details.append(f"maintenance margin {maintenance}% dari Initial Margin")
+            if margin_call_restore is not None:
+                details.append(
+                    f"margin call saat dana di bawah {maintenance}% Initial Margin "
+                    f"dan harus dipenuhi kembali hingga {margin_call_restore}%"
+                )
         if auto_liquidation is not None:
-            details.append(f"auto liquidation pada {auto_liquidation}% equity")
+            if result.value.get("auto_liquidation_basis") == "initial_margin":
+                details.append(
+                    f"auto liquidation saat equity (dana) menyentuh {auto_liquidation}% "
+                    "dari Initial Margin"
+                )
+            else:
+                details.append(f"auto liquidation pada {auto_liquidation}% equity")
+        if cdd_threshold is not None:
+            threshold = f"{int(cdd_threshold):,}".replace(",", ".")
+            details.append(
+                f"equity di atas USD {threshold} mewajibkan pengkinian data CDD Standar"
+            )
         if details:
             return (
                 f"- Margin: {'; '.join(details)}. Margin adalah dana "
@@ -443,8 +470,14 @@ def _format_fact(result: ResolvedProductFact) -> str:
         for product_code, details in result.value.items():
             if not isinstance(details, dict):
                 continue
-            buy = details.get("buy_usd_per_0_1_lot_per_night")
-            sell = details.get("sell_usd_per_0_1_lot_per_night")
+            if details.get("buy_usd_per_lot_per_night") is not None:
+                buy = details.get("buy_usd_per_lot_per_night")
+                sell = details.get("sell_usd_per_lot_per_night")
+                lot_unit = "1 lot"
+            else:
+                buy = details.get("buy_usd_per_0_1_lot_per_night")
+                sell = details.get("sell_usd_per_0_1_lot_per_night")
+                lot_unit = "0,1 lot"
             vat = details.get("vat_percent")
             if buy is None or sell is None or vat is None:
                 continue
@@ -456,7 +489,7 @@ def _format_fact(result: ResolvedProductFact) -> str:
                 else f"buy USD {buy_text}; sell USD {sell_text}"
             )
             products.append(
-                f"{product_code}: {fee} per 0,1 lot per malam + PPN {vat}%"
+                f"{product_code}: {fee} per {lot_unit} per malam + PPN {vat}%"
             )
         if products:
             return f"- Storage fee: {'; '.join(products)}."

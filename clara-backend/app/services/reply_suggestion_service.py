@@ -540,14 +540,15 @@ PRODUCT_COST_REQUEST_PATTERN = re.compile(
     r"\b("
     r"storage(?:\s+fee)?|rollover(?:\s+fee)?|swap(?:nya)?|spread(?:nya)?|"
     r"komisi(?:nya)?|commission(?:nya)?|"
-    r"biaya\s+transaksi|biaya\s+nginep|biaya\s+menginap|overnight\s+fee|"
+    r"biaya\s+transaksi|biaya\s+nginep|biaya\s+menginap|biaya\s+inap(?:nya)?|"
+    r"roll\s*over(?:\s+fee)?(?:nya)?|overnight\s+fee|"
     r"margin(?:\s+per\s+lot)?"
     r")\b",
     re.IGNORECASE,
 )
 
 PRODUCT_COST_FACT_PATTERNS = (
-    (re.compile(r"\b(storage|rollover|swap|nginep|menginap|overnight)\b", re.I), "trading.storage_fee"),
+    (re.compile(r"\b(storage|roll\s*over|swap|nginep|menginap|inap(?:nya)?|overnight)\b", re.I), "trading.storage_fee"),
     (re.compile(r"\bspread\b", re.I), "trading.spread"),
     (re.compile(r"\b(komisi|commission|biaya transaksi)\b", re.I), "trading.commission"),
     (re.compile(r"\bmargin\b", re.I), "trading.margin"),
@@ -3986,9 +3987,11 @@ def build_requested_product_fact_fallback(
             amount_text = f"{float(amount):g}".replace(".", ",")
             per_lot_text = f"{float(per_lot):g}".replace(".", ",")
             vat_text = f"{float(vat):g}".replace(".", ",")
+            basis = commission.get("basis")
+            basis_text = f" {basis}" if basis else ""
             return (
                 f"Komisi {account_label} adalah USD {amount_text} per "
-                f"{per_lot_text} lot + PPN {vat_text}%."
+                f"{per_lot_text} lot{basis_text} + PPN {vat_text}%."
             )
 
     return None

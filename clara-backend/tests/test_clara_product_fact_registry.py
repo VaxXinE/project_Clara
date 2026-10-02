@@ -345,6 +345,92 @@ def test_active_storage_fact_is_rendered_without_missing_fact_fallback(
     db.close()
 
 
+def test_trade_table_storage_fee_is_rendered_per_lot(
+    db_session_factory: sessionmaker,
+) -> None:
+    db = db_session_factory()
+    add_fact(
+        db,
+        key="trading.storage_fee",
+        value={
+            "XUL10": {
+                "buy_usd_per_lot_per_night": 0.5,
+                "sell_usd_per_lot_per_night": 0.5,
+                "vat_percent": 11,
+            }
+        },
+    )
+
+    composition = compose_product_fact_prompt(
+        db,
+        mode=ProductFactMode.REGISTRY,
+        account_category="mini",
+        organization_id=None,
+        legacy_content="legacy",
+        fact_keys=("trading.storage_fee",),
+        now=NOW,
+    )
+
+    assert "XUL10: USD 0,5 per 1 lot per malam + PPN 11%" in composition.content
+    assert "0,1 lot" not in composition.content
+    db.close()
+
+
+def test_trade_table_commission_spread_and_margin_basis_are_rendered(
+    db_session_factory: sessionmaker,
+) -> None:
+    db = db_session_factory()
+    add_fact(
+        db,
+        key="trading.commission",
+        value={"amount_usd": 1.5, "per_lot": 1, "vat_percent": 11, "basis": "per sisi"},
+    )
+    add_fact(
+        db,
+        key="trading.spread",
+        value={
+            "XUL10": {
+                "minimum": 0.4,
+                "maximum": 1.0,
+                "unit": "USD/Troy Ounce/side",
+            }
+        },
+    )
+    add_fact(
+        db,
+        key="trading.margin",
+        value={
+            "daytrade_usd_per_lot": 100,
+            "maintenance_margin_percent_of_initial": 70,
+            "margin_call_restore_percent_of_initial": 100,
+            "auto_liquidation_level_percent": 30,
+            "auto_liquidation_basis": "initial_margin",
+            "cdd_standard_equity_threshold_usd": 2_500,
+        },
+    )
+
+    composition = compose_product_fact_prompt(
+        db,
+        mode=ProductFactMode.REGISTRY,
+        account_category="mini",
+        organization_id=None,
+        legacy_content="legacy",
+        fact_keys=("trading.commission", "trading.spread", "trading.margin"),
+        now=NOW,
+    )
+
+    assert "Komisi: USD 1.5 per 1 lot per sisi + PPN 11%" in composition.content
+    assert "XUL10: minimum 0,4 USD/Troy Ounce per sisi, maksimum 1" in composition.content
+    assert "maintenance margin 70% dari Initial Margin" in composition.content
+    assert (
+        "auto liquidation saat equity (dana) menyentuh 30% dari Initial Margin"
+        in composition.content
+    )
+    assert "pengkinian data CDD Standar" in composition.content
+    assert "USD 2.500" in composition.content
+    db.close()
+
+
 def test_active_auto_liquidation_level_is_rendered_from_margin_fact(
     db_session_factory: sessionmaker,
 ) -> None:

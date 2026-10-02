@@ -693,3 +693,38 @@ def test_semantic_shadow_evaluator_is_offline_safe_and_deterministic() -> None:
     assert render_semantic_shadow_markdown(first) == (
         render_semantic_shadow_markdown(second)
     )
+
+
+def test_commission_fallback_keeps_per_side_basis_from_fact() -> None:
+    answer = reply_suggestion_service.build_requested_product_fact_fallback(
+        latest_customer_message="Komisi akun Mini berapa?",
+        account_category="mini",
+        requested_product_fact_values={
+            "trading.commission": {
+                "amount_usd": 1.5,
+                "per_lot": 1,
+                "vat_percent": 11,
+                "basis": "per sisi",
+            }
+        },
+    )
+
+    assert answer == "Komisi akun Mini adalah USD 1,5 per 1 lot per sisi + PPN 11%."
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Kalau untuk biaya inap nya berapa?",
+        "Kalau biaya roll over nya berapa?",
+        "Biaya rollover fee Gold berapa?",
+        "biaya nginep berapa",
+    ],
+)
+def test_overnight_cost_phrasings_request_storage_fee_fact(message: str) -> None:
+    intent = reply_suggestion_service.infer_latest_customer_intent(message)
+
+    assert intent == "product_costs"
+    assert reply_suggestion_service.get_requested_product_fact_keys(
+        message, intent
+    ) == ("trading.storage_fee",)
