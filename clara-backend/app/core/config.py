@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -52,6 +53,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     database_url: str
     redis_url: str = "redis://localhost:6379/0"
+    rate_limit_backend: Literal["memory", "redis"] = "memory"
     sgcc_integration_api_key: str | None = None
     sgcc_integration_rate_limit_per_minute: int = 30
 

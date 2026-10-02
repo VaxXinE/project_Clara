@@ -44,6 +44,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clara_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-clara_db}
       REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_BACKEND: redis
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
     command: ["/bin/sh", "/app/infra/docker/backend-entrypoint.sh"]
