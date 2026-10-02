@@ -1,13 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, formatStatusLabel } from "@/lib/format";
-import { canAccessStrategicInsights } from "@/lib/roles";
+import { describeDelta } from "@/lib/vocab";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
+import { PAGE_NAMES } from "@/lib/labels";
+import { canAccessStrategicInsights, getRoleDisplayLabel } from "@/lib/roles";
+import {
+  BUYING_INTENT,
+  EXECUTION_STATUS,
+  EXECUTION_TYPE,
+  PRIORITY,
+  SENTIMENT,
+  STAGE,
+  describeContentFormat,
+  describeScopeLabel,
+  plainJargon,
+} from "@/lib/vocab";
 import type {
   CurrentUser,
   MarketingExecutionItem,
@@ -32,7 +46,11 @@ type ExecutionOutcomeDraft = {
 };
 
 function formatIdr(value: number): string {
-  return `IDR ${value.toLocaleString("id-ID")}`;
+  return `Rp ${value.toLocaleString("id-ID")}`;
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(0)}%`;
 }
 
 function toDateTimeLocal(value: string | null): string {
@@ -49,9 +67,7 @@ function toDateTimeLocal(value: string | null): string {
   return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
-function buildOutcomeDraftMap(
-  items: MarketingExecutionItem[],
-): Record<string, ExecutionOutcomeDraft> {
+function buildOutcomeDraftMap(items: MarketingExecutionItem[]): Record<string, ExecutionOutcomeDraft> {
   return Object.fromEntries(
     items.map((item) => [
       item.id,
@@ -76,64 +92,53 @@ export default function MarketingInsightsPage() {
   const [snapshots, setSnapshots] = useState<MarketingInsightSnapshot[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [users, setUsers] = useState<CurrentUser[]>([]);
-  const [outcomeDrafts, setOutcomeDrafts] = useState<
-    Record<string, ExecutionOutcomeDraft>
-  >({});
+  const [outcomeDrafts, setOutcomeDrafts] = useState<Record<string, ExecutionOutcomeDraft>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingSnapshot, setIsGeneratingSnapshot] = useState(false);
   const [isCreatingExecutionItem, setIsCreatingExecutionItem] = useState(false);
   const [updatingExecutionItemId, setUpdatingExecutionItemId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [createdMessage, setCreatedMessage] = useState("");
 
-  async function loadSnapshotList() {
-    const snapshotData = await apiFetch<MarketingInsightSnapshot[]>(
-      "/dashboard/marketing/insight-snapshots"
-    );
-    setSnapshots(snapshotData);
+  async function loadInsights() {
+    setErrorMessage("");
+
+    try {
+      const me = await apiFetch<CurrentUser>("/auth/me");
+      setCurrentUser(me);
+
+      if (!canAccessStrategicInsights(me.role)) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      const [insightData, snapshotData, scopedUsers] = await Promise.all([
+        apiFetch<MarketingInsightsPreview>("/dashboard/marketing/insights-preview"),
+        apiFetch<MarketingInsightSnapshot[]>("/dashboard/marketing/insight-snapshots"),
+        apiFetch<CurrentUser[]>("/auth/users"),
+      ]);
+      setInsights(insightData);
+      setOutcomeDrafts(buildOutcomeDraftMap(insightData.execution_items));
+      setSnapshots(snapshotData);
+      setUsers(
+        scopedUsers.filter(
+          (user) => user.is_active && (!me.organization_id || user.organization_id === me.organization_id),
+        ),
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Insight pasar belum bisa dimuat.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   useEffect(() => {
-    async function loadInsights() {
-      try {
-        const me = await apiFetch<CurrentUser>("/auth/me");
-        setCurrentUser(me);
+    const timer = setTimeout(() => {
+      void loadInsights();
+    }, 0);
 
-        if (!canAccessStrategicInsights(me.role)) {
-          router.replace("/dashboard");
-          return;
-        }
-
-        const [insightData, snapshotData, scopedUsers] = await Promise.all([
-          apiFetch<MarketingInsightsPreview>(
-            "/dashboard/marketing/insights-preview"
-          ),
-          apiFetch<MarketingInsightSnapshot[]>(
-            "/dashboard/marketing/insight-snapshots"
-          ),
-          apiFetch<CurrentUser[]>("/auth/users"),
-        ]);
-        setInsights(insightData);
-        setOutcomeDrafts(buildOutcomeDraftMap(insightData.execution_items));
-        setSnapshots(snapshotData);
-        setUsers(
-          scopedUsers.filter(
-            (user) =>
-              user.is_active &&
-              (!me.organization_id || user.organization_id === me.organization_id)
-          )
-        );
-      } catch (error) {
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Gagal memuat marketing insights."
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadInsights();
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   async function handleGenerateSnapshot() {
@@ -141,1039 +146,608 @@ export default function MarketingInsightsPage() {
     setErrorMessage("");
 
     try {
-      await apiFetch<MarketingInsightSnapshot>(
-        "/dashboard/marketing/insight-snapshots/generate",
-        {
-          method: "POST",
-        }
-      );
+      await apiFetch<MarketingInsightSnapshot>("/dashboard/marketing/insight-snapshots/generate", { method: "POST" });
 
-      const latestInsights = await apiFetch<MarketingInsightsPreview>(
-        "/dashboard/marketing/insights-preview"
-      );
+      const latestInsights = await apiFetch<MarketingInsightsPreview>("/dashboard/marketing/insights-preview");
       setInsights(latestInsights);
       setOutcomeDrafts(buildOutcomeDraftMap(latestInsights.execution_items));
-      await loadSnapshotList();
+      setSnapshots(await apiFetch<MarketingInsightSnapshot[]>("/dashboard/marketing/insight-snapshots"));
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal generate insight snapshot."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Insight belum bisa diperbarui. Coba lagi.");
     } finally {
       setIsGeneratingSnapshot(false);
     }
   }
 
-  async function handleCreateExecutionItem(
-    payload: MarketingExecutionItemCreateRequest
-  ) {
+  async function handleCreateExecutionItem(payload: MarketingExecutionItemCreateRequest) {
     setIsCreatingExecutionItem(true);
     setErrorMessage("");
+    setCreatedMessage("");
 
     try {
-      const createdItem = await apiFetch<MarketingExecutionItem>(
-        "/dashboard/marketing/execution-items",
-        {
-          method: "POST",
-          body: payload,
-        }
-      );
+      const createdItem = await apiFetch<MarketingExecutionItem>("/dashboard/marketing/execution-items", {
+        method: "POST",
+        body: payload,
+      });
 
       setInsights((previous) =>
-        previous
-          ? {
-              ...previous,
-              execution_items: [createdItem, ...previous.execution_items],
-            }
-          : previous
+        previous ? { ...previous, execution_items: [createdItem, ...previous.execution_items] } : previous,
       );
-      setOutcomeDrafts((current) => ({
-        ...current,
-        ...buildOutcomeDraftMap([createdItem]),
-      }));
+      setOutcomeDrafts((current) => ({ ...current, ...buildOutcomeDraftMap([createdItem]) }));
+      setCreatedMessage(`"${plainJargon(createdItem.title)}" sudah masuk Daftar kerja pemasaran.`);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal membuat execution item marketing."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Tugas belum bisa dibuat. Coba lagi.");
     } finally {
       setIsCreatingExecutionItem(false);
     }
   }
 
-  async function handleUpdateExecutionItem(
-    itemId: string,
-    payload: MarketingExecutionItemUpdateRequest
-  ) {
+  async function handleUpdateExecutionItem(itemId: string, payload: MarketingExecutionItemUpdateRequest) {
     setUpdatingExecutionItemId(itemId);
     setErrorMessage("");
+    setCreatedMessage("");
 
     try {
-      const updatedItem = await apiFetch<MarketingExecutionItem>(
-        `/dashboard/marketing/execution-items/${itemId}`,
-        {
-          method: "PATCH",
-          body: payload,
-        }
-      );
+      const updatedItem = await apiFetch<MarketingExecutionItem>(`/dashboard/marketing/execution-items/${itemId}`, {
+        method: "PATCH",
+        body: payload,
+      });
 
       setInsights((previous) =>
         previous
           ? {
               ...previous,
-              execution_items: previous.execution_items.map((item) =>
-                item.id === updatedItem.id ? updatedItem : item
-              ),
+              execution_items: previous.execution_items.map((item) => (item.id === updatedItem.id ? updatedItem : item)),
             }
-          : previous
+          : previous,
       );
-      setOutcomeDrafts((current) => ({
-        ...current,
-        ...buildOutcomeDraftMap([updatedItem]),
-      }));
+      setOutcomeDrafts((current) => ({ ...current, ...buildOutcomeDraftMap([updatedItem]) }));
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Gagal memperbarui execution item marketing."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Tugas belum bisa diperbarui. Coba lagi.");
     } finally {
       setUpdatingExecutionItemId(null);
     }
   }
 
+  function setDraft(itemId: string, field: keyof ExecutionOutcomeDraft, value: string) {
+    setOutcomeDrafts((current) => ({ ...current, [itemId]: { ...current[itemId], [field]: value } }));
+  }
+
+  function saveOutcome(itemId: string) {
+    const draft = outcomeDrafts[itemId];
+
+    void handleUpdateExecutionItem(itemId, {
+      campaign_name: draft?.campaign_name || null,
+      published_at: draft?.published_at ? new Date(draft.published_at).toISOString() : null,
+      result_notes: draft?.result_notes || null,
+      leads_generated: Number(draft?.leads_generated || 0),
+      qualified_leads: Number(draft?.qualified_leads || 0),
+      won_leads: Number(draft?.won_leads || 0),
+      attributed_pipeline_value: Number(draft?.attributed_pipeline_value || 0),
+      attributed_won_value: Number(draft?.attributed_won_value || 0),
+      attributed_deposit_amount: Number(draft?.attributed_deposit_amount || 0),
+    });
+  }
+
+  const topObjections = insights?.top_objections ?? [];
+  const tasks = insights?.execution_items ?? [];
+  const openTasks = tasks.filter((item) => item.status !== "done").length;
+  const summary = {
+    total_items: tasks.length,
+    leads_generated: tasks.reduce((sum, item) => sum + item.leads_generated, 0),
+    won_leads: tasks.reduce((sum, item) => sum + item.won_leads, 0),
+    attributed_won_value: tasks.reduce((sum, item) => sum + item.attributed_won_value, 0),
+  };
+
+  const summaryTitle = !insights
+    ? ""
+    : topObjections.length > 0
+      ? `Keraguan terbanyak customer: ${topObjections
+          .slice(0, 3)
+          .map((item) => item.topic)
+          .join(", ")}`
+      : "Belum ada pola keraguan yang menonjol";
+  const summaryHelper = !insights
+    ? ""
+    : `Dari ${insights.total_conversations} percakapan, ${formatPercent(insights.kpi_summary.analysis_coverage_rate)} sudah dibaca Clara dan ${insights.kpi_summary.high_risk_conversation_count} berisiko tinggi. Mulai dari "Konten yang sebaiknya dibuat" di bawah.`;
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.analysis}
       title={PAGE_NAMES.marketing}
-      description="Ringkasan yang membantu superadmin dan head membaca kebutuhan pasar, area resistensi, dan prioritas konten berikutnya tanpa harus membongkar seluruh chat customer."
+      description="Apa yang ditanyakan dan diragukan customer, dan konten apa yang sebaiknya dibuat tim pemasaran."
       backHref="/dashboard"
-      backLabel="Kembali ke overview"
+      backLabel="Kembali ke beranda"
       actions={
         insights ? (
-          <>
-            <div className="rounded-full border border-[#f0cb73]/18 bg-[#1f1810] px-4 py-2.5 text-sm text-clara-ink-3">
-              Snapshot: {formatDateTime(insights.generated_at)}
-            </div>
-            <button
-              type="button"
-              onClick={() => void handleGenerateSnapshot()}
-              disabled={isGeneratingSnapshot}
-              className="clara-button clara-button-primary"
-            >
-              {isGeneratingSnapshot ? "Generating..." : "Generate Snapshot"}
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => void handleGenerateSnapshot()}
+            disabled={isGeneratingSnapshot}
+            className="clara-button clara-button-primary"
+          >
+            {isGeneratingSnapshot ? "Memperbarui..." : "Perbarui insight"}
+          </button>
         ) : null
       }
     >
       <div className="space-y-6">
+        {isLoading ? <LoadingState message="Memuat insight pasar..." /> : null}
 
-        {isLoading && (
-          <div role="status" className="clara-empty-state text-sm text-clara-ink-3">
-            Memuat insight pasar...
-          </div>
-        )}
+        {!isLoading && errorMessage && !insights ? <ErrorState message={errorMessage} onRetry={() => void loadInsights()} /> : null}
 
-        {errorMessage && (
+        {errorMessage && insights ? (
           <div role="alert" className="clara-alert clara-alert-danger">
             {errorMessage}
           </div>
-        )}
+        ) : null}
 
-        {insights && !isLoading && (
+        {createdMessage ? (
+          <div role="status" className="clara-alert clara-alert-success">
+            {createdMessage}
+          </div>
+        ) : null}
+
+        {insights && !isLoading ? (
           <>
-            <p className="text-sm leading-6 text-clara-ink-3">
-              Sinyal dan outcome membantu menentukan prioritas; korelasi data
-              tidak otomatis membuktikan sebab-akibat.
-            </p>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                label="Total Conversations"
-                value={String(insights.total_conversations)}
-                tone="slate"
-              />
-              <MetricCard
-                label="Analysis Coverage"
-                value={`${(insights.kpi_summary.analysis_coverage_rate * 100).toFixed(0)}%`}
-                tone="blue"
-              />
-              <MetricCard
-                label="Reply Sent Rate"
-                value={`${(insights.kpi_summary.reply_sent_rate * 100).toFixed(0)}%`}
-                tone="green"
-              />
-              <MetricCard
-                label="High Risk Conversations"
-                value={String(insights.kpi_summary.high_risk_conversation_count)}
-                tone="red"
-              />
+            <section aria-labelledby="mkt-summary" className="clara-card p-5 sm:p-6">
+              <h2 id="mkt-summary" className="break-words text-xl font-bold clara-text-primary sm:text-2xl">
+                {summaryTitle}
+              </h2>
+              <p className="mt-1 text-sm leading-6 clara-text-secondary">{summaryHelper}</p>
+              <p className="mt-1 text-xs clara-text-muted">
+                Data per {formatRelativeTime(insights.generated_at)} ({formatDateTime(insights.generated_at)}). Ini pola
+                dari percakapan, belum tentu sebab-akibat.
+              </p>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                label="Execution Items"
-                value={String(insights.execution_summary.total_items)}
-                tone="slate"
-              />
-              <MetricCard
-                label="Lead Masuk"
-                value={String(insights.execution_summary.leads_generated)}
-                tone="blue"
-              />
-              <MetricCard
-                label="Lead Closing"
-                value={String(insights.execution_summary.won_leads)}
-                tone="green"
-              />
-              <MetricCard
-                label="Attributed Won"
-                value={formatIdr(insights.execution_summary.attributed_won_value)}
-                tone="green"
-              />
+            {topObjections.length > 0 ? (
+              <section aria-labelledby="mkt-objections" className="space-y-3">
+                <h2 id="mkt-objections" className="text-lg font-bold clara-text-primary">
+                  Hal yang diragukan customer
+                </h2>
+                <ul className="flex flex-wrap gap-2">
+                  {topObjections.map((item) => (
+                    <li key={item.topic}>
+                      <Tag tone="warn" className="px-3 py-1 text-sm">
+                        {item.topic} · {item.count} percakapan
+                      </Tag>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <section aria-labelledby="mkt-content" className="space-y-3">
+              <h2 id="mkt-content" className="text-lg font-bold clara-text-primary">
+                Konten yang sebaiknya dibuat
+              </h2>
+              {insights.top_content_recommendations.length === 0 ? (
+                <EmptyState title="Belum ada saran konten" description="Saran muncul setelah ada cukup percakapan yang dibaca Clara." />
+              ) : (
+                <ul className="space-y-3">
+                  {insights.top_content_recommendations.map((item) => (
+                    <li key={`${item.title}-${item.suggested_format}`} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="break-words text-base font-semibold clara-text-primary">{plainJargon(item.title)}</h3>
+                        <ValueTag table={PRIORITY} value={item.priority} />
+                      </div>
+                      <p className="mt-2 text-sm leading-6 clara-text-secondary">{plainJargon(item.rationale)}</p>
+                      <p className="mt-2 text-sm clara-text-primary">
+                        <span className="font-semibold">Bentuk: </span>
+                        {describeContentFormat(item.suggested_format)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
-            <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="space-y-6">
-                <Panel
-                  title="Top Customer Objections"
-                  description="Area resistensi yang paling sering muncul dan paling layak dijawab lewat edukasi atau konten."
-                >
-                  {insights.top_objections.length === 0 ? (
-                    <EmptyText text="Belum ada objection yang cukup untuk dianalisis." />
-                  ) : (
-                    <div className="space-y-3">
-                      {insights.top_objections.map((item) => (
-                        <article
-                          key={item.topic}
-                          className="clara-card-soft rounded-2xl p-4"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-clara-ink-3">
-                              {item.topic}
-                            </p>
-                            <span className="rounded-full bg-clara-deep px-2.5 py-1 text-xs font-semibold text-clara-cream">
-                              {item.count}
-                            </span>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </Panel>
+            <details className="clara-card p-4 sm:p-5">
+              <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                Brief siap pakai untuk tim konten ({insights.content_briefs.length})
+              </summary>
+              <div className="mt-3 space-y-3">
+              {insights.content_briefs.length === 0 ? (
+                <EmptyState title="Belum ada brief" description="Brief disusun otomatis dari keraguan customer yang paling sering muncul." />
+              ) : (
+                <ul className="space-y-3">
+                  {insights.content_briefs.map((brief) => (
+                    <li key={`${brief.title}-${brief.suggested_format}`} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="break-words text-base font-semibold clara-text-primary">{plainJargon(brief.title)}</h3>
+                        <ValueTag table={PRIORITY} value={brief.urgency} />
+                      </div>
+                      <p className="mt-2 text-sm leading-6 clara-text-primary">{plainJargon(brief.key_message)}</p>
+                      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                        <Fact label="Untuk siapa" value={plainJargon(brief.audience_segment)} />
+                        <Fact label="Bentuk" value={describeContentFormat(brief.suggested_format)} />
+                        <Fact label="Nada" value={plainJargon(brief.tone.replaceAll("_", " "))} />
+                        <Fact label="Ajakan di akhir" value={plainJargon(brief.call_to_action)} />
+                      </dl>
+                      <button
+                        type="button"
+                        disabled={isCreatingExecutionItem}
+                        onClick={() =>
+                          void handleCreateExecutionItem({
+                            item_type: "content_brief",
+                            source_kind: "content_brief",
+                            title: brief.title,
+                            summary: brief.key_message,
+                            recommended_action: brief.call_to_action,
+                            priority: brief.urgency === "high" ? "high" : "medium",
+                            assigned_user_id: currentUser?.id ?? null,
+                          })
+                        }
+                        className="clara-button clara-button-primary mt-4"
+                      >
+                        {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan tugas"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            </details>
 
-                <Panel
-                  title="Recommended Content Angles"
-                  description="Saran output marketing yang langsung bisa diprioritaskan berdasarkan percakapan terbaru."
-                >
-                  {insights.top_content_recommendations.length === 0 ? (
-                    <EmptyText text="Belum ada rekomendasi konten yang cukup kuat." />
-                  ) : (
-                    <div className="space-y-4">
-                      {insights.top_content_recommendations.map((item) => (
-                        <article
-                          key={`${item.title}-${item.suggested_format}`}
-                          className="clara-card-soft rounded-2xl p-4"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-clara-ink-3">
-                              {item.title}
-                            </h3>
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                item.priority === "high"
-                                  ? "bg-red-600/15 text-red-200"
-                                  : "bg-amber-600/15 text-amber-200"
-                              }`}
-                            >
-                              {item.priority}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-sm text-clara-ink-3">
-                            {item.rationale}
-                          </p>
-                          <p className="mt-3 text-xs font-semibold text-clara-ink-3">
-                            Suggested format
-                          </p>
-                          <p className="mt-1 text-sm text-clara-ink-3">
-                            {formatStatusLabel(item.suggested_format)}
-                          </p>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </Panel>
+            <details className="clara-card p-4 sm:p-5">
+              <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                Saran untuk iklan ({insights.ads_signals.length})
+              </summary>
+              <div className="mt-3 space-y-3">
+              {insights.ads_signals.length === 0 ? (
+                <EmptyState title="Belum ada saran iklan" description="Saran budget dan materi iklan muncul saat polanya cukup kuat." />
+              ) : (
+                <ul className="space-y-3">
+                  {insights.ads_signals.map((signal) => (
+                    <li key={`${signal.title}-${signal.budget_shift}`} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="break-words text-base font-semibold clara-text-primary">{plainJargon(signal.title)}</h3>
+                        <ValueTag table={PRIORITY} value={signal.urgency} />
+                      </div>
+                      <dl className="mt-3 space-y-3 text-sm">
+                        <Fact label="Yang terlihat" value={plainJargon(signal.observation)} />
+                        <Fact label="Langkah yang disarankan" value={plainJargon(signal.recommendation)} />
+                        <Fact label="Pengaturan budget" value={plainJargon(signal.budget_shift)} />
+                      </dl>
+                      <button
+                        type="button"
+                        disabled={isCreatingExecutionItem}
+                        onClick={() =>
+                          void handleCreateExecutionItem({
+                            item_type: "ads_signal",
+                            source_kind: "ads_signal",
+                            title: signal.title,
+                            summary: signal.observation,
+                            recommended_action: `${signal.recommendation} ${signal.budget_shift}`,
+                            priority: signal.urgency === "high" ? "high" : "medium",
+                            assigned_user_id: currentUser?.id ?? null,
+                          })
+                        }
+                        className="clara-button clara-button-primary mt-4"
+                      >
+                        {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan tugas"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            </details>
 
-                <Panel
-                  title="Ready-to-use Content Briefs"
-                  description="Brief ringkas yang bisa langsung dilempar ke content creator tanpa harus menyusun ulang insight mentah."
-                >
-                  {insights.content_briefs.length === 0 ? (
-                    <EmptyText text="Belum ada brief yang cukup kuat untuk disiapkan." />
-                  ) : (
-                    <div className="space-y-4">
-                      {insights.content_briefs.map((brief) => (
-                        <article
-                          key={`${brief.title}-${brief.suggested_format}`}
-                          className="clara-card rounded-2xl p-5"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-clara-ink-3">
-                              {brief.title}
-                            </h3>
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                brief.urgency === "high"
-                                  ? "bg-red-600/15 text-red-200"
-                                  : "bg-amber-600/15 text-amber-200"
-                              }`}
-                            >
-                              {brief.urgency}
-                            </span>
-                          </div>
+            <section aria-labelledby="mkt-board" className="space-y-3">
+              <h2 id="mkt-board" className="text-lg font-bold clara-text-primary">
+                Daftar kerja pemasaran
+              </h2>
+              <p className="text-sm clara-text-secondary">
+                {summary.total_items > 0
+                  ? `${summary.total_items} tugas (${openTasks} belum selesai). Hasilnya sejauh ini: ${summary.leads_generated} lead masuk, ${summary.won_leads} closing, nilai ${formatIdr(summary.attributed_won_value)}.`
+                  : "Tugas yang kamu buat dari brief atau saran iklan muncul di sini, lengkap dengan penanggung jawab dan hasilnya."}
+              </p>
+              {insights.execution_items.length === 0 ? (
+                <EmptyState title="Belum ada tugas" description="Tekan Jadikan tugas pada brief atau saran iklan di atas." />
+              ) : (
+                <ul className="space-y-3">
+                  {insights.execution_items.map((item) => (
+                    <TaskCard
+                      key={item.id}
+                      item={item}
+                      users={users}
+                      draft={outcomeDrafts[item.id]}
+                      busy={updatingExecutionItemId === item.id}
+                      onUpdate={(payload) => void handleUpdateExecutionItem(item.id, payload)}
+                      onDraft={(field, value) => setDraft(item.id, field, value)}
+                      onSaveOutcome={() => saveOutcome(item.id)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
 
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <BriefRow
-                              label="Audience"
-                              value={brief.audience_segment}
-                            />
-                            <BriefRow
-                              label="Format"
-                              value={formatStatusLabel(brief.suggested_format)}
-                            />
-                            <BriefRow
-                              label="Tone"
-                              value={formatStatusLabel(brief.tone)}
-                            />
-                            <BriefRow
-                              label="CTA"
-                              value={brief.call_to_action}
-                            />
-                          </div>
-
-                          <div className="mt-4 rounded-2xl bg-[rgba(31,24,17,0.9)] p-4">
-                            <p className="text-xs font-semibold text-clara-ink-3">
-                              Key message
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-clara-ink-3">
-                              {brief.key_message}
-                            </p>
-                          </div>
-
-                          <div className="mt-4 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void handleCreateExecutionItem({
-                                  item_type: "content_brief",
-                                  source_kind: "content_brief",
-                                  title: brief.title,
-                                  summary: brief.key_message,
-                                  recommended_action: brief.call_to_action,
-                                  priority: brief.urgency === "high" ? "high" : "medium",
-                                  assigned_user_id: currentUser?.id ?? null,
-                                })
-                              }
-                              disabled={isCreatingExecutionItem}
-                              className="clara-button clara-button-primary"
-                            >
-                              {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan Execution Item"}
-                            </button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </Panel>
-
-                <Panel
-                  title="Marketing Execution Board"
-                  description="Daftar item kerja yang sudah diturunkan dari insight, supaya tim tahu mana yang masih draft, sudah di-assign, sedang dikerjakan, atau selesai."
-                >
-                  {insights.execution_items.length === 0 ? (
-                    <EmptyText text="Belum ada execution item. Konversi content brief atau ads signal menjadi item kerja." />
-                  ) : (
-                    <div className="space-y-4">
-                      {insights.execution_items.map((item) => (
-                        <article
-                          key={item.id}
-                          className="clara-card rounded-2xl p-5"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-clara-ink-3">
-                              {item.title}
-                            </h3>
-                            <span className="rounded-full bg-clara-sunken px-2.5 py-1 text-xs font-semibold text-clara-ink-3">
-                              {formatStatusLabel(item.item_type)}
-                            </span>
-                            <span className="rounded-full bg-amber-600/15 px-2.5 py-1 text-xs font-semibold text-amber-200">
-                              {item.priority}
-                            </span>
-                          </div>
-
-                          <p className="mt-3 text-sm leading-6 text-clara-ink-3">
-                            {item.summary}
-                          </p>
-
-                          <div className="mt-4 grid gap-4 md:grid-cols-2">
-                            <SignalBlock label="Recommended action" value={item.recommended_action} />
-                            <div className="rounded-2xl bg-[rgba(31,24,17,0.9)] p-4">
-                              <p className="text-xs font-semibold text-clara-ink-3">
-                                Ownership
-                              </p>
-                              <p className="mt-2 text-sm text-clara-ink-3">
-                                Dibuat oleh {item.created_by_user_name ?? "System"}
-                              </p>
-                              <p className="mt-1 text-sm text-clara-ink-3">
-                                PIC: {item.assigned_user_name ?? "Belum di-assign"}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
-                                Status
-                              </span>
-                              <select
-                                value={item.status}
-                                onChange={(event) =>
-                                  void handleUpdateExecutionItem(item.id, {
-                                    status: event.target.value,
-                                  })
-                                }
-                                disabled={updatingExecutionItemId === item.id}
-                                className="clara-select"
-                              >
-                                {EXECUTION_STATUS_OPTIONS.map((option) => (
-                                  <option key={option} value={option}>
-                                    {formatStatusLabel(option)}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
-                                Assign PIC
-                              </span>
-                              <select
-                                value={item.assigned_user_id ?? ""}
-                                onChange={(event) =>
-                                  void handleUpdateExecutionItem(item.id, {
-                                    assigned_user_id: event.target.value || null,
-                                  })
-                                }
-                                disabled={updatingExecutionItemId === item.id}
-                                className="clara-select"
-                              >
-                                <option value="">Belum di-assign</option>
-                                {users.map((user) => (
-                                  <option key={user.id} value={user.id}>
-                                    {user.name} · {user.role}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
-                                Campaign Name
-                              </span>
-                              <input
-                                type="text"
-                                value={outcomeDrafts[item.id]?.campaign_name ?? ""}
-                                onChange={(event) =>
-                                  setOutcomeDrafts((current) => ({
-                                    ...current,
-                                    [item.id]: {
-                                      ...current[item.id],
-                                      campaign_name: event.target.value,
-                                    },
-                                  }))
-                                }
-                                className="clara-input"
-                              />
-                            </label>
-
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
-                                Published At
-                              </span>
-                              <input
-                                type="datetime-local"
-                                value={outcomeDrafts[item.id]?.published_at ?? ""}
-                                onChange={(event) =>
-                                  setOutcomeDrafts((current) => ({
-                                    ...current,
-                                    [item.id]: {
-                                      ...current[item.id],
-                                      published_at: event.target.value,
-                                    },
-                                  }))
-                                }
-                                className="clara-input"
-                              />
-                            </label>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 md:grid-cols-3">
-                            <OutcomeNumberField
-                              label="Lead Masuk"
-                              value={outcomeDrafts[item.id]?.leads_generated ?? "0"}
-                              onChange={(value) =>
-                                setOutcomeDrafts((current) => ({
-                                  ...current,
-                                  [item.id]: { ...current[item.id], leads_generated: value },
-                                }))
-                              }
-                            />
-                            <OutcomeNumberField
-                              label="Lead Terkualifikasi"
-                              value={outcomeDrafts[item.id]?.qualified_leads ?? "0"}
-                              onChange={(value) =>
-                                setOutcomeDrafts((current) => ({
-                                  ...current,
-                                  [item.id]: { ...current[item.id], qualified_leads: value },
-                                }))
-                              }
-                            />
-                            <OutcomeNumberField
-                              label="Lead Closing"
-                              value={outcomeDrafts[item.id]?.won_leads ?? "0"}
-                              onChange={(value) =>
-                                setOutcomeDrafts((current) => ({
-                                  ...current,
-                                  [item.id]: { ...current[item.id], won_leads: value },
-                                }))
-                              }
-                            />
-                          </div>
-
-                          <div className="mt-4 grid gap-3 md:grid-cols-3">
-                            <OutcomeNumberField
-                              label="Attributed Pipeline"
-                              value={outcomeDrafts[item.id]?.attributed_pipeline_value ?? "0"}
-                              onChange={(value) =>
-                                setOutcomeDrafts((current) => ({
-                                  ...current,
-                                  [item.id]: {
-                                    ...current[item.id],
-                                    attributed_pipeline_value: value,
-                                  },
-                                }))
-                              }
-                            />
-                            <OutcomeNumberField
-                              label="Attributed Won"
-                              value={outcomeDrafts[item.id]?.attributed_won_value ?? "0"}
-                              onChange={(value) =>
-                                setOutcomeDrafts((current) => ({
-                                  ...current,
-                                  [item.id]: {
-                                    ...current[item.id],
-                                    attributed_won_value: value,
-                                  },
-                                }))
-                              }
-                            />
-                            <OutcomeNumberField
-                              label="Attributed Deposit"
-                              value={outcomeDrafts[item.id]?.attributed_deposit_amount ?? "0"}
-                              onChange={(value) =>
-                                setOutcomeDrafts((current) => ({
-                                  ...current,
-                                  [item.id]: {
-                                    ...current[item.id],
-                                    attributed_deposit_amount: value,
-                                  },
-                                }))
-                              }
-                            />
-                          </div>
-
-                          <label className="mt-4 block">
-                            <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
-                              Result Notes
-                            </span>
-                            <textarea
-                              value={outcomeDrafts[item.id]?.result_notes ?? ""}
-                              onChange={(event) =>
-                                setOutcomeDrafts((current) => ({
-                                  ...current,
-                                  [item.id]: {
-                                    ...current[item.id],
-                                    result_notes: event.target.value,
-                                  },
-                                }))
-                              }
-                              rows={3}
-                              className="clara-textarea"
-                            />
-                          </label>
-
-                          <div className="mt-4 flex justify-end">
-                            <button
-                              type="button"
-                              disabled={updatingExecutionItemId === item.id}
-                              onClick={() =>
-                                void handleUpdateExecutionItem(item.id, {
-                                  campaign_name:
-                                    outcomeDrafts[item.id]?.campaign_name || null,
-                                  published_at:
-                                    outcomeDrafts[item.id]?.published_at
-                                      ? new Date(
-                                          outcomeDrafts[item.id].published_at
-                                        ).toISOString()
-                                      : null,
-                                  result_notes:
-                                    outcomeDrafts[item.id]?.result_notes || null,
-                                  leads_generated: Number(
-                                    outcomeDrafts[item.id]?.leads_generated || 0
-                                  ),
-                                  qualified_leads: Number(
-                                    outcomeDrafts[item.id]?.qualified_leads || 0
-                                  ),
-                                  won_leads: Number(
-                                    outcomeDrafts[item.id]?.won_leads || 0
-                                  ),
-                                  attributed_pipeline_value: Number(
-                                    outcomeDrafts[item.id]?.attributed_pipeline_value || 0
-                                  ),
-                                  attributed_won_value: Number(
-                                    outcomeDrafts[item.id]?.attributed_won_value || 0
-                                  ),
-                                  attributed_deposit_amount: Number(
-                                    outcomeDrafts[item.id]?.attributed_deposit_amount || 0
-                                  ),
-                                })
-                              }
-                              className="rounded-full bg-clara-success-surface px-4 py-2 text-sm font-semibold text-clara-cream disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {updatingExecutionItemId === item.id
-                                ? "Menyimpan..."
-                                : "Simpan Outcome"}
-                            </button>
-                          </div>
-
-                          {item.notes && (
-                            <div className="mt-4 rounded-2xl bg-[rgba(31,24,17,0.9)] p-4">
-                              <p className="text-xs font-semibold text-clara-ink-3">
-                                Notes
-                              </p>
-                              <p className="mt-2 text-sm leading-6 text-clara-ink-3">
-                                {item.notes}
-                              </p>
-                            </div>
-                          )}
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </Panel>
-
-                <Panel
-                  title="Recent Snapshots"
-                  description="Bandingkan perubahan antar snapshot untuk membaca apakah arah tren sedang menguat, melemah, atau bergeser."
-                >
-                  {snapshots.length === 0 ? (
-                    <EmptyText text="Belum ada snapshot. Generate snapshot pertama untuk mulai tracking." />
-                  ) : (
-                    <div className="space-y-4">
-                      {snapshots.map((snapshot) => (
-                        <article
-                          key={snapshot.id}
-                          className="clara-card-soft rounded-2xl p-4"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <h3 className="text-sm font-semibold text-clara-ink-3">
-                                {formatDateTime(snapshot.created_at)}
-                              </h3>
-                              <p className="mt-1 text-xs text-clara-ink-3">
-                                Period: {snapshot.period_start} s/d {snapshot.period_end}
-                              </p>
-                            </div>
-                            <span className="rounded-full bg-clara-sunken px-2.5 py-1 text-xs font-semibold text-clara-ink-3">
-                              {snapshot.scope_type}
-                            </span>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <TrendRow
-                              label="Conversations"
-                              value={String(snapshot.total_conversations)}
-                              delta={snapshot.comparison?.conversation_delta}
-                            />
-                            <TrendRow
-                              label="Analyzed"
-                              value={String(snapshot.total_analyzed_conversations)}
-                              delta={snapshot.comparison?.analyzed_delta}
-                            />
-                            <TrendRow
-                              label="Reply Sent Rate"
-                              value={`${(snapshot.kpi_summary.reply_sent_rate * 100).toFixed(0)}%`}
-                              delta={snapshot.comparison?.reply_sent_rate_delta}
-                              asPercent
-                            />
-                            <TrendRow
-                              label="Approved Reply Rate"
-                              value={`${(snapshot.kpi_summary.approved_reply_rate * 100).toFixed(0)}%`}
-                              delta={snapshot.comparison?.approved_reply_rate_delta}
-                              asPercent
-                            />
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </Panel>
+            <details className="clara-card p-4 sm:p-5">
+              <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                Gambaran customer saat ini
+              </summary>
+              <div className="mt-3 grid gap-4 md:grid-cols-3">
+                <Breakdown title="Minat beli" table={BUYING_INTENT} items={insights.buying_intent_breakdown} />
+                <Breakdown title="Suasana hati customer" table={SENTIMENT} items={insights.sentiment_breakdown} />
+                <Breakdown title="Tahap percakapan" table={STAGE} items={insights.pipeline_stage_breakdown} />
               </div>
+              <p className="mt-4 text-sm clara-text-secondary">
+                Balasan terkirim {formatPercent(insights.kpi_summary.reply_sent_rate)}, disetujui{" "}
+                {formatPercent(insights.kpi_summary.approved_reply_rate)}.
+              </p>
+            </details>
 
-              <div className="space-y-6">
-                <Panel
-                  title="Audience Signals"
-                  description="Breakdown cepat intent, sentiment, dan stage percakapan agar tim tahu siapa yang mendekat ke keputusan."
-                >
-                  <BreakdownGroup
-                    title="Buying Intent"
-                    items={insights.buying_intent_breakdown}
-                  />
-                  <BreakdownGroup
-                    title="Sentiment"
-                    items={insights.sentiment_breakdown}
-                  />
-                  <BreakdownGroup
-                    title="Pipeline Stage"
-                    items={insights.pipeline_stage_breakdown}
-                  />
-                </Panel>
+            <details className="clara-card p-4 sm:p-5">
+              <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                Rencana konten 30 hari ({insights.monthly_content_plan.length})
+              </summary>
+              {insights.monthly_content_plan.length === 0 ? (
+                <p className="mt-3 text-sm clara-text-secondary">Belum ada rencana. Rencana disusun dari percakapan nyata.</p>
+              ) : (
+                <ol className="mt-3 space-y-3">
+                  {insights.monthly_content_plan.map((item) => (
+                    <li key={`${item.window_label}-${item.theme}`} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Tag tone="gold">{plainJargon(item.window_label).replace(/^week /i, "Minggu ")}</Tag>
+                        <span className="text-xs clara-text-muted">{describeContentFormat(item.suggested_format)}</span>
+                      </div>
+                      <h3 className="mt-2 break-words text-base font-semibold clara-text-primary">{plainJargon(item.theme)}</h3>
+                      <p className="mt-1 text-sm leading-6 clara-text-secondary">{plainJargon(item.objective)}</p>
+                      <p className="mt-2 text-xs clara-text-muted">Ukuran berhasil: {plainJargon(item.primary_metric)}</p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </details>
 
-                <Panel
-                  title="KPI Operasional"
-                  description="KPI pendukung untuk membaca kesehatan pipeline analysis dan workflow balasan tim."
-                >
-                  <div className="grid gap-3">
-                    <KpiRow
-                      label="Approved reply rate"
-                      value={`${(insights.kpi_summary.approved_reply_rate * 100).toFixed(0)}%`}
-                    />
-                    <KpiRow
-                      label="Lead temperature tracked"
-                      value={String(
-                        Object.values(insights.lead_temperature_breakdown).reduce(
-                          (sum, count) => sum + count,
-                          0
-                        )
-                      )}
-                    />
-                    <KpiRow
-                      label="Risk signals tracked"
-                      value={String(
-                        Object.values(insights.risk_level_breakdown).reduce(
-                          (sum, count) => sum + count,
-                          0
-                        )
-                      )}
-                    />
-                  </div>
-                </Panel>
-
-                <Panel
-                  title="Signals for Ads Specialist"
-                  description="Sinyal yang lebih operasional untuk pengambilan keputusan budget, retargeting, dan angle creative."
-                >
-                  {insights.ads_signals.length === 0 ? (
-                    <EmptyText text="Belum ada sinyal budget atau creative yang cukup kuat." />
-                  ) : (
-                    <div className="space-y-4">
-                      {insights.ads_signals.map((signal) => (
-                        <article
-                          key={`${signal.title}-${signal.budget_shift}`}
-                          className="clara-card rounded-2xl p-5"
-                        >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold text-clara-ink-3">
-                              {signal.title}
-                            </h3>
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                signal.urgency === "high"
-                                  ? "bg-red-600/15 text-red-200"
-                                  : "bg-sky-600/15 text-sky-200"
-                              }`}
-                            >
-                              {signal.urgency}
-                            </span>
-                          </div>
-                          <div className="mt-4 space-y-3">
-                            <SignalBlock
-                              label="Observation"
-                              value={signal.observation}
-                            />
-                            <SignalBlock
-                              label="Recommended move"
-                              value={signal.recommendation}
-                            />
-                            <SignalBlock
-                              label="Budget shift"
-                              value={signal.budget_shift}
-                            />
-                          </div>
-
-                          <div className="mt-4 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void handleCreateExecutionItem({
-                                  item_type: "ads_signal",
-                                  source_kind: "ads_signal",
-                                  title: signal.title,
-                                  summary: signal.observation,
-                                  recommended_action: `${signal.recommendation} ${signal.budget_shift}`,
-                                  priority: signal.urgency === "high" ? "high" : "medium",
-                                  assigned_user_id: currentUser?.id ?? null,
-                                })
-                              }
-                              disabled={isCreatingExecutionItem}
-                              className="clara-button clara-button-primary"
-                            >
-                              {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan Execution Item"}
-                            </button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </Panel>
-
-                <Panel
-                  title="30-day Content Plan"
-                  description="Draft planning bulanan berbasis percakapan real, supaya tim konten tidak mulai dari kertas kosong."
-                >
-                  {insights.monthly_content_plan.length === 0 ? (
-                    <EmptyText text="Belum ada plan yang cukup untuk dirangkai." />
-                  ) : (
-                    <div className="space-y-4">
-                      {insights.monthly_content_plan.map((item) => (
-                        <article
-                          key={`${item.window_label}-${item.theme}`}
-                          className="clara-card-soft rounded-2xl p-4"
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <h3 className="text-sm font-semibold text-clara-ink-3">
-                              {item.window_label}
-                            </h3>
-                            <span className="rounded-full bg-clara-sunken px-2.5 py-1 text-xs font-semibold text-clara-ink-3">
-                              {formatStatusLabel(item.suggested_format)}
-                            </span>
-                          </div>
-                          <p className="mt-3 text-base font-semibold text-clara-ink-3">
-                            {item.theme}
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-clara-ink-3">
-                            {item.objective}
-                          </p>
-                          <div className="mt-4 rounded-2xl bg-[rgba(31,24,17,0.9)] px-4 py-3">
-                            <p className="text-xs font-semibold text-clara-ink-3">
-                              Primary metric
-                            </p>
-                            <p className="mt-1 text-sm font-medium text-clara-ink-3">
-                              {item.primary_metric}
-                            </p>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </Panel>
-              </div>
-            </section>
+            <details className="clara-card p-4 sm:p-5">
+              <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                Riwayat insight ({snapshots.length})
+              </summary>
+              {snapshots.length === 0 ? (
+                <p className="mt-3 text-sm clara-text-secondary">Belum ada riwayat. Tekan Perbarui insight untuk menyimpan yang pertama.</p>
+              ) : (
+                <ul className="mt-3 space-y-3">
+                  {snapshots.map((snapshot) => (
+                    <li key={snapshot.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                      <p className="text-sm font-semibold clara-text-primary">{formatDateTime(snapshot.created_at)}</p>
+                      <p className="mt-1 text-xs clara-text-muted">
+                        Periode {snapshot.period_start} s/d {snapshot.period_end} · {describeScopeLabel(snapshot.scope_type)}
+                      </p>
+                      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+                        <Trend label="Percakapan" value={String(snapshot.total_conversations)} delta={snapshot.comparison?.conversation_delta} />
+                        <Trend label="Sudah dibaca Clara" value={String(snapshot.total_analyzed_conversations)} delta={snapshot.comparison?.analyzed_delta} />
+                        <Trend
+                          label="Balasan terkirim"
+                          value={formatPercent(snapshot.kpi_summary.reply_sent_rate)}
+                          delta={snapshot.comparison?.reply_sent_rate_delta}
+                          percent
+                        />
+                        <Trend
+                          label="Balasan disetujui"
+                          value={formatPercent(snapshot.kpi_summary.approved_reply_rate)}
+                          delta={snapshot.comparison?.approved_reply_rate_delta}
+                          percent
+                        />
+                      </dl>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </details>
           </>
-        )}
+        ) : null}
       </div>
     </WorkspaceShell>
   );
 }
 
-function Panel({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
+function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <section className="clara-card rounded-3xl p-5">
-      <h2 className="text-lg font-semibold clara-text-primary">{title}</h2>
-      <p className="mt-1 text-sm text-clara-ink-3">{description}</p>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "slate" | "blue" | "green" | "red";
-}) {
-  const toneClass = {
-    slate: "bg-[linear-gradient(180deg,rgba(31,24,17,0.98)_0%,rgba(21,16,12,0.98)_100%)] border border-[#f0cb73]/12 text-[#f8e8c1]",
-    blue: "bg-[linear-gradient(180deg,rgba(10,29,50,0.95)_0%,rgba(6,18,36,0.94)_100%)] border border-[#7dd3fc]/20 text-sky-100",
-    green: "bg-[linear-gradient(180deg,rgba(10,30,24,0.95)_0%,rgba(7,22,16,0.94)_100%)] border border-[#4ade80]/20 text-emerald-100",
-    red: "bg-[linear-gradient(180deg,rgba(59,15,15,0.95)_0%,rgba(38,9,9,0.94)_100%)] border border-[#f87171]/20 text-rose-100",
-  }[tone];
-
-  return (
-    <div className={`clara-card rounded-2xl p-5 ${toneClass}`}>
-      <p className="text-sm font-medium text-clara-ink-3">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-clara-cream">{value}</p>
+    <div className="min-w-0">
+      <dt className="text-xs font-semibold clara-text-muted">{label}</dt>
+      <dd className="mt-1 break-words leading-6 clara-text-primary">{value}</dd>
     </div>
   );
 }
 
-function BreakdownGroup({
+function Breakdown({
   title,
+  table,
   items,
 }: {
   title: string;
+  table: Parameters<typeof ValueTag>[0]["table"];
   items: { label: string; count: number }[];
 }) {
   return (
-    <div className="mt-4 first:mt-0">
-      <p className="text-xs font-semibold text-clara-ink-3">
-        {title}
-      </p>
+    <div>
+      <h3 className="text-sm font-semibold clara-text-primary">{title}</h3>
       {items.length === 0 ? (
-        <EmptyText text="Belum ada data." />
+        <p className="mt-2 text-sm clara-text-secondary">Belum ada data.</p>
       ) : (
-        <div className="mt-2 space-y-2">
+        <ul className="mt-2 space-y-2">
           {items.map((item) => (
-            <div
-              key={`${title}-${item.label}`}
-              className="clara-card-soft flex items-center justify-between rounded-xl px-3 py-2"
-            >
-              <span className="text-sm text-clara-ink-3">
-                {formatStatusLabel(item.label)}
-              </span>
-              <span className="text-sm font-semibold clara-text-primary">
-                {item.count}
-              </span>
-            </div>
+            <li key={item.label} className="flex items-center justify-between gap-2 text-sm">
+              <ValueTag table={table} value={item.label} />
+              <span className="font-semibold clara-text-primary">{item.count}</span>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );
 }
 
-function KpiRow({ label, value }: { label: string; value: string }) {
+function Trend({ label, value, delta, percent = false }: { label: string; value: string; delta?: number; percent?: boolean }) {
+  const change = typeof delta === "number" ? describeDelta(percent ? Math.round(delta * 100) : delta) : null;
+
   return (
-    <div className="clara-card-soft flex items-center justify-between rounded-xl px-4 py-3">
-      <span className="text-sm text-clara-ink-3">{label}</span>
-      <span className="text-sm font-semibold text-clara-ink-3">{value}</span>
+    <div className="min-w-0">
+      <dt className="text-xs clara-text-muted">{label}</dt>
+      <dd className="mt-1 font-semibold clara-text-primary">{value}</dd>
+      {change ? <p className="mt-0.5 text-xs clara-text-muted">{change.text}{percent && delta !== 0 ? " poin" : ""}</p> : null}
     </div>
   );
 }
 
-function EmptyText({ text }: { text: string }) {
-  return <p className="text-sm text-clara-ink-3">{text}</p>;
-}
+function NumberField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const id = useId();
 
-function BriefRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="clara-card-soft rounded-2xl px-4 py-3">
-      <p className="text-xs font-semibold text-clara-ink-3">
+    <div>
+      <label htmlFor={id} className="clara-label">
         {label}
-      </p>
-      <p className="mt-1 text-sm leading-6 text-clara-ink-3">{value}</p>
+      </label>
+      <input id={id} type="number" min="0" step="1" value={value} onChange={(event) => onChange(event.target.value)} className="clara-input mt-1 w-full" />
     </div>
   );
 }
 
-function SignalBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="clara-card-soft rounded-2xl p-4">
-      <p className="text-xs font-semibold text-clara-ink-3">
-        {label}
-      </p>
-      <p className="mt-2 text-sm leading-6 text-clara-ink-3">{value}</p>
-    </div>
-  );
-}
-
-function TrendRow({
-  label,
-  value,
-  delta,
-  asPercent = false,
-}: {
-  label: string;
-  value: string;
-  delta?: number;
-  asPercent?: boolean;
-}) {
-  const hasDelta = typeof delta === "number";
-  const positive = hasDelta && delta > 0;
-  const negative = hasDelta && delta < 0;
-
-  return (
-    <div className="clara-card-soft rounded-xl px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm text-clara-ink-3">{label}</span>
-        <span className="text-sm font-semibold text-clara-ink-3">{value}</span>
-      </div>
-      {hasDelta && (
-        <p
-          className={`mt-2 text-xs font-medium ${
-            positive
-              ? "text-clara-success"
-              : negative
-                ? "text-clara-danger"
-                : "text-clara-ink-3"
-          }`}
-        >
-          Delta: {delta > 0 ? "+" : ""}
-          {asPercent ? `${(delta * 100).toFixed(0)}%` : delta}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function OutcomeNumberField({
+function TextField({
   label,
   value,
   onChange,
+  type = "text",
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  type?: string;
 }) {
+  const id = useId();
+
   return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-semibold text-clara-ink-3">
+    <div>
+      <label htmlFor={id} className="clara-label">
         {label}
-      </span>
-      <input
-        type="number"
-        min="0"
-        step="1"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="clara-input"
-      />
-    </label>
+      </label>
+      <input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} className="clara-input mt-1 w-full" />
+    </div>
+  );
+}
+
+function TaskCard({
+  item,
+  users,
+  draft,
+  busy,
+  onUpdate,
+  onDraft,
+  onSaveOutcome,
+}: {
+  item: MarketingExecutionItem;
+  users: CurrentUser[];
+  draft: ExecutionOutcomeDraft | undefined;
+  busy: boolean;
+  onUpdate: (payload: MarketingExecutionItemUpdateRequest) => void;
+  onDraft: (field: keyof ExecutionOutcomeDraft, value: string) => void;
+  onSaveOutcome: () => void;
+}) {
+  const statusId = useId();
+  const picId = useId();
+  const notesId = useId();
+
+  return (
+    <li className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="break-words text-base font-semibold clara-text-primary">{plainJargon(item.title)}</h3>
+        <ValueTag table={EXECUTION_TYPE} value={item.item_type} />
+        <ValueTag table={PRIORITY} value={item.priority} />
+        <ValueTag table={EXECUTION_STATUS} value={item.status} />
+      </div>
+      <p className="mt-2 text-sm leading-6 clara-text-secondary">{plainJargon(item.summary)}</p>
+      <p className="mt-2 text-sm leading-6 clara-text-primary">
+        <span className="font-semibold">Langkah yang disarankan: </span>
+        {plainJargon(item.recommended_action)}
+      </p>
+      <p className="mt-1 text-xs clara-text-muted">
+        Dibuat oleh {item.created_by_user_name ?? "Clara"} · Penanggung jawab: {item.assigned_user_name ?? "belum ada"}
+      </p>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor={statusId} className="clara-label">
+            Status
+          </label>
+          <select
+            id={statusId}
+            value={item.status}
+            disabled={busy}
+            onChange={(event) => onUpdate({ status: event.target.value })}
+            className="clara-select mt-1 w-full"
+          >
+            {EXECUTION_STATUS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {EXECUTION_STATUS[option]?.label ?? option}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor={picId} className="clara-label">
+            Penanggung jawab
+          </label>
+          <select
+            id={picId}
+            value={item.assigned_user_id ?? ""}
+            disabled={busy}
+            onChange={(event) => onUpdate({ assigned_user_id: event.target.value || null })}
+            className="clara-select mt-1 w-full"
+          >
+            <option value="">Belum ada</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name} ({getRoleDisplayLabel(user.role)})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <details className="mt-4">
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-clara-gold">Catat hasil kampanye</summary>
+        <div className="mt-2 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <TextField label="Nama kampanye" value={draft?.campaign_name ?? ""} onChange={(value) => onDraft("campaign_name", value)} />
+            <TextField label="Waktu tayang" type="datetime-local" value={draft?.published_at ?? ""} onChange={(value) => onDraft("published_at", value)} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <NumberField label="Lead masuk" value={draft?.leads_generated ?? "0"} onChange={(value) => onDraft("leads_generated", value)} />
+            <NumberField label="Lead layak" value={draft?.qualified_leads ?? "0"} onChange={(value) => onDraft("qualified_leads", value)} />
+            <NumberField label="Lead closing" value={draft?.won_leads ?? "0"} onChange={(value) => onDraft("won_leads", value)} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <NumberField label="Nilai pipeline (Rp)" value={draft?.attributed_pipeline_value ?? "0"} onChange={(value) => onDraft("attributed_pipeline_value", value)} />
+            <NumberField label="Nilai closing (Rp)" value={draft?.attributed_won_value ?? "0"} onChange={(value) => onDraft("attributed_won_value", value)} />
+            <NumberField label="Deposit (Rp)" value={draft?.attributed_deposit_amount ?? "0"} onChange={(value) => onDraft("attributed_deposit_amount", value)} />
+          </div>
+          <div>
+            <label htmlFor={notesId} className="clara-label">
+              Catatan hasil
+            </label>
+            <textarea
+              id={notesId}
+              rows={3}
+              value={draft?.result_notes ?? ""}
+              onChange={(event) => onDraft("result_notes", event.target.value)}
+              className="clara-textarea mt-1 w-full"
+            />
+          </div>
+          <button type="button" disabled={busy} onClick={onSaveOutcome} className="clara-button clara-button-secondary">
+            {busy ? "Menyimpan..." : "Simpan hasil"}
+          </button>
+        </div>
+      </details>
+
+      {item.notes ? (
+        <p className="mt-3 text-sm clara-text-secondary">
+          <span className="font-semibold clara-text-primary">Catatan: </span>
+          {item.notes}
+        </p>
+      ) : null}
+    </li>
   );
 }

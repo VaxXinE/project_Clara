@@ -178,6 +178,35 @@ const JARGON_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\breply\b/gi, "balasan"],
   [/\bdraft\b/gi, "draf"],
   [/\bapproval\b/gi, "persetujuan"],
+  [/\bobjections?\b/gi, "keberatan"],
+  [/social proof/gi, "bukti sosial"],
+  [/\bretargeting\b/gi, "menjangkau ulang audiens"],
+  [/\bcreative\b/gi, "materi iklan"],
+  [/\baudience\b/gi, "audiens"],
+  [/\bwarm\b/gi, "hangat"],
+  [/\bcold\b/gi, "dingin"],
+  [/\bcontent brief\b/gi, "brief konten"],
+  [/\bcontent\b/gi, "konten"],
+  [/\bhigh-risk\b/gi, "berisiko tinggi"],
+  [/\bhigh risk\b/gi, "berisiko tinggi"],
+  [/\bleads\b/gi, "lead"],
+  [/\bsales enablement\b/gi, "bekal untuk Sales"],
+  [/\btrust-building\b/gi, "membangun kepercayaan"],
+  [/\btrust layer\b/gi, "dasar kepercayaan"],
+  [/\btrust\b/gi, "kepercayaan"],
+  [/\btop funnel\b/gi, "tahap awal penjualan"],
+  [/\bbroad test\b/gi, "uji audiens luas"],
+  [/\bhype\b/gi, "bombastis"],
+  [/\bengage\b/gi, "terlibat"],
+  [/\breassuring\b/gi, "menenangkan"],
+  [/\bempathetic\b/gi, "empatik"],
+  [/\bprofessional\b/gi, "profesional"],
+  [/\bplaybook\b/gi, "panduan"],
+  [/\basset\b/gi, "bahan"],
+  [/\bangle\b/gi, "pendekatan"],
+  [/\bcautious\b/gi, "ragu-ragu"],
+  [/\bintent\b/gi, "minat beli"],
+  [/\bfunnel\b/gi, "alur penjualan"],
 ];
 
 /** Label periode dari backend ("7d", "prev_7d", "prev_weekly") jadi kalimat. */
@@ -449,6 +478,7 @@ export const PRIORITY: VocabTable = {
   high: { label: "Mendesak", tone: "warn" },
   normal: { label: "Biasa", tone: "neutral" },
   low: { label: "Santai", tone: "neutral" },
+  medium: { label: "Sedang", tone: "warn" },
   stable: { label: "Stabil", tone: "good" },
   tinggi: { label: "Tinggi", tone: "danger" },
   sedang: { label: "Sedang", tone: "warn" },
@@ -705,3 +735,34 @@ export const CHANNEL_DESCRIPTION: Record<string, string> = {
   telegram: "Chat Telegram masuk lewat berkas chat atau tempel teks.",
   live_chat: "Percakapan live chat dari website kamu, diterima otomatis.",
 };
+
+export const EXECUTION_STATUS: VocabTable = {
+  draft: { label: "Draf", tone: "neutral" },
+  assigned: { label: "Sudah ditugaskan", tone: "info" },
+  in_progress: { label: "Sedang dikerjakan", tone: "warn" },
+  done: { label: "Selesai", tone: "good" },
+};
+
+export const EXECUTION_TYPE: VocabTable = {
+  content_brief: { label: "Brief konten", tone: "info" },
+  ads_signal: { label: "Saran iklan", tone: "gold" },
+};
+
+const CONTENT_FORMAT: Record<string, string> = {
+  carousel_instagram: "Carousel Instagram",
+  video_testimonial: "Video testimoni",
+  internal_sales_enablement: "Bahan internal untuk Sales",
+  short_video_or_carousel: "Video pendek atau carousel",
+  testimonial_video: "Video testimoni",
+  faq_landing_snippet: "Ringkasan FAQ di halaman web",
+  faq_reels_or_landing_snippet: "Reels FAQ atau ringkasan di halaman web",
+  carousel_and_short_video: "Carousel dan video pendek",
+  best_angle_recut: "Potong ulang dari pendekatan terbaik",
+};
+
+/** Format konten dari backend ("carousel instagram") jadi nama yang enak dibaca. */
+export function describeContentFormat(value: string | null | undefined): string {
+  const key = (value ?? "").trim().toLowerCase().replace(/[ /]+/g, "_");
+
+  return CONTENT_FORMAT[key] ?? plainJargon((value ?? "").replaceAll("_", " "));
+}
