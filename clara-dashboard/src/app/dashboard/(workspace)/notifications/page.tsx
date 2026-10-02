@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useEffect, useId, useMemo, useState } from "react";
 
+import { Tag, ValueTag } from "@/components/dashboard/Tag";
+import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
-import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
+import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, formatStatusLabel } from "@/lib/format";
+import { formatRelativeTime } from "@/lib/format";
 import { canAccessQueueAndActionCenter, isHeadRole, isManagerRole, normalizeWorkspaceRole } from "@/lib/roles";
+import { AGE, ALERT_SEVERITY, ALERT_STATUS, plainJargon } from "@/lib/vocab";
 import type {
   CurrentUser,
   OpsNotificationItem,
@@ -15,99 +18,51 @@ import type {
   OpsNotificationResponse,
 } from "@/types/dashboard";
 
-type NotificationGroup = {
-  ownerName: string;
-  items: OpsNotificationItem[];
+const VISIBLE_STEP = 8;
+
+const STATUS_CHIPS = ["open", "resolved", "ignored"] as const;
+
+const CHIP_LABELS: Record<string, string> = {
+  open: "Perlu ditangani",
+  resolved: "Selesai",
+  ignored: "Diabaikan",
 };
 
-function getSeverityClass(severity: string) {
-  if (severity === "critical") {
-    return "border border-[#f0cb73]/18 bg-[#6a2417] text-[#fff0c9]";
-  }
-  if (severity === "high") {
-    return "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]";
-  }
-  if (severity === "medium") {
-    return "border border-[#f0cb73]/18 bg-[#2c1f12] text-[#f0cb73]";
-  }
-  return "border border-[#f0cb73]/18 bg-[#1f170f] text-[#f0cb73]";
-}
-
-function resolveNotificationTargetHref(
-  href: string | null | undefined,
-  role?: string | null,
-): string | null {
+function resolveNotificationTargetHref(href: string | null | undefined, role?: string | null): string | null {
   if (!href) {
     return null;
   }
 
-  if (normalizeWorkspaceRole(role) === "head" && !canAccessQueueAndActionCenter(role)) {
-    if (href.startsWith("/dashboard/follow-up")) {
-      return "/dashboard/notifications";
-    }
+  const normalized = href.replace(/^\/dashboard/, "") || "/";
+  const canQueue = canAccessQueueAndActionCenter(role);
 
-    if (href.startsWith("/dashboard/sales")) {
-      return "/dashboard/approvals";
-    }
+  if (normalizeWorkspaceRole(role) === "head" && !canQueue) {
+    if (normalized.startsWith("/follow-up")) return "/notifications";
+    if (normalized.startsWith("/sales")) return "/approvals";
   }
 
-  if (isManagerRole(role) && !canAccessQueueAndActionCenter(role)) {
-    if (href.startsWith("/dashboard/follow-up")) {
-      return "/dashboard/manager-insights";
-    }
-
-    if (href.startsWith("/dashboard/sales")) {
-      return "/dashboard/approvals";
-    }
+  if (isManagerRole(role) && !canQueue) {
+    if (normalized.startsWith("/follow-up")) return "/manager-insights";
+    if (normalized.startsWith("/sales")) return "/approvals";
   }
 
-  return href;
+  return normalized;
 }
 
 export default function NotificationsPage() {
-  const resolutionNoteId = useId();
+  const noteId = useId();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [notifications, setNotifications] = useState<OpsNotificationResponse | null>(
-    null
-  );
+  const [notifications, setNotifications] = useState<OpsNotificationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [actionError, setActionError] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [resolutionNote, setResolutionNote] = useState("");
-  const [statusFilter, setStatusFilter] = useState("active");
+  const [statusFilter, setStatusFilter] = useState<string>("open");
   const [severityFilter, setSeverityFilter] = useState("all");
-  const [notificationPage, setNotificationPage] = useState(1);
-  const pageSize = 5;
-
-  function updateNotificationLocally(
-    notificationId: string,
-    updater: (item: OpsNotificationItem) => OpsNotificationItem
-  ) {
-    setNotifications((current) => {
-      if (!current) {
-        return current;
-      }
-
-      const nextItems = current.items.map((item) =>
-        item.id === notificationId ? updater(item) : item
-      );
-
-      return {
-        ...current,
-        active_count: nextItems.filter((item) => item.status === "active").length,
-        acknowledged_count: nextItems.filter((item) => item.status === "acknowledged").length,
-        resolved_count: nextItems.filter((item) => item.status === "resolved").length,
-        ignored_count: nextItems.filter((item) => item.status === "ignored").length,
-        escalated_count: nextItems.filter((item) => item.escalation_level !== "none").length,
-        items: nextItems,
-      };
-    });
-  }
+  const [visible, setVisible] = useState(VISIBLE_STEP);
 
   async function loadNotifications() {
-    setIsLoading(true);
-    setErrorMessage("");
-
     try {
       const [me, data] = await Promise.all([
         apiFetch<CurrentUser>("/auth/me"),
@@ -115,937 +70,338 @@ export default function NotificationsPage() {
       ]);
       setCurrentUser(me);
       setNotifications(data);
+      setErrorMessage("");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal memuat alert center."
-      );
+      setErrorMessage(error instanceof Error ? error.message : "Daftar alert belum bisa dimuat.");
     } finally {
       setIsLoading(false);
     }
   }
 
   useEffect(() => {
-    let isCancelled = false;
+    const timer = setTimeout(() => {
+      void loadNotifications();
+    }, 0);
 
-    async function bootstrapNotifications() {
-      setIsLoading(true);
-      setErrorMessage("");
-
-      try {
-        const [me, data] = await Promise.all([
-          apiFetch<CurrentUser>("/auth/me"),
-          apiFetch<OpsNotificationResponse>("/dashboard/notifications"),
-        ]);
-        if (isCancelled) {
-          return;
-        }
-        setCurrentUser(me);
-        setNotifications(data);
-      } catch (error) {
-        if (!isCancelled) {
-          setErrorMessage(
-            error instanceof Error ? error.message : "Gagal memuat alert center.",
-          );
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void bootstrapNotifications();
-
-    return () => {
-      isCancelled = true;
-    };
+    return () => clearTimeout(timer);
   }, []);
 
-  async function handleAcknowledge(item: OpsNotificationItem) {
+  async function runAction(item: OpsNotificationItem, path: string, withNote: boolean, failure: string) {
     setUpdatingId(item.id);
-    setErrorMessage("");
+    setActionError("");
 
     try {
-      await apiFetch(`/dashboard/notifications/${item.id}/acknowledge`, {
-        method: "PATCH",
-      });
+      const body: OpsNotificationResolveRequest | undefined = withNote
+        ? { resolution_note: resolutionNote.trim() || null }
+        : undefined;
+      await apiFetch(`/dashboard/notifications/${item.id}/${path}`, { method: "PATCH", body });
+      if (withNote) {
+        setResolutionNote("");
+      }
       await loadNotifications();
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal acknowledge notification."
-      );
-    } finally {
-      setUpdatingId(null);
-    }
-  }
-
-  async function handleResolve(item: OpsNotificationItem) {
-    setUpdatingId(item.id);
-    setErrorMessage("");
-    try {
-      const payload: OpsNotificationResolveRequest = {
-        resolution_note: resolutionNote.trim() || null,
-      };
-      await apiFetch(`/dashboard/notifications/${item.id}/resolve`, {
-        method: "PATCH",
-        body: payload,
-      });
-      setResolutionNote("");
-      await loadNotifications();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal resolve notification."
-      );
-    } finally {
-      setUpdatingId(null);
-    }
-  }
-
-  async function handleIgnore(item: OpsNotificationItem) {
-    setUpdatingId(item.id);
-    setErrorMessage("");
-    try {
-      const payload: OpsNotificationResolveRequest = {
-        resolution_note: resolutionNote.trim() || null,
-      };
-      await apiFetch(`/dashboard/notifications/${item.id}/ignore`, {
-        method: "PATCH",
-        body: payload,
-      });
-      setResolutionNote("");
-      await loadNotifications();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal ignore notification."
-      );
-    } finally {
-      setUpdatingId(null);
-    }
-  }
-
-  async function handleReopen(item: OpsNotificationItem) {
-    setUpdatingId(item.id);
-    setErrorMessage("");
-    try {
-      const reopenedItem = await apiFetch<OpsNotificationItem>(
-        `/dashboard/notifications/${item.id}/reopen`,
-        {
-        method: "PATCH",
-        }
-      );
-      updateNotificationLocally(item.id, () => reopenedItem);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal reopen notification."
-      );
-    } finally {
-      setUpdatingId(null);
-    }
-  }
-
-  async function handleEscalate(item: OpsNotificationItem) {
-    setUpdatingId(item.id);
-    setErrorMessage("");
-    try {
-      await apiFetch(`/dashboard/notifications/${item.id}/escalate`, {
-        method: "PATCH",
-      });
-      await loadNotifications();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Gagal escalate notification."
-      );
+      setActionError(error instanceof Error ? error.message : failure);
     } finally {
       setUpdatingId(null);
     }
   }
 
   const canAccessQueue = canAccessQueueAndActionCenter(currentUser?.role);
-  const isManagerMonitorView =
-    isManagerRole(currentUser?.role) && !canAccessQueue;
-  const isHeadMonitorView = isHeadRole(currentUser?.role);
-  const isOversightAlertView = isManagerMonitorView || isHeadMonitorView;
+  const isHeadView = isHeadRole(currentUser?.role);
+  const isOversightView = isHeadView || (isManagerRole(currentUser?.role) && !canAccessQueue);
+  const canEscalate = ["head", "superadmin"].includes(currentUser?.role ?? "");
 
-  const roleScopedNotifications = useMemo(() => {
+  const scoped = useMemo(() => {
     const items = notifications?.items ?? [];
+    return isOversightView ? items.filter((item) => Boolean(item.alert_type)) : items.filter((item) => !item.alert_type);
+  }, [isOversightView, notifications?.items]);
 
-    if (!isOversightAlertView) {
-      return items.filter((item) => !item.alert_type);
+  const counts = useMemo(() => {
+    const result: Record<string, number> = { active: 0, acknowledged: 0, resolved: 0, ignored: 0 };
+
+    for (const item of scoped) {
+      result[item.status] = (result[item.status] ?? 0) + 1;
     }
 
-    return items.filter((item) => Boolean(item.alert_type));
-  }, [isOversightAlertView, notifications?.items]);
+    return result;
+  }, [scoped]);
 
-  const filteredNotifications = useMemo(() => {
-    const items = roleScopedNotifications;
-
-    return items.filter((item) => {
-      const matchesStatus =
-        statusFilter === "all" || item.status === statusFilter;
-      const matchesSeverity =
-        severityFilter === "all" || item.severity === severityFilter;
-      return matchesStatus && matchesSeverity;
-    });
-  }, [roleScopedNotifications, severityFilter, statusFilter]);
-
-  const totalNotificationPages = Math.max(
-    1,
-    Math.ceil(filteredNotifications.length / pageSize),
+  const filtered = useMemo(
+    () =>
+      scoped.filter(
+        (item) =>
+          (statusFilter === "all" ||
+            (statusFilter === "open" ? item.status === "active" || item.status === "acknowledged" : item.status === statusFilter)) &&
+          (severityFilter === "all" ||
+            (severityFilter === "medium" ? item.severity === "medium" || item.severity === "warning" : item.severity === severityFilter)),
+      ),
+    [scoped, severityFilter, statusFilter],
   );
-  const effectiveNotificationPage = Math.min(
-    notificationPage,
-    totalNotificationPages,
-  );
+  const shown = filtered.slice(0, visible);
 
-  const paginatedNotifications = useMemo(() => {
-    const startIndex = (effectiveNotificationPage - 1) * pageSize;
-    return filteredNotifications.slice(startIndex, startIndex + pageSize);
-  }, [effectiveNotificationPage, filteredNotifications]);
-
-  const groupedNotifications = useMemo<NotificationGroup[]>(() => {
-    const groups = new Map<string, OpsNotificationItem[]>();
-
-    for (const item of paginatedNotifications) {
-      const ownerName =
-        item.sales_owner_name?.trim() ||
-        item.team_name?.trim() ||
-        "Belum ada owner";
-      const existing = groups.get(ownerName);
-      if (existing) {
-        existing.push(item);
-      } else {
-        groups.set(ownerName, [item]);
-      }
-    }
-
-    return Array.from(groups.entries()).map(([ownerName, items]) => ({
-      ownerName,
-      items,
-    }));
-  }, [paginatedNotifications]);
-
-  const scopedCounts = useMemo(
-    () => ({
-      active: roleScopedNotifications.filter((item) => item.status === "active").length,
-      acknowledged: roleScopedNotifications.filter((item) => item.status === "acknowledged")
-        .length,
-      resolved: roleScopedNotifications.filter((item) => item.status === "resolved").length,
-      ignored: roleScopedNotifications.filter((item) => item.status === "ignored").length,
-      escalated: roleScopedNotifications.filter((item) => item.escalation_level !== "none")
-        .length,
-    }),
-    [roleScopedNotifications],
-  );
-
-  const hasAnyNotifications = roleScopedNotifications.length > 0;
-  const isActiveStatusView = statusFilter === "active";
-  const showActiveEmptyState =
-    hasAnyNotifications && isActiveStatusView && filteredNotifications.length === 0;
-  const headPrimaryAlert = isHeadMonitorView ? roleScopedNotifications[0] ?? null : null;
-  const headAlertSummary = isHeadMonitorView
-    ? scopedCounts.active > 0
-      ? `Ada ${scopedCounts.active} alert aktif yang sudah masuk radar Head. Mulai dari yang paling berisiko, lalu putuskan apakah cukup dipantau, perlu ditekan ke manager, atau harus dinaikkan levelnya.`
-      : scopedCounts.resolved > 0
-        ? "Tidak ada alert aktif saat ini. Kalau perlu, buka histori selesai untuk membaca pola masalah yang baru lewat."
-        : "Belum ada sinyal lintas tim yang cukup besar untuk masuk radar Head."
-    : "";
-  const filterSummaryText = isHeadMonitorView
-    ? `Menampilkan ${paginatedNotifications.length} dari ${filteredNotifications.length} alert yang relevan untuk keputusan Head.`
-    : `Menampilkan ${paginatedNotifications.length} dari ${filteredNotifications.length} alert`;
+  const openCount = (counts.active ?? 0) + (counts.acknowledged ?? 0);
+  const summaryTitle =
+    openCount > 0
+      ? `${openCount} alert perlu ditangani`
+      : scoped.length > 0
+        ? "Semua alert sudah ditangani"
+        : "Belum ada alert";
+  const summaryHelper =
+    openCount > 0
+      ? isHeadView
+        ? "Mulai dari yang paling atas. Putuskan apakah cukup dipantau, diserahkan ke manager, atau perlu dinaikkan."
+        : "Mulai dari yang paling atas. Buka konteksnya dan tangani. Alert hilang sendiri setelah beres."
+      : "Alert yang sudah ditangani ada di kelompok Selesai.";
+  const reappearNote = "Alert peringatan yang ditandai selesai akan muncul lagi kalau masalahnya belum beres.";
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={
-        isHeadMonitorView || isOversightAlertView
-          ? NAV_GROUP_NAMES.monitoring
-          : NAV_GROUP_NAMES.daily
-      }
-      title={isHeadMonitorView ? PAGE_NAMES.alertsTeam : PAGE_NAMES.alerts}
+      title={isHeadView ? PAGE_NAMES.alertsTeam : PAGE_NAMES.alerts}
       description={
-        isHeadMonitorView
-          ? "Alert lintas tim yang paling penting, supaya kamu cepat memutuskan area mana yang perlu ditindak."
-          : isOversightAlertView
+        isHeadView
+          ? "Peringatan lintas tim yang perlu keputusanmu."
+          : isOversightView
             ? "Follow-up Sales yang mulai terlambat dan lead yang belum ditindak."
-          : "Hal yang perlu segera ditindak: follow-up terlambat, review kritis, dan alert KPI sesuai role kamu."
+            : "Hal yang perlu segera ditindak: follow-up terlambat, review kritis, dan peringatan KPI."
       }
       backHref="/dashboard"
       backLabel="Kembali ke beranda"
       actions={
-        <>
-          {currentUser && canAccessQueueAndActionCenter(currentUser.role) ? (
-            <Link
-              href="/dashboard/follow-up"
-              className="clara-button clara-button-secondary"
-            >
-              Tindak Lanjut
-            </Link>
-          ) : (
-            <Link
-              href={isHeadMonitorView ? "/dashboard/crm" : "/dashboard/manager-insights"}
-              className="clara-button clara-button-secondary"
-            >
-              {isHeadMonitorView ? "Buka Lead Tim" : "Monitor Tim"}
-            </Link>
-          )}
-          <Link
-            href="/dashboard/approvals"
-            className="clara-button clara-button-primary"
-          >
-            {isHeadMonitorView ? "Buka Arahan Tim" : "Review Sales"}
-          </Link>
-        </>
+        <Link href="/approvals" className="clara-button clara-button-primary">
+          {isHeadView ? "Buka Arahan Tim" : "Buka Review Sales"}
+        </Link>
       }
     >
-      <div className="space-y-6">
-        {isLoading && (
-          <div role="status" className="clara-empty-state p-8 text-center text-sm text-[#d6bb84]">
-            Memuat alert...
-          </div>
-        )}
+      <div className="space-y-5">
+        {isLoading ? <LoadingState message="Memuat alert..." /> : null}
 
-        {errorMessage && (
-          <div role="alert" className="rounded-2xl border border-[#f0cb73]/20 bg-[linear-gradient(180deg,rgba(33,24,17,0.94)_0%,rgba(18,13,10,0.94)_100%)] p-5 text-sm text-[#f0cb73]">
-            {errorMessage}
-          </div>
-        )}
+        {!isLoading && errorMessage && !notifications ? (
+          <ErrorState message={errorMessage} onRetry={() => void loadNotifications()} />
+        ) : null}
 
-        {notifications && !isLoading && (
+        {actionError ? (
+          <div role="alert" className="clara-alert clara-alert-danger">
+            {actionError}
+          </div>
+        ) : null}
+
+        {notifications ? (
           <>
-            {isHeadMonitorView ? (
-              <section
-                data-onboarding-id="head-alerts-summary"
-                className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
-              >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="max-w-3xl">
-                    <p className="text-xs font-semibold text-[#f0cb73]">
-                      Ringkasan hari ini
-                    </p>
-                    <h2 className="mt-2 text-2xl font-semibold text-[#fff0c9]">
-                      Prioritaskan alert yang benar-benar butuh keputusan Head
-                    </h2>
-                    <p className="mt-3 text-sm leading-7 text-[#e3c990]">
-                      {headAlertSummary}
-                    </p>
-                  </div>
+            <section data-onboarding-id="head-alerts-summary" aria-labelledby="alert-summary" className="clara-card p-5 sm:p-6">
+              <h2 id="alert-summary" className="text-xl font-bold clara-text-primary sm:text-2xl">
+                {summaryTitle}
+              </h2>
+              <p className="mt-1 text-sm leading-6 clara-text-secondary">{summaryHelper}</p>
+              {isOversightView ? <p className="mt-1 text-sm leading-6 clara-text-muted">{reappearNote}</p> : null}
+            </section>
 
-                  <div className="flex flex-wrap gap-3">
-                    <Link
-                      href="/dashboard/manager-insights"
-                      className="clara-button clara-button-secondary"
-                    >
-                      Buka Monitor Tim
-                    </Link>
-                    <Link
-                      href="/dashboard/approvals"
-                      className="clara-button clara-button-primary"
-                    >
-                      Buka Arahan Tim
-                    </Link>
-                  </div>
-                </div>
-
-                {headPrimaryAlert ? (
-                  <div className="mt-5 rounded-2xl border border-[#f0cb73]/14 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4">
-                    <p className="text-xs font-semibold text-[#f0cb73]">
-                      Alert teratas untuk dibaca dulu
-                    </p>
-                    <p className="mt-2 text-base font-semibold text-[#fff0c9]">
-                      {headPrimaryAlert.lead_name ?? headPrimaryAlert.title}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-[#d6bb84]">
-                      {headPrimaryAlert.body}
-                    </p>
-                  </div>
-                ) : null}
-              </section>
-            ) : null}
-
-            {hasAnyNotifications ? (
-              <>
-                {!showActiveEmptyState ? (
-                  <>
-                    <section
-                      data-onboarding-id="head-alerts-metrics"
-                      className="grid gap-4 md:grid-cols-3"
-                    >
-                      <MetricCard
-                        label={
-                          isHeadMonitorView
-                            ? "Butuh keputusan"
-                            : isOversightAlertView
-                              ? "Perlu Follow-up"
-                              : "Active"
-                        }
-                        value={String(scopedCounts.active)}
-                      />
-                      <MetricCard
-                        label={
-                          isHeadMonitorView
-                            ? "Sudah ditinjau"
-                            : isOversightAlertView
-                              ? "Sudah Dicek"
-                              : "Acknowledged"
-                        }
-                        value={String(scopedCounts.acknowledged)}
-                      />
-                      <MetricCard
-                        label={
-                          isHeadMonitorView
-                            ? "Sudah ditutup"
-                            : isOversightAlertView
-                              ? "Selesai"
-                              : "Resolved"
-                        }
-                        value={String(scopedCounts.resolved)}
-                      />
-                    </section>
-
-                    <section className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
-                      <div
-                        className={`grid gap-4 ${isOversightAlertView ? "md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-4"}`}
-                      >
-                        <MetricCard
-                          label={isHeadMonitorView ? "Naik level" : "Escalated"}
-                          value={String(scopedCounts.escalated)}
-                        />
-                        <MetricCard
-                          label={isHeadMonitorView ? "Data terakhir" : "Generated"}
-                          value={formatDateTime(notifications.generated_at)}
-                        />
-                        {!isOversightAlertView ? (
-                          <div className="rounded-3xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-6 md:col-span-2">
-                            <label
-                              htmlFor={resolutionNoteId}
-                              className="text-xs font-semibold text-[#f0cb73]"
-                            >
-                              Resolution Note
-                            </label>
-                            <textarea
-                              id={resolutionNoteId}
-                              value={resolutionNote}
-                              onChange={(event) => {
-                                setResolutionNote(event.target.value);
-                              }}
-                              placeholder="Catatan saat resolve notification..."
-                              className="clara-textarea mt-3 min-h-[88px]"
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                    </section>
-                  </>
-                ) : (
-                  <section className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <p className="text-xs font-semibold text-[#f0cb73]">
-                          Tidak Ada Alert Aktif
-                        </p>
-                        <h3 className="mt-2 text-lg font-semibold text-[#fff0c9]">
-                          {isOversightAlertView
-                            ? isHeadMonitorView
-                              ? "Belum ada area tim yang perlu ditekan sekarang"
-                              : "Tidak ada follow-up sales yang perlu ditekan sekarang"
-                            : "Tidak ada sinyal operasional yang perlu ditangani sekarang"}
-                        </h3>
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#e3c990]">
-                          {isOversightAlertView
-                            ? isHeadMonitorView
-                              ? "Kalau area ini kosong, berarti belum ada tim yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead tim, monitor tim, atau histori alert yang sudah selesai."
-                              : "Kalau area ini kosong, berarti belum ada sales yang sedang bocor di follow-up. Langkah berikutnya biasanya cek lead tim, monitor tim, atau histori alert follow-up yang sudah selesai."
-                            : `Fokus halaman ini adalah alert aktif. Karena sekarang kosong, lanjutkan kerja dari ${
-                                canAccessQueue
-                                  ? "Tindak Lanjut, Chat Masuk, atau Lead"
-                                  : isHeadMonitorView
-                                    ? "Monitor Tim, Lead Tim, atau Arahan Tim"
-                                    : "Monitor Tim atau Review Sales"
-                              }.`}
-                          {scopedCounts.resolved > 0
-                            ? ` Ada ${scopedCounts.resolved} alert resolved yang bisa dibuka kalau kamu butuh melihat histori.`
-                            : ""}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setStatusFilter("resolved");
-                            setNotificationPage(1);
-                          }}
-                          className="clara-button clara-button-secondary"
-                        >
-                          Lihat Histori Alert
-                        </button>
-                        <Link
-                          href={
-                            canAccessQueue
-                              ? "/dashboard/follow-up"
-                              : isHeadMonitorView
-                                ? "/dashboard/manager-insights"
-                                : "/dashboard/manager-insights"
-                          }
-                          className="clara-button clara-button-primary"
-                        >
-                          {canAccessQueue
-                            ? "Buka Tindak Lanjut"
-                            : isHeadMonitorView
-                              ? "Buka Monitor Tim"
-                              : "Buka Monitor Tim"}
-                        </Link>
-                      </div>
-                    </div>
-                    <div className="mt-5 grid gap-4 md:grid-cols-3">
-                        <MetricCard
-                        label={
-                          isHeadMonitorView
-                            ? "Butuh keputusan"
-                            : isOversightAlertView
-                              ? "Perlu Follow-up"
-                              : "Active"
-                        }
-                        value={String(scopedCounts.active)}
-                      />
-                      <MetricCard
-                        label={
-                          isHeadMonitorView
-                            ? "Sudah ditutup"
-                            : isOversightAlertView
-                              ? "Selesai"
-                              : "Resolved"
-                        }
-                        value={String(scopedCounts.resolved)}
-                      />
-                      <MetricCard
-                        label={isHeadMonitorView ? "Data terakhir" : "Generated"}
-                        value={formatDateTime(notifications.generated_at)}
-                      />
-                    </div>
-                  </section>
-                )}
-
-                <section
-                  data-onboarding-id="head-alerts-filters"
-                  className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-5 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
+            <section
+              data-onboarding-id="head-alerts-filters"
+              aria-label="Saring alert"
+              className="clara-card space-y-4 p-4 sm:p-5"
+            >
+              <div data-onboarding-id="head-alerts-metrics" role="group" aria-label="Status alert" className="flex flex-wrap gap-2">
+                {STATUS_CHIPS.map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    aria-pressed={statusFilter === status}
+                    onClick={() => {
+                      setStatusFilter(status);
+                      setVisible(VISIBLE_STEP);
+                    }}
+                    className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
+                      statusFilter === status
+                        ? "border-clara-gold bg-clara-gold text-clara-deep"
+                        : "border-clara-line bg-clara-sunken text-clara-ink-2 hover:border-clara-gold hover:text-clara-ink"
+                    }`}
+                  >
+                    {CHIP_LABELS[status]} ({status === "open" ? (counts.active ?? 0) + (counts.acknowledged ?? 0) : (counts[status] ?? 0)})
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  aria-pressed={statusFilter === "all"}
+                  onClick={() => {
+                    setStatusFilter("all");
+                    setVisible(VISIBLE_STEP);
+                  }}
+                  className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
+                    statusFilter === "all"
+                      ? "border-clara-gold bg-clara-gold text-clara-deep"
+                      : "border-clara-line bg-clara-sunken text-clara-ink-2 hover:border-clara-gold hover:text-clara-ink"
+                  }`}
                 >
-                  <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                      <p className="text-xs font-semibold text-[#f0cb73]">
-                        {isHeadMonitorView ? "Saring radar head" : "Saring alert"}
-                      </p>
-                      <h3 className="mt-1 text-lg font-semibold text-[#fff0c9]">
-                        {isHeadMonitorView
-                          ? "Tampilkan hanya alert yang memang perlu dibaca Head dulu"
-                          : "Tampilkan hanya alert yang memang ingin Anda baca dulu"}
-                      </h3>
-                    </div>
-                    <p className="text-sm text-[#d8bc84]">{filterSummaryText}</p>
-                  </div>
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                      <span>Filter status</span>
-                      <select
-                        value={statusFilter}
-                        onChange={(event) => {
-                          setStatusFilter(event.target.value);
-                          setNotificationPage(1);
-                        }}
-                        className="clara-select"
-                      >
-                        <option value="all">Semua status</option>
-                        <option value="active">Active</option>
-                        <option value="acknowledged">Acknowledged</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="ignored">Ignored</option>
-                      </select>
-                    </label>
+                  Semua ({scoped.length})
+                </button>
+              </div>
 
-                    <label className="space-y-2 text-sm font-medium text-[#e3c990]">
-                      <span>Filter severity</span>
-                      <select
-                        value={severityFilter}
-                        onChange={(event) => {
-                          setSeverityFilter(event.target.value);
-                          setNotificationPage(1);
-                        }}
-                        className="clara-select"
-                      >
-                        <option value="all">Semua severity</option>
-                        <option value="critical">Critical</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                      </select>
-                    </label>
+              <div className="max-w-xs">
+                <label htmlFor="alert-severity" className="clara-label">
+                  Tingkat kepentingan
+                </label>
+                <select
+                  id="alert-severity"
+                  value={severityFilter}
+                  onChange={(event) => {
+                    setSeverityFilter(event.target.value);
+                    setVisible(VISIBLE_STEP);
+                  }}
+                  className="clara-select mt-2 w-full"
+                >
+                  <option value="all">Semua</option>
+                  <option value="critical">Kritis</option>
+                  <option value="high">Penting</option>
+                  <option value="medium">Perlu dicek</option>
+                  <option value="low">Info</option>
+                </select>
+              </div>
 
-                    <div className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(29,21,15,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-4 xl:col-span-2">
-                      <p className="text-sm text-[#d8bc84]">{filterSummaryText}</p>
-                      <p className="mt-2 text-sm text-[#d8bc84]">
-                        Halaman {effectiveNotificationPage} dari {totalNotificationPages}
-                        {isHeadMonitorView
-                          ? " • pakai status aktif kalau mau fokus ke keputusan hari ini"
-                          : ""}
-                      </p>
-                    </div>
-                  </div>
-                </section>
+              <details className="group">
+                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-clara-gold">
+                  Tambah catatan penyelesaian (opsional)
+                </summary>
+                <label htmlFor={noteId} className="clara-label mt-2 block">
+                  Catatan ini ikut tersimpan saat kamu menekan Tandai selesai atau Abaikan
+                </label>
+                <textarea
+                  id={noteId}
+                  value={resolutionNote}
+                  onChange={(event) => setResolutionNote(event.target.value)}
+                  rows={2}
+                  className="clara-textarea mt-2 w-full"
+                  placeholder="Contoh: sudah dibicarakan dengan manager"
+                />
+              </details>
 
-                <section className="space-y-4">
-                  {filteredNotifications.length === 0 ? (
-                    <div className="clara-empty-state border-dashed p-8 text-center text-sm text-[#d6bb84]">
-                      Tidak ada alert yang cocok dengan filter saat ini. Coba ubah status atau severity untuk melihat histori alert lain.
-                    </div>
-                  ) : isOversightAlertView ? (
-                    groupedNotifications.map((group, index) => (
-                      <section
-                        key={group.ownerName}
-                        data-onboarding-id={
-                          index === 0 ? "head-alerts-list" : undefined
-                        }
-                        className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(27,20,14,0.96)_0%,rgba(16,12,9,0.96)_100%)] p-5 shadow-[0_12px_30px_rgba(0,0,0,0.18)]"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f0cb73]/12 pb-4">
-                          <div>
-                            <p className="text-xs font-semibold text-[#f0cb73]">
-                              {isHeadMonitorView ? "PIC sales" : "Sales Owner"}
-                            </p>
-                            <h2 className="mt-2 text-lg font-semibold text-[#fff0c9]">
-                              {group.ownerName}
-                            </h2>
+              <p role="status" aria-live="polite" className="text-sm clara-text-secondary">
+                {filtered.length} alert
+              </p>
+            </section>
+
+            {filtered.length === 0 ? (
+              <EmptyState
+                title={scoped.length === 0 ? "Belum ada alert" : "Tidak ada alert di kelompok ini"}
+                description={
+                  scoped.length === 0
+                    ? "Alert muncul otomatis saat ada follow-up terlambat atau area tim yang bermasalah."
+                    : "Pilih kelompok lain atau ubah tingkat kepentingan."
+                }
+              />
+            ) : (
+              <ul data-onboarding-id="head-alerts-list" className="space-y-3">
+                {shown.map((item) => {
+                  const href = resolveNotificationTargetHref(item.target_href, currentUser?.role);
+                  const busy = updatingId === item.id;
+                  const owner = item.sales_owner_name?.trim() || item.team_name?.trim();
+                  // Alert turunan (mis. antrean persetujuan) dihitung ulang dari data terbaru dan
+                  // hilang sendiri setelah masalahnya ditangani, jadi tidak bisa ditutup manual.
+                  const isDerived = item.source_type !== "operational_alert";
+
+                  return (
+                    <li key={item.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="break-words text-base font-semibold clara-text-primary">
+                              {plainJargon(item.title)}
+                            </h3>
+                            <ValueTag table={ALERT_SEVERITY} value={item.severity} />
+                            <ValueTag table={ALERT_STATUS} value={item.status} />
+                            {item.age_bucket !== "fresh" ? <ValueTag table={AGE} value={item.age_bucket} /> : null}
+                            {item.escalation_level !== "none" ? <Tag tone="danger">Sudah dinaikkan</Tag> : null}
                           </div>
-                          <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-3 py-1 text-xs font-semibold text-[#f0cb73]">
-                            {group.items.length} alert
-                          </span>
+                          <p className="mt-1 text-xs clara-text-muted">
+                            {owner ? `${owner} · ` : ""}
+                            {formatRelativeTime(item.triggered_at ?? item.created_at)}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 clara-text-secondary">{plainJargon(item.body)}</p>
+                          {isDerived && (item.status === "active" || item.status === "acknowledged") ? (
+                            <p className="mt-2 text-xs clara-text-muted">Alert ini hilang sendiri setelah kamu menanganinya.</p>
+                          ) : null}
+                          {item.resolution_note ? (
+                            <p className="mt-2 text-sm clara-text-secondary">
+                              <span className="font-semibold clara-text-primary">Catatan: </span>
+                              {item.resolution_note}
+                            </p>
+                          ) : null}
                         </div>
 
-                        <div className="mt-4 space-y-4">
-                          {group.items.map((item) => (
-                            <article
-                              key={item.id}
-                              className="rounded-2xl border border-[#f0cb73]/16 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-5"
+                        <div className="flex shrink-0 flex-wrap gap-2 lg:w-56 lg:flex-col">
+                          {href ? (
+                            <Link href={href} className="clara-button clara-button-primary">
+                              {isOversightView ? "Buka konteks" : "Buka follow-up"}
+                            </Link>
+                          ) : null}
+                          {item.status === "active" && !isDerived ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void runAction(item, "acknowledge", false, "Alert belum bisa ditandai dibaca. Coba lagi.")}
+                              className="clara-button clara-button-secondary"
                             >
-                              <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="text-base font-semibold text-[#fff0c9]">
-                                      {item.lead_name ?? item.title}
-                                    </h3>
-                                    <span
-                                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getSeverityClass(
-                                        item.severity
-                                      )}`}
-                                    >
-                                      {item.severity.toUpperCase()}
-                                    </span>
-                                    <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                                      {formatStatusLabel(item.status)}
-                                    </span>
-                                    <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                                      Age: {formatStatusLabel(item.age_bucket)}
-                                    </span>
-                                  </div>
-                                  <p className="mt-3 text-sm leading-7 text-[#fff0c9]">
-                                    {item.title}
-                                  </p>
-                                  <p className="mt-2 text-sm leading-7 text-[#d6bb84]">
-                                    {item.body}
-                                  </p>
-                                  <p className="mt-3 text-xs text-[#b89a62]">
-                                    Dibuat: {formatDateTime(item.created_at)} | Update:{" "}
-                                    {formatDateTime(item.updated_at)}
-                                  </p>
-                                  {item.resolution_note ? (
-                                    <p className="mt-3 rounded-xl border border-[#f0cb73]/16 bg-[#1d150d] p-3 text-sm text-[#f0cb73]">
-                                      Resolution note: {item.resolution_note}
-                                    </p>
-                                  ) : null}
-                                </div>
-
-                                <div className="flex w-full flex-col gap-2 xl:w-64 xl:flex-none">
-                                  {resolveNotificationTargetHref(item.target_href, currentUser?.role) ? (
-                                    <Link
-                                      href={
-                                        resolveNotificationTargetHref(
-                                          item.target_href,
-                                          currentUser?.role,
-                                        ) as string
-                                      }
-                                      className="clara-button clara-button-primary"
-                                  >
-                                      {isHeadMonitorView ? "Buka konteks" : "Buka Follow-up"}
-                                    </Link>
-                                  ) : null}
-                                  {item.status === "active" ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        disabled={updatingId === item.id}
-                                        onClick={() => {
-                                          void handleAcknowledge(item);
-                                        }}
-                                        className="clara-button clara-button-secondary"
-                                      >
-                                        {updatingId === item.id ? "Memproses..." : isHeadMonitorView ? "Tandai dibaca" : "Sudah Dicek"}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={updatingId === item.id}
-                                        onClick={() => {
-                                          void handleResolve(item);
-                                        }}
-                                        className="clara-button clara-button-primary"
-                                      >
-                                        {isHeadMonitorView ? "Tandai selesai" : "Tandai Selesai"}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={updatingId === item.id}
-                                        onClick={() => {
-                                          void handleIgnore(item);
-                                        }}
-                                        className="clara-button clara-button-secondary"
-                                      >
-                                        Abaikan
-                                      </button>
-                                    </>
-                                  ) : null}
-                                  {item.status === "acknowledged" ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        disabled={updatingId === item.id}
-                                        onClick={() => {
-                                          void handleResolve(item);
-                                        }}
-                                        className="clara-button clara-button-primary"
-                                      >
-                                        Tandai Selesai
-                                      </button>
-                                      <button
-                                        type="button"
-                                        disabled={updatingId === item.id}
-                                        onClick={() => {
-                                          void handleIgnore(item);
-                                        }}
-                                        className="clara-button clara-button-secondary"
-                                      >
-                                        Abaikan
-                                      </button>
-                                    </>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </article>
-                          ))}
-                        </div>
-                      </section>
-                    ))
-                  ) : (
-                    paginatedNotifications.map((item) => (
-                      <article
-                        key={item.id}
-                        className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.96)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]"
-                      >
-                        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h2 className="text-lg font-semibold text-[#fff0c9]">
-                                {item.title}
-                              </h2>
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getSeverityClass(
-                                  item.severity
-                                )}`}
-                              >
-                                {item.severity.toUpperCase()}
-                              </span>
-                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                                {formatStatusLabel(item.status)}
-                              </span>
-                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#241a10] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                                Delivery: {formatStatusLabel(item.delivery_status)}
-                              </span>
-                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#2b2013] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                                Escalation: {formatStatusLabel(item.escalation_level)}
-                              </span>
-                              <span className="rounded-full border border-[#f0cb73]/18 bg-[#1f170f] px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                                Age: {formatStatusLabel(item.age_bucket)}
-                              </span>
-                            </div>
-                            <p className="mt-3 text-sm leading-7 text-[#d6bb84]">
-                              {item.body}
-                            </p>
-                            <p className="mt-3 text-xs text-[#b89a62]">
-                              Dibuat: {formatDateTime(item.created_at)} | Update:{" "}
-                              {formatDateTime(item.updated_at)}
-                            </p>
-                            {item.resolution_note ? (
-                              <p className="mt-3 rounded-xl border border-[#f0cb73]/16 bg-[#1d150d] p-3 text-sm text-[#f0cb73]">
-                                Resolution note: {item.resolution_note}
-                              </p>
-                            ) : null}
-                          </div>
-
-                          <div className="flex w-full flex-col gap-2 xl:w-64 xl:flex-none">
-                            {resolveNotificationTargetHref(item.target_href, currentUser?.role) ? (
-                              <Link
-                                href={
-                                  resolveNotificationTargetHref(
-                                    item.target_href,
-                                    currentUser?.role,
-                                  ) as string
-                                }
-                                className="clara-button clara-button-primary"
-                              >
-                                Buka Tindakan
-                              </Link>
-                            ) : null}
-                            {item.status === "active" ? (
-                              <>
+                              {busy ? "Memproses..." : "Tandai sudah dibaca"}
+                            </button>
+                          ) : null}
+                          {item.status === "active" || item.status === "acknowledged" ? (
+                            <>
+                              {!isDerived ? (
                                 <button
                                   type="button"
-                                  disabled={updatingId === item.id}
-                                  onClick={() => {
-                                    void handleAcknowledge(item);
-                                  }}
+                                  disabled={busy}
+                                  onClick={() => void runAction(item, "resolve", true, "Alert belum bisa ditandai selesai. Coba lagi.")}
                                   className="clara-button clara-button-secondary"
                                 >
-                                  {updatingId === item.id ? "Memproses..." : "Acknowledge"}
+                                  Tandai selesai
                                 </button>
-                                <button
-                                  type="button"
-                                  disabled={updatingId === item.id}
-                                  onClick={() => {
-                                    void handleResolve(item);
-                                  }}
-                                  className="clara-button clara-button-primary"
-                                >
-                                  Resolve
-                                </button>
-                                {["head", "superadmin"].includes(currentUser?.role ?? "") ? (
-                                  <button
-                                    type="button"
-                                    disabled={updatingId === item.id}
-                                    onClick={() => {
-                                      void handleEscalate(item);
-                                    }}
-                                    className="clara-button clara-button-ghost"
-                                  >
-                                    Escalate
-                                  </button>
-                                ) : null}
-                              </>
-                            ) : null}
-                            {item.status === "resolved" ? (
+                              ) : null}
                               <button
                                 type="button"
-                                disabled={updatingId === item.id}
-                                onClick={() => {
-                                  void handleReopen(item);
-                                }}
-                                className="clara-button clara-button-secondary"
+                                disabled={busy}
+                                onClick={() => void runAction(item, "ignore", true, "Alert belum bisa diabaikan. Coba lagi.")}
+                                className="clara-button clara-button-ghost"
                               >
-                                Reopen
+                                Abaikan
                               </button>
-                            ) : null}
-                          </div>
+                              {canEscalate && item.escalation_level === "none" ? (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => void runAction(item, "escalate", false, "Alert belum bisa dinaikkan. Coba lagi.")}
+                                  className="clara-button clara-button-ghost"
+                                >
+                                  Naikkan ke atasan
+                                </button>
+                              ) : null}
+                            </>
+                          ) : null}
+                          {(item.status === "resolved" || item.status === "ignored") && item.source_type !== "operational_alert" ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void runAction(item, "reopen", false, "Alert belum bisa dibuka lagi. Coba lagi.")}
+                              className="clara-button clara-button-secondary"
+                            >
+                              Buka lagi
+                            </button>
+                          ) : null}
                         </div>
-                      </article>
-                    ))
-                  )}
-                </section>
-
-                {filteredNotifications.length > pageSize ? (
-                  <section className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(16,12,9,0.98)_100%)] p-4 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-[#d8bc84]">Navigasi daftar alert</p>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setNotificationPage((current) => Math.max(1, current - 1))
-                          }
-                          disabled={effectiveNotificationPage === 1}
-                          className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Sebelumnya
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setNotificationPage((current) =>
-                              Math.min(totalNotificationPages, current + 1),
-                            )
-                          }
-                          disabled={effectiveNotificationPage === totalNotificationPages}
-                          className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Berikutnya
-                        </button>
                       </div>
-                    </div>
-                  </section>
-                ) : null}
-              </>
-            ) : (
-              <section className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_45%,rgba(53,39,17,0.94)_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.22)]">
-                <p className="text-xs font-semibold text-[#f0cb73]">
-                  Lanjutkan Dari Sini
-                </p>
-                <p className="mt-3 max-w-3xl text-sm leading-6 text-[#e3c990]">
-                  {isHeadMonitorView
-                    ? "Saat Alert Tim kosong, itu artinya follow-up tim sedang relatif aman. Untuk role Head, langkah berikutnya biasanya lanjut ke Monitor Tim, Lead Tim, lalu cek pipeline yang masih tertahan."
-                    : "Saat Alert kosong, itu artinya tidak ada sinyal operasional yang sedang meledak. Untuk role manager, langkah berikutnya biasanya memantau tim, review balasan sales, atau cek lead yang masih tertahan."}
-                </p>
-                <div className="mt-5 flex flex-wrap gap-3">
-                  {isHeadMonitorView ? (
-                    <Link
-                      href="/dashboard/manager-insights"
-                      className="clara-button clara-button-primary"
-                    >
-                      Buka Monitor Tim
-                    </Link>
-                  ) : (
-                    <Link
-                      href="/dashboard/manager-insights"
-                      className="clara-button clara-button-primary"
-                    >
-                      Buka Monitor Tim
-                    </Link>
-                  )}
-                  <Link
-                    href="/dashboard/approvals"
-                    className="clara-button clara-button-secondary"
-                  >
-                    {isHeadMonitorView ? "Buka Arahan Tim" : "Buka Review Sales"}
-                  </Link>
-                  <Link
-                    href="/dashboard/crm"
-                    className="clara-button clara-button-secondary"
-                  >
-                    Buka Lead Tim
-                  </Link>
-                  {isHeadMonitorView ? (
-                    null
-                  ) : null}
-                </div>
-              </section>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
+
+            {filtered.length > visible ? (
+              <button type="button" onClick={() => setVisible((count) => count + VISIBLE_STEP)} className="clara-button clara-button-ghost">
+                Tampilkan {Math.min(filtered.length - visible, VISIBLE_STEP)} alert lagi ({filtered.length - visible} tersisa)
+              </button>
+            ) : null}
           </>
-        )}
+        ) : null}
       </div>
     </WorkspaceShell>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <article className="rounded-3xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,#f7dfa2_0%,#be8d2f_100%)] p-6 shadow-[0_12px_34px_rgba(0,0,0,0.2)]">
-      <p className="text-xs font-semibold text-[#140f08]">
-        {label}
-      </p>
-      <p className="mt-3 text-3xl font-bold text-[#140f08]">{value}</p>
-    </article>
   );
 }

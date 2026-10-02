@@ -492,6 +492,8 @@ export const ALERT_SEVERITY: VocabTable = {
   medium: { label: "Perlu dicek", tone: "warn" },
   low: { label: "Info", tone: "neutral" },
   critical: { label: "Kritis", tone: "danger" },
+  warning: { label: "Perlu dicek", tone: "warn" },
+  info: { label: "Info", tone: "neutral" },
 };
 
 export const PERFORMANCE_SOURCE: VocabTable = {
@@ -514,3 +516,10 @@ export function describeDelta(value: number, lowerIsBetter = false): { text: str
     tone: better ? "good" : "warn",
   };
 }
+
+export const ALERT_STATUS: VocabTable = {
+  active: { label: "Baru", tone: "warn", hint: "Belum ada yang menanganinya." },
+  acknowledged: { label: "Sudah dibaca", tone: "info" },
+  resolved: { label: "Selesai", tone: "good" },
+  ignored: { label: "Diabaikan", tone: "neutral" },
+};
