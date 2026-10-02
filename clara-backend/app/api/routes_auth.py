@@ -12,7 +12,6 @@ from app.schemas.auth_schema import (
     ChangePasswordRequest,
     CreateUserRequest,
     CurrentUserResponse,
-    LoginOptionsResponse,
     LoginRequest,
     ResetUserPasswordRequest,
     SessionResponse,
@@ -29,7 +28,6 @@ from app.services.auth_service import (
     create_user,
     delete_user,
     get_user_by_id,
-    list_login_options,
     list_users,
     set_user_active_status,
     set_user_password,
@@ -146,13 +144,6 @@ def login(
     set_auth_cookies(response=response, access_token=access_token)
 
     return session_response
-
-
-@router.get("/login-options", response_model=LoginOptionsResponse)
-def get_login_options(
-    db: Session = Depends(get_db),
-):
-    return LoginOptionsResponse(items=list_login_options(db=db))
 
 
 @router.get("/me", response_model=CurrentUserResponse)

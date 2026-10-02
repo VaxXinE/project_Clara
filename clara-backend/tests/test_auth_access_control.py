@@ -100,24 +100,52 @@ def test_inactive_user_cannot_login(
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Akun user ini sedang nonaktif."
+    assert response.json()["detail"] == "Akun ini sedang nonaktif. Hubungi admin tim kamu."
 
 
-def test_login_options_lists_active_users_grouped_by_role(
+def test_login_options_endpoint_no_longer_exposes_staff_emails(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    response = client.get("/auth/login-options")
+
+    assert response.status_code == 404
+    assert seeded_data["owner"].email not in response.text
+
+
+def test_login_failure_does_not_reveal_whether_the_email_exists(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    owner = seeded_data["owner"]
+
+    unknown = client.post(
+        "/auth/login",
+        json={"email": "nobody-here@example.com", "password": "Whatever123!"},
+    )
+    wrong_password = client.post(
+        "/auth/login",
+        json={"email": owner.email, "password": "WrongPass123!"},
+    )
+
+    assert unknown.status_code == wrong_password.status_code == 401
+    assert unknown.json()["detail"] == wrong_password.json()["detail"]
+    assert unknown.json()["detail"] == "Email atau password salah."
+
+
+def test_inactive_account_status_is_hidden_until_password_is_correct(
     client: TestClient,
     seeded_data: dict[str, object],
 ) -> None:
     inactive_user = seeded_data["inactive_user"]
 
-    response = client.get("/auth/login-options")
+    wrong_password = client.post(
+        "/auth/login",
+        json={"email": inactive_user.email, "password": "WrongPass123!"},
+    )
 
-    assert response.status_code == 200, response.text
-    payload = response.json()
-    assert payload["items"]
-    assert all(item["email"] != inactive_user.email for item in payload["items"])
-    assert all(item["role"] != "superadmin" for item in payload["items"])
-    assert payload["items"][0]["role"] == "head"
-    assert any(item["role"] == "sales" for item in payload["items"])
+    assert wrong_password.status_code == 401
+    assert wrong_password.json()["detail"] == "Email atau password salah."
 
 
 def test_head_cannot_reset_password_via_access_control_api(

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from uuid import UUID
 
 import jwt
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
 from app.models.user import User
-from app.schemas.auth_schema import CreateUserRequest, LoginOptionItem, UpdateUserRequest
+from app.schemas.auth_schema import CreateUserRequest, UpdateUserRequest
 from app.models.organization import Organization
 from app.models.sales_team import SalesTeam
 from app.services.role_service import normalize_role
@@ -23,12 +24,11 @@ class AuthError(RuntimeError):
 
 
 ALLOWED_ROLES = {"superadmin", "head", "manager", "sales"}
-LOGIN_ROLE_ORDER = {
-    "superadmin": 0,
-    "head": 1,
-    "manager": 2,
-    "sales": 3,
-}
+
+# Satu pesan yang sama untuk email tidak terdaftar dan password salah, supaya halaman login
+# tidak bisa dipakai untuk menebak email mana yang terdaftar.
+GENERIC_LOGIN_ERROR = "Email atau password salah."
+INACTIVE_ACCOUNT_ERROR = "Akun ini sedang nonaktif. Hubungi admin tim kamu."
 
 
 def hash_password(password: str) -> str:
@@ -102,17 +102,25 @@ def decode_access_token(token: str) -> dict:
         raise AuthError("Invalid token.") from exc
 
 
+@lru_cache(maxsize=1)
+def _timing_equalizer_hash() -> str:
+    return hash_password("clara-login-timing-equalizer")
+
+
 def authenticate_user(db: Session, email: str, password: str) -> User:
     user = get_user_by_email(db=db, email=email)
 
     if user is None:
-        raise AuthError("User dengan email ini belum terdaftar.")
-
-    if not user.is_active:
-        raise AuthError("Akun user ini sedang nonaktif.")
+        # Tetap menghitung hash supaya waktu respons tidak membedakan email yang tidak ada.
+        verify_password(password, _timing_equalizer_hash())
+        raise AuthError(GENERIC_LOGIN_ERROR)
 
     if not verify_password(password, user.hashed_password):
-        raise AuthError("Password yang Anda masukkan salah.")
+        raise AuthError(GENERIC_LOGIN_ERROR)
+
+    # Status nonaktif baru diberitahukan setelah password terbukti benar.
+    if not user.is_active:
+        raise AuthError(INACTIVE_ACCOUNT_ERROR)
 
     return user
 
@@ -173,36 +181,6 @@ def list_users(db: Session) -> list[User]:
             )
             .order_by(User.created_at.desc())
         ).all()
-    )
-
-
-def list_login_options(db: Session) -> list[LoginOptionItem]:
-    users = list(
-        db.scalars(
-            select(User)
-            .where(User.is_active.is_(True))
-            .order_by(User.role.asc(), User.name.asc(), User.email.asc())
-        ).all()
-    )
-
-    options = [
-        LoginOptionItem(
-            role=normalize_role(user.role),
-            name=user.name,
-            email=user.email,
-        )
-        for user in users
-        if normalize_role(user.role) in ALLOWED_ROLES
-        and normalize_role(user.role) != "superadmin"
-    ]
-
-    return sorted(
-        options,
-        key=lambda item: (
-            LOGIN_ROLE_ORDER.get(item.role, 999),
-            item.name.lower(),
-            item.email.lower(),
-        ),
     )
 
 
