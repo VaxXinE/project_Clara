@@ -45,8 +45,12 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clara_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-clara_db}
       REDIS_URL: redis://redis:6379/0
       RATE_LIMIT_BACKEND: redis
+      # Package extension yang diupload superadmin. Harus di volume, kalau tidak hilang tiap container dibuat ulang.
+      EXTENSION_DISTRIBUTION_DIR: /app/clara-backend/storage/extension-builds
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONUNBUFFERED: "1"
+    volumes:
+      - clara_extension_builds:/app/clara-backend/storage/extension-builds
     command: ["/bin/sh", "/app/infra/docker/backend-entrypoint.sh"]
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
@@ -93,3 +97,4 @@ services:
 volumes:
   clara_postgres_data:
   clara_redis_data:
+  clara_extension_builds:
