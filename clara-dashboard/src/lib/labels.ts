@@ -15,6 +15,8 @@ export const NAV_GROUP_NAMES = {
   team: "Pantau Tim",
   knowledge: "Pengetahuan & Pasar",
   settings: "Pengaturan Sistem",
+  control: "Kontrol Sistem",
+  operations: "Pantau Operasional",
   account: "Akun",
   guide: "Panduan",
 } as const;
@@ -39,6 +41,7 @@ export const PAGE_NAMES = {
   channels: "Channel",
   users: "Pengguna & Akses",
   audit: "Audit & Status Sistem",
+  extension: "Ekstensi Chrome",
   persona: "Persona AI",
   productFacts: "Fakta Produk",
   supportKnowledge: "Knowledge Support",

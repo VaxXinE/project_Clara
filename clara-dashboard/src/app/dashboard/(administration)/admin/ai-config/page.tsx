@@ -339,8 +339,6 @@ export default function AiPersonaConfigPage() {
       currentUser={currentUser}
       title={`${PAGE_NAMES.persona} Clara`}
       description="Atur tugas, batasan, alur, dan gaya bicara Clara saat membalas customer. Perubahan langsung dipakai semua pengguna."
-      backHref="/knowledge"
-      backLabel="Kembali ke Knowledge Base"
       actions={
         <Link className="clara-button clara-button-ghost" href="/knowledge">
           Buka Knowledge Base

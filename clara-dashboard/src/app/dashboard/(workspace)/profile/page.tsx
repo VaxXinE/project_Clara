@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 
 import { ErrorState, LoadingState } from "@/components/dashboard/StateViews";
@@ -40,11 +41,6 @@ export default function ProfilePage() {
   const [profileSuccessMessage, setProfileSuccessMessage] = useState("");
   const [passwordErrorMessage, setPasswordErrorMessage] = useState("");
   const [passwordSuccessMessage, setPasswordSuccessMessage] = useState("");
-  const [extensionErrorMessage, setExtensionErrorMessage] = useState("");
-  const [extensionSuccessMessage, setExtensionSuccessMessage] = useState("");
-  const [isUploadingExtension, setIsUploadingExtension] = useState(false);
-  const [extensionUploadVersion, setExtensionUploadVersion] = useState("");
-  const [extensionUploadFile, setExtensionUploadFile] = useState<File | null>(null);
 
   async function loadExtensionBuilds() {
     setExtensionBuild(await apiFetch<ExtensionBuildItem>("/dashboard/extension-builds"));
@@ -127,41 +123,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleUploadExtensionBuild(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setExtensionErrorMessage("");
-    setExtensionSuccessMessage("");
-
-    if (!extensionUploadFile) {
-      setExtensionErrorMessage("Pilih berkas ekstensi (.zip atau .crx) dulu.");
-      return;
-    }
-
-    if (extensionUploadVersion.trim().length < 2) {
-      setExtensionErrorMessage("Isi nomor versi dulu.");
-      return;
-    }
-
-    setIsUploadingExtension(true);
-
-    try {
-      const formData = new FormData();
-      formData.set("version", extensionUploadVersion.trim());
-      formData.set("file", extensionUploadFile);
-
-      await apiFetch<ExtensionBuildItem>("/dashboard/extension-builds", { method: "POST", body: formData });
-
-      await loadExtensionBuilds();
-      setExtensionUploadFile(null);
-      setExtensionUploadVersion("");
-      setExtensionSuccessMessage("Ekstensi baru sudah diunggah dan siap diunduh semua pengguna.");
-    } catch (error) {
-      setExtensionErrorMessage(error instanceof Error ? error.message : "Ekstensi belum bisa diunggah. Coba lagi.");
-    } finally {
-      setIsUploadingExtension(false);
-    }
-  }
-
   const passwordStrength = getPasswordStrength(passwordForm.new_password);
   const canManageExtensionBuilds = canAccessAdminPages(currentUser?.role);
 
@@ -194,16 +155,6 @@ export default function ProfilePage() {
               <p className="text-sm leading-6 clara-text-secondary">
                 Ekstensi membaca chat yang sedang kamu buka di halaman chat (misalnya WhatsApp Web) lalu mengirimnya ke Clara. Satu berkas yang sama dipakai semua pengguna.
               </p>
-              {extensionErrorMessage ? (
-                <div role="alert" className="clara-alert clara-alert-danger">
-                  {extensionErrorMessage}
-                </div>
-              ) : null}
-              {extensionSuccessMessage ? (
-                <div role="status" className="clara-alert clara-alert-success">
-                  {extensionSuccessMessage}
-                </div>
-              ) : null}
               {extensionBuild?.available ? (
                 <>
                   <p className="text-xs clara-text-muted">
@@ -211,13 +162,28 @@ export default function ProfilePage() {
                     {extensionBuild.uploaded_at ? ` · diunggah ${formatDateTime(extensionBuild.uploaded_at)}` : ""}
                     {extensionBuild.uploaded_by_email ? ` oleh ${extensionBuild.uploaded_by_email}` : ""}
                   </p>
-                  <a href="/api/dashboard/extension-builds/download" className="clara-button clara-button-primary">
-                    Unduh ekstensi
-                  </a>
+                  <div className="flex flex-wrap gap-2">
+                    <a href="/api/dashboard/extension-builds/download" className="clara-button clara-button-primary">
+                      Unduh ekstensi
+                    </a>
+                    {canManageExtensionBuilds ? (
+                      <Link href="/admin/extension" className="clara-button clara-button-ghost">
+                        Kelola ekstensi
+                      </Link>
+                    ) : null}
+                  </div>
                 </>
               ) : (
                 <p className="text-sm clara-text-secondary">
                   Superadmin belum mengunggah ekstensi. Setelah diunggah, tombol unduh muncul di sini.
+                  {canManageExtensionBuilds ? (
+                    <>
+                      {" "}
+                      <Link href="/admin/extension" className="font-semibold text-clara-gold hover:underline">
+                        Unggah sekarang
+                      </Link>
+                    </>
+                  ) : null}
                 </p>
               )}
             </section>
@@ -339,39 +305,6 @@ export default function ProfilePage() {
               </form>
             </section>
 
-            {canManageExtensionBuilds ? (
-              <details data-onboarding-id="profile-extension-upload" className="clara-card p-4 sm:p-5">
-                <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
-                  Unggah versi baru ekstensi (khusus admin)
-                </summary>
-                <form onSubmit={handleUploadExtensionBuild} className="mt-3 space-y-4">
-                  <p className="text-sm leading-6 clara-text-secondary">
-                    Unggah sekali untuk semua pengguna. Berkas lama langsung tergantikan.
-                  </p>
-                  <InputField
-                    label="Nomor versi"
-                    value={extensionUploadVersion}
-                    onChange={setExtensionUploadVersion}
-                    placeholder="Contoh: v0.1.2"
-                  />
-                  <div>
-                    <label htmlFor="extension-file" className="clara-label">
-                      Berkas ekstensi (.zip atau .crx)
-                    </label>
-                    <input
-                      id="extension-file"
-                      accept=".zip,.crx"
-                      onChange={(event) => setExtensionUploadFile(event.target.files?.[0] ?? null)}
-                      type="file"
-                      className="clara-file-input mt-2"
-                    />
-                  </div>
-                  <button type="submit" disabled={isUploadingExtension} className="clara-button clara-button-primary">
-                    {isUploadingExtension ? "Mengunggah..." : "Unggah ekstensi"}
-                  </button>
-                </form>
-              </details>
-            ) : null}
           </>
         ) : null}
       </div>

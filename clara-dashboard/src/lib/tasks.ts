@@ -101,7 +101,12 @@ export const TASKS: TaskEntry[] = [
   {
     goal: "Cek log audit dan status sistem",
     href: "/admin/ops",
-    keywords: "audit log jejak status sistem ops build extension unduh",
+    keywords: "audit log jejak status sistem ops",
+  },
+  {
+    goal: "Unggah versi baru ekstensi Chrome",
+    href: "/admin/extension",
+    keywords: "ekstensi extension chrome unggah upload versi build zip unduh pasang update",
   },
   {
     goal: "Atur gaya dan aturan jawaban Clara",

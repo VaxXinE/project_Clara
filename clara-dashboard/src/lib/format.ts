@@ -262,3 +262,13 @@ export function formatDayLabel(value: string, now: Date = new Date()): string {
 export function formatRupiah(value: number | null | undefined): string {
   return `Rp ${(Number.isFinite(value) ? (value as number) : 0).toLocaleString("id-ID")}`;
 }
+
+export function formatFileSize(bytes: number | null | undefined): string {
+  if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes <= 0) {
+    return "-";
+  }
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(".", ",")} MB`;
+}

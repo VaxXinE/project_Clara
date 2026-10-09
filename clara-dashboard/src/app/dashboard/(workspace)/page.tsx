@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { HeadHome } from "@/components/dashboard/HeadHome";
 import { ManagerHome } from "@/components/dashboard/ManagerHome";
 import { SalesHome } from "@/components/dashboard/SalesHome";
+import { SuperadminHome } from "@/components/dashboard/SuperadminHome";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
@@ -14,6 +15,9 @@ import { plainJargon } from "@/lib/vocab";
 import { canAccessQueueAndActionCenter } from "@/lib/roles";
 import type {
   ChatReviewCenterResponse,
+  ExtensionBuildItem,
+  KnowledgeUpdateProposalItem,
+  OpsDatabaseOverview,
   OpsNotificationItem,
   OpsNotificationResponse,
   CurrentUser,
@@ -68,6 +72,11 @@ export default function DashboardHomePage() {
   const [reviewQueue, setReviewQueue] = useState<ChatReviewCenterResponse | null>(null);
   const [managerInsights, setManagerInsights] =
     useState<ManagerInsightsResponse | null>(null);
+  const [adminProposals, setAdminProposals] = useState<KnowledgeUpdateProposalItem[] | null>(null);
+  const [adminExtension, setAdminExtension] = useState<ExtensionBuildItem | null>(null);
+  const [adminOverview, setAdminOverview] = useState<OpsDatabaseOverview | null>(null);
+  const [adminUsers, setAdminUsers] = useState<CurrentUser[] | null>(null);
+  const [adminAlertCount, setAdminAlertCount] = useState<number | null>(null);
   const [hasLeadershipData, setHasLeadershipData] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -97,7 +106,27 @@ export default function DashboardHomePage() {
           }
         }
 
-        if (["superadmin", "head"].includes(me.role)) {
+        if (me.role === "superadmin") {
+          const [proposalResult, extensionResult, overviewResult, usersResult, alertResult] = await Promise.allSettled([
+            apiFetch<KnowledgeUpdateProposalItem[]>("/product-knowledge/proposals"),
+            apiFetch<ExtensionBuildItem>("/dashboard/extension-builds"),
+            apiFetch<OpsDatabaseOverview>("/dashboard/admin/ops-overview"),
+            apiFetch<CurrentUser[]>("/auth/users"),
+            apiFetch<OpsNotificationResponse>("/dashboard/notifications"),
+          ]);
+
+          if (proposalResult.status === "fulfilled") setAdminProposals(proposalResult.value);
+          if (extensionResult.status === "fulfilled") setAdminExtension(extensionResult.value);
+          if (overviewResult.status === "fulfilled") setAdminOverview(overviewResult.value);
+          if (usersResult.status === "fulfilled") setAdminUsers(usersResult.value);
+          if (alertResult.status === "fulfilled") {
+            setAdminAlertCount(
+              alertResult.value.items.filter((item) => Boolean(item.alert_type) && item.status === "active").length,
+            );
+          }
+        }
+
+        if (me.role === "head") {
           const [insightsResult, kpiResult] = await Promise.allSettled([
             apiFetch<MarketingInsightsPreview>(
               "/dashboard/marketing/insights-preview",
@@ -185,6 +214,7 @@ export default function DashboardHomePage() {
   const isSalesWorkspace = currentUser?.role === "sales";
   const isManagerWorkspace = currentUser?.role === "manager";
   const isHeadWorkspace = currentUser?.role === "head";
+  const isSuperadminWorkspace = currentUser?.role === "superadmin";
   const shouldRenderLeadershipWorkspace =
     !isLoading && (!errorMessage || hasLeadershipData);
   const pendingAiCount = Math.max(metrics.inboxCount - metrics.analyzedCount, 0);
@@ -319,7 +349,9 @@ export default function DashboardHomePage() {
       description={
         isSalesWorkspace
           ? "Ini yang perlu kamu kerjakan hari ini."
-          : (roleLabel?.summary ?? "Ringkasan kerja hari ini.")
+          : isSuperadminWorkspace
+            ? "Kondisi sistem dan hal yang menunggu keputusanmu."
+            : (roleLabel?.summary ?? "Ringkasan kerja hari ini.")
       }
     >
       <div className="space-y-6">
@@ -329,11 +361,6 @@ export default function DashboardHomePage() {
           </section>
         )}
 
-        {currentUser && !isSalesWorkspace && !isManagerWorkspace && !isHeadWorkspace && isLoading ? (
-          <div role="status" className="clara-empty-state text-sm text-clara-ink-2">
-            Memuat ringkasan...
-          </div>
-        ) : null}
 
         {isSalesWorkspace ? (
           <SalesHome
@@ -350,6 +377,15 @@ export default function DashboardHomePage() {
             insights={managerInsights}
             alerts={headAlerts}
             kpi={kpi}
+            isLoading={isLoading}
+          />
+        ) : isSuperadminWorkspace ? (
+          <SuperadminHome
+            proposals={adminProposals}
+            extension={adminExtension}
+            overview={adminOverview}
+            users={adminUsers}
+            activeAlertCount={adminAlertCount}
             isLoading={isLoading}
           />
         ) : !shouldRenderLeadershipWorkspace ? null : (

@@ -8,11 +8,12 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/Sta
 import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
-import { formatDateTime, formatRelativeTime } from "@/lib/format";
+import { AUDIT_FILTER_LABEL, auditKind, groupAuditLogs, type AuditFilter } from "@/lib/audit";
+import { formatRelativeTime } from "@/lib/format";
 import { PAGE_NAMES } from "@/lib/labels";
 import { canAccessAdminPages, getRoleDisplayLabel } from "@/lib/roles";
-import { CONVERSATION_STATUS, SNAPSHOT_SCOPE, TABLE_COUNT_LABEL, describeAuditAction } from "@/lib/vocab";
-import type { CurrentUser, OpsDatabaseOverview } from "@/types/dashboard";
+import { CONVERSATION_STATUS, SNAPSHOT_SCOPE, TABLE_COUNT_LABEL } from "@/lib/vocab";
+import type { CurrentUser, ExtensionBuildItem, OpsDatabaseOverview } from "@/types/dashboard";
 
 const LOG_STEP = 10;
 
@@ -23,6 +24,9 @@ export default function AdminOpsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [logVisible, setLogVisible] = useState(LOG_STEP);
+  const [logFilter, setLogFilter] = useState<AuditFilter>("all");
+  const [serviceStatus, setServiceStatus] = useState<"checking" | "ok" | "down">("checking");
+  const [extension, setExtension] = useState<ExtensionBuildItem | null>(null);
 
   async function loadOverview() {
     setErrorMessage("");
@@ -37,6 +41,15 @@ export default function AdminOpsPage() {
       }
 
       setOverview(await apiFetch<OpsDatabaseOverview>("/dashboard/admin/ops-overview"));
+
+      const [health, extensionBuild] = await Promise.allSettled([
+        apiFetch<{ status?: string }>("/health"),
+        apiFetch<ExtensionBuildItem>("/dashboard/extension-builds"),
+      ]);
+      setServiceStatus(health.status === "fulfilled" && health.value?.status === "ok" ? "ok" : "down");
+      if (extensionBuild.status === "fulfilled") {
+        setExtension(extensionBuild.value);
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Status sistem belum bisa dimuat.");
     } finally {
@@ -54,14 +67,16 @@ export default function AdminOpsPage() {
   }, [router]);
 
   const logs = overview?.recent_audit_logs ?? [];
+  const filteredLogs = logs.filter((log) => logFilter === "all" || auditKind(log.action) === logFilter);
+  const groups = groupAuditLogs(filteredLogs);
+  const filterCount = (filter: AuditFilter) =>
+    filter === "all" ? logs.length : logs.filter((log) => auditKind(log.action) === filter).length;
 
   return (
     <WorkspaceShell
       currentUser={currentUser}
       title={PAGE_NAMES.audit}
       description="Siapa melakukan apa di Clara, dan seberapa banyak data yang tersimpan. Halaman ini hanya untuk dibaca."
-      backHref="/dashboard"
-      backLabel="Kembali ke beranda"
       actions={
         <Link href="/admin/access" className="clara-button clara-button-secondary">
           Buka Pengguna &amp; Akses
@@ -75,6 +90,41 @@ export default function AdminOpsPage() {
 
         {overview && !isLoading ? (
           <>
+            <section aria-labelledby="ops-status" className="clara-card p-5 sm:p-6">
+              <h2 id="ops-status" className="text-lg font-bold clara-text-primary">
+                Status layanan
+              </h2>
+              <ul className="mt-3 grid gap-3 sm:grid-cols-3">
+                <li className="clara-card-soft p-3">
+                  <p className="text-xs clara-text-muted">Server Clara</p>
+                  <p className="mt-1 text-base font-bold">
+                    {serviceStatus === "ok" ? (
+                      <span className="text-clara-success">Berjalan normal</span>
+                    ) : serviceStatus === "down" ? (
+                      <span className="text-clara-warning">Tidak merespons</span>
+                    ) : (
+                      <span className="clara-text-muted">Memeriksa...</span>
+                    )}
+                  </p>
+                </li>
+                <li className="clara-card-soft p-3">
+                  <p className="text-xs clara-text-muted">Ekstensi Chrome</p>
+                  <p className="mt-1 text-base font-bold clara-text-primary">
+                    {extension ? (extension.available ? `Versi ${extension.version ?? "-"}` : "Belum diunggah") : "-"}
+                  </p>
+                  <Link href="/admin/extension" className="text-xs font-semibold text-clara-gold hover:underline">
+                    Kelola ekstensi
+                  </Link>
+                </li>
+                <li className="clara-card-soft p-3">
+                  <p className="text-xs clara-text-muted">Aktivitas terakhir</p>
+                  <p className="mt-1 text-base font-bold clara-text-primary">
+                    {logs[0] ? formatRelativeTime(logs[0].created_at) : "Belum ada"}
+                  </p>
+                </li>
+              </ul>
+            </section>
+
             <section aria-labelledby="ops-counts" className="clara-card p-5 sm:p-6">
               <h2 id="ops-counts" className="text-lg font-bold clara-text-primary">
                 Isi sistem saat ini
@@ -97,54 +147,58 @@ export default function AdminOpsPage() {
               <h2 id="ops-log" className="text-lg font-bold clara-text-primary">
                 Aktivitas terbaru
               </h2>
-              {logs.length === 0 ? (
-                <EmptyState title="Belum ada aktivitas tercatat" description="Setiap login dan perubahan penting akan muncul di sini." />
+              <div role="group" aria-label="Jenis aktivitas" className="flex flex-wrap gap-2">
+                {(Object.keys(AUDIT_FILTER_LABEL) as AuditFilter[]).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    aria-pressed={logFilter === filter}
+                    onClick={() => {
+                      setLogFilter(filter);
+                      setLogVisible(LOG_STEP);
+                    }}
+                    className={`min-h-11 rounded-full border px-4 text-sm font-semibold ${
+                      logFilter === filter
+                        ? "border-clara-gold bg-clara-gold text-clara-deep"
+                        : "border-clara-line bg-clara-sunken text-clara-ink-2 hover:border-clara-gold hover:text-clara-ink"
+                    }`}
+                  >
+                    {AUDIT_FILTER_LABEL[filter]} <span className="tabular-nums opacity-70">{filterCount(filter)}</span>
+                  </button>
+                ))}
+              </div>
+
+              {groups.length === 0 ? (
+                <EmptyState
+                  title="Belum ada aktivitas tercatat"
+                  description="Setiap login dan perubahan penting akan muncul di sini."
+                />
               ) : (
                 <ul className="space-y-2">
-                  {logs.slice(0, logVisible).map((log) => (
-                    <li key={log.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
+                  {groups.slice(0, logVisible).map((group) => (
+                    <li key={`${group.key}-${group.latestAt}`} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="break-words text-sm font-semibold clara-text-primary">{describeAuditAction(log.action)}</p>
-                        {log.actor_role ? <Tag>{getRoleDisplayLabel(log.actor_role)}</Tag> : null}
+                        <p className="break-words text-sm font-semibold clara-text-primary">
+                          {group.label}
+                          {group.count > 1 ? ` (${group.count} kali)` : ""}
+                        </p>
+                        {group.actorRole ? <Tag>{getRoleDisplayLabel(group.actorRole)}</Tag> : null}
                       </div>
                       <p className="mt-1 break-words text-xs clara-text-muted">
-                        {log.actor_email ?? "Sistem"}
-                        {log.organization_name ? ` · ${log.organization_name}` : ""} · {formatRelativeTime(log.created_at)}
+                        {group.actorEmail ?? "Sistem"}
+                        {group.organizationName ? ` · ${group.organizationName}` : ""} · {formatRelativeTime(group.latestAt)}
+                        {group.count > 1 ? ` (mulai ${formatRelativeTime(group.earliestAt)})` : ""}
                       </p>
                     </li>
                   ))}
                 </ul>
               )}
-              {logs.length > logVisible ? (
+              {groups.length > logVisible ? (
                 <button type="button" onClick={() => setLogVisible((count) => count + LOG_STEP)} className="clara-button clara-button-ghost">
-                  Tampilkan {Math.min(logs.length - logVisible, LOG_STEP)} aktivitas lagi ({logs.length - logVisible} tersisa)
+                  Tampilkan {Math.min(groups.length - logVisible, LOG_STEP)} lagi ({groups.length - logVisible} tersisa)
                 </button>
               ) : null}
             </section>
-
-            <Section title="Pengguna terbaru" count={overview.recent_users.length} empty="Belum ada pengguna.">
-              {overview.recent_users.map((user) => (
-                <li key={user.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="break-words text-sm font-semibold clara-text-primary">{user.name}</p>
-                    <Tag>{getRoleDisplayLabel(user.role)}</Tag>
-                  </div>
-                  <p className="mt-1 break-words text-xs clara-text-muted">
-                    {user.email} · dibuat {formatDateTime(user.created_at)}
-                    {user.created_by_user_name ? ` oleh ${user.created_by_user_name}` : ""}
-                  </p>
-                </li>
-              ))}
-            </Section>
-
-            <Section title="Organisasi terbaru" count={overview.recent_organizations.length} empty="Belum ada organisasi.">
-              {overview.recent_organizations.map((organization) => (
-                <li key={organization.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
-                  <p className="break-words text-sm font-semibold clara-text-primary">{organization.name}</p>
-                  <p className="mt-1 text-xs clara-text-muted">Dibuat {formatDateTime(organization.created_at)}</p>
-                </li>
-              ))}
-            </Section>
 
             <Section title="Percakapan terbaru" count={overview.recent_conversations.length} empty="Belum ada percakapan.">
               {overview.recent_conversations.map((conversation) => (

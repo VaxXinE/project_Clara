@@ -8,7 +8,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/Sta
 import { Tag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/format";
+import { formatRelativeTime, isExperimentalChannel } from "@/lib/format";
 import { PAGE_NAMES } from "@/lib/labels";
 import { isAdminLike } from "@/lib/roles";
 import { CHANNEL_DESCRIPTION, describeSource } from "@/lib/vocab";
@@ -57,8 +57,6 @@ export default function ChannelsOverviewPage() {
       currentUser={currentUser}
       title={PAGE_NAMES.channels}
       description="Dari mana chat customer masuk ke Clara, dan berapa banyak yang sudah masuk lewat tiap jalur."
-      backHref="/dashboard"
-      backLabel="Kembali ke beranda"
       actions={
         <Link href="/upload" className="clara-button clara-button-primary">
           Buka Input Chat
@@ -88,8 +86,13 @@ export default function ChannelsOverviewPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-lg font-semibold clara-text-primary">{item.label}</h2>
                       <Tag tone={item.supports_live_sync ? "good" : "neutral"}>
-                        {item.supports_live_sync ? "Masuk otomatis" : "Dimasukkan manual"}
+                        {isExperimentalChannel(item.key)
+                          ? "Lewat Ekstensi Clara"
+                          : item.supports_live_sync
+                            ? "Masuk otomatis"
+                            : "Dimasukkan manual"}
                       </Tag>
+                      {isExperimentalChannel(item.key) ? <Tag tone="warn">Eksperimental</Tag> : null}
                     </div>
                     <p className="mt-2 text-sm leading-6 clara-text-secondary">
                       {CHANNEL_DESCRIPTION[item.key] ?? item.description}
@@ -107,7 +110,9 @@ export default function ChannelsOverviewPage() {
                         <ul className="mt-1 flex flex-wrap gap-2">
                           {item.supports_file_upload ? <Tag>Unggah berkas chat</Tag> : null}
                           {item.supports_text_paste ? <Tag>Tempel teks chat</Tag> : null}
-                          {item.supports_live_sync ? <Tag tone="good">Otomatis</Tag> : null}
+                          {item.supports_live_sync ? (
+                            <Tag tone="good">{isExperimentalChannel(item.key) ? "Dibaca dari chat yang dibuka" : "Otomatis"}</Tag>
+                          ) : null}
                         </ul>
                       </div>
                       <div>

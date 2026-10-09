@@ -38,6 +38,7 @@ export default function AdminAccessPage() {
   const [hasLoadedAccessData, setHasLoadedAccessData] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
+  const [moreActionsUserId, setMoreActionsUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [userSearchQuery, setUserSearchQuery] = useState("");
@@ -348,11 +349,9 @@ export default function AdminAccessPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      eyebrow={NAV_GROUP_NAMES.admin}
+      eyebrow={NAV_GROUP_NAMES.control}
       title={PAGE_NAMES.users}
       description="Atur siapa yang bisa masuk ke Clara, perannya, dan timnya."
-      backHref="/workspace"
-      backLabel="Kembali ke beranda"
       actions={
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/access/create/user" className="clara-button clara-button-primary">
@@ -387,6 +386,250 @@ export default function AdminAccessPage() {
         currentUser &&
         isOwnerLike(currentUser.role) ? (
           <>
+            <section>
+              <Panel
+                title="Daftar Pengguna"
+                description="Cari pengguna, ubah datanya, atau nonaktifkan akunnya."
+              >
+                {users.length === 0 ? (
+                  <EmptyText text="Belum ada pengguna." />
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-4">
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <div>
+                          <label className="text-xs font-semibold text-[#f0cb73]">
+                            Cari pengguna
+                          </label>
+                          <input
+                            value={userSearchQuery}
+                            onChange={(event) => {
+                              setUserSearchQuery(event.target.value);
+                              setUserPage(1);
+                            }}
+                            placeholder="Cari nama, email, tim, atau unit"
+                            className="clara-input mt-2"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-[#f0cb73]">
+                            Peran
+                          </label>
+                          <select
+                            value={userRoleFilter}
+                            onChange={(event) => {
+                              setUserRoleFilter(event.target.value);
+                              setUserPage(1);
+                            }}
+                            className="clara-select mt-2"
+                          >
+                            <option value="all">Semua peran</option>
+                            <option value="sales">Sales</option>
+                            <option value="manager">Manager</option>
+                            <option value="head">Head</option>
+                            <option value="superadmin">Superadmin</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-[#f0cb73]">
+                            Status
+                          </label>
+                          <select
+                            value={userStatusFilter}
+                            onChange={(event) => {
+                              setUserStatusFilter(event.target.value);
+                              setUserPage(1);
+                            }}
+                            className="clara-select mt-2"
+                          >
+                            <option value="all">Semua status</option>
+                            <option value="active">Aktif</option>
+                            <option value="inactive">Nonaktif</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-[#d6bb84]">
+                        <p>
+                          Menampilkan {paginatedUsers.length} dari {filteredUsers.length} pengguna
+                        </p>
+                        <p>
+                          Halaman {effectiveUserPage} dari {totalUserPages}
+                        </p>
+                      </div>
+                    </div>
+
+                    {filteredUsers.length === 0 ? (
+                      <EmptyText text="Tidak ada pengguna yang cocok. Ubah pencarian atau filter." />
+                    ) : (
+                      <div className="overflow-hidden rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)]">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-left text-sm">
+                            <thead className="bg-[#1d150d] text-[#b89a62]">
+                              <tr>
+                                <th className="px-4 py-3 font-medium">Pengguna</th>
+                                <th className="px-4 py-3 font-medium">Peran</th>
+                                <th className="px-4 py-3 font-medium">Status</th>
+                                <th className="px-4 py-3 font-medium">Organisasi / Tim</th>
+                                <th className="px-4 py-3 font-medium">Dibuat</th>
+                                <th className="px-4 py-3 font-medium text-right">Aksi</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {paginatedUsers.map((user) => {
+                                const isSelf = currentUser.id === user.id;
+                                const teamDisplay = getUserTeamDisplay(user, teams);
+
+                                return (
+                                  <tr
+                                    key={user.id}
+                                    className="border-t border-[#f0cb73]/10 align-top"
+                                  >
+                                    <td className="px-4 py-3">
+                                      <div className="font-semibold text-[#fff0c9]">
+                                        {user.name}
+                                      </div>
+                                      <div className="mt-1 text-xs text-[#b89a62]">
+                                        {user.email}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
+                                        {formatStatusLabel(user.role)}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <span
+                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                          user.is_active
+                                            ? "border border-[#f0cb73]/18 bg-[#f0cb73]/10 text-[#f0cb73]"
+                                            : "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
+                                        }`}
+                                      >
+                                        {user.is_active ? "aktif" : "nonaktif"}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-[#d6bb84]">
+                                      <div>
+                                        {getOrganizationLabel(user.organization_id, organizations)}
+                                      </div>
+                                      <div className="mt-1">
+                                        {teamDisplay.teamName}
+                                        {teamDisplay.unitName !== "-"
+                                          ? ` / ${teamDisplay.unitName}`
+                                          : ""}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-[#d6bb84]">
+                                      {formatDateTime(user.created_at)}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <div className="flex justify-end gap-2">
+                                        <Link
+                                          href={`/admin/access/${user.id}/edit/profile`}
+                                          className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
+                                        >
+                                          Ubah
+                                        </Link>
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleToggleActive(user)}
+                                          disabled={actionUserId === user.id || isSelf}
+                                          className={`min-h-11 rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+                                            user.is_active
+                                              ? "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
+                                              : "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08]"
+                                          }`}
+                                        >
+                                          {actionUserId === user.id
+                                            ? "..."
+                                            : user.is_active
+                                              ? "Nonaktifkan"
+                                              : "Aktifkan"}
+                                        </button>
+                                        {isSelf ? null : moreActionsUserId === user.id ? (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() => void handleDeleteUser(user)}
+                                              disabled={actionUserId === user.id}
+                                              className="min-h-11 rounded-xl border border-[#6a421b] bg-[#2a170d] px-3 py-2 text-sm font-semibold text-[#f0a37a] disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                              {actionUserId === user.id ? "..." : "Hapus akun"}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => setMoreActionsUserId(null)}
+                                              className="min-h-11 rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
+                                            >
+                                              Tutup
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            aria-label={`Aksi lain untuk ${user.name}`}
+                                            onClick={() => setMoreActionsUserId(user.id)}
+                                            className="min-h-11 rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
+                                          >
+                                            Lainnya
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {filteredUsers.length > userPageSize ? (
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)] p-4">
+                        <p className="text-sm text-[#d6bb84]">Halaman daftar pengguna</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setUserPage((current) => Math.max(1, current - 1))
+                            }
+                            disabled={effectiveUserPage === 1}
+                            className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Sebelumnya
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setUserPage((current) =>
+                                Math.min(totalUserPages, current + 1),
+                              )
+                            }
+                            disabled={effectiveUserPage === totalUserPages}
+                            className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Berikutnya
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+              </Panel>
+            </section>
+
+            <details className="clara-card p-4 sm:p-5">
+              <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
+                Struktur organisasi ({organizations.length} organisasi · {units.length} unit · {teams.length} tim)
+              </summary>
+              <p className="mt-1 text-sm clara-text-secondary">
+                Organisasi, unit, dan tim menentukan siapa melapor ke siapa. Buka bagian ini kalau perlu menambah atau mengubahnya.
+              </p>
+              <div className="mt-4">
             <section className="grid gap-6 lg:grid-cols-3">
               <Panel
                 title="Organisasi"
@@ -748,227 +991,8 @@ export default function AdminAccessPage() {
                 )}
               </Panel>
             </section>
-
-            <section>
-              <Panel
-                title="Daftar Pengguna"
-                description="Cari pengguna, ubah datanya, atau nonaktifkan akunnya."
-                action={
-                  <Link href="/admin/access/create/user" className="clara-button clara-button-primary">
-                    Buat pengguna
-                  </Link>
-                }
-              >
-                {users.length === 0 ? (
-                  <EmptyText text="Belum ada pengguna." />
-                ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(135deg,rgba(31,23,16,0.96)_0%,rgba(22,16,12,0.96)_42%,rgba(53,39,17,0.94)_100%)] p-4">
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <div>
-                          <label className="text-xs font-semibold text-[#f0cb73]">
-                            Cari pengguna
-                          </label>
-                          <input
-                            value={userSearchQuery}
-                            onChange={(event) => {
-                              setUserSearchQuery(event.target.value);
-                              setUserPage(1);
-                            }}
-                            placeholder="Cari nama, email, tim, atau unit"
-                            className="clara-input mt-2"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-[#f0cb73]">
-                            Peran
-                          </label>
-                          <select
-                            value={userRoleFilter}
-                            onChange={(event) => {
-                              setUserRoleFilter(event.target.value);
-                              setUserPage(1);
-                            }}
-                            className="clara-select mt-2"
-                          >
-                            <option value="all">Semua peran</option>
-                            <option value="sales">sales</option>
-                            <option value="manager">manager</option>
-                            <option value="head">head</option>
-                            <option value="superadmin">superadmin</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-semibold text-[#f0cb73]">
-                            Status
-                          </label>
-                          <select
-                            value={userStatusFilter}
-                            onChange={(event) => {
-                              setUserStatusFilter(event.target.value);
-                              setUserPage(1);
-                            }}
-                            className="clara-select mt-2"
-                          >
-                            <option value="all">Semua status</option>
-                            <option value="active">Aktif</option>
-                            <option value="inactive">Nonaktif</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-[#d6bb84]">
-                        <p>
-                          Menampilkan {paginatedUsers.length} dari {filteredUsers.length} pengguna
-                        </p>
-                        <p>
-                          Halaman {effectiveUserPage} dari {totalUserPages}
-                        </p>
-                      </div>
-                    </div>
-
-                    {filteredUsers.length === 0 ? (
-                      <EmptyText text="Tidak ada pengguna yang cocok. Ubah pencarian atau filter." />
-                    ) : (
-                      <div className="overflow-hidden rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)]">
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full text-left text-sm">
-                            <thead className="bg-[#1d150d] text-[#b89a62]">
-                              <tr>
-                                <th className="px-4 py-3 font-medium">Pengguna</th>
-                                <th className="px-4 py-3 font-medium">Peran</th>
-                                <th className="px-4 py-3 font-medium">Status</th>
-                                <th className="px-4 py-3 font-medium">Organisasi / Tim</th>
-                                <th className="px-4 py-3 font-medium">Dibuat</th>
-                                <th className="px-4 py-3 font-medium text-right">Aksi</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {paginatedUsers.map((user) => {
-                                const isSelf = currentUser.id === user.id;
-                                const teamDisplay = getUserTeamDisplay(user, teams);
-
-                                return (
-                                  <tr
-                                    key={user.id}
-                                    className="border-t border-[#f0cb73]/10 align-top"
-                                  >
-                                    <td className="px-4 py-3">
-                                      <div className="font-semibold text-[#fff0c9]">
-                                        {user.name}
-                                      </div>
-                                      <div className="mt-1 text-xs text-[#b89a62]">
-                                        {user.email}
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <span className="rounded-full border border-[#f0cb73]/18 bg-[#f0cb73]/10 px-2.5 py-1 text-xs font-semibold text-[#f0cb73]">
-                                        {formatStatusLabel(user.role)}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <span
-                                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                          user.is_active
-                                            ? "border border-[#f0cb73]/18 bg-[#f0cb73]/10 text-[#f0cb73]"
-                                            : "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
-                                        }`}
-                                      >
-                                        {user.is_active ? "aktif" : "nonaktif"}
-                                      </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-xs text-[#d6bb84]">
-                                      <div>
-                                        {getOrganizationLabel(user.organization_id, organizations)}
-                                      </div>
-                                      <div className="mt-1">
-                                        {teamDisplay.teamName}
-                                        {teamDisplay.unitName !== "-"
-                                          ? ` / ${teamDisplay.unitName}`
-                                          : ""}
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-xs text-[#d6bb84]">
-                                      {formatDateTime(user.created_at)}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                      <div className="flex justify-end gap-2">
-                                        <Link
-                                          href={`/admin/access/${user.id}/edit/profile`}
-                                          className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-3 py-2 text-sm font-semibold text-[#e1c27c]"
-                                        >
-                                          Ubah
-                                        </Link>
-                                        <button
-                                          type="button"
-                                          onClick={() => void handleToggleActive(user)}
-                                          disabled={actionUserId === user.id || isSelf}
-                                          className={`min-h-11 rounded-xl px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
-                                            user.is_active
-                                              ? "border border-[#f0cb73]/18 bg-[#4a3112] text-[#f0cb73]"
-                                              : "border border-[#f7dfa2]/18 bg-[linear-gradient(135deg,#f6d98c_0%,#c29032_100%)] text-[#140f08]"
-                                          }`}
-                                        >
-                                          {actionUserId === user.id
-                                            ? "..."
-                                            : user.is_active
-                                              ? "Nonaktifkan"
-                                              : "Aktifkan"}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => void handleDeleteUser(user)}
-                                          disabled={actionUserId === user.id || isSelf}
-                                          className="rounded-xl border border-[#6a421b] bg-[#2a170d] px-3 py-2 text-sm font-semibold text-[#f0cb73] disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                          {actionUserId === user.id ? "..." : "Hapus"}
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {filteredUsers.length > userPageSize ? (
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#f0cb73]/18 bg-[linear-gradient(180deg,rgba(31,23,16,0.96)_0%,rgba(18,13,10,0.98)_100%)] p-4">
-                        <p className="text-sm text-[#d6bb84]">Halaman daftar pengguna</p>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setUserPage((current) => Math.max(1, current - 1))
-                            }
-                            disabled={effectiveUserPage === 1}
-                            className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Sebelumnya
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setUserPage((current) =>
-                                Math.min(totalUserPages, current + 1),
-                              )
-                            }
-                            disabled={effectiveUserPage === totalUserPages}
-                            className="rounded-xl border border-[#3c2c16] bg-[#22190f] px-4 py-2 text-sm font-semibold text-[#e1c27c] disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            Berikutnya
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </Panel>
-            </section>
+              </div>
+            </details>
           </>
         ) : null}
       </div>

@@ -18,6 +18,7 @@ import {
   faComments,
   faGaugeHigh,
   faMagnifyingGlass,
+  faPuzzlePiece,
   faShareNodes,
   faSliders,
   faTriangleExclamation,
@@ -237,42 +238,19 @@ function buildNavGroups(
     return [
       {
         title: NAV_GROUP_NAMES.daily,
+        hideDescriptions: true,
         items: [
-          home("Ringkasan kerja hari ini"),
-          inbox("Chat masuk Sales"),
-          followUp("Prioritas tindak lanjut"),
-          leads(PAGE_NAMES.leads, "Progres lead"),
-          {
-            href: "/customers",
-            label: PAGE_NAMES.customers,
-            icon: faAddressBook,
-            description: "Data customer",
-          },
-          complaints,
-        ],
-      },
-      {
-        title: NAV_GROUP_NAMES.team,
-        items: [
+          home("Yang perlu kamu putuskan"),
           {
             href: "/notifications",
             label: PAGE_NAMES.alerts,
             icon: faTriangleExclamation,
             description: "Alert operasional",
           },
-          {
-            href: "/approvals",
-            label: PAGE_NAMES.reviewSales,
-            icon: faClipboardCheck,
-            description: "Review jawaban Sales",
-          },
-          teamMonitor("Progres prospect Sales"),
-          opsDashboard,
         ],
       },
-      { title: NAV_GROUP_NAMES.knowledge, items: [knowledge, marketing] },
       {
-        title: NAV_GROUP_NAMES.settings,
+        title: NAV_GROUP_NAMES.control,
         items: [
           {
             href: "/admin/access",
@@ -293,11 +271,42 @@ function buildNavGroups(
             description: "Gaya dan aturan jawaban Clara",
           },
           {
+            href: "/admin/extension",
+            label: PAGE_NAMES.extension,
+            icon: faPuzzlePiece,
+            description: "Versi yang diunduh semua pengguna",
+          },
+          {
             href: "/admin/ops",
             label: PAGE_NAMES.audit,
             icon: faClipboardList,
             description: "Jejak audit dan status sistem",
           },
+        ],
+      },
+      { title: NAV_GROUP_NAMES.knowledge, hideDescriptions: true, items: [knowledge, marketing] },
+      {
+        title: NAV_GROUP_NAMES.operations,
+        hideDescriptions: true,
+        items: [
+          inbox("Chat masuk Sales"),
+          followUp("Prioritas tindak lanjut"),
+          leads(PAGE_NAMES.leads, "Progres lead"),
+          {
+            href: "/customers",
+            label: PAGE_NAMES.customers,
+            icon: faAddressBook,
+            description: "Data customer",
+          },
+          complaints,
+          {
+            href: "/approvals",
+            label: PAGE_NAMES.reviewSales,
+            icon: faClipboardCheck,
+            description: "Review jawaban Sales",
+          },
+          teamMonitor("Progres prospect Sales"),
+          opsDashboard,
         ],
       },
     ];
