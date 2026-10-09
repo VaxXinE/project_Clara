@@ -39,10 +39,12 @@ import {
   SITE_NAME,
   formatNotificationSource,
 } from "@/lib/labels";
+import { isDecisionBucket } from "@/lib/review";
 import { getRoleDisplayLabel, normalizeWorkspaceRole } from "@/lib/roles";
 import { tasksForUser } from "@/lib/tasks";
 import { plainJargon } from "@/lib/vocab";
 import type {
+  ChatReviewCenterResponse,
   CurrentUser,
   OpsNotificationItem,
   OpsNotificationResponse,
@@ -71,6 +73,8 @@ type NavItem = {
   description: string;
   /** Halaman lain yang menu ini ikut dianggap aktif, mis. profil customer di bawah menu Lead & Customer. */
   alsoActiveFor?: string[];
+  /** Angka kecil di samping nama menu, mis. jumlah kasus yang menunggu keputusan. */
+  badge?: number;
 };
 
 type NavGroup = {
@@ -80,7 +84,7 @@ type NavGroup = {
   hideDescriptions?: boolean;
 };
 
-function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
+function buildNavGroups(currentUser?: CurrentUser | null, reviewDecisionCount = 0): NavGroup[] {
   const role = normalizeWorkspaceRole(currentUser?.role);
 
   if (!currentUser) {
@@ -166,6 +170,7 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   }
 
   if (role === "manager") {
+    // Satu kelompok saja, diurutkan menurut kerja Manager: putuskan kasus, pantau tim, lalu lead dan komplain.
     return [
       {
         title: NAV_GROUP_NAMES.daily,
@@ -175,15 +180,13 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
             href: "/approvals",
             label: PAGE_NAMES.reviewSales,
             icon: faClipboardCheck,
-            description: "Cek balasan dan arahkan Sales",
+            description: "Putuskan balasan Sales yang menunggu",
+            badge: reviewDecisionCount,
           },
+          teamMonitor("Pantau progres dan hambatan tim"),
           leads(PAGE_NAMES.leadsTeam, "Progres lead timmu"),
           complaints,
         ],
-      },
-      {
-        title: NAV_GROUP_NAMES.team,
-        items: [teamMonitor("Pantau progres dan hambatan tim")],
       },
     ];
   }
@@ -353,7 +356,8 @@ export function WorkspaceShell({
   const pathname = usePathname();
   const dashboardUser = useDashboardUser();
   const resolvedCurrentUser = currentUser ?? dashboardUser?.currentUser ?? null;
-  const navGroups = buildNavGroups(resolvedCurrentUser);
+  const [reviewDecisionCount, setReviewDecisionCount] = useState(0);
+  const navGroups = buildNavGroups(resolvedCurrentUser, reviewDecisionCount);
   const mobileMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileSidebarRef = useRef<HTMLElement>(null);
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
@@ -570,6 +574,34 @@ export function WorkspaceShell({
     };
   }, [resolvedCurrentUser, pathname]);
 
+  // Angka di menu Review Sales: berapa kasus yang menunggu keputusan Manager.
+  useEffect(() => {
+    if (normalizedRole !== "manager") {
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function loadDecisionCount() {
+      try {
+        const queue = await apiFetch<ChatReviewCenterResponse>("/dashboard/sales/chat-review-center");
+        if (!isCancelled) {
+          setReviewDecisionCount(queue.items.filter((item) => isDecisionBucket(item.review_bucket)).length);
+        }
+      } catch {
+        if (!isCancelled) {
+          setReviewDecisionCount(0);
+        }
+      }
+    }
+
+    void loadDecisionCount();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [normalizedRole, pathname]);
+
   async function handleLogout() {
     setIsLoggingOut(true);
 
@@ -736,7 +768,7 @@ export function WorkspaceShell({
                             className="h-4 w-4"
                           />
                         </span>
-                        <span className="min-w-0">
+                        <span className="min-w-0 flex-1">
                           <span className="block truncate">{item.label}</span>
                           {group.hideDescriptions ? null : (
                             <span
@@ -750,6 +782,15 @@ export function WorkspaceShell({
                             </span>
                           )}
                         </span>
+                        {item.badge && item.badge > 0 ? (
+                          <span
+                            role="img"
+                            aria-label={`${item.badge} menunggu`}
+                            className="ml-auto flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)] px-1.5 text-xs font-bold text-[var(--color-accent-foreground)]"
+                          >
+                            {item.badge}
+                          </span>
+                        ) : null}
                       </Link>
                     );
                   })}

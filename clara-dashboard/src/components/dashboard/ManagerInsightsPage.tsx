@@ -5,12 +5,20 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { usePromptText } from "@/components/dashboard/ConfirmDialog";
-import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/StateViews";
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from "@/components/dashboard/StateViews";
 import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import { formatChannelLabel, formatDateTime, formatRelativeTime } from "@/lib/format";
+import {
+  formatChannelLabel,
+  formatDateTime,
+  formatRelativeTime,
+} from "@/lib/format";
 import { canAccessManagerInsights, isHeadRole } from "@/lib/roles";
 import {
   ACTION_STATUS,
@@ -26,6 +34,7 @@ import {
   SLA_STATUS,
   STAGE,
   TEMPERATURE,
+  describe,
   describeDelta,
   describeRangeLabel,
   describeScopeLabel,
@@ -48,7 +57,13 @@ type TeamItem = ManagerInsightsResponse["team_performance"][number];
 
 const VISIBLE_STEP = 6;
 
-const ACTION_TYPE_OPTIONS = ["coaching", "follow_up_recovery", "reply_backlog_review", "crm_cleanup", "weekly_review"];
+const ACTION_TYPE_OPTIONS = [
+  "coaching",
+  "follow_up_recovery",
+  "reply_backlog_review",
+  "crm_cleanup",
+  "weekly_review",
+];
 const PRIORITY_OPTIONS = ["urgent", "high", "normal", "low"];
 
 const SORT_OPTIONS = [
@@ -78,7 +93,10 @@ function formatWeekLabel(value: string): string {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short" }).format(date);
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+  }).format(date);
 }
 
 function resolveDefaultActionType(focusArea: string): string {
@@ -93,7 +111,10 @@ function resolveActionPriority(priorityLabel: string): string {
 }
 
 /** Apa yang perlu dilakukan reviewer untuk sebuah kasus pembinaan, dalam satu kalimat. */
-function describeReviewCase(item: ManagerInsightsResponse["coaching_priority"][number], isHeadView: boolean): string {
+function describeReviewCase(
+  item: ManagerInsightsResponse["coaching_priority"][number],
+  isHeadView: boolean,
+): string {
   if (item.review_status === "in_review") {
     return isHeadView
       ? "Baca chat-nya dan beri arahan yang tegas ke Sales."
@@ -117,22 +138,32 @@ export function ManagerInsightsPage() {
   const promptText = usePromptText();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [insights, setInsights] = useState<ManagerInsightsResponse | null>(null);
+  const [insights, setInsights] = useState<ManagerInsightsResponse | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [performanceRange, setPerformanceRange] = useState("7d");
   const [salesSortBy, setSalesSortBy] = useState("priority");
   const [salesVisible, setSalesVisible] = useState(VISIBLE_STEP);
-  const [selectedSalesUserId, setSelectedSalesUserId] = useState<string | null>(null);
-  const [salesDetail, setSalesDetail] = useState<SalesPerformanceDetailResponse | null>(null);
-  const [salesDetailLoadingId, setSalesDetailLoadingId] = useState<string | null>(null);
+  const [selectedSalesUserId, setSelectedSalesUserId] = useState<string | null>(
+    null,
+  );
+  const [salesDetail, setSalesDetail] =
+    useState<SalesPerformanceDetailResponse | null>(null);
+  const [salesDetailLoadingId, setSalesDetailLoadingId] = useState<
+    string | null
+  >(null);
   const [salesDetailError, setSalesDetailError] = useState("");
-  const [actionList, setActionList] = useState<PerformanceActionListResponse | null>(null);
+  const [actionList, setActionList] =
+    useState<PerformanceActionListResponse | null>(null);
   const [actionListError, setActionListError] = useState("");
   const [actionDraft, setActionDraft] = useState<ActionDraft | null>(null);
   const [actionSubmitKey, setActionSubmitKey] = useState<string | null>(null);
-  const [actionStatusLoadingId, setActionStatusLoadingId] = useState<string | null>(null);
+  const [actionStatusLoadingId, setActionStatusLoadingId] = useState<
+    string | null
+  >(null);
   const isHeadView = isHeadRole(currentUser?.role);
 
   const weeklyReview = insights?.weekly_review ?? null;
@@ -146,28 +177,45 @@ export function ManagerInsightsPage() {
     const items = [...(insights?.sales_performance ?? [])];
 
     return items.sort((left, right) => {
-      if (salesSortBy === "priority") return right.coaching_signal.priority_score - left.coaching_signal.priority_score;
-      if (salesSortBy === "hot") return right.hot_leads_count - left.hot_leads_count;
+      if (salesSortBy === "priority")
+        return (
+          right.coaching_signal.priority_score -
+          left.coaching_signal.priority_score
+        );
+      if (salesSortBy === "hot")
+        return right.hot_leads_count - left.hot_leads_count;
       if (salesSortBy === "latest_activity") {
-        return (right.latest_activity_at ?? "").localeCompare(left.latest_activity_at ?? "");
+        return (right.latest_activity_at ?? "").localeCompare(
+          left.latest_activity_at ?? "",
+        );
       }
-      if (salesSortBy === "needs_reply") return right.needs_reply_count - left.needs_reply_count;
+      if (salesSortBy === "needs_reply")
+        return right.needs_reply_count - left.needs_reply_count;
       return right.overdue_follow_up_count - left.overdue_follow_up_count;
     });
   }, [insights?.sales_performance, salesSortBy]);
 
   const openActionItems = useMemo(
-    () => (actionList?.items ?? []).filter((item) => item.status === "open" || item.status === "in_progress"),
+    () =>
+      (actionList?.items ?? []).filter(
+        (item) => item.status === "open" || item.status === "in_progress",
+      ),
     [actionList?.items],
   );
 
   async function loadPerformanceActions() {
     try {
-      const response = await apiFetch<PerformanceActionListResponse>("/dashboard/performance-actions");
+      const response = await apiFetch<PerformanceActionListResponse>(
+        "/dashboard/performance-actions",
+      );
       setActionList(response);
       setActionListError("");
     } catch (error) {
-      setActionListError(error instanceof Error ? error.message : "Daftar tugas tim belum bisa dimuat.");
+      setActionListError(
+        error instanceof Error
+          ? error.message
+          : "Daftar tugas tim belum bisa dimuat.",
+      );
     }
   }
 
@@ -183,7 +231,11 @@ export function ManagerInsightsPage() {
       );
       setSalesDetail(response);
     } catch (error) {
-      setSalesDetailError(error instanceof Error ? error.message : "Detail Sales ini belum bisa dimuat.");
+      setSalesDetailError(
+        error instanceof Error
+          ? error.message
+          : "Detail Sales ini belum bisa dimuat.",
+      );
     } finally {
       setSalesDetailLoadingId(null);
     }
@@ -203,11 +255,17 @@ export function ManagerInsightsPage() {
           return;
         }
 
-        const response = await apiFetch<ManagerInsightsResponse>(`/dashboard/manager-insights?range=${performanceRange}`);
+        const response = await apiFetch<ManagerInsightsResponse>(
+          `/dashboard/manager-insights?range=${performanceRange}`,
+        );
         setInsights(response);
         await loadPerformanceActions();
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : "Monitor tim belum bisa dimuat.");
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Monitor tim belum bisa dimuat.",
+        );
       } finally {
         setIsLoading(false);
       }
@@ -217,7 +275,10 @@ export function ManagerInsightsPage() {
   }, [performanceRange, reloadKey, router]);
 
   async function handleOpenSalesDetail(salesUserId: string) {
-    if (selectedSalesUserId === salesUserId && salesDetail?.sales_user.id === salesUserId) {
+    if (
+      selectedSalesUserId === salesUserId &&
+      salesDetail?.sales_user.id === salesUserId
+    ) {
       setSelectedSalesUserId(null);
       setSalesDetail(null);
       setSalesDetailError("");
@@ -252,7 +313,10 @@ export function ManagerInsightsPage() {
   }
 
   function openTeamActionDraft(item: TeamItem) {
-    const defaultAssigneeId = item.top_sales_contributors[0]?.sales_user_id ?? actionAssigneeOptions[0]?.sales_user_id ?? "";
+    const defaultAssigneeId =
+      item.top_sales_contributors[0]?.sales_user_id ??
+      actionAssigneeOptions[0]?.sales_user_id ??
+      "";
 
     setActionDraft({
       contextKey: `team:${item.team_id ?? item.team_name}`,
@@ -270,7 +334,9 @@ export function ManagerInsightsPage() {
   }
 
   function handleWeeklyReviewTeamAction(item: WeeklyReviewEntityItem) {
-    const matchedTeam = insights?.team_performance.find((team) => team.team_id === item.team_id);
+    const matchedTeam = insights?.team_performance.find(
+      (team) => team.team_id === item.team_id,
+    );
     if (matchedTeam) {
       openTeamActionDraft(matchedTeam);
       return;
@@ -278,7 +344,9 @@ export function ManagerInsightsPage() {
     router.push("/notifications");
   }
 
-  async function handleSubmitActionDraft(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmitActionDraft(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
     if (!actionDraft) {
       return;
@@ -298,19 +366,31 @@ export function ManagerInsightsPage() {
         description: actionDraft.description,
         action_type: actionDraft.actionType,
         priority_label: actionDraft.priorityLabel,
-        due_at: actionDraft.dueAt ? new Date(actionDraft.dueAt).toISOString() : null,
+        due_at: actionDraft.dueAt
+          ? new Date(actionDraft.dueAt).toISOString()
+          : null,
       };
-      await apiFetch<PerformanceActionItem>("/dashboard/performance-actions", { method: "POST", body: payload });
+      await apiFetch<PerformanceActionItem>("/dashboard/performance-actions", {
+        method: "POST",
+        body: payload,
+      });
       setActionDraft(null);
       await loadPerformanceActions();
     } catch (error) {
-      setActionListError(error instanceof Error ? error.message : "Tugas belum bisa dibuat. Coba lagi.");
+      setActionListError(
+        error instanceof Error
+          ? error.message
+          : "Tugas belum bisa dibuat. Coba lagi.",
+      );
     } finally {
       setActionSubmitKey(null);
     }
   }
 
-  async function handleActionStatusUpdate(actionId: string, nextStatus: "in_progress" | "done" | "skipped") {
+  async function handleActionStatusUpdate(
+    actionId: string,
+    nextStatus: "in_progress" | "done" | "skipped",
+  ) {
     setActionStatusLoadingId(actionId);
     setActionListError("");
 
@@ -331,11 +411,21 @@ export function ManagerInsightsPage() {
         }
       }
 
-      const payload: PerformanceActionUpdateRequest = { status: nextStatus, resolution_note: resolutionNote };
-      await apiFetch<PerformanceActionItem>(`/dashboard/performance-actions/${actionId}`, { method: "PATCH", body: payload });
+      const payload: PerformanceActionUpdateRequest = {
+        status: nextStatus,
+        resolution_note: resolutionNote,
+      };
+      await apiFetch<PerformanceActionItem>(
+        `/dashboard/performance-actions/${actionId}`,
+        { method: "PATCH", body: payload },
+      );
       await loadPerformanceActions();
     } catch (error) {
-      setActionListError(error instanceof Error ? error.message : "Status tugas belum bisa diubah. Coba lagi.");
+      setActionListError(
+        error instanceof Error
+          ? error.message
+          : "Status tugas belum bisa diubah. Coba lagi.",
+      );
     } finally {
       setActionStatusLoadingId(null);
     }
@@ -349,7 +439,7 @@ export function ManagerInsightsPage() {
   const summaryHelper = !insights
     ? ""
     : attentionCount > 0
-      ? `${boundaryAlerts.length} peringatan dari tim dan ${reviewCases.length} kasus pembinaan. Mulai dari daftar di bawah.`
+      ? `${boundaryAlerts.length} peringatan dari tim dan ${reviewCases.length} kasus yang perlu masukanmu. Mulai dari daftar di bawah.`
       : insights.overdue_follow_up_count > 0
         ? `Tidak ada peringatan, tapi ada ${insights.overdue_follow_up_count} follow-up yang terlambat. Cek anggota tim di bawah.`
         : "Tidak ada peringatan dan tidak ada kasus yang menunggu.";
@@ -363,11 +453,12 @@ export function ManagerInsightsPage() {
           ? "Ritme kerja semua tim, area yang berisiko, dan hal yang perlu kamu putuskan."
           : "Progres timmu, hambatan follow-up, dan kasus yang butuh arahanmu."
       }
-      backHref="/dashboard"
-      backLabel="Kembali ke beranda"
       actions={
         <>
-          <Link href={isHeadView ? "/notifications" : "/approvals"} className="clara-button clara-button-primary">
+          <Link
+            href={isHeadView ? "/notifications" : "/approvals"}
+            className="clara-button clara-button-primary"
+          >
             {isHeadView ? "Lihat Alert Tim" : "Lihat Review Sales"}
           </Link>
           <Link
@@ -381,10 +472,15 @@ export function ManagerInsightsPage() {
       }
     >
       <div className="space-y-5">
-        {isLoading && !insights ? <LoadingState message="Memuat monitor tim..." /> : null}
+        {isLoading && !insights ? (
+          <LoadingState message="Memuat monitor tim..." />
+        ) : null}
 
         {!isLoading && errorMessage && !insights ? (
-          <ErrorState message={errorMessage} onRetry={() => setReloadKey((key) => key + 1)} />
+          <ErrorState
+            message={errorMessage}
+            onRetry={() => setReloadKey((key) => key + 1)}
+          />
         ) : null}
 
         {actionListError ? (
@@ -400,10 +496,15 @@ export function ManagerInsightsPage() {
               aria-labelledby="monitor-summary"
               className="clara-card p-5 sm:p-6"
             >
-              <h2 id="monitor-summary" className="text-xl font-bold clara-text-primary sm:text-2xl">
+              <h2
+                id="monitor-summary"
+                className="text-xl font-bold clara-text-primary sm:text-2xl"
+              >
                 {summaryTitle}
               </h2>
-              <p className="mt-1 text-sm leading-6 clara-text-secondary">{summaryHelper}</p>
+              <p className="mt-1 text-sm leading-6 clara-text-secondary">
+                {summaryHelper}
+              </p>
 
               <dl
                 data-onboarding-id="manager-insights-metrics"
@@ -424,26 +525,39 @@ export function ManagerInsightsPage() {
                   value={String(insights.missing_or_stale_log_count)}
                   hint="Lead yang catatan hariannya kosong atau sudah lama."
                 />
-                <Fact label="Kasus pembinaan terbuka" value={String(insights.open_coaching_case_count)} />
+                <Fact
+                  label="Kasus masukan yang belum selesai"
+                  value={String(insights.open_coaching_case_count)}
+                />
               </dl>
               <p className="mt-4 text-xs clara-text-muted">
-                {describeScopeLabel(insights.scope_label)} · {insights.scope_team_count} tim · {insights.scope_member_count} Sales · data
-                per {formatDateTime(insights.generated_at)}
+                {describeScopeLabel(insights.scope_label)} ·{" "}
+                {insights.scope_team_count} tim · {insights.scope_member_count}{" "}
+                Sales · data per {formatDateTime(insights.generated_at)}
               </p>
             </section>
 
             <section aria-labelledby="attention-title" className="space-y-3">
-              <h2 id="attention-title" className="text-base font-semibold clara-text-primary">
-                Perlu perhatian <span className="font-normal clara-text-muted">({attentionCount})</span>
+              <h2
+                id="attention-title"
+                className="text-base font-semibold clara-text-primary"
+              >
+                Perlu perhatian{" "}
+                <span className="font-normal clara-text-muted">
+                  ({attentionCount})
+                </span>
               </h2>
 
               {attentionCount === 0 ? (
                 <EmptyState
                   title="Tidak ada yang perlu perhatian"
-                  description="Peringatan tim dan kasus pembinaan akan muncul di sini saat ada."
+                  description="Peringatan dari tim dan kasus yang perlu masukanmu akan muncul di sini saat ada."
                 />
               ) : (
-                <ul data-onboarding-id="manager-insights-steps" className="space-y-3">
+                <ul
+                  data-onboarding-id="manager-insights-steps"
+                  className="space-y-3"
+                >
                   {boundaryAlerts.map((alert) => (
                     <li
                       key={`${alert.team_id ?? alert.team_name}-${alert.title}`}
@@ -452,17 +566,27 @@ export function ManagerInsightsPage() {
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold clara-text-primary">{plainJargon(alert.title)}</h3>
-                            <ValueTag table={ALERT_SEVERITY} value={alert.severity} />
+                            <h3 className="text-base font-semibold clara-text-primary">
+                              {plainJargon(alert.title)}
+                            </h3>
+                            <ValueTag
+                              table={ALERT_SEVERITY}
+                              value={alert.severity}
+                            />
                           </div>
                           <p className="mt-1 text-xs clara-text-muted">
                             {alert.team_name}
                             {alert.unit_name ? ` · ${alert.unit_name}` : ""}
                           </p>
-                          <p className="mt-2 text-sm leading-6 clara-text-secondary">{plainJargon(alert.description)}</p>
+                          <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                            {plainJargon(alert.description)}
+                          </p>
                         </div>
                         {alert.target_href ? (
-                          <Link href={alert.target_href} className="clara-button clara-button-primary shrink-0">
+                          <Link
+                            href={alert.target_href}
+                            className="clara-button clara-button-primary shrink-0"
+                          >
                             Lihat
                           </Link>
                         ) : null}
@@ -479,22 +603,35 @@ export function ManagerInsightsPage() {
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold clara-text-primary">{item.lead_name}</h3>
-                            <ValueTag table={REVIEW_STATUS} value={item.review_status} />
-                            {item.risk_level === "high" ? <Tag tone="danger">Risiko tinggi</Tag> : null}
+                            <h3 className="text-base font-semibold clara-text-primary">
+                              {item.lead_name}
+                            </h3>
+                            <ValueTag
+                              table={REVIEW_STATUS}
+                              value={item.review_status}
+                            />
+                            {item.risk_level === "high" ? (
+                              <Tag tone="danger">Risiko tinggi</Tag>
+                            ) : null}
                           </div>
                           <p className="mt-1 text-xs clara-text-muted">
-                            Sales: {item.sales_owner_name ?? "belum ada"} · Peninjau:{" "}
-                            {item.reviewer_user_name ?? "belum ditunjuk"} · pesan terakhir{" "}
+                            Sales: {item.sales_owner_name ?? "belum ada"} ·
+                            Peninjau:{" "}
+                            {item.reviewer_user_name ?? "belum ditunjuk"} ·
+                            pesan terakhir{" "}
                             {formatRelativeTime(item.latest_message_at)}
                           </p>
                           <p className="mt-2 text-sm leading-6 clara-text-secondary">
-                            <span className="font-semibold clara-text-primary">Yang perlu dilakukan: </span>
+                            <span className="font-semibold clara-text-primary">
+                              Yang perlu dilakukan:{" "}
+                            </span>
                             {describeReviewCase(item, isHeadView)}
                           </p>
                           {item.recommended_action ? (
                             <p className="mt-1 text-sm leading-6 clara-text-secondary">
-                              <span className="font-semibold clara-text-primary">Saran Clara: </span>
+                              <span className="font-semibold clara-text-primary">
+                                Saran Clara:{" "}
+                              </span>
                               {item.recommended_action}
                             </p>
                           ) : null}
@@ -506,7 +643,10 @@ export function ManagerInsightsPage() {
                           >
                             Buka chat
                           </Link>
-                          <Link href="/approvals" className="clara-button clara-button-secondary">
+                          <Link
+                            href="/approvals"
+                            className="clara-button clara-button-secondary"
+                          >
                             {isHeadView ? "Arahan Tim" : "Review Sales"}
                           </Link>
                         </div>
@@ -524,13 +664,36 @@ export function ManagerInsightsPage() {
             >
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <h2 id="members-title" className="text-base font-semibold clara-text-primary">
-                    Anggota tim <span className="font-normal clara-text-muted">({sortedSales.length})</span>
+                  <h2
+                    id="members-title"
+                    className="text-base font-semibold clara-text-primary"
+                  >
+                    Anggota tim{" "}
+                    <span className="font-normal clara-text-muted">
+                      ({sortedSales.length})
+                    </span>
                   </h2>
                   <p className="text-sm clara-text-secondary">
-                    Dibanding {describeRangeLabel(insights.sales_performance_summary.previous_range_label)}:{" "}
-                    {describeDelta(insights.sales_performance_summary.delta_total_needs_reply, true).text} chat belum
-                    dibalas, {describeDelta(insights.sales_performance_summary.delta_total_overdue_follow_up, true).text}{" "}
+                    Dibanding{" "}
+                    {describeRangeLabel(
+                      insights.sales_performance_summary.previous_range_label,
+                    )}
+                    :{" "}
+                    {
+                      describeDelta(
+                        insights.sales_performance_summary
+                          .delta_total_needs_reply,
+                        true,
+                      ).text
+                    }{" "}
+                    chat belum dibalas,{" "}
+                    {
+                      describeDelta(
+                        insights.sales_performance_summary
+                          .delta_total_overdue_follow_up,
+                        true,
+                      ).text
+                    }{" "}
                     follow-up terlambat.
                   </p>
                 </div>
@@ -589,15 +752,20 @@ export function ManagerInsightsPage() {
                         item={item}
                         isOpen={selectedSalesUserId === item.sales_user_id}
                         isLoading={salesDetailLoadingId === item.sales_user_id}
-                        onToggleDetail={() => void handleOpenSalesDetail(item.sales_user_id)}
+                        onToggleDetail={() =>
+                          void handleOpenSalesDetail(item.sales_user_id)
+                        }
                         onCreateAction={() => openSalesActionDraft(item)}
                       />
 
-                      {actionDraft?.contextKey === `sales:${item.sales_user_id}` ? (
+                      {actionDraft?.contextKey ===
+                      `sales:${item.sales_user_id}` ? (
                         <ActionDraftPanel
                           draft={actionDraft}
                           salesOptions={actionAssigneeOptions}
-                          isSubmitting={actionSubmitKey === actionDraft.contextKey}
+                          isSubmitting={
+                            actionSubmitKey === actionDraft.contextKey
+                          }
                           onCancel={() => setActionDraft(null)}
                           onChange={setActionDraft}
                           onSubmit={handleSubmitActionDraft}
@@ -610,11 +778,16 @@ export function ManagerInsightsPage() {
                             <LoadingState message="Memuat detail Sales ini..." />
                           ) : null}
                           {!salesDetailLoadingId && salesDetailError ? (
-                            <div role="alert" className="clara-alert clara-alert-danger">
+                            <div
+                              role="alert"
+                              className="clara-alert clara-alert-danger"
+                            >
                               {salesDetailError}
                             </div>
                           ) : null}
-                          {!salesDetailLoadingId && salesDetail && salesDetail.sales_user.id === selectedSalesUserId ? (
+                          {!salesDetailLoadingId &&
+                          salesDetail &&
+                          salesDetail.sales_user.id === selectedSalesUserId ? (
                             <SalesDetailPanel detail={salesDetail} />
                           ) : null}
                         </>
@@ -627,22 +800,32 @@ export function ManagerInsightsPage() {
               {sortedSales.length > salesVisible ? (
                 <button
                   type="button"
-                  onClick={() => setSalesVisible((count) => count + VISIBLE_STEP)}
+                  onClick={() =>
+                    setSalesVisible((count) => count + VISIBLE_STEP)
+                  }
                   className="clara-button clara-button-ghost"
                 >
-                  Tampilkan {Math.min(sortedSales.length - salesVisible, VISIBLE_STEP)} Sales lagi (
-                  {sortedSales.length - salesVisible} tersisa)
+                  Tampilkan{" "}
+                  {Math.min(sortedSales.length - salesVisible, VISIBLE_STEP)}{" "}
+                  Sales lagi ({sortedSales.length - salesVisible} tersisa)
                 </button>
               ) : null}
             </section>
 
             <section aria-labelledby="tasks-title" className="space-y-3">
               <div>
-                <h2 id="tasks-title" className="text-base font-semibold clara-text-primary">
-                  Tugas untuk tim <span className="font-normal clara-text-muted">({openActionItems.length})</span>
+                <h2
+                  id="tasks-title"
+                  className="text-base font-semibold clara-text-primary"
+                >
+                  Tugas untuk tim{" "}
+                  <span className="font-normal clara-text-muted">
+                    ({openActionItems.length})
+                  </span>
                 </h2>
                 <p className="text-sm clara-text-secondary">
-                  Tugas yang kamu buat dari daftar anggota tim. Selesai: {actionList?.done_count ?? 0} · Dilewati:{" "}
+                  Tugas yang kamu berikan ke anggota tim. Selesai:{" "}
+                  {actionList?.done_count ?? 0} · Dilewati:{" "}
                   {actionList?.skipped_count ?? 0}
                 </p>
               </div>
@@ -650,23 +833,38 @@ export function ManagerInsightsPage() {
               {openActionItems.length === 0 ? (
                 <EmptyState
                   title="Belum ada tugas yang berjalan"
-                  description="Klik Beri tugas pada seorang anggota tim untuk membuat tugas pembinaan."
+                  description="Klik Beri tugas pada seorang anggota tim untuk membuat tugas baginya."
                 />
               ) : (
                 <ul className="space-y-3">
                   {openActionItems.slice(0, 8).map((item) => (
-                    <li key={item.id} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
+                    <li
+                      key={item.id}
+                      className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5"
+                    >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-base font-semibold clara-text-primary">{item.title}</h3>
-                            <ValueTag table={ACTION_STATUS} value={item.status} />
-                            <ValueTag table={PRIORITY} value={item.priority_label} />
+                            <h3 className="text-base font-semibold clara-text-primary">
+                              {item.title}
+                            </h3>
+                            <ValueTag
+                              table={ACTION_STATUS}
+                              value={item.status}
+                            />
+                            <ValueTag
+                              table={PRIORITY}
+                              value={item.priority_label}
+                            />
                           </div>
-                          <p className="mt-2 text-sm leading-6 clara-text-secondary">{item.description}</p>
+                          <p className="mt-2 text-sm leading-6 clara-text-secondary">
+                            {item.description}
+                          </p>
                           <p className="mt-2 text-xs clara-text-muted">
-                            Untuk: {item.assigned_to_user_name ?? "-"} · Tenggat: {formatDateTime(item.due_at)} · Dibuat
-                            oleh {item.created_by_user_name ?? "-"} · {labelOf(ACTION_TYPE, item.action_type)}
+                            Untuk: {item.assigned_to_user_name ?? "-"} ·
+                            Tenggat: {formatDateTime(item.due_at)} · Dibuat oleh{" "}
+                            {item.created_by_user_name ?? "-"} ·{" "}
+                            {labelOf(ACTION_TYPE, item.action_type)}
                           </p>
                         </div>
                         <div className="flex shrink-0 flex-wrap gap-2">
@@ -674,7 +872,12 @@ export function ManagerInsightsPage() {
                             <button
                               type="button"
                               disabled={actionStatusLoadingId === item.id}
-                              onClick={() => void handleActionStatusUpdate(item.id, "in_progress")}
+                              onClick={() =>
+                                void handleActionStatusUpdate(
+                                  item.id,
+                                  "in_progress",
+                                )
+                              }
                               className="clara-button clara-button-secondary"
                             >
                               Mulai
@@ -683,15 +886,21 @@ export function ManagerInsightsPage() {
                           <button
                             type="button"
                             disabled={actionStatusLoadingId === item.id}
-                            onClick={() => void handleActionStatusUpdate(item.id, "done")}
+                            onClick={() =>
+                              void handleActionStatusUpdate(item.id, "done")
+                            }
                             className="clara-button clara-button-primary"
                           >
-                            {actionStatusLoadingId === item.id ? "Menyimpan..." : "Tandai selesai"}
+                            {actionStatusLoadingId === item.id
+                              ? "Menyimpan..."
+                              : "Tandai selesai"}
                           </button>
                           <button
                             type="button"
                             disabled={actionStatusLoadingId === item.id}
-                            onClick={() => void handleActionStatusUpdate(item.id, "skipped")}
+                            onClick={() =>
+                              void handleActionStatusUpdate(item.id, "skipped")
+                            }
                             className="clara-button clara-button-ghost"
                           >
                             Lewati
@@ -709,26 +918,37 @@ export function ManagerInsightsPage() {
                 data-onboarding-id="manager-insights-team-performance"
                 className="clara-card group p-5 sm:p-6"
               >
-                <summary className="flex min-h-11 cursor-pointer flex-wrap items-center justify-between gap-2 text-lg font-bold clara-text-primary">
+                <summary className="clara-disclosure text-lg font-bold clara-text-primary">
                   <span>
                     Perbandingan antar tim{" "}
-                    <span className="font-normal clara-text-muted">({insights.team_performance.length})</span>
+                    <span className="font-normal clara-text-muted">
+                      ({insights.team_performance.length})
+                    </span>
                   </span>
-                  <span className="text-sm font-normal clara-text-secondary group-open:hidden">Tampilkan</span>
                 </summary>
                 <p className="mt-1 text-sm clara-text-secondary">
-                  Lihat tim mana yang beban kerjanya paling berat dan Sales mana yang paling mewakili kondisinya.
+                  Lihat tim mana yang beban kerjanya paling berat dan Sales mana
+                  yang paling mewakili kondisinya.
                 </p>
 
                 <ul className="mt-4 space-y-3">
                   {insights.team_performance.map((team) => (
-                    <li key={team.team_id ?? team.team_name} className="space-y-3">
-                      <TeamRow item={team} onCreateAction={() => openTeamActionDraft(team)} />
-                      {actionDraft?.contextKey === `team:${team.team_id ?? team.team_name}` ? (
+                    <li
+                      key={team.team_id ?? team.team_name}
+                      className="space-y-3"
+                    >
+                      <TeamRow
+                        item={team}
+                        onCreateAction={() => openTeamActionDraft(team)}
+                      />
+                      {actionDraft?.contextKey ===
+                      `team:${team.team_id ?? team.team_name}` ? (
                         <ActionDraftPanel
                           draft={actionDraft}
                           salesOptions={actionAssigneeOptions}
-                          isSubmitting={actionSubmitKey === actionDraft.contextKey}
+                          isSubmitting={
+                            actionSubmitKey === actionDraft.contextKey
+                          }
                           onCancel={() => setActionDraft(null)}
                           onChange={setActionDraft}
                           onSubmit={handleSubmitActionDraft}
@@ -742,20 +962,32 @@ export function ManagerInsightsPage() {
 
             {weeklyReview ? (
               <details className="clara-card group p-5 sm:p-6">
-                <summary className="flex min-h-11 cursor-pointer flex-wrap items-center justify-between gap-2 text-lg font-bold clara-text-primary">
+                <summary className="clara-disclosure text-lg font-bold clara-text-primary">
                   <span>Review mingguan</span>
-                  <span className="text-sm font-normal clara-text-secondary group-open:hidden">Tampilkan</span>
                 </summary>
                 <p className="mt-1 text-sm clara-text-secondary">
-                  {formatWeekLabel(weeklyReview.review_start)} sampai {formatWeekLabel(weeklyReview.review_end)} ·{" "}
+                  {formatWeekLabel(weeklyReview.review_start)} sampai{" "}
+                  {formatWeekLabel(weeklyReview.review_end)} ·{" "}
                   {describeScopeLabel(weeklyReview.scope_label)}
                 </p>
 
                 <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 text-sm md:grid-cols-4">
-                  <Fact label="Tim yang sehat" value={String(weeklyReview.healthy_team_count)} />
-                  <Fact label="Tim perlu perhatian" value={String(weeklyReview.teams_needing_attention_count)} />
-                  <Fact label="Tugas belum selesai" value={String(weeklyReview.unresolved_action_count)} />
-                  <Fact label="Alert kritis aktif" value={String(weeklyReview.critical_alert_open_count)} />
+                  <Fact
+                    label="Tim yang sehat"
+                    value={String(weeklyReview.healthy_team_count)}
+                  />
+                  <Fact
+                    label="Tim perlu perhatian"
+                    value={String(weeklyReview.teams_needing_attention_count)}
+                  />
+                  <Fact
+                    label="Tugas belum selesai"
+                    value={String(weeklyReview.unresolved_action_count)}
+                  />
+                  <Fact
+                    label="Peringatan penting yang masih terbuka"
+                    value={String(weeklyReview.critical_alert_open_count)}
+                  />
                 </dl>
 
                 <div className="mt-5 grid gap-5 xl:grid-cols-3">
@@ -784,20 +1016,29 @@ export function ManagerInsightsPage() {
 
                 {weeklyReview.critical_alerts_open.length > 0 ? (
                   <div className="mt-5">
-                    <h3 className="text-sm font-semibold clara-text-primary">Alert kritis yang masih terbuka</h3>
+                    <h3 className="text-sm font-semibold clara-text-primary">
+                      Peringatan penting yang masih terbuka
+                    </h3>
                     <ul className="mt-2 space-y-2">
                       {weeklyReview.critical_alerts_open.map((alert) => (
                         <li
                           key={alert.notification_id}
                           className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-3 text-sm"
                         >
-                          <p className="font-semibold clara-text-primary">{plainJargon(alert.title)}</p>
-                          <p className="mt-1 clara-text-secondary">{plainJargon(alert.description)}</p>
+                          <p className="font-semibold clara-text-primary">
+                            {plainJargon(alert.title)}
+                          </p>
+                          <p className="mt-1 clara-text-secondary">
+                            {plainJargon(alert.description)}
+                          </p>
                         </li>
                       ))}
                     </ul>
-                    <Link href="/notifications" className="clara-button clara-button-secondary mt-3">
-                      Buka semua alert
+                    <Link
+                      href="/notifications"
+                      className="clara-button clara-button-secondary mt-3"
+                    >
+                      Buka semua peringatan
                     </Link>
                   </div>
                 ) : null}
@@ -810,11 +1051,15 @@ export function ManagerInsightsPage() {
                 aria-labelledby="objection-title"
                 className="clara-card-outline p-5 sm:p-6"
               >
-                <h2 id="objection-title" className="text-base font-semibold clara-text-primary">
+                <h2
+                  id="objection-title"
+                  className="text-base font-semibold clara-text-primary"
+                >
                   Hal yang paling sering membuat customer ragu
                 </h2>
                 <p className="mt-1 text-sm clara-text-secondary">
-                  Kalau keraguan yang sama muncul terus, beri arahan umum ke seluruh tim.
+                  Kalau keraguan yang sama muncul terus, beri arahan umum ke
+                  seluruh tim.
                 </p>
                 <ul className="mt-3 flex flex-wrap gap-2">
                   {objectionTrends.slice(0, 6).map((item) => (
@@ -834,16 +1079,34 @@ export function ManagerInsightsPage() {
   );
 }
 
-function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Fact({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <div className="min-w-0" title={hint}>
       <dt className="text-xs clara-text-muted">{label}</dt>
-      <dd className="mt-1 break-words text-lg font-semibold clara-text-primary">{value}</dd>
+      <dd className="mt-1 break-words text-lg font-semibold clara-text-primary">
+        {value}
+      </dd>
     </div>
   );
 }
 
-function DeltaTag({ label, value, lowerIsBetter }: { label: string; value: number; lowerIsBetter?: boolean }) {
+function DeltaTag({
+  label,
+  value,
+  lowerIsBetter,
+}: {
+  label: string;
+  value: number;
+  lowerIsBetter?: boolean;
+}) {
   if (value === 0) {
     return null;
   }
@@ -869,22 +1132,52 @@ function SalesRow({
   onToggleDetail: () => void;
   onCreateAction: () => void;
 }) {
+  // Tanda "baik" tidak perlu ditampilkan di tiap baris. Manager mencari yang bermasalah.
+  const hasSignal =
+    describe(SLA_STATUS, item.avg_response_sla_status).tone !== "good" ||
+    describe(CRM_DISCIPLINE, item.crm_discipline_status).tone !== "good" ||
+    item.trend.delta_needs_reply !== 0 ||
+    item.trend.delta_overdue_follow_up !== 0 ||
+    item.trend.delta_won_deals !== 0;
+
   return (
     <div className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold clara-text-primary">{item.sales_name}</h3>
-            <ValueTag table={PRIORITY} value={item.coaching_signal.priority_label} />
-            <ValueTag table={MOMENTUM} value={item.trend.momentum_label} />
+            <h3 className="text-base font-semibold clara-text-primary">
+              {item.sales_name}
+            </h3>
+            <ValueTag
+              table={PRIORITY}
+              value={item.coaching_signal.priority_label}
+            />
+            {item.trend.momentum_label !== "stable" ? (
+              <ValueTag table={MOMENTUM} value={item.trend.momentum_label} />
+            ) : null}
           </div>
-          <p className="mt-1 text-sm leading-6 clara-text-secondary">{plainJargon(item.coaching_signal.primary_reason)}</p>
+          <p className="mt-1 text-sm leading-6 clara-text-secondary">
+            {plainJargon(item.coaching_signal.primary_reason)}
+          </p>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <button type="button" onClick={onToggleDetail} aria-expanded={isOpen} className="clara-button clara-button-primary">
-            {isOpen ? (isLoading ? "Memuat..." : "Tutup detail") : "Lihat detail"}
+          <button
+            type="button"
+            onClick={onToggleDetail}
+            aria-expanded={isOpen}
+            className="clara-button clara-button-primary"
+          >
+            {isOpen
+              ? isLoading
+                ? "Memuat..."
+                : "Tutup detail"
+              : "Lihat detail"}
           </button>
-          <button type="button" onClick={onCreateAction} className="clara-button clara-button-secondary">
+          <button
+            type="button"
+            onClick={onCreateAction}
+            className="clara-button clara-button-secondary"
+          >
             Beri tugas
           </button>
         </div>
@@ -892,58 +1185,117 @@ function SalesRow({
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm md:grid-cols-4">
         <Fact label="Lead aktif" value={String(item.active_leads_count)} />
-        <Fact label="Chat belum dibalas" value={String(item.needs_reply_count)} />
-        <Fact label="Follow-up terlambat" value={String(item.overdue_follow_up_count)} />
+        <Fact
+          label="Chat belum dibalas"
+          value={String(item.needs_reply_count)}
+        />
+        <Fact
+          label="Follow-up terlambat"
+          value={String(item.overdue_follow_up_count)}
+        />
         <Fact label="Customer panas" value={String(item.hot_leads_count)} />
       </dl>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <ValueTag table={SLA_STATUS} value={item.avg_response_sla_status} />
-        <ValueTag table={CRM_DISCIPLINE} value={item.crm_discipline_status} />
-        <DeltaTag label="Belum dibalas" value={item.trend.delta_needs_reply} lowerIsBetter />
-        <DeltaTag label="Terlambat" value={item.trend.delta_overdue_follow_up} lowerIsBetter />
-        <DeltaTag label="Deal berhasil" value={item.trend.delta_won_deals} />
-      </div>
+      {hasSignal ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {describe(SLA_STATUS, item.avg_response_sla_status).tone !==
+          "good" ? (
+            <ValueTag table={SLA_STATUS} value={item.avg_response_sla_status} />
+          ) : null}
+          {describe(CRM_DISCIPLINE, item.crm_discipline_status).tone !==
+          "good" ? (
+            <ValueTag
+              table={CRM_DISCIPLINE}
+              value={item.crm_discipline_status}
+            />
+          ) : null}
+          <DeltaTag
+            label="Belum dibalas"
+            value={item.trend.delta_needs_reply}
+            lowerIsBetter
+          />
+          <DeltaTag
+            label="Terlambat"
+            value={item.trend.delta_overdue_follow_up}
+            lowerIsBetter
+          />
+          <DeltaTag label="Deal berhasil" value={item.trend.delta_won_deals} />
+        </div>
+      ) : null}
 
       <p className="mt-3 text-xs clara-text-muted">
-        Fokus pembinaan: {labelOf(FOCUS_AREA, item.coaching_signal.focus_area)} · aktivitas terakhir{" "}
-        {formatRelativeTime(item.latest_activity_at)} · nilai kinerja {item.scorecard.overall_score} (
+        Yang perlu difokuskan:{" "}
+        {labelOf(FOCUS_AREA, item.coaching_signal.focus_area).toLowerCase()} ·
+        Aktif terakhir{" "}
+        {item.latest_activity_at
+          ? formatRelativeTime(item.latest_activity_at)
+          : "belum ada"}{" "}
+        · Skor kinerja {item.scorecard.overall_score} dari 100 (
         {labelOf(SCORE_LABEL, item.scorecard.score_label).toLowerCase()})
       </p>
     </div>
   );
 }
 
-function TeamRow({ item, onCreateAction }: { item: TeamItem; onCreateAction: () => void }) {
+function TeamRow({
+  item,
+  onCreateAction,
+}: {
+  item: TeamItem;
+  onCreateAction: () => void;
+}) {
   return (
     <div className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold clara-text-primary">{item.team_name}</h3>
-            <ValueTag table={PRIORITY} value={item.coaching_signal.priority_label} />
-            <ValueTag table={MOMENTUM} value={item.trend.momentum_label} />
+            <h3 className="text-base font-semibold clara-text-primary">
+              {item.team_name}
+            </h3>
+            <ValueTag
+              table={PRIORITY}
+              value={item.coaching_signal.priority_label}
+            />
+            {item.trend.momentum_label !== "stable" ? (
+              <ValueTag table={MOMENTUM} value={item.trend.momentum_label} />
+            ) : null}
           </div>
           <p className="mt-1 text-xs clara-text-muted">
-            {item.unit_name ?? "Tanpa unit"} · Manager: {item.manager_user_name ?? "-"} · {item.member_count} Sales
+            {item.unit_name ?? "Tanpa unit"} · Manager:{" "}
+            {item.manager_user_name ?? "-"} · {item.member_count} Sales
           </p>
-          <p className="mt-2 text-sm leading-6 clara-text-secondary">{plainJargon(item.coaching_signal.primary_reason)}</p>
+          <p className="mt-2 text-sm leading-6 clara-text-secondary">
+            {plainJargon(item.coaching_signal.primary_reason)}
+          </p>
         </div>
-        <button type="button" onClick={onCreateAction} className="clara-button clara-button-secondary shrink-0">
+        <button
+          type="button"
+          onClick={onCreateAction}
+          className="clara-button clara-button-secondary shrink-0"
+        >
           Beri tugas ke tim
         </button>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm md:grid-cols-4">
         <Fact label="Lead aktif" value={String(item.active_leads_count)} />
-        <Fact label="Chat belum dibalas" value={String(item.needs_reply_count)} />
-        <Fact label="Follow-up terlambat" value={String(item.overdue_follow_up_count)} />
+        <Fact
+          label="Chat belum dibalas"
+          value={String(item.needs_reply_count)}
+        />
+        <Fact
+          label="Follow-up terlambat"
+          value={String(item.overdue_follow_up_count)}
+        />
         <Fact label="Customer panas" value={String(item.hot_leads_count)} />
       </dl>
 
       {item.top_sales_contributors.length > 0 ? (
         <p className="mt-3 text-xs clara-text-muted">
-          Paling mewakili kondisi tim: {item.top_sales_contributors.map((sales) => sales.sales_name).join(", ")}
+          Paling mewakili kondisi tim:{" "}
+          {item.top_sales_contributors
+            .map((sales) => sales.sales_name)
+            .join(", ")}
         </p>
       ) : null}
     </div>
@@ -976,15 +1328,24 @@ function WeeklyList({
               className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-3"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold clara-text-primary">{item.label}</p>
+                <p className="text-sm font-semibold clara-text-primary">
+                  {item.label}
+                </p>
                 <ValueTag table={SCORE_LABEL} value={item.score_label} />
                 <ValueTag table={MOMENTUM} value={item.trend_label} />
               </div>
-              <p className="mt-1 text-sm clara-text-secondary">{plainJargon(item.summary)}</p>
-              <p className="mt-1 text-xs clara-text-muted">
-                Belum dibalas {item.backlog_count} · Terlambat {item.overdue_count} · Tugas terbuka {item.action_open_count}
+              <p className="mt-1 text-sm clara-text-secondary">
+                {plainJargon(item.summary)}
               </p>
-              <button type="button" onClick={() => onAction(item)} className="clara-button clara-button-ghost mt-2">
+              <p className="mt-1 text-xs clara-text-muted">
+                Belum dibalas {item.backlog_count} · Terlambat{" "}
+                {item.overdue_count} · Tugas terbuka {item.action_open_count}
+              </p>
+              <button
+                type="button"
+                onClick={() => onAction(item)}
+                className="clara-button clara-button-ghost mt-2"
+              >
                 {actionLabel}
               </button>
             </li>
@@ -1020,9 +1381,15 @@ function ActionDraftPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h4 className="text-base font-bold clara-text-primary">Beri tugas</h4>
-          <p className="mt-1 text-sm clara-text-secondary">Tugasnya tersimpan dan muncul di daftar Tugas untuk tim.</p>
+          <p className="mt-1 text-sm clara-text-secondary">
+            Tugasnya tersimpan dan muncul di daftar Tugas untuk tim.
+          </p>
         </div>
-        <button type="button" onClick={onCancel} className="clara-button clara-button-ghost">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="clara-button clara-button-ghost"
+        >
           Batal
         </button>
       </div>
@@ -1035,7 +1402,9 @@ function ActionDraftPanel({
           <select
             id={`${id}-type`}
             value={draft.actionType}
-            onChange={(event) => onChange({ ...draft, actionType: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...draft, actionType: event.target.value })
+            }
             className="clara-select mt-2 w-full"
           >
             {ACTION_TYPE_OPTIONS.map((option) => (
@@ -1052,7 +1421,9 @@ function ActionDraftPanel({
           <select
             id={`${id}-priority`}
             value={draft.priorityLabel}
-            onChange={(event) => onChange({ ...draft, priorityLabel: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...draft, priorityLabel: event.target.value })
+            }
             className="clara-select mt-2 w-full"
           >
             {PRIORITY_OPTIONS.map((option) => (
@@ -1073,7 +1444,9 @@ function ActionDraftPanel({
               onChange({
                 ...draft,
                 assignedToUserId: event.target.value,
-                salesUserId: draft.salesUserId ? event.target.value : draft.salesUserId,
+                salesUserId: draft.salesUserId
+                  ? event.target.value
+                  : draft.salesUserId,
               })
             }
             className="clara-select mt-2 w-full"
@@ -1094,7 +1467,9 @@ function ActionDraftPanel({
             id={`${id}-due`}
             type="datetime-local"
             value={draft.dueAt}
-            onChange={(event) => onChange({ ...draft, dueAt: event.target.value })}
+            onChange={(event) =>
+              onChange({ ...draft, dueAt: event.target.value })
+            }
             className="clara-input mt-2 w-full"
           />
         </div>
@@ -1108,7 +1483,9 @@ function ActionDraftPanel({
           id={`${id}-title`}
           type="text"
           value={draft.title}
-          onChange={(event) => onChange({ ...draft, title: event.target.value })}
+          onChange={(event) =>
+            onChange({ ...draft, title: event.target.value })
+          }
           className="clara-input mt-2 w-full"
         />
       </div>
@@ -1120,14 +1497,18 @@ function ActionDraftPanel({
         <textarea
           id={`${id}-desc`}
           value={draft.description}
-          onChange={(event) => onChange({ ...draft, description: event.target.value })}
+          onChange={(event) =>
+            onChange({ ...draft, description: event.target.value })
+          }
           className="clara-textarea mt-2 min-h-[110px] w-full"
         />
       </div>
 
       <button
         type="submit"
-        disabled={isSubmitting || !draft.assignedToUserId || !draft.title.trim()}
+        disabled={
+          isSubmitting || !draft.assignedToUserId || !draft.title.trim()
+        }
         className="clara-button clara-button-primary"
       >
         {isSubmitting ? "Menyimpan..." : "Simpan tugas"}
@@ -1136,29 +1517,49 @@ function ActionDraftPanel({
   );
 }
 
-function SalesDetailPanel({ detail }: { detail: SalesPerformanceDetailResponse }) {
+function SalesDetailPanel({
+  detail,
+}: {
+  detail: SalesPerformanceDetailResponse;
+}) {
   const summary = detail.summary;
-  const teamLabel = [detail.sales_user.team_name, detail.sales_user.unit_name].filter(Boolean).join(" · ");
+  const teamLabel = [detail.sales_user.team_name, detail.sales_user.unit_name]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <section className="space-y-4 rounded-2xl border border-clara-line bg-clara-sunken p-4 sm:p-5">
       <div>
-        <h4 className="text-lg font-bold clara-text-primary">{detail.sales_user.name}</h4>
+        <h4 className="text-lg font-bold clara-text-primary">
+          {detail.sales_user.name}
+        </h4>
         <p className="mt-1 text-xs clara-text-muted">
-          {teamLabel || "Tanpa tim"} · {detail.sales_user.is_active ? "Aktif" : "Nonaktif"} · periode{" "}
-          {describeRangeLabel(summary.range_label)} dibanding {describeRangeLabel(summary.previous_range_label)}
+          {teamLabel || "Tanpa tim"} ·{" "}
+          {detail.sales_user.is_active ? "Aktif" : "Nonaktif"} · periode{" "}
+          {describeRangeLabel(summary.range_label)} dibanding{" "}
+          {describeRangeLabel(summary.previous_range_label)}
         </p>
       </div>
 
       <div className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4">
-        <p className="text-sm font-semibold clara-text-primary">{plainJargon(summary.coaching_signal.primary_reason)}</p>
-        <p className="mt-1 text-sm clara-text-secondary">{plainJargon(summary.coaching_signal.recommended_action)}</p>
+        <p className="text-sm font-semibold clara-text-primary">
+          {plainJargon(summary.coaching_signal.primary_reason)}
+        </p>
+        <p className="mt-1 text-sm clara-text-secondary">
+          {plainJargon(summary.coaching_signal.recommended_action)}
+        </p>
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm md:grid-cols-4">
         <Fact label="Lead aktif" value={String(summary.active_leads_count)} />
-        <Fact label="Chat belum dibalas" value={String(summary.needs_reply_count)} />
-        <Fact label="Follow-up terlambat" value={String(summary.overdue_follow_up_count)} />
+        <Fact
+          label="Chat belum dibalas"
+          value={String(summary.needs_reply_count)}
+        />
+        <Fact
+          label="Follow-up terlambat"
+          value={String(summary.overdue_follow_up_count)}
+        />
         <Fact label="Customer panas" value={String(summary.hot_leads_count)} />
         <Fact
           label="Chat yang sudah dibaca Clara"
@@ -1179,14 +1580,19 @@ function SalesDetailPanel({ detail }: { detail: SalesPerformanceDetailResponse }
               href={item.target_href}
               className="block rounded-2xl border border-clara-line-subtle bg-clara-raised p-3 hover:border-clara-gold"
             >
-              <p className="text-sm font-semibold clara-text-primary">{item.lead_name}</p>
+              <p className="text-sm font-semibold clara-text-primary">
+                {item.lead_name}
+              </p>
               <div className="mt-1 flex flex-wrap gap-2">
                 <ValueTag table={STAGE} value={item.current_stage} />
                 <ValueTag table={TEMPERATURE} value={item.lead_temperature} />
               </div>
               <p className="mt-1 text-xs clara-text-muted">
-                Terakhir dihubungi {formatRelativeTime(item.last_contact_at)} · follow-up{" "}
-                {item.next_follow_up_at ? formatDateTime(item.next_follow_up_at) : "belum dijadwalkan"}
+                Terakhir dihubungi {formatRelativeTime(item.last_contact_at)} ·
+                follow-up{" "}
+                {item.next_follow_up_at
+                  ? formatDateTime(item.next_follow_up_at)
+                  : "belum dijadwalkan"}
               </p>
             </Link>
           ))}
@@ -1201,13 +1607,18 @@ function SalesDetailPanel({ detail }: { detail: SalesPerformanceDetailResponse }
               href={item.target_href}
               className="block rounded-2xl border border-clara-line-subtle bg-clara-raised p-3 hover:border-clara-gold"
             >
-              <p className="text-sm font-semibold clara-text-primary">{item.conversation_title}</p>
+              <p className="text-sm font-semibold clara-text-primary">
+                {item.conversation_title}
+              </p>
               <div className="mt-1 flex flex-wrap gap-2">
                 <ValueTag table={REPLY_STATE} value={item.ui_status} />
-                {item.risk_level === "high" ? <Tag tone="danger">Risiko tinggi</Tag> : null}
+                {item.risk_level === "high" ? (
+                  <Tag tone="danger">Risiko tinggi</Tag>
+                ) : null}
               </div>
               <p className="mt-1 text-xs clara-text-muted">
-                {formatChannelLabel(item.source_channel)} · pesan terakhir {formatRelativeTime(item.last_message_at)}
+                {formatChannelLabel(item.source_channel)} · pesan terakhir{" "}
+                {formatRelativeTime(item.last_message_at)}
               </p>
             </Link>
           ))}
@@ -1222,7 +1633,9 @@ function SalesDetailPanel({ detail }: { detail: SalesPerformanceDetailResponse }
               href={item.target_href}
               className="block rounded-2xl border border-clara-line-subtle bg-clara-raised p-3 hover:border-clara-gold"
             >
-              <p className="text-sm font-semibold clara-text-primary">{item.lead_name}</p>
+              <p className="text-sm font-semibold clara-text-primary">
+                {item.lead_name}
+              </p>
               <div className="mt-1 flex flex-wrap gap-2">
                 <ValueTag table={PRIORITY} value={item.priority_label} />
               </div>
@@ -1237,14 +1650,25 @@ function SalesDetailPanel({ detail }: { detail: SalesPerformanceDetailResponse }
   );
 }
 
-function DetailList({ title, emptyText, items }: { title: string; emptyText: string; items: React.ReactNode[] }) {
+function DetailList({
+  title,
+  emptyText,
+  items,
+}: {
+  title: string;
+  emptyText: string;
+  items: React.ReactNode[];
+}) {
   return (
     <section className="min-w-0">
       <h5 className="text-sm font-semibold clara-text-primary">{title}</h5>
       <div className="mt-2 space-y-2">
-        {items.length === 0 ? <p className="text-sm clara-text-secondary">{emptyText}</p> : items}
+        {items.length === 0 ? (
+          <p className="text-sm clara-text-secondary">{emptyText}</p>
+        ) : (
+          items
+        )}
       </div>
     </section>
   );
 }
-

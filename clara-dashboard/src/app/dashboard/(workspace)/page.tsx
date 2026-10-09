@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ManagerHome } from "@/components/dashboard/ManagerHome";
 import { SalesHome } from "@/components/dashboard/SalesHome";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { PAGE_NAMES } from "@/lib/labels";
@@ -11,6 +12,7 @@ import { ACTIONABLE_BUCKETS, getQueueBucket } from "@/lib/inbox";
 import { plainJargon } from "@/lib/vocab";
 import { canAccessQueueAndActionCenter } from "@/lib/roles";
 import type {
+  ChatReviewCenterResponse,
   CurrentUser,
   KpiCommandCenterResponse,
   ManagerInsightsResponse,
@@ -59,6 +61,7 @@ export default function DashboardHomePage() {
   const [inboxItems, setInboxItems] = useState<SalesInboxItem[]>([]);
   const [worklist, setWorklist] = useState<SalesWorklistResponse | null>(null);
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
+  const [reviewQueue, setReviewQueue] = useState<ChatReviewCenterResponse | null>(null);
   const [managerInsights, setManagerInsights] =
     useState<ManagerInsightsResponse | null>(null);
   const [hasLeadershipData, setHasLeadershipData] = useState(false);
@@ -118,6 +121,14 @@ export default function DashboardHomePage() {
             setErrorMessage(
               "Sebagian ringkasan strategis gagal dimuat. Data yang berhasil dimuat tetap ditampilkan.",
             );
+          }
+        }
+
+        if (me.role === "manager") {
+          try {
+            setReviewQueue(await apiFetch<ChatReviewCenterResponse>("/dashboard/sales/chat-review-center"));
+          } catch {
+            // Beranda tetap tampil dari data monitor tim kalau antrean review gagal dimuat.
           }
         }
 
@@ -298,7 +309,7 @@ export default function DashboardHomePage() {
           </section>
         )}
 
-        {currentUser && !isSalesWorkspace && isLoading ? (
+        {currentUser && !isSalesWorkspace && !isManagerWorkspace && isLoading ? (
           <div role="status" className="clara-empty-state text-sm text-clara-ink-2">
             Memuat ringkasan...
           </div>
@@ -311,6 +322,8 @@ export default function DashboardHomePage() {
             worklistItems={worklist?.items ?? []}
             isLoading={isLoading}
           />
+        ) : isManagerWorkspace ? (
+          <ManagerHome queue={reviewQueue} insights={managerInsights} isLoading={isLoading} />
         ) : !shouldRenderLeadershipWorkspace ? null : (
           <>
             <section

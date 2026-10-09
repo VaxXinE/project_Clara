@@ -517,7 +517,7 @@ export function SalesReplyFlow({
   );
 }
 
-function ClaraReading({
+export function ClaraReading({
   extraction,
   isExperimental,
   collapsible,

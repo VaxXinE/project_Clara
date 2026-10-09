@@ -26,7 +26,6 @@ type TourState = {
 
 type TourRole = "sales" | "manager" | "head";
 
-const STORAGE_VERSION = 4;
 const VIEWPORT_GAP = 16;
 const POPUP_WIDTH = 320;
 
@@ -745,22 +744,20 @@ function getTourRoutes(role: TourRole) {
 }
 
 /**
- * Sales tidak lagi dipaksa masuk tur 10 halaman saat pertama login (layar diblur dan popup muncul
- * di setiap halaman). Tur Sales hanya jalan kalau diminta lewat "Ulangi onboarding". Versi key
- * dinaikkan supaya user yang tur-nya tertahan di tengah juga berhenti diganggu.
+ * Tur onboarding tidak lagi dipaksa saat pertama login (layar diblur dan popup muncul di setiap halaman). Tur hanya
+ * jalan kalau diminta lewat "Ulangi onboarding" atau "Mulai tur singkat". Versi key dinaikkan supaya user yang
+ * tur-nya tertahan di tengah juga berhenti diganggu.
  */
-const SALES_STORAGE_VERSION = 5;
+const TOUR_STORAGE_VERSION = 5;
 
 function buildStorageKey(userId: string, role: TourRole) {
-  const version = role === "sales" ? SALES_STORAGE_VERSION : STORAGE_VERSION;
-  return `clara.${role}-onboarding.v${version}.${userId}`;
+  return `clara.${role}-onboarding.v${TOUR_STORAGE_VERSION}.${userId}`;
 }
 
-function buildInitialState(role: TourRole): TourState {
-  const isOptIn = role === "sales";
+function buildInitialState(): TourState {
   return {
-    completed: isOptIn,
-    dismissed: isOptIn,
+    completed: true,
+    dismissed: true,
     routeIndex: 0,
     stepIndex: 0,
   };
@@ -771,17 +768,12 @@ export function resetDashboardOnboardingState(userId: string, role: TourRole) {
     return;
   }
 
-  if (role === "sales") {
-    writeState(userId, role, {
-      completed: false,
-      dismissed: false,
-      routeIndex: 0,
-      stepIndex: 0,
-    });
-    return;
-  }
-
-  window.localStorage.removeItem(buildStorageKey(userId, role));
+  writeState(userId, role, {
+    completed: false,
+    dismissed: false,
+    routeIndex: 0,
+    stepIndex: 0,
+  });
 }
 
 export function resetSalesOnboardingState(userId: string) {
@@ -790,13 +782,13 @@ export function resetSalesOnboardingState(userId: string) {
 
 function readState(userId: string, role: TourRole): TourState {
   if (typeof window === "undefined") {
-    return buildInitialState(role);
+    return buildInitialState();
   }
 
   try {
     const raw = window.localStorage.getItem(buildStorageKey(userId, role));
     if (!raw) {
-      return buildInitialState(role);
+      return buildInitialState();
     }
 
     const parsed = JSON.parse(raw) as Partial<TourState>;
@@ -817,7 +809,7 @@ function readState(userId: string, role: TourRole): TourState {
       ),
     };
   } catch {
-    return buildInitialState(role);
+    return buildInitialState();
   }
 }
 

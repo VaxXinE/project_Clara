@@ -238,6 +238,7 @@ export default function CrmPage() {
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [sortBy, setSortBy] = useState("priority");
   const [searchQuery, setSearchQuery] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("all");
   const [visibleCounts, setVisibleCounts] = useState<
     Partial<Record<BucketKey, number>>
   >({});
@@ -297,6 +298,10 @@ export default function CrmPage() {
   const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;
   const isSalesWorkspace =
     normalizeWorkspaceRole(currentUser?.role) === "sales";
+  // Manager dan Head memantau lead timnya. Mengirim pesan dan mengatur jadwal follow-up adalah pekerjaan Sales.
+  const ownerOptions = Array.from(
+    new Set(leads.map((lead) => lead.assigned_user_name ?? "Belum ada")),
+  ).sort((left, right) => left.localeCompare(right));
 
   const quickCounts = useMemo(() => {
     const counts = {} as Record<QuickFilter, number>;
@@ -317,6 +322,11 @@ export default function CrmPage() {
       .filter((lead) => matchesQuickFilter(lead, quickFilter))
       .filter(
         (lead) => stageFilter === "all" || lead.current_stage === stageFilter,
+      )
+      .filter(
+        (lead) =>
+          ownerFilter === "all" ||
+          (lead.assigned_user_name ?? "Belum ada") === ownerFilter,
       )
       .filter((lead) => {
         if (!normalizedQuery) return true;
@@ -352,7 +362,7 @@ export default function CrmPage() {
 
       return calculateLeadPriority(right) - calculateLeadPriority(left);
     });
-  }, [leads, quickFilter, searchQuery, sortBy, stageFilter]);
+  }, [leads, ownerFilter, quickFilter, searchQuery, sortBy, stageFilter]);
 
   const sections = useMemo(
     () =>
@@ -463,7 +473,7 @@ export default function CrmPage() {
       title={pageTitle}
       description={pageDescription}
       actions={
-        !isHeadWorkspace ? (
+        !isLeadershipWorkspace ? (
           <Link href="/upload" className="clara-button clara-button-primary">
             {PAGE_NAMES.intake}
           </Link>
@@ -583,7 +593,11 @@ export default function CrmPage() {
 
                   <div
                     data-onboarding-id="sales-crm-filters"
-                    className="grid grid-cols-2 gap-3 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                    className={`grid grid-cols-2 gap-3 ${
+                      isLeadershipWorkspace && ownerOptions.length > 1
+                        ? "md:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]"
+                        : "md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                    }`}
                   >
                     <div className="col-span-2 md:col-span-1">
                       <label htmlFor="lead-search" className="clara-label">
@@ -615,6 +629,28 @@ export default function CrmPage() {
                         ))}
                       </select>
                     </div>
+                    {isLeadershipWorkspace && ownerOptions.length > 1 ? (
+                      <div>
+                        <label htmlFor="lead-owner" className="clara-label">
+                          Sales
+                        </label>
+                        <select
+                          id="lead-owner"
+                          value={ownerFilter}
+                          onChange={(event) =>
+                            setOwnerFilter(event.target.value)
+                          }
+                          className="clara-select mt-2 w-full"
+                        >
+                          <option value="all">Semua Sales</option>
+                          {ownerOptions.map((owner) => (
+                            <option key={owner} value={owner}>
+                              {owner}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
                     <div>
                       <label htmlFor="lead-channel" className="clara-label">
                         Channel
@@ -709,6 +745,7 @@ export default function CrmPage() {
                               lead={lead}
                               showOwner={isLeadershipWorkspace}
                               canChangeStage={!isHeadWorkspace}
+                              canWork={!isLeadershipWorkspace}
                               isUpdating={updatingLeadId === lead.id}
                               onStageChange={(stage) =>
                                 requestStageChange(lead, stage)
@@ -744,9 +781,9 @@ export default function CrmPage() {
               <EmptyState
                 title="Belum ada lead"
                 description="Lead dibuat otomatis saat sebuah chat masuk ke Clara. Masukkan chat pertama untuk memulai."
-                actionHref={!isHeadWorkspace ? "/upload" : undefined}
+                actionHref={!isLeadershipWorkspace ? "/upload" : undefined}
                 actionLabel={
-                  !isHeadWorkspace ? "Masukkan chat pertama" : undefined
+                  !isLeadershipWorkspace ? "Masukkan chat pertama" : undefined
                 }
               />
             )}
@@ -901,6 +938,7 @@ function LeadRow({
   lead,
   showOwner,
   canChangeStage,
+  canWork,
   isUpdating,
   onStageChange,
   onSchedule,
@@ -908,6 +946,8 @@ function LeadRow({
   lead: LeadListItem;
   showOwner: boolean;
   canChangeStage: boolean;
+  /** Sales yang menangani lead: boleh mengatur jadwal dan membuka web chat. Manager dan Head hanya memantau. */
+  canWork: boolean;
   isUpdating: boolean;
   onStageChange: (stage: string) => void;
   onSchedule: (date: Date | null) => void;
@@ -952,7 +992,7 @@ function LeadRow({
               href={`/sales/conversations/${lead.latest_conversation_id}`}
               className="clara-button clara-button-secondary"
             >
-              Buka chat
+              {canWork ? "Buka chat" : "Tinjau chat"}
             </Link>
           ) : null}
         </div>
@@ -992,7 +1032,7 @@ function LeadRow({
       {isClosed ? null : (
         <FollowUpLine
           lead={lead}
-          canSchedule={canChangeStage}
+          canSchedule={canWork}
           isUpdating={isUpdating}
           onSchedule={onSchedule}
         />
@@ -1041,7 +1081,7 @@ function LeadRow({
                 Profil customer
               </Link>
             ) : null}
-            {openChat && canChangeStage ? (
+            {openChat && canWork ? (
               <a
                 href={openChat.href}
                 target="_blank"
