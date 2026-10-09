@@ -138,6 +138,9 @@ class SalesInboxItem(BaseModel):
 class SalesConversationDetail(BaseModel):
     conversation_id: UUID
     organization_id: UUID | None
+    # Lead dan profil customer yang memiliki percakapan ini, untuk tautan ke halaman lead di dashboard.
+    lead_id: UUID | None = None
+    customer_profile_id: UUID | None = None
     title: str
     source: str
     source_channel: str

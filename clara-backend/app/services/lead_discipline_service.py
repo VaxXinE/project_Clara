@@ -18,6 +18,7 @@ from app.schemas.lead_schema import (
     LeadDisciplineSummaryItem,
 )
 from app.services.lead_activity_service import create_lead_activity_event
+from app.services.lead_task_service import upsert_follow_up_task_for_lead
 from app.models.ai_extraction import AIExtraction
 from app.models.conversation import Conversation
 from app.models.message import Message
@@ -287,6 +288,8 @@ def create_discipline_log(
             to_value=payload.next_follow_up_at.isoformat(),
         )
         lead.next_follow_up_at = payload.next_follow_up_at
+        # Jadwal dari log harian harus ikut jadi tugas, kalau tidak lead tidak muncul di daftar Tindak Lanjut.
+        upsert_follow_up_task_for_lead(db=db, lead=lead)
 
     create_lead_activity_event(
         db=db,
@@ -378,6 +381,7 @@ def update_discipline_log(
                 to_value=payload.next_follow_up_at.isoformat() if payload.next_follow_up_at else None,
             )
             lead.next_follow_up_at = payload.next_follow_up_at
+            upsert_follow_up_task_for_lead(db=db, lead=lead)
         log.next_follow_up_at = payload.next_follow_up_at
 
     after_summary = f"{log.log_date.isoformat()} | {log.activity_type} | {log.result_status}"

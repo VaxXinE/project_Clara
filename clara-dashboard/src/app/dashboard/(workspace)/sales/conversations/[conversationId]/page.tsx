@@ -2,13 +2,24 @@
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { ConversationAiActions } from "@/components/dashboard/ConversationAiActions";
+import { useDashboardUser } from "@/components/dashboard/DashboardUserProvider";
 import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { ReplySuggestionActions } from "@/components/dashboard/ReplySuggestionActions";
+import { SalesConversationPane } from "@/components/dashboard/SalesConversationPane";
+import { SalesWorkbench } from "@/components/dashboard/SalesWorkbench";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
+import {
+  getLatestCustomerMessage,
+  isSalesConversationMessage,
+  isAnalysisStale,
+  isReplySuggestionStale,
+  hasFreshCustomerReply,
+  buildContinuationHref,
+} from "@/lib/conversation";
 import {
   formatChannelLabel,
   formatDateTime,
@@ -20,8 +31,6 @@ import {
 } from "@/lib/format";
 import {
   ACCOUNT_CATEGORY,
-  BUYING_INTENT,
-  SENTIMENT,
   STAGE,
   SUGGESTION_STATE,
   TEMPERATURE,
@@ -79,74 +88,6 @@ function formatReviewCaseLabel(value: string): string {
 
 function formatKnowledgeProposalStatus(value: string): string {
   return formatStatusLabel(value);
-}
-
-function getLatestConversationMessage(detail: SalesConversationDetail) {
-  return [...detail.messages].sort((left, right) =>
-    left.message_timestamp.localeCompare(right.message_timestamp),
-  )[detail.messages.length - 1] ?? null;
-}
-
-function getLatestCustomerMessage(detail: SalesConversationDetail) {
-  const customerMessages = detail.messages.filter(
-    (message) => message.sender_type === "customer",
-  );
-  return [...customerMessages].sort((left, right) =>
-    left.message_timestamp.localeCompare(right.message_timestamp),
-  )[customerMessages.length - 1] ?? null;
-}
-
-function isSalesConversationMessage(
-  message: SalesConversationDetail["messages"][number],
-): boolean {
-  const normalizedSenderType = message.sender_type.trim().toLowerCase();
-
-  return ["sales", "outgoing", "agent", "admin"].includes(
-    normalizedSenderType,
-  );
-}
-
-function getLatestSentMessage(detail: SalesConversationDetail) {
-  return [...detail.sent_messages].sort((left, right) =>
-    left.sent_at.localeCompare(right.sent_at),
-  )[detail.sent_messages.length - 1] ?? null;
-}
-
-function isAnalysisStale(detail: SalesConversationDetail): boolean {
-  const extraction = detail.latest_ai_extraction;
-  const latestMessage = getLatestConversationMessage(detail);
-  if (!extraction || !latestMessage || latestMessage.sender_type !== "customer") {
-    return false;
-  }
-  return extraction.created_at < latestMessage.message_timestamp;
-}
-
-function isReplySuggestionStale(detail: SalesConversationDetail): boolean {
-  const suggestion = detail.latest_reply_suggestion;
-  const latestMessage = getLatestConversationMessage(detail);
-  if (!suggestion || !latestMessage || latestMessage.sender_type !== "customer") {
-    return false;
-  }
-  return suggestion.created_at < latestMessage.message_timestamp;
-}
-
-function hasFreshCustomerReply(detail: SalesConversationDetail): boolean {
-  const latestMessage = getLatestConversationMessage(detail);
-  const latestSent = getLatestSentMessage(detail);
-  if (!latestMessage || latestMessage.sender_type !== "customer" || !latestSent) {
-    return false;
-  }
-  return latestMessage.message_timestamp > latestSent.sent_at;
-}
-
-function buildContinuationHref(detail: SalesConversationDetail): string {
-  const params = new URLSearchParams({
-    mode: "continue",
-    title: detail.title,
-    channel: detail.source_channel || "whatsapp",
-    conversationId: detail.conversation_id,
-  });
-  return `/upload?${params.toString()}`;
 }
 
 function buildUploadResultBanner(
@@ -236,6 +177,10 @@ export default function SalesConversationDetailPage() {
   const [isReviewingKnowledgeProposal, setIsReviewingKnowledgeProposal] =
     useState(false);
 
+  const hasLoadedOnceRef = useRef(false);
+  const dashboardUser = useDashboardUser();
+  const [refreshToken, setRefreshToken] = useState(0);
+
   const loadConversationDetail = useCallback(async () => {
     if (!conversationId) {
       setDetail(null);
@@ -245,7 +190,10 @@ export default function SalesConversationDetailPage() {
     }
 
     setErrorMessage("");
-    setIsLoading(true);
+    // Muat ulang setelah sebuah aksi berjalan diam-diam. Layar tidak boleh kosong dan kehilangan posisi scroll.
+    if (!hasLoadedOnceRef.current) {
+      setIsLoading(true);
+    }
 
     try {
       const [data, me] = await Promise.all([
@@ -256,6 +204,7 @@ export default function SalesConversationDetailPage() {
       ]);
       setDetail(data);
       setCurrentUser(me);
+      hasLoadedOnceRef.current = true;
       const reviewCase = data.chat_review_case;
       setReviewStatusInput(reviewCase?.status ?? "draft");
       setReviewLabelInput(reviewCase?.review_label ?? "unik");
@@ -315,11 +264,38 @@ export default function SalesConversationDetailPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      // Pindah ke chat lain: jangan menampilkan isi chat sebelumnya sambil menunggu.
+      hasLoadedOnceRef.current = false;
+      setDetail(null);
       void loadConversationDetail();
     }, 0);
 
     return () => clearTimeout(timer);
   }, [loadConversationDetail]);
+
+  // Pesan baru dari extension harus muncul di chat yang sedang dibuka tanpa reload. Hanya untuk Sales,
+  // karena memuat ulang di halaman review akan mengosongkan isian yang sedang diketik reviewer.
+  const isSalesRole = (currentUser?.role ?? dashboardUser?.currentUser?.role) === "sales";
+
+  useEffect(() => {
+    if (!isSalesRole) {
+      return;
+    }
+
+    function refreshIfVisible() {
+      if (document.visibilityState === "visible") {
+        void loadConversationDetail();
+      }
+    }
+
+    const timer = window.setInterval(refreshIfVisible, 30_000);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [isSalesRole, loadConversationDetail]);
 
   async function handleSaveReviewCase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -544,6 +520,42 @@ export default function SalesConversationDetailPage() {
 
   const isReviewer = Boolean(currentUser && !canAccessQueueAndActionCenter(currentUser.role));
 
+  if ((currentUser?.role ?? dashboardUser?.currentUser?.role) === "sales") {
+    const currentDetail = detail?.conversation_id === conversationId ? detail : null;
+
+    return (
+      <SalesWorkbench
+        currentUser={currentUser ?? dashboardUser?.currentUser ?? null}
+        selectedId={conversationId}
+        title={currentDetail?.title}
+        refreshToken={refreshToken}
+      >
+        {errorMessage && !currentDetail ? (
+          <div role="alert" className="m-6 space-y-3">
+            <p className="clara-alert clara-alert-danger">{errorMessage}</p>
+            <Link href="/sales" className="clara-button clara-button-secondary">
+              Kembali ke daftar chat
+            </Link>
+          </div>
+        ) : currentDetail ? (
+          <SalesConversationPane
+            key={currentDetail.conversation_id}
+            detail={currentDetail}
+            uploadBanner={buildUploadResultBanner(searchParams)}
+            onUpdated={async () => {
+              await loadConversationDetail();
+              setRefreshToken((token) => token + 1);
+            }}
+          />
+        ) : (
+          <p role="status" aria-live="polite" className="p-6 text-sm clara-text-secondary">
+            Memuat percakapan...
+          </p>
+        )}
+      </SalesWorkbench>
+    );
+  }
+
   return (
     <WorkspaceShell
       currentUser={currentUser}
@@ -551,7 +563,7 @@ export default function SalesConversationDetailPage() {
       description={
         isReviewer
           ? "Baca chat dan tinjau jawaban yang disarankan Clara untuk Sales ini."
-          : "Baca chat di sebelah kiri, lalu pakai jawaban yang disarankan Clara di sebelah kanan."
+          : "Baca chat, lalu pilih jawaban dari Clara dan kirim sendiri dari WhatsApp."
       }
       backHref={isReviewer ? "/approvals" : "/sales"}
       backLabel={isReviewer ? "Kembali ke Review Sales" : "Kembali ke Chat Masuk"}
@@ -908,7 +920,6 @@ function ConversationDetailContent({
 }) {
   const extraction = detail.latest_ai_extraction;
   const suggestion = detail.latest_reply_suggestion;
-  const isSalesWorkspace = currentUser?.role === "sales";
   const canManage = canManageReviewCase(currentUser?.role);
   const canReviewProposal = canReviewKnowledgeProposal(currentUser?.role);
   const reviewCase = detail.chat_review_case;
@@ -922,16 +933,6 @@ function ConversationDetailContent({
   const visibleMessages = showAllMessages
     ? detail.messages
     : detail.messages.slice(Math.max(detail.messages.length - 12, 0));
-  const aiActions = (
-    <ConversationAiActions
-      conversationId={detail.conversation_id}
-      hasAiExtraction={Boolean(extraction)}
-      hasReplySuggestion={Boolean(suggestion)}
-      analysisNeedsRefresh={analysisStale}
-      replyNeedsRefresh={suggestionStale}
-      onUpdated={onUpdated}
-    />
-  );
   const chatTimeline = (
     <section
       data-onboarding-id="sales-conversation-timeline"
@@ -1030,173 +1031,8 @@ function ConversationDetailContent({
 
   return (
     <section className="space-y-6">
-      <section
-        className={`grid gap-6 xl:items-start ${
-          isSalesWorkspace
-            ? "xl:grid-cols-[minmax(0,1.18fr)_minmax(320px,0.82fr)]"
-            : "xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)]"
-        }`}
-      >
-        {isSalesWorkspace ? (
-          <>
-            <div>{chatTimeline}</div>
-
-            <section
-              data-onboarding-id="sales-conversation-workspace"
-              aria-label="Balas customer"
-              className="min-w-0 space-y-4"
-            >
-              <div className="clara-card p-5">
-                <h2 className="text-lg font-bold clara-text-primary">Balas customer ini</h2>
-                <ol className="mt-2 grid gap-1 text-sm clara-text-secondary sm:grid-cols-2">
-                  <li>1. Baca chat di sebelah kiri</li>
-                  <li>2. Pilih atau ubah jawaban</li>
-                  <li>3. Kirim sendiri dari WhatsApp</li>
-                  <li>4. Tandai sudah terkirim</li>
-                </ol>
-
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  <PanelTab
-                    label="Jawaban"
-                    isActive={activePanel === "ai_reply"}
-                    onClick={() => setActivePanel("ai_reply")}
-                  />
-                  <PanelTab
-                    label={`Riwayat kirim (${detail.sent_messages.length})`}
-                    isActive={activePanel === "sent_logs"}
-                    onClick={() => setActivePanel("sent_logs")}
-                  />
-                </div>
-              </div>
-
-              {activePanel === "ai_reply" ? (
-                <div className="space-y-4">
-                  {!suggestion ? aiActions : null}
-
-                  <div data-onboarding-id="sales-conversation-reply-actions">
-                    {suggestion ? (
-                      <ReplySuggestionActions
-                        key={suggestion.id}
-                        replySuggestionId={suggestion.id}
-                        suggestedReplies={suggestion.suggested_replies}
-                        approvalStatus={suggestion.approval_status}
-                        finalReplyText={suggestion.final_reply_text}
-                        hasBeenSent={detail.sent_messages.some(
-                          (sentMessage) => sentMessage.reply_suggestion_id === suggestion.id,
-                        )}
-                        isStale={suggestionStale}
-                        onUpdated={onUpdated}
-                      />
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-clara-line p-5">
-                        <h3 className="text-base font-semibold clara-text-primary">Belum ada jawaban</h3>
-                        <p className="mt-1 text-sm leading-6 clara-text-secondary">
-                          {extraction
-                            ? "Klik Susun jawaban di atas. Clara akan menyiapkan beberapa pilihan yang tinggal kamu cek."
-                            : "Klik Baca percakapan ini di atas. Setelah itu Clara bisa menyusun jawaban."}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  <section
-                    data-onboarding-id="sales-conversation-ai-summary"
-                    className="clara-card p-5"
-                  >
-                    <h3 className="text-base font-bold clara-text-primary">Yang Clara baca dari chat ini</h3>
-
-                    {extraction ? (
-                      <>
-                        {extraction.customer_summary ? (
-                          <p className="mt-2 text-sm leading-6 clara-text-primary">{extraction.customer_summary}</p>
-                        ) : null}
-
-                        <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                          <SummaryItem label="Tahap customer">
-                            <ValueTag table={STAGE} value={extraction.pipeline_stage} />
-                          </SummaryItem>
-                          <SummaryItem label="Minat beli">
-                            <ValueTag table={BUYING_INTENT} value={extraction.buying_intent} />
-                          </SummaryItem>
-                          <SummaryItem label="Suasana hati customer">
-                            <ValueTag table={SENTIMENT} value={extraction.sentiment} />
-                          </SummaryItem>
-                          <SummaryItem label="Keyakinan Clara">
-                            <span className="text-sm clara-text-primary">
-                              {(extraction.confidence_score * 100).toFixed(0)}%
-                            </span>
-                          </SummaryItem>
-                          <div className="col-span-2">
-                            <dt className="text-xs clara-text-muted">Hal yang membuat customer ragu</dt>
-                            <dd className="mt-1.5 flex flex-wrap gap-2">
-                              {extraction.main_objections.length > 0 ? (
-                                extraction.main_objections.map((objection) => (
-                                  <Tag key={objection}>{objection}</Tag>
-                                ))
-                              ) : (
-                                <span className="text-sm clara-text-secondary">Tidak ada yang menonjol.</span>
-                              )}
-                            </dd>
-                          </div>
-                        </dl>
-
-                        <div className="mt-4 rounded-xl bg-clara-wash p-3">
-                          <p className="text-sm leading-6 clara-text-primary">
-                            <span className="font-semibold">Langkah berikutnya: </span>
-                            {extraction.next_best_action}
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="mt-2 text-sm leading-6 clara-text-secondary">
-                        Clara belum membaca percakapan ini. Klik Baca percakapan ini supaya muncul ringkasan,
-                        tahap customer, dan langkah berikutnya.
-                      </p>
-                    )}
-
-                    {isExperimentalChannel(detail.source_channel) ? (
-                      <p className="mt-3 text-xs leading-5 clara-text-muted">
-                        Channel ini masih eksperimental. Baca ulang konteks chat sebelum memakai draft apa adanya.
-                      </p>
-                    ) : null}
-                  </section>
-
-                  {suggestion ? aiActions : null}
-                </div>
-              ) : null}
-
-              {activePanel === "sent_logs" ? (
-                <div className="clara-card p-5">
-                  <h3 className="text-base font-bold clara-text-primary">Balasan yang sudah ditandai terkirim</h3>
-                  <p className="mt-1 text-sm leading-6 clara-text-secondary">
-                    Ini catatan manual dari dashboard, bukan bukti pesan sampai atau sudah dibaca customer.
-                  </p>
-
-                  {detail.sent_messages.length > 0 ? (
-                    <div className="mt-4 space-y-3">
-                      {detail.sent_messages.map((sentMessage) => (
-                        <div
-                          key={sentMessage.id}
-                          className="rounded-2xl border border-clara-success-line bg-clara-success-surface p-4 text-sm text-clara-success"
-                        >
-                          <p className="font-semibold">Dikirim oleh {sentMessage.sent_by_name}</p>
-                          <p className="mt-1 text-xs">{formatDateTime(sentMessage.sent_at)}</p>
-                          <p className="mt-3 break-words whitespace-pre-wrap leading-6 [overflow-wrap:anywhere]">
-                            {sentMessage.message_text}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-3 text-sm clara-text-secondary">
-                      Belum ada balasan yang ditandai terkirim untuk percakapan ini.
-                    </p>
-                  )}
-                </div>
-              ) : null}
-            </section>
-          </>
-        ) : (
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(340px,0.88fr)] xl:items-start">
+        {
           <>
             <section className="clara-card rounded-3xl p-5">
           <div>
@@ -1890,7 +1726,7 @@ function ConversationDetailContent({
 
             <div className="xl:sticky xl:top-28">{chatTimeline}</div>
           </>
-        )}
+        }
       </section>
     </section>
   );
@@ -1930,11 +1766,3 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SummaryItem({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs clara-text-muted">{label}</dt>
-      <dd className="mt-1.5">{children}</dd>
-    </div>
-  );
-}

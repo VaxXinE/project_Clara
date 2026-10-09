@@ -490,3 +490,40 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Bagian yang bisa dibuka-tutup: panah di kanan supaya jelas bisa diklik. */
+summary.clara-disclosure {
+  display: flex;
+  min-height: 2.75rem;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+summary.clara-disclosure::-webkit-details-marker {
+  display: none;
+}
+
+summary.clara-disclosure::after {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 160ms ease;
+}
+
+details[open] > summary.clara-disclosure::after {
+  transform: rotate(-135deg) translateY(-2px);
+}
+
+summary.clara-disclosure:hover {
+  color: var(--color-text-primary);
+}

@@ -30,9 +30,9 @@ export const TASKS: TaskEntry[] = [
     keywords: "tindak lanjut follow up jadwal pengingat reminder terlambat overdue hubungi",
   },
   {
-    goal: "Cari prospect dan ubah tahapnya",
+    goal: "Cari prospect atau customer, dan ubah tahapnya",
     href: "/crm",
-    keywords: "lead prospect pipeline tahap stage crm cari status deal",
+    keywords: "lead prospect customer pelanggan profil kontak nomor pipeline tahap stage crm cari status deal",
     roles: ["sales", "superadmin"],
   },
   {

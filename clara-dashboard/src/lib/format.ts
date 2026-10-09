@@ -214,3 +214,46 @@ const PASSWORD_STRENGTH_TEXT: Record<string, string> = {
 export function formatPasswordStrengthLabel(label: string): string {
   return PASSWORD_STRENGTH_TEXT[label] ?? label;
 }
+
+/** Kunci hari menurut jam di perangkat, untuk mengelompokkan pesan per tanggal. */
+export function localDayKey(value: string): string {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+}
+
+/** "Hari ini", "Kemarin", atau tanggal. Dipakai sebagai pemisah di isi chat. */
+export function formatDayHeading(value: string, now: Date = new Date()): string {
+  const date = new Date(value);
+  const startOf = (input: Date) => new Date(input.getFullYear(), input.getMonth(), input.getDate()).getTime();
+  const diffDays = Math.round((startOf(now) - startOf(date)) / (24 * 60 * 60 * 1000));
+
+  if (diffDays === 0) return "Hari ini";
+  if (diffDays === 1) return "Kemarin";
+
+  return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+/** Jam saja, mis. "09.07". */
+export function formatClock(value: string): string {
+  return new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+/** Selisih hari kalender menurut jam di perangkat: 0 hari ini, 1 besok, -1 kemarin. */
+export function dayOffset(value: string, now: Date = new Date()): number {
+  const target = new Date(value);
+  const startOf = (input: Date) => new Date(input.getFullYear(), input.getMonth(), input.getDate()).getTime();
+
+  return Math.round((startOf(target) - startOf(now)) / (24 * 60 * 60 * 1000));
+}
+
+/** "Hari ini", "Besok", "Lusa", "Kemarin", atau nama hari dan tanggal. */
+export function formatDayLabel(value: string, now: Date = new Date()): string {
+  const offset = dayOffset(value, now);
+
+  if (offset === 0) return "Hari ini";
+  if (offset === 1) return "Besok";
+  if (offset === 2) return "Lusa";
+  if (offset === -1) return "Kemarin";
+
+  return new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "short" }).format(new Date(value));
+}

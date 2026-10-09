@@ -1544,6 +1544,12 @@ def get_sales_conversation_detail(
     return SalesConversationDetail(
         conversation_id=conversation.id,
         organization_id=conversation.organization_id,
+        lead_id=conversation.lead_id,
+        customer_profile_id=(
+            conversation.lead.customer_profile_id
+            if conversation.lead is not None
+            else None
+        ),
         title=conversation.title,
         source=conversation.source,
         source_channel=normalize_source_channel(conversation.source),
@@ -1852,6 +1858,40 @@ def build_discipline_worklist_item(
     )
 
 
+def build_scheduled_worklist_item(
+    *,
+    lead: Lead,
+    conversation: Conversation | None,
+    latest_extraction: AIExtraction | None,
+    latest_discipline_log: LeadDisciplineLog | None,
+) -> SalesWorklistItem:
+    """Lead yang sudah punya jadwal follow-up tapi belum punya tugas terbuka, misalnya jadwal lama dari log harian."""
+    return SalesWorklistItem(
+        task_id=None,
+        lead_id=lead.id,
+        conversation_id=conversation.id if conversation else None,
+        lead_name=lead.display_name,
+        assigned_user_name=lead.assigned_user.name if lead.assigned_user else None,
+        current_stage=lead.current_stage,
+        lead_temperature=lead.lead_temperature,
+        priority_score=calculate_priority_score(latest_extraction, None) + 10,
+        task_type="scheduled_follow_up",
+        task_status=None,
+        task_label="Follow-up terjadwal",
+        reason="Jadwal follow-up ini diatur dari halaman lead.",
+        recommended_action=(
+            latest_extraction.next_best_action
+            if latest_extraction is not None
+            else "Buka detail lead, review konteks terbaru, lalu putuskan follow-up yang paling aman."
+        ),
+        last_contact_at=lead.last_contact_at,
+        next_follow_up_at=ensure_aware_utc(lead.next_follow_up_at),
+        latest_discipline_log_date=(
+            latest_discipline_log.log_date if latest_discipline_log else None
+        ),
+    )
+
+
 def get_sales_worklist(
     db: Session,
     current_user: User,
@@ -1993,6 +2033,19 @@ def get_sales_worklist(
                     latest_extraction=latest_extraction,
                     latest_discipline_log=latest_discipline_log,
                     now=now,
+                )
+            )
+        elif (
+            not lead_is_closed
+            and (lead_follow_up_at := ensure_aware_utc(lead.next_follow_up_at)) is not None
+            and lead_follow_up_at > now
+        ):
+            upcoming_items.append(
+                build_scheduled_worklist_item(
+                    lead=lead,
+                    conversation=conversation,
+                    latest_extraction=latest_extraction,
+                    latest_discipline_log=latest_discipline_log,
                 )
             )
 

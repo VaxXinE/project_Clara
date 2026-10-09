@@ -526,3 +526,22 @@ def test_marketing_cannot_reassign_lead(
         headers=csrf_headers(client),
     )
     assert response.status_code == 403, response.text
+
+
+def test_conversation_detail_links_to_lead_and_customer_profile(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_b = seeded_data["marketing_b"]
+    owned_conversation = seeded_data["owned_conversation"]
+    owned_lead = seeded_data["owned_lead"]
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+
+    response = client.get(f"/dashboard/sales/conversations/{owned_conversation.id}")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+
+    # Dashboard memakai ini untuk membuka halaman lead dan profil customer dari layar chat.
+    assert payload["lead_id"] == str(owned_lead.id)
+    assert payload["customer_profile_id"] == str(owned_lead.customer_profile_id)

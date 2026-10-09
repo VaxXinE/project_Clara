@@ -187,6 +187,8 @@ export type ChatReviewerCandidateItem = {
 export type SalesConversationDetail = {
   conversation_id: string;
   organization_id: string | null;
+  lead_id?: string | null;
+  customer_profile_id?: string | null;
   title: string;
   source: string;
   source_channel: string;

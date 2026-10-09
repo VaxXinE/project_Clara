@@ -236,3 +236,36 @@ def test_worklist_hides_follow_up_for_won_lead(
 
     assert all(item["lead_id"] != str(lead.id) for item in payload["items"])
     assert all(item["lead_id"] != str(lead.id) for item in payload["upcoming_items"])
+
+
+def test_worklist_lists_future_lead_schedule_even_without_a_task(
+    client: TestClient,
+    db_session_factory: sessionmaker,
+    seeded_data: dict[str, object],
+) -> None:
+    admin_a = seeded_data["admin_a"]
+    marketing_a = seeded_data["marketing_a"]
+
+    db = db_session_factory()
+    lead = Lead(
+        organization_id=marketing_a.organization_id,
+        assigned_user_id=marketing_a.id,
+        display_name="Scheduled Without Task Lead",
+        source="manual_test",
+        current_stage="qualification",
+        lead_temperature="warm",
+        next_follow_up_at=datetime.now(timezone.utc) + timedelta(days=1, hours=3),
+    )
+    db.add(lead)
+    db.commit()
+
+    login(client, email=admin_a.email, password="AdminPass123!")
+
+    payload = client.get("/dashboard/sales/worklist").json()
+
+    # Jadwal lama yang tidak punya tugas tetap harus kelihatan sebagai jadwal ke depan.
+    assert any(
+        item["lead_id"] == str(lead.id) and item["task_type"] == "scheduled_follow_up"
+        for item in payload["upcoming_items"]
+    )
+    assert all(item["lead_id"] != str(lead.id) or item["task_type"] != "overdue_follow_up" for item in payload["items"])

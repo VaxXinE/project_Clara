@@ -201,3 +201,32 @@ def test_discipline_log_suggestion_prefills_from_latest_ai_context(
     assert "Chat terbaru: Saya masih ragu soal legalitasnya" in payload["notes"]
     assert payload["next_follow_up_at"] is not None
     assert payload["confidence_score"] >= 0.8
+
+
+def test_discipline_log_follow_up_date_creates_task_for_upcoming_list(
+    client: TestClient,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_b = seeded_data["marketing_b"]
+    owned_lead = seeded_data["owned_lead"]
+
+    login(client, email=marketing_b.email, password="MarketingPass123!")
+
+    follow_up_at = (datetime.now(timezone.utc) + timedelta(days=2)).replace(microsecond=0)
+    response = client.post(
+        f"/leads/{owned_lead.id}/discipline-logs",
+        json={
+            "activity_type": "follow_up_chat",
+            "result_status": "waiting_customer",
+            "next_follow_up_at": follow_up_at.isoformat().replace("+00:00", "Z"),
+        },
+        headers=csrf_headers(client),
+    )
+    assert response.status_code == 201, response.text
+
+    worklist = client.get("/dashboard/sales/worklist").json()
+    upcoming = [item for item in worklist["upcoming_items"] if item["lead_id"] == str(owned_lead.id)]
+
+    # Jadwal dari log harian harus muncul di daftar jadwal ke depan sebagai tugas sungguhan.
+    assert len(upcoming) == 1
+    assert upcoming[0]["task_id"] is not None

@@ -8,6 +8,7 @@ export const SITE_NAME = "Clara";
 
 export const NAV_GROUP_NAMES = {
   daily: "Kerja Harian",
+  salesData: "Data Saya",
   analysis: "Analisis",
   monitoring: "Pemantauan",
   admin: "Administrasi",
@@ -22,6 +23,7 @@ export const PAGE_NAMES = {
   home: "Beranda",
   inbox: "Chat Masuk",
   leads: "Lead",
+  leadsAndCustomers: "Lead & Customer",
   leadsTeam: "Lead Tim",
   followUp: "Tindak Lanjut",
   intake: "Input Chat",

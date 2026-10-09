@@ -3,16 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { Tag, ValueTag } from "@/components/dashboard/Tag";
+import { SalesHome } from "@/components/dashboard/SalesHome";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
-import {
-  formatChannelLabel,
-  formatRelativeTime,
-} from "@/lib/format";
-import { ACTIONABLE_BUCKETS, getQueueBucket, pickNextChat } from "@/lib/inbox";
-import { REPLY_STATE, TEMPERATURE, plainJargon } from "@/lib/vocab";
+import { ACTIONABLE_BUCKETS, getQueueBucket } from "@/lib/inbox";
+import { plainJargon } from "@/lib/vocab";
 import { canAccessQueueAndActionCenter } from "@/lib/roles";
 import type {
   CurrentUser,
@@ -162,7 +158,6 @@ export default function DashboardHomePage() {
     !isLoading && (!errorMessage || hasLeadershipData);
   const pendingAiCount = Math.max(metrics.inboxCount - metrics.analyzedCount, 0);
   const openTaskCount = worklist?.items.length ?? 0;
-  const nextWorkItem = worklist?.items[0] ?? null;
   const managerReviewCount = managerInsights?.open_coaching_case_count ?? 0;
   const managerOverdueCount = managerInsights?.overdue_follow_up_count ?? 0;
   const managerBoundaryAlertCount = managerInsights?.boundary_alerts.length ?? 0;
@@ -170,7 +165,6 @@ export default function DashboardHomePage() {
   const managerScopeMemberCount = managerInsights?.scope_member_count ?? 0;
   const managerNeedsAttentionCount = managerOverdueCount + managerBoundaryAlertCount;
   const managerTopAlert = managerInsights?.boundary_alerts[0] ?? null;
-  const nextChat = pickNextChat(inboxItems);
   const actionableChatCount = inboxItems.filter((item) =>
     ACTIONABLE_BUCKETS.includes(getQueueBucket(item)),
   ).length;
@@ -311,128 +305,12 @@ export default function DashboardHomePage() {
         ) : null}
 
         {isSalesWorkspace ? (
-          <>
-            <section
-              data-onboarding-id="sales-home-next-action"
-              aria-labelledby="sales-next-title"
-              className="clara-card p-5 sm:p-6"
-            >
-              <p className="text-sm font-semibold text-clara-gold">Mulai dari sini</p>
-
-              {isLoading ? (
-                <div className="mt-3 space-y-3" role="status" aria-label="Memuat">
-                  <LoadingBar className="h-6 w-1/2" />
-                  <LoadingBar className="h-4 w-full" />
-                  <LoadingBar className="h-4 w-2/3" />
-                </div>
-              ) : nextChat ? (
-                <>
-                  <h2
-                    id="sales-next-title"
-                    className="mt-2 break-words text-xl font-bold clara-text-primary sm:text-2xl"
-                  >
-                    {nextChat.title}
-                  </h2>
-                  <p className="mt-1 text-xs clara-text-muted">
-                    {formatChannelLabel(nextChat.source_channel)} · {formatRelativeTime(nextChat.last_message_at)}
-                  </p>
-                  <p className="mt-3 line-clamp-2 text-sm leading-6 clara-text-secondary">
-                    {nextChat.latest_message?.message_text ?? "Belum ada pesan."}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {nextChat.latest_ai_extraction ? (
-                      <ValueTag table={TEMPERATURE} value={nextChat.latest_ai_extraction.lead_temperature} />
-                    ) : null}
-                    {nextChat.latest_ai_extraction?.risk_level === "high" ? (
-                      <Tag tone="danger">Risiko tinggi</Tag>
-                    ) : null}
-                    <ValueTag table={REPLY_STATE} value={nextChat.ui_status} />
-                  </div>
-                  {nextChat.latest_ai_extraction?.next_best_action ? (
-                    <p className="mt-3 text-sm leading-6 clara-text-secondary">
-                      <span className="font-semibold clara-text-primary">Langkah berikutnya: </span>
-                      {nextChat.latest_ai_extraction.next_best_action}
-                    </p>
-                  ) : null}
-                  <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                    <Link
-                      href={`/sales/conversations/${nextChat.conversation_id}`}
-                      className="clara-button clara-button-primary justify-center"
-                    >
-                      Buka dan balas
-                    </Link>
-                    <Link href="/sales" className="clara-button clara-button-secondary justify-center">
-                      Lihat semua chat ({actionableChatCount})
-                    </Link>
-                  </div>
-                </>
-              ) : nextWorkItem ? (
-                <>
-                  <h2
-                    id="sales-next-title"
-                    className="mt-2 break-words text-xl font-bold clara-text-primary sm:text-2xl"
-                  >
-                    {nextWorkItem.lead_name}
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
-                    {nextWorkItem.reason || "Ada tindak lanjut yang perlu kamu selesaikan."}
-                  </p>
-                  <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-                    <Link
-                      href={
-                        nextWorkItem.conversation_id
-                          ? `/sales/conversations/${nextWorkItem.conversation_id}`
-                          : "/follow-up"
-                      }
-                      className="clara-button clara-button-primary justify-center"
-                    >
-                      {nextWorkItem.conversation_id ? "Buka chat" : "Buka Tindak Lanjut"}
-                    </Link>
-                    <Link href="/follow-up" className="clara-button clara-button-secondary justify-center">
-                      Lihat semua tindak lanjut
-                    </Link>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2 id="sales-next-title" className="mt-2 text-xl font-bold clara-text-primary sm:text-2xl">
-                    Belum ada yang mendesak
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 clara-text-secondary">
-                    Semua chat sudah kamu tangani. Kalau ada percakapan dari luar extension, masukkan lewat Input
-                    Chat supaya Clara bisa membantu membalasnya.
-                  </p>
-                  <div className="mt-5">
-                    <Link href="/upload" className="clara-button clara-button-primary">
-                      Masukkan chat baru
-                    </Link>
-                  </div>
-                </>
-              )}
-            </section>
-
-            <section
-              data-onboarding-id="sales-home-counts"
-              aria-label="Ringkasan pekerjaan"
-              className="grid gap-3 sm:grid-cols-3"
-            >
-              <CountLink
-                href="/sales"
-                label="Chat menunggu kamu"
-                value={isLoading ? null : actionableChatCount}
-              />
-              <CountLink
-                href="/sales"
-                label="Chat berisiko tinggi"
-                value={isLoading ? null : highRiskChatCount}
-              />
-              <CountLink
-                href="/follow-up"
-                label="Tindak lanjut aktif"
-                value={isLoading ? null : openTaskCount}
-              />
-            </section>
-          </>
+          <SalesHome
+            userId={currentUser?.id ?? null}
+            inboxItems={inboxItems}
+            worklistItems={worklist?.items ?? []}
+            isLoading={isLoading}
+          />
         ) : !shouldRenderLeadershipWorkspace ? null : (
           <>
             <section

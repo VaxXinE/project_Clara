@@ -59,6 +59,8 @@ type WorkspaceShellProps = {
   backHref?: string;
   backLabel?: string;
   actions?: React.ReactNode;
+  /** Tanpa judul besar di atas isi halaman. Dipakai halaman kerja dua panel yang butuh tinggi layar penuh. */
+  bare?: boolean;
   children: React.ReactNode;
 };
 
@@ -67,11 +69,15 @@ type NavItem = {
   label: string;
   icon: IconDefinition;
   description: string;
+  /** Halaman lain yang menu ini ikut dianggap aktif, mis. profil customer di bawah menu Lead & Customer. */
+  alsoActiveFor?: string[];
 };
 
 type NavGroup = {
   title: string;
   items: NavItem[];
+  /** Sembunyikan kalimat penjelas di bawah nama menu supaya daftar menu lebih ringkas. */
+  hideDescriptions?: boolean;
 };
 
 function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
@@ -105,11 +111,12 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
     icon: faCalendarCheck,
     description,
   });
-  const leads = (label: string, description: string): NavItem => ({
+  const leads = (label: string, description: string, alsoActiveFor?: string[]): NavItem => ({
     href: "/crm",
     label,
     icon: faBriefcase,
     description,
+    alsoActiveFor,
   });
   const teamMonitor = (description: string): NavItem => ({
     href: "/manager-insights",
@@ -142,21 +149,16 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
         title: NAV_GROUP_NAMES.daily,
         items: [
           home("Prioritas kerja hari ini"),
-          inbox("Tempat mulai balas chat"),
-          {
-            href: "/upload",
-            label: PAGE_NAMES.intake,
-            icon: faCloudArrowUp,
-            description: "Tambah chat baru ke Clara",
-          },
-          followUp("Pekerjaan follow-up yang belum selesai"),
-          leads(PAGE_NAMES.leads, "Prospect yang sedang kamu tangani"),
-          {
-            href: "/customers",
-            label: PAGE_NAMES.customers,
-            icon: faAddressBook,
-            description: "Ringkasan customer aktif",
-          },
+          inbox("Chat customer yang perlu dibalas"),
+          followUp("Customer yang perlu dihubungi lagi"),
+        ],
+      },
+      {
+        title: NAV_GROUP_NAMES.salesData,
+        hideDescriptions: true,
+        items: [
+          // Daftar Customer digabung ke sini: tiap lead punya tautan ke profil customernya.
+          leads(PAGE_NAMES.leadsAndCustomers, "Prospect dan profil customer", ["/customers"]),
           complaints,
         ],
       },
@@ -289,12 +291,14 @@ function buildNavGroups(currentUser?: CurrentUser | null): NavGroup[] {
   return [{ title: NAV_GROUP_NAMES.daily, items: [home("Ringkasan kerja hari ini")] }];
 }
 
-function isNavItemActive(pathname: string, href: string): boolean {
-  if (href === "/workspace") {
-    return pathname === href;
+function isNavItemActive(pathname: string, item: NavItem): boolean {
+  const matches = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+  if (item.href === "/workspace") {
+    return pathname === item.href;
   }
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return matches(item.href) || Boolean(item.alsoActiveFor?.some(matches));
 }
 
 function getAccountProfileHref() {
@@ -343,6 +347,7 @@ export function WorkspaceShell({
   backHref,
   backLabel,
   actions,
+  bare = false,
   children,
 }: WorkspaceShellProps) {
   const pathname = usePathname();
@@ -372,17 +377,21 @@ export function WorkspaceShell({
 
   const allNavItems = navGroups.flatMap((group) => group.items);
   const activeNavItem = allNavItems
-    .filter((item) => isNavItemActive(pathname, item.href))
+    .filter((item) => isNavItemActive(pathname, item))
     .sort((left, right) => right.href.length - left.href.length)[0];
   const finderItems = useMemo(() => {
     const pageLabels = new Map(allNavItems.map((item) => [item.href, item.label]));
     pageLabels.set("/profile", "Profil");
     pageLabels.set("/start", PAGE_NAMES.guide);
 
-    return tasksForUser(
-      normalizedRole,
-      new Set(allNavItems.map((item) => item.href)),
-    ).map((task) => ({
+    const reachableHrefs = new Set(allNavItems.map((item) => item.href));
+    if (normalizedRole === "sales") {
+      // Input Chat ada sebagai tombol di sidebar, bukan sebagai item menu.
+      reachableHrefs.add("/upload");
+      pageLabels.set("/upload", PAGE_NAMES.intake);
+    }
+
+    return tasksForUser(normalizedRole, reachableHrefs).map((task) => ({
       goal: task.goal,
       href: task.href,
       keywords: task.keywords,
@@ -676,6 +685,19 @@ export function WorkspaceShell({
             </div>
           </div>
 
+          {normalizedRole === "sales" ? (
+            <div className="shrink-0 px-3 pt-4">
+              <Link
+                href="/upload"
+                onClick={() => setMobileNavOpen(false)}
+                className="clara-button clara-button-primary w-full justify-center"
+              >
+                <FontAwesomeIcon icon={faCloudArrowUp} className="mr-2 h-4 w-4" />
+                {PAGE_NAMES.intake}
+              </Link>
+            </div>
+          ) : null}
+
           <nav
             className="clara-scrollbar min-h-0 flex-1 space-y-6 overflow-y-auto px-3 py-5"
             aria-label="Menu workspace"
@@ -693,12 +715,13 @@ export function WorkspaceShell({
                 </h2>
                 <div className="mt-2 space-y-1">
                   {group.items.map((item) => {
-                    const active = isNavItemActive(pathname, item.href);
+                    const active = isNavItemActive(pathname, item);
 
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
+                        title={group.hideDescriptions ? item.description : undefined}
                         onClick={() => setMobileNavOpen(false)}
                         aria-current={active ? "page" : undefined}
                         className={`group flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium ${
@@ -715,15 +738,17 @@ export function WorkspaceShell({
                         </span>
                         <span className="min-w-0">
                           <span className="block truncate">{item.label}</span>
-                          <span
-                            className={`block text-xs font-normal leading-4 ${
-                              active
-                                ? "text-[var(--color-text-secondary)]"
-                                : "text-[var(--color-text-muted)]"
-                            }`}
-                          >
-                            {item.description}
-                          </span>
+                          {group.hideDescriptions ? null : (
+                            <span
+                              className={`block text-xs font-normal leading-4 ${
+                                active
+                                  ? "text-[var(--color-text-secondary)]"
+                                  : "text-[var(--color-text-muted)]"
+                              }`}
+                            >
+                              {item.description}
+                            </span>
+                          )}
                         </span>
                       </Link>
                     );
@@ -910,42 +935,44 @@ export function WorkspaceShell({
           />
 
           <div className="space-y-4">
-            <header className="clara-page-hero border-b border-[var(--color-border-default)] px-4 pb-5 pt-4 sm:px-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="min-w-0 flex-1">
-                  {backHref && backLabel ? (
-                    <Link
-                      href={backHref}
-                      className="clara-text-secondary mb-3 inline-flex min-h-11 max-w-full items-center rounded-lg px-2 text-sm font-medium hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)]"
-                    >
-                      <span aria-hidden="true" className="mr-2">
-                        ←
-                      </span>
-                      <span className="truncate">{backLabel}</span>
-                    </Link>
-                  ) : null}
-                  <h1 className="clara-page-title mt-2 break-words">
-                    {title}
-                  </h1>
-                  <p className="clara-text-secondary mt-2 max-w-3xl text-sm leading-6 sm:text-[15px]">
-                    {description}
-                  </p>
-                </div>
-
-                {actions ? (
-                  <div
-                    data-onboarding-id={
-                      normalizedRole === "sales"
-                        ? "sales-shell-actions"
-                        : undefined
-                    }
-                    className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto lg:max-w-[520px] lg:flex-none lg:justify-end [&_.clara-button]:max-w-full [&_.clara-button]:px-3 [&_.clara-button]:py-2 [&_.clara-button]:text-sm"
-                  >
-                    {actions}
+            {bare ? null : (
+              <header className="clara-page-hero border-b border-[var(--color-border-default)] px-4 pb-5 pt-4 sm:px-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    {backHref && backLabel ? (
+                      <Link
+                        href={backHref}
+                        className="clara-text-secondary mb-3 inline-flex min-h-11 max-w-full items-center rounded-lg px-2 text-sm font-medium hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-text-primary)]"
+                      >
+                        <span aria-hidden="true" className="mr-2">
+                          ←
+                        </span>
+                        <span className="truncate">{backLabel}</span>
+                      </Link>
+                    ) : null}
+                    <h1 className="clara-page-title mt-2 break-words">
+                      {title}
+                    </h1>
+                    <p className="clara-text-secondary mt-2 max-w-3xl text-sm leading-6 sm:text-[15px]">
+                      {description}
+                    </p>
                   </div>
-                ) : null}
-              </div>
-            </header>
+
+                  {actions ? (
+                    <div
+                      data-onboarding-id={
+                        normalizedRole === "sales"
+                          ? "sales-shell-actions"
+                          : undefined
+                      }
+                      className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto lg:max-w-[520px] lg:flex-none lg:justify-end [&_.clara-button]:max-w-full [&_.clara-button]:px-3 [&_.clara-button]:py-2 [&_.clara-button]:text-sm"
+                    >
+                      {actions}
+                    </div>
+                  ) : null}
+                </div>
+              </header>
+            )}
 
             {globalNotifications.length > 0 ? (
               <div className="space-y-2" aria-label="Notifikasi penting">

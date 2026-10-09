@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ErrorState, LoadingState } from "@/components/dashboard/StateViews";
 import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
+import { rememberFollowUpNotice } from "@/lib/follow-up-notice";
+import { QUICK_SCHEDULES } from "@/lib/schedule";
 import { getRoleDisplayLabel, isHeadRole, isManagerRole } from "@/lib/roles";
 import {
   ACCOUNT_CATEGORY,
@@ -189,6 +191,11 @@ export default function LeadDetailPage() {
   const isManagerWorkspace = isManagerRole(currentUser?.role);
   const isHeadWorkspace = isHeadRole(currentUser?.role);
   const isLeadershipWorkspace = isManagerWorkspace || isHeadWorkspace;
+  const disciplineSuccessRef = useRef<HTMLDivElement | null>(null);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleMessage, setScheduleMessage] = useState("");
+  const [scheduleError, setScheduleError] = useState("");
+  const [customScheduleInput, setCustomScheduleInput] = useState("");
 
   const canReassignLead =
     currentUser?.role === "head" || currentUser?.role === "superadmin";
@@ -361,7 +368,7 @@ export default function LeadDetailPage() {
       headline: "Belum ada jadwal follow-up",
       helper: isLeadershipWorkspace
         ? "Pastikan ada langkah berikutnya yang terjadwal sebelum lead ini makin tertinggal."
-        : "Atur jadwal follow-up di bawah supaya lead ini tidak terlewat.",
+        : "Pilih jadwalnya di bawah ini, misalnya Besok pagi, supaya lead ini muncul di Tindak Lanjut dan tidak terlewat.",
     };
   }, [isLeadershipWorkspace, lead]);
   const visibleTimeline = useMemo(() => {
@@ -372,6 +379,38 @@ export default function LeadDetailPage() {
     const startIndex = (effectiveTimelinePage - 1) * timelinePageSize;
     return lead.timeline.slice(startIndex, startIndex + timelinePageSize);
   }, [effectiveTimelinePage, lead]);
+
+  /** Atur jadwal follow-up saja, tanpa menyentuh kolom lead yang lain. Backend ikut membuat tugasnya. */
+  async function handleSchedule(date: Date | null) {
+    if (!lead) {
+      return;
+    }
+
+    setIsScheduling(true);
+    setScheduleError("");
+    setScheduleMessage("");
+
+    try {
+      const payload: LeadUpdateRequest = { next_follow_up_at: date ? date.toISOString() : null };
+      const updatedLead = await apiFetch<LeadDetail>(`/leads/${lead.id}`, {
+        method: "PATCH",
+        body: payload,
+      });
+
+      setLead(updatedLead);
+      setFollowUpInput(toDateTimeLocalValue(updatedLead.next_follow_up_at));
+      setCustomScheduleInput("");
+      setScheduleMessage(
+        updatedLead.next_follow_up_at
+          ? `Jadwal tersimpan: ${formatDateTime(updatedLead.next_follow_up_at)}. Lead ini akan muncul di Tindak Lanjut pada hari itu.`
+          : "Jadwal follow-up dihapus.",
+      );
+    } catch (error) {
+      setScheduleError(error instanceof Error ? error.message : "Jadwal belum bisa disimpan. Coba lagi.");
+    } finally {
+      setIsScheduling(false);
+    }
+  }
 
   async function handleSaveLead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -464,6 +503,13 @@ export default function LeadDetailPage() {
     }
   }
 
+  useEffect(() => {
+    if (disciplineSuccessMessage) {
+      // Tombol simpan ada di bawah formulir, jadi pesan suksesnya harus dibawa ke layar.
+      disciplineSuccessRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [disciplineSuccessMessage]);
+
   async function handleCreateDisciplineLog(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!lead) {
@@ -502,6 +548,9 @@ export default function LeadDetailPage() {
       setDisciplineFollowUpInput("");
       setDisciplineSuccessMessage("Catatan tersimpan.");
       setDisciplineSuggestionHint("");
+      rememberFollowUpNotice(
+        `Catatan untuk ${refreshedLead.display_name} sudah tersimpan, jadi tugas "Isi catatan" untuknya selesai dan hilang dari daftar.`,
+      );
     } catch (error) {
       setDisciplineErrorMessage(
         error instanceof Error
@@ -659,20 +708,92 @@ export default function LeadDetailPage() {
                     ikut berubah. Buka Nilai deal di sebelah kanan lalu simpan supaya laporan KPI cocok.
                   </div>
                 ) : null}
+
+                {isLeadershipWorkspace ? null : (
+                  <div className="mt-5 space-y-3 border-t border-clara-line-subtle pt-4" data-onboarding-id="sales-lead-schedule">
+                    <h3 className="text-sm font-semibold clara-text-primary">
+                      {lead.next_follow_up_at ? "Ubah jadwal follow-up" : "Jadwalkan follow-up"}
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {QUICK_SCHEDULES.map((option) => (
+                        <button
+                          key={option.label}
+                          type="button"
+                          disabled={isScheduling}
+                          onClick={() => void handleSchedule(option.date())}
+                          className="clara-button clara-button-secondary"
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                      {lead.next_follow_up_at ? (
+                        <button
+                          type="button"
+                          disabled={isScheduling}
+                          onClick={() => void handleSchedule(null)}
+                          className="clara-button clara-button-ghost"
+                        >
+                          Hapus jadwal
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <div className="sm:w-64">
+                        <label htmlFor="custom-schedule" className="clara-label">
+                          Atau pilih tanggal dan jam sendiri
+                        </label>
+                        <input
+                          id="custom-schedule"
+                          type="datetime-local"
+                          value={customScheduleInput}
+                          onChange={(event) => setCustomScheduleInput(event.target.value)}
+                          className="clara-input mt-2 w-full"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isScheduling || !customScheduleInput}
+                        onClick={() => {
+                          const iso = fromDateTimeLocalValue(customScheduleInput);
+                          if (iso) {
+                            void handleSchedule(new Date(iso));
+                          }
+                        }}
+                        className="clara-button clara-button-primary"
+                      >
+                        {isScheduling ? "Menyimpan..." : "Simpan jadwal"}
+                      </button>
+                    </div>
+                    {scheduleMessage ? (
+                      <p role="status" aria-live="polite" className="clara-alert clara-alert-success">
+                        {scheduleMessage}{" "}
+                        <Link href="/follow-up" className="font-semibold underline">
+                          Lihat di Tindak Lanjut
+                        </Link>
+                      </p>
+                    ) : null}
+                    {scheduleError ? (
+                      <p role="alert" className="clara-alert clara-alert-danger">
+                        {scheduleError}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
               </section>
 
-              <form
+              <details
+                open={isLeadershipWorkspace || Boolean(successMessage)}
                 data-onboarding-id="sales-lead-detail-context"
-                onSubmit={(event) => void handleSaveLead(event)}
-                className="clara-card space-y-5 p-5 sm:p-6"
+                className="clara-card p-5 sm:p-6"
               >
+              <summary className="clara-disclosure text-lg font-bold clara-text-primary">
+                Ubah tahap, jadwal, dan catatan lead
+              </summary>
+              <form onSubmit={(event) => void handleSaveLead(event)} className="mt-4 space-y-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-bold clara-text-primary">Ubah data lead</h2>
-                    <p className="mt-1 text-sm clara-text-secondary">
-                      Perbarui tahap, suhu, dan jadwal follow-up kalau ada perkembangan.
-                    </p>
-                  </div>
+                  <p className="text-sm clara-text-secondary">
+                    Perbarui tahap, suhu, dan jadwal follow-up kalau ada perkembangan.
+                  </p>
                   {successMessage ? (
                     <span role="status" aria-live="polite" className="clara-alert clara-alert-success">
                       {successMessage}
@@ -760,6 +881,7 @@ export default function LeadDetailPage() {
                   </button>
                 </div>
               </form>
+              </details>
 
               <section
                 data-onboarding-id="sales-lead-detail-discipline"
@@ -787,9 +909,30 @@ export default function LeadDetailPage() {
                 </p>
 
                 {disciplineSuccessMessage ? (
-                  <p role="status" aria-live="polite" className="clara-alert clara-alert-success">
-                    {disciplineSuccessMessage}
-                  </p>
+                  <div
+                    ref={disciplineSuccessRef}
+                    role="status"
+                    aria-live="polite"
+                    className="clara-alert clara-alert-success space-y-3"
+                  >
+                    <p className="font-semibold">{disciplineSuccessMessage}</p>
+                    {isLeadershipWorkspace ? null : (
+                      <>
+                        <p className="text-sm">
+                          Tugas &ldquo;Isi catatan&rdquo; untuk customer ini sudah selesai, jadi hilang dari Tindak
+                          Lanjut.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Link href="/follow-up" className="clara-button clara-button-primary">
+                            Kembali ke Tindak Lanjut
+                          </Link>
+                          <Link href="/sales" className="clara-button clara-button-secondary">
+                            Buka Chat Masuk
+                          </Link>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 ) : null}
 
                 {disciplineSuggestionHint ? (
@@ -1019,10 +1162,7 @@ export default function LeadDetailPage() {
               </section>
 
               <details open={dealMetricsNeedsSync} className="clara-card group p-5 sm:p-6">
-                <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-lg font-bold clara-text-primary">
-                  Nilai deal
-                  <span className="text-sm font-normal clara-text-secondary group-open:hidden">Tampilkan</span>
-                </summary>
+                <summary className="clara-disclosure text-lg font-bold clara-text-primary">Nilai deal</summary>
                 <p className="mt-1 text-sm clara-text-secondary">
                   Isi perkiraan nilai dan status deal supaya laporan KPI akurat.
                 </p>
@@ -1207,10 +1347,10 @@ export default function LeadDetailPage() {
                 </details>
               </section>
 
-              <section aria-labelledby="history-title" className="clara-card-outline p-5 sm:p-6">
-                <h2 id="history-title" className="text-lg font-bold clara-text-primary">
-                  Riwayat lead
-                </h2>
+              <details open={isLeadershipWorkspace} aria-labelledby="history-title" className="clara-card-outline p-5 sm:p-6">
+                <summary id="history-title" className="clara-disclosure text-lg font-bold clara-text-primary">
+                  Riwayat lead ({lead.timeline.length})
+                </summary>
                 <p className="mt-1 text-sm clara-text-secondary">
                   Semua perubahan penting pada lead ini, dari yang terbaru.
                 </p>
@@ -1285,7 +1425,7 @@ export default function LeadDetailPage() {
                     ) : null}
                   </>
                 )}
-              </section>
+              </details>
             </aside>
           </div>
         ) : null}

@@ -134,6 +134,11 @@ export function labelOf(table: VocabTable, value: string | null | undefined): st
 }
 
 const JARGON_REPLACEMENTS: Array<[RegExp, string]> = [
+  [
+    /jalankan ai analysis lagi agar next action dan draft ikut refresh\.?/gi,
+    "Minta Clara membaca chat ini lagi, supaya langkah berikutnya dan jawabannya ikut diperbarui.",
+  ],
+  [/belum dibaca ulang oleh AI/gi, "belum dibaca ulang oleh Clara"],
   [/discipline log/gi, "catatan aktivitas harian"],
   [/next follow-up/gi, "follow-up berikutnya"],
   [/bottleneck/gi, "hambatan"],

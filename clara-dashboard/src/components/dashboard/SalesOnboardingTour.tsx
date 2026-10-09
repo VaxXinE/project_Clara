@@ -744,12 +744,40 @@ function getTourRoutes(role: TourRole) {
   return TOUR_ROUTES;
 }
 
+/**
+ * Sales tidak lagi dipaksa masuk tur 10 halaman saat pertama login (layar diblur dan popup muncul
+ * di setiap halaman). Tur Sales hanya jalan kalau diminta lewat "Ulangi onboarding". Versi key
+ * dinaikkan supaya user yang tur-nya tertahan di tengah juga berhenti diganggu.
+ */
+const SALES_STORAGE_VERSION = 5;
+
 function buildStorageKey(userId: string, role: TourRole) {
-  return `clara.${role}-onboarding.v${STORAGE_VERSION}.${userId}`;
+  const version = role === "sales" ? SALES_STORAGE_VERSION : STORAGE_VERSION;
+  return `clara.${role}-onboarding.v${version}.${userId}`;
+}
+
+function buildInitialState(role: TourRole): TourState {
+  const isOptIn = role === "sales";
+  return {
+    completed: isOptIn,
+    dismissed: isOptIn,
+    routeIndex: 0,
+    stepIndex: 0,
+  };
 }
 
 export function resetDashboardOnboardingState(userId: string, role: TourRole) {
   if (typeof window === "undefined" || !userId) {
+    return;
+  }
+
+  if (role === "sales") {
+    writeState(userId, role, {
+      completed: false,
+      dismissed: false,
+      routeIndex: 0,
+      stepIndex: 0,
+    });
     return;
   }
 
@@ -762,23 +790,13 @@ export function resetSalesOnboardingState(userId: string) {
 
 function readState(userId: string, role: TourRole): TourState {
   if (typeof window === "undefined") {
-    return {
-      completed: false,
-      dismissed: false,
-      routeIndex: 0,
-      stepIndex: 0,
-    };
+    return buildInitialState(role);
   }
 
   try {
     const raw = window.localStorage.getItem(buildStorageKey(userId, role));
     if (!raw) {
-      return {
-        completed: false,
-        dismissed: false,
-        routeIndex: 0,
-        stepIndex: 0,
-      };
+      return buildInitialState(role);
     }
 
     const parsed = JSON.parse(raw) as Partial<TourState>;
@@ -799,12 +817,7 @@ function readState(userId: string, role: TourRole): TourState {
       ),
     };
   } catch {
-    return {
-      completed: false,
-      dismissed: false,
-      routeIndex: 0,
-      stepIndex: 0,
-    };
+    return buildInitialState(role);
   }
 }
 
