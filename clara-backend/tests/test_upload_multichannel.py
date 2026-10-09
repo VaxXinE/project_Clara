@@ -206,6 +206,32 @@ def test_dashboard_channel_overview_returns_counts(
     assert {"whatsapp", "telegram", "live_chat"} <= channel_keys
 
 
+def test_dashboard_channel_overview_lists_extension_only_channels(
+    client,
+    seeded_data: dict[str, object],
+) -> None:
+    marketing_a = seeded_data["marketing_a"]
+    login(client, email=marketing_a.email, password="MarketingPass123!")
+
+    overview = client.get("/dashboard/channels")
+    assert overview.status_code == 200, overview.text
+    items = {item["key"]: item for item in overview.json()["items"]}
+
+    assert {"whatsapp", "instagram", "tiktok", "telegram", "live_chat"} <= set(items)
+    assert items["instagram"]["label"] == "Instagram DM"
+    assert items["instagram"]["supported_sources"] == ["instagram_extension"]
+    assert items["tiktok"]["supports_live_sync"] is True
+    assert items["tiktok"]["supports_file_upload"] is False
+
+    # Form Input Chat memakai /upload/channels. Instagram dan TikTok belum punya jalur unggah,
+    # jadi tidak boleh muncul sebagai pilihan di sana.
+    upload_channels = client.get("/upload/channels")
+    assert upload_channels.status_code == 200, upload_channels.text
+    upload_keys = {item["key"] for item in upload_channels.json()}
+    assert "instagram" not in upload_keys
+    assert "tiktok" not in upload_keys
+
+
 def test_upload_txt_over_5mb_is_rejected_for_both_formats(
     client,
     seeded_data: dict[str, object],

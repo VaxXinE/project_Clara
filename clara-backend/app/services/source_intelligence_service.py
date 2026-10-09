@@ -48,6 +48,38 @@ CHANNEL_REGISTRY: dict[str, dict[str, object]] = {
     },
 }
 
+# Channel yang masuk lewat Ekstensi Clara (dibaca dari tampilan halaman chat). Sengaja tidak masuk
+# CHANNEL_REGISTRY karena registry itu juga dipakai form Input Chat, sedangkan Instagram dan TikTok
+# belum punya jalur unggah berkas atau tempel teks.
+EXTENSION_CHANNEL_REGISTRY: dict[str, dict[str, object]] = {
+    "instagram": {
+        "key": "instagram",
+        "label": "Instagram DM",
+        "description": "Dibaca dari halaman Instagram DM lewat Ekstensi Clara. Masih tahap uji coba.",
+        "supports_file_upload": False,
+        "supports_text_paste": False,
+        "supports_live_sync": True,
+        "file_endpoint": None,
+        "text_endpoint": None,
+        "supported_sources": ["instagram_extension"],
+        "sample_hint": "Dibaca langsung dari chat Instagram yang sedang terbuka.",
+    },
+    "tiktok": {
+        "key": "tiktok",
+        "label": "TikTok DM",
+        "description": "Dibaca dari halaman TikTok Messages lewat Ekstensi Clara. Masih tahap uji coba.",
+        "supports_file_upload": False,
+        "supports_text_paste": False,
+        "supports_live_sync": True,
+        "file_endpoint": None,
+        "text_endpoint": None,
+        "supported_sources": ["tiktok_extension"],
+        "sample_hint": "Dibaca langsung dari chat TikTok yang sedang terbuka.",
+    },
+}
+
+OVERVIEW_CHANNEL_ORDER = ("whatsapp", "instagram", "tiktok", "telegram", "live_chat")
+
 
 def normalize_source_key(source: str | None) -> str:
     if source is None:
@@ -120,6 +152,14 @@ def build_source_label(source: str | None) -> str:
 
 def list_channel_definitions() -> list[dict[str, object]]:
     return [CHANNEL_REGISTRY[key].copy() for key in CHANNEL_REGISTRY]
+
+
+def list_overview_channel_definitions() -> list[dict[str, object]]:
+    """Semua channel yang dikenali Clara untuk halaman Channel, termasuk yang hanya lewat ekstensi."""
+    combined = {**CHANNEL_REGISTRY, **EXTENSION_CHANNEL_REGISTRY}
+    ordered = [key for key in OVERVIEW_CHANNEL_ORDER if key in combined]
+    ordered += [key for key in combined if key not in OVERVIEW_CHANNEL_ORDER]
+    return [combined[key].copy() for key in ordered]
 
 
 def get_channel_definition(channel: str | None) -> dict[str, object] | None:

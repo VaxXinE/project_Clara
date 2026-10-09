@@ -135,7 +135,7 @@ from app.services.knowledge_update_queue_service import (
 from app.services.performance_action_service import list_performance_actions
 from app.services.source_intelligence_service import (
     build_source_label,
-    list_channel_definitions,
+    list_overview_channel_definitions,
     matches_source_channel,
     normalize_source_channel,
     normalize_source_key,
@@ -7059,7 +7059,7 @@ def get_channel_overview(
     leads = db.scalars(lead_statement).all()
 
     items: list[ChannelOverviewItem] = []
-    for definition in list_channel_definitions():
+    for definition in list_overview_channel_definitions():
         channel_key = str(definition["key"])
         channel_conversations = [
             conversation
