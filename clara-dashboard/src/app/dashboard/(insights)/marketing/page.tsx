@@ -256,8 +256,6 @@ export default function MarketingInsightsPage() {
       currentUser={currentUser}
       title={PAGE_NAMES.marketing}
       description="Apa yang ditanyakan dan diragukan customer, dan konten apa yang sebaiknya dibuat tim pemasaran."
-      backHref="/dashboard"
-      backLabel="Kembali ke beranda"
       actions={
         insights ? (
           <button
@@ -296,7 +294,7 @@ export default function MarketingInsightsPage() {
               </h2>
               <p className="mt-1 text-sm leading-6 clara-text-secondary">{summaryHelper}</p>
               <p className="mt-1 text-xs clara-text-muted">
-                Data per {formatRelativeTime(insights.generated_at)} ({formatDateTime(insights.generated_at)}). Ini pola
+                Diperbarui {formatRelativeTime(insights.generated_at)} ({formatDateTime(insights.generated_at)}). Ini pola
                 dari percakapan, belum tentu sebab-akibat.
               </p>
             </section>
@@ -343,7 +341,7 @@ export default function MarketingInsightsPage() {
               )}
             </section>
 
-            <details className="clara-card p-4 sm:p-5">
+            <details open={insights.content_briefs.length > 0} className="clara-card p-4 sm:p-5">
               <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
                 Brief siap pakai untuk tim konten ({insights.content_briefs.length})
               </summary>
@@ -365,10 +363,11 @@ export default function MarketingInsightsPage() {
                         <Fact label="Nada" value={plainJargon(brief.tone.replaceAll("_", " "))} />
                         <Fact label="Ajakan di akhir" value={plainJargon(brief.call_to_action)} />
                       </dl>
-                      <button
-                        type="button"
-                        disabled={isCreatingExecutionItem}
-                        onClick={() =>
+                      <MakeTaskRow
+                        users={users}
+                        currentUserId={currentUser?.id ?? null}
+                        busy={isCreatingExecutionItem}
+                        onCreate={(assignedUserId) =>
                           void handleCreateExecutionItem({
                             item_type: "content_brief",
                             source_kind: "content_brief",
@@ -376,13 +375,10 @@ export default function MarketingInsightsPage() {
                             summary: brief.key_message,
                             recommended_action: brief.call_to_action,
                             priority: brief.urgency === "high" ? "high" : "medium",
-                            assigned_user_id: currentUser?.id ?? null,
+                            assigned_user_id: assignedUserId,
                           })
                         }
-                        className="clara-button clara-button-primary mt-4"
-                      >
-                        {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan tugas"}
-                      </button>
+                      />
                     </li>
                   ))}
                 </ul>
@@ -390,7 +386,7 @@ export default function MarketingInsightsPage() {
             </div>
             </details>
 
-            <details className="clara-card p-4 sm:p-5">
+            <details open={insights.ads_signals.length > 0} className="clara-card p-4 sm:p-5">
               <summary className="flex min-h-11 cursor-pointer items-center text-base font-semibold clara-text-primary">
                 Saran untuk iklan ({insights.ads_signals.length})
               </summary>
@@ -410,10 +406,11 @@ export default function MarketingInsightsPage() {
                         <Fact label="Langkah yang disarankan" value={plainJargon(signal.recommendation)} />
                         <Fact label="Pengaturan budget" value={plainJargon(signal.budget_shift)} />
                       </dl>
-                      <button
-                        type="button"
-                        disabled={isCreatingExecutionItem}
-                        onClick={() =>
+                      <MakeTaskRow
+                        users={users}
+                        currentUserId={currentUser?.id ?? null}
+                        busy={isCreatingExecutionItem}
+                        onCreate={(assignedUserId) =>
                           void handleCreateExecutionItem({
                             item_type: "ads_signal",
                             source_kind: "ads_signal",
@@ -421,13 +418,10 @@ export default function MarketingInsightsPage() {
                             summary: signal.observation,
                             recommended_action: `${signal.recommendation} ${signal.budget_shift}`,
                             priority: signal.urgency === "high" ? "high" : "medium",
-                            assigned_user_id: currentUser?.id ?? null,
+                            assigned_user_id: assignedUserId,
                           })
                         }
-                        className="clara-button clara-button-primary mt-4"
-                      >
-                        {isCreatingExecutionItem ? "Menyimpan..." : "Jadikan tugas"}
-                      </button>
+                      />
                     </li>
                   ))}
                 </ul>
@@ -442,10 +436,10 @@ export default function MarketingInsightsPage() {
               <p className="text-sm clara-text-secondary">
                 {summary.total_items > 0
                   ? `${summary.total_items} tugas (${openTasks} belum selesai). Hasilnya sejauh ini: ${summary.leads_generated} lead masuk, ${summary.won_leads} closing, nilai ${formatIdr(summary.attributed_won_value)}.`
-                  : "Tugas yang kamu buat dari brief atau saran iklan muncul di sini, lengkap dengan penanggung jawab dan hasilnya."}
+                  : "Tugas dari brief atau saran iklan muncul di sini, lengkap dengan penanggung jawab dan hasilnya."}
               </p>
               {insights.execution_items.length === 0 ? (
-                <EmptyState title="Belum ada tugas" description="Tekan Jadikan tugas pada brief atau saran iklan di atas." />
+                <EmptyState title="Belum ada tugas" description="Pilih penanggung jawab lalu tekan Jadikan tugas pada brief atau saran iklan di atas." />
               ) : (
                 <ul className="space-y-3">
                   {insights.execution_items.map((item) => (
@@ -541,6 +535,54 @@ export default function MarketingInsightsPage() {
         ) : null}
       </div>
     </WorkspaceShell>
+  );
+}
+
+/** Pilih penanggung jawab sebelum membuat tugas, supaya tugas tidak otomatis jatuh ke yang sedang membuka halaman. */
+function MakeTaskRow({
+  users,
+  currentUserId,
+  busy,
+  onCreate,
+}: {
+  users: CurrentUser[];
+  currentUserId: string | null;
+  busy: boolean;
+  onCreate: (assignedUserId: string | null) => void;
+}) {
+  const selectId = useId();
+  const [assignee, setAssignee] = useState(currentUserId ?? "");
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+      <div className="sm:w-72">
+        <label htmlFor={selectId} className="clara-label">
+          Penanggung jawab
+        </label>
+        <select
+          id={selectId}
+          value={assignee}
+          disabled={busy}
+          onChange={(event) => setAssignee(event.target.value)}
+          className="clara-select mt-1 w-full"
+        >
+          <option value="">Belum ada</option>
+          {[...users].sort((a, b) => Number(b.id === currentUserId) - Number(a.id === currentUserId)).map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.id === currentUserId ? "Saya" : user.name} ({getRoleDisplayLabel(user.role)})
+            </option>
+          ))}
+        </select>
+      </div>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onCreate(assignee || null)}
+        className="clara-button clara-button-primary"
+      >
+        {busy ? "Menyimpan..." : "Jadikan tugas"}
+      </button>
+    </div>
   );
 }
 

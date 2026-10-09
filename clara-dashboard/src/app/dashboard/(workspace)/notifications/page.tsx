@@ -165,8 +165,6 @@ export default function NotificationsPage() {
             ? "Follow-up Sales yang mulai terlambat dan lead yang belum ditindak."
             : "Hal yang perlu segera ditindak: follow-up terlambat, review kritis, dan peringatan KPI."
       }
-      backHref="/dashboard"
-      backLabel="Kembali ke beranda"
       actions={
         <Link href="/approvals" className="clara-button clara-button-primary">
           {isHeadView ? "Buka Arahan Tim" : "Buka Review Sales"}
@@ -237,42 +235,46 @@ export default function NotificationsPage() {
                 </button>
               </div>
 
-              <div className="max-w-xs">
-                <label htmlFor="alert-severity" className="clara-label">
-                  Tingkat kepentingan
-                </label>
-                <select
-                  id="alert-severity"
-                  value={severityFilter}
-                  onChange={(event) => {
-                    setSeverityFilter(event.target.value);
-                    setVisible(VISIBLE_STEP);
-                  }}
-                  className="clara-select mt-2 w-full"
-                >
-                  <option value="all">Semua</option>
-                  <option value="critical">Kritis</option>
-                  <option value="high">Penting</option>
-                  <option value="medium">Perlu dicek</option>
-                  <option value="low">Info</option>
-                </select>
-              </div>
-
-              <details className="group">
-                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-clara-gold">
-                  Tambah catatan penyelesaian (opsional)
-                </summary>
-                <label htmlFor={noteId} className="clara-label mt-2 block">
-                  Catatan ini ikut tersimpan saat kamu menekan Tandai selesai atau Abaikan
-                </label>
-                <textarea
-                  id={noteId}
-                  value={resolutionNote}
-                  onChange={(event) => setResolutionNote(event.target.value)}
-                  rows={2}
-                  className="clara-textarea mt-2 w-full"
-                  placeholder="Contoh: sudah dibicarakan dengan manager"
-                />
+              <details>
+                <summary className="clara-disclosure">Saring menurut tingkat kepentingan, dan tambah catatan</summary>
+                <div className="mt-3 space-y-4">
+                  <div className="max-w-xs">
+                    <label htmlFor="alert-severity" className="clara-label">
+                      Tingkat kepentingan
+                    </label>
+                    <select
+                      id="alert-severity"
+                      value={severityFilter}
+                      onChange={(event) => {
+                        setSeverityFilter(event.target.value);
+                        setVisible(VISIBLE_STEP);
+                      }}
+                      className="clara-select mt-2 w-full"
+                    >
+                      <option value="all">Semua</option>
+                      <option value="critical">Kritis</option>
+                      <option value="high">Penting</option>
+                      <option value="medium">Perlu dicek</option>
+                      <option value="low">Info</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor={noteId} className="clara-label">
+                      Catatan penyelesaian (opsional)
+                    </label>
+                    <p className="mt-1 text-xs clara-text-muted">
+                      Ikut tersimpan saat kamu menekan Tandai selesai atau Abaikan.
+                    </p>
+                    <textarea
+                      id={noteId}
+                      value={resolutionNote}
+                      onChange={(event) => setResolutionNote(event.target.value)}
+                      rows={2}
+                      className="clara-textarea mt-2 w-full"
+                      placeholder="Contoh: sudah dibicarakan dengan manager"
+                    />
+                  </div>
+                </div>
               </details>
 
               <p role="status" aria-live="polite" className="text-sm clara-text-secondary">

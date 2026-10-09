@@ -15,7 +15,11 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { describeKnowledgeScope, describeKnowledgeSource } from "@/lib/vocab";
+import { KnowledgeReference } from "@/components/dashboard/KnowledgeReference";
+import { AccountFilterTabs } from "@/components/dashboard/AccountFilterTabs";
+import { MarkdownView } from "@/components/dashboard/MarkdownView";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
+import { matchesAccount, type AccountFilter } from "@/lib/knowledge";
 import { NAV_GROUP_NAMES, PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
@@ -64,9 +68,11 @@ export default function ProductKnowledgePage() {
   );
   const [proposalQueueOpen, setProposalQueueOpen] = useState(false);
   const [hasLoadedKnowledgeList, setHasLoadedKnowledgeList] = useState(false);
+  const [accountFilter, setAccountFilter] = useState<AccountFilter>("all");
 
   const canManageKnowledge = currentUser?.role === "superadmin";
   const canReviewProposals = currentUser?.role === "superadmin";
+  const isReadOnlyViewer = currentUser !== null && !canManageKnowledge;
   const canSeeProposalQueue = ["manager", "head", "superadmin"].includes(
     currentUser?.role ?? "",
   );
@@ -147,13 +153,17 @@ export default function ProductKnowledgePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const visibleItems = items.filter((item) =>
+    matchesAccount(item.title, accountFilter),
+  );
   const effectiveSelectedKnowledgeId =
-    selectedKnowledgeId && items.some((item) => item.id === selectedKnowledgeId)
+    selectedKnowledgeId &&
+    visibleItems.some((item) => item.id === selectedKnowledgeId)
       ? selectedKnowledgeId
-      : (items[0]?.id ?? null);
+      : (visibleItems[0]?.id ?? null);
   const selectedKnowledge =
-    items.find((item) => item.id === effectiveSelectedKnowledgeId) ??
-    items[0] ??
+    visibleItems.find((item) => item.id === effectiveSelectedKnowledgeId) ??
+    visibleItems[0] ??
     null;
   const selectedKnowledgeStats = selectedKnowledge
     ? buildKnowledgeContentStats(selectedKnowledge.content)
@@ -330,9 +340,11 @@ export default function ProductKnowledgePage() {
       currentUser={currentUser}
       eyebrow={NAV_GROUP_NAMES.analysis}
       title={PAGE_NAMES.knowledge}
-      description="Temukan dan kelola sumber jawaban resmi tanpa memisahkan pencarian dari konteks yang sedang dibaca."
-      backHref="/workspace"
-      backLabel="Kembali ke beranda"
+      description={
+        isReadOnlyViewer
+          ? "Jawaban resmi yang dipakai Clara saat membalas customer."
+          : "Temukan dan kelola sumber jawaban resmi tanpa memisahkan pencarian dari konteks yang sedang dibaca."
+      }
       actions={
         <div className="flex flex-wrap gap-2">
           <div className="relative">
@@ -373,6 +385,22 @@ export default function ProductKnowledgePage() {
         </div>
       }
     >
+      {isReadOnlyViewer ? (
+        <div className="space-y-5">
+          {errorMessage ? (
+            <div role="alert" className="clara-alert clara-alert-danger">
+              {errorMessage}
+            </div>
+          ) : null}
+          {isLoading ? (
+            <div role="status" className="clara-empty-state">
+              Memuat pengetahuan...
+            </div>
+          ) : (
+            <KnowledgeReference items={items} proposals={proposals} />
+          )}
+        </div>
+      ) : (
       <div className="space-y-5">
         {errorMessage ? (
           <div role="alert" className="clara-alert clara-alert-danger">
@@ -480,7 +508,7 @@ export default function ProductKnowledgePage() {
               <div className="flex min-h-11 items-center justify-between gap-2 lg:justify-end">
                 <span className="whitespace-nowrap text-sm text-[var(--color-text-muted)]">
                   <strong className="tabular-nums text-[var(--color-text-primary)]">
-                    {items.length}
+                    {visibleItems.length}
                   </strong>{" "}
                   hasil
                 </span>
@@ -501,14 +529,21 @@ export default function ProductKnowledgePage() {
                 ) : null}
               </div>
             </form>
+            <div className="border-b border-[var(--color-border-subtle)] px-4 py-3">
+              <AccountFilterTabs
+                value={accountFilter}
+                onChange={setAccountFilter}
+                titles={items.map((item) => item.title)}
+              />
+            </div>
 
             <div className="grid min-h-[640px] lg:h-[calc(100vh-300px)] lg:min-h-[620px] lg:grid-cols-[390px_minmax(0,1fr)]">
               <div
                 className={`${selectedKnowledgeId ? "hidden lg:block" : "block"} clara-scrollbar overflow-y-auto border-r border-[var(--color-border-subtle)] bg-[var(--color-surface-base)] p-3`}
               >
-                {items.length ? (
+                {visibleItems.length ? (
                   <div className="space-y-2">
-                    {items.map((item) => {
+                    {visibleItems.map((item) => {
                       const active = item.id === selectedKnowledge?.id;
                       const stats = buildKnowledgeContentStats(item.content);
                       return (
@@ -694,7 +729,7 @@ export default function ProductKnowledgePage() {
                         Isi pengetahuan
                       </p>
                       <div className="mt-5">
-                        {renderKnowledgeContent(selectedKnowledge.content)}
+                        <MarkdownView content={selectedKnowledge.content} />
                       </div>
                     </div>
                   </article>
@@ -831,6 +866,7 @@ export default function ProductKnowledgePage() {
           </section>
         ) : null}
       </div>
+      )}
 
       {editorOpen ? (
         <div
@@ -998,110 +1034,6 @@ function StatusBadge({ active }: { active: boolean }) {
       {active ? "Aktif" : "Nonaktif"}
     </span>
   );
-}
-
-function renderKnowledgeContent(content: string) {
-  const blocks = content
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter(Boolean)
-    .filter((block) => !/^[-=*_•]{3,}$/.test(block.replace(/\s+/g, "")));
-
-  return (
-    <article className="w-full space-y-8 text-justify text-[15px] leading-8 text-[var(--color-text-secondary)] [text-align-last:left]">
-      {blocks.map((block, blockIndex) => {
-        const lines = mergeWrappedKnowledgeLines(
-          block
-            .split("\n")
-            .map((line) => line.trim())
-            .filter(Boolean)
-            .filter((line) => line !== "---"),
-        );
-        const titleLine = lines[0] ?? "";
-        const hasStructuredLead = /^(user|jawaban|q|a)\s*:/i.test(titleLine);
-        return (
-          <section
-            key={`${blockIndex}-${block.slice(0, 40)}`}
-            className="border-b border-[var(--color-border-subtle)] pb-8 last:border-0 last:pb-0"
-          >
-            <div className="space-y-3">
-              {lines.map((line, lineIndex) => {
-                const isLabelLine = /^(user|jawaban|q|a)\s*:/i.test(line);
-                const isHeading =
-                  (lineIndex === 0 &&
-                    !hasStructuredLead &&
-                    line.length <= 90) ||
-                  /:$/.test(line);
-                if (/^[-*•]\s+/.test(line)) {
-                  return (
-                    <div
-                      key={`${blockIndex}-${lineIndex}`}
-                      className="flex gap-3 pl-1 text-justify [text-align-last:left]"
-                    >
-                      <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-accent)]" />
-                      <p className="text-pretty">
-                        {line.replace(/^[-*•]\s+/, "")}
-                      </p>
-                    </div>
-                  );
-                }
-                if (isLabelLine) {
-                  const [label, ...rest] = line.split(":");
-                  return (
-                    <p
-                      key={`${blockIndex}-${lineIndex}`}
-                      className="text-justify [text-align-last:left]"
-                    >
-                      <span className="font-semibold text-[var(--color-text-primary)]">
-                        {label}:
-                      </span>{" "}
-                      {rest.join(":").trim()}
-                    </p>
-                  );
-                }
-                if (isHeading)
-                  return (
-                    <h3
-                      key={`${blockIndex}-${lineIndex}`}
-                      className="text-balance text-lg font-bold tracking-[-0.02em] text-[var(--color-text-primary)]"
-                    >
-                      {line}
-                    </h3>
-                  );
-                return (
-                  <p
-                    key={`${blockIndex}-${lineIndex}`}
-                    className="text-justify [text-align-last:left]"
-                  >
-                    {line}
-                  </p>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
-    </article>
-  );
-}
-
-function mergeWrappedKnowledgeLines(lines: string[]) {
-  return lines.reduce<string[]>((merged, line) => {
-    const previous = merged.at(-1);
-    const startsNewBlock =
-      /^#{1,6}\s+/.test(line) ||
-      /^[-*•]\s+/.test(line) ||
-      /^(user|jawaban|q|a)\s*:/i.test(line) ||
-      /^\|/.test(line) ||
-      !previous ||
-      /:$/.test(previous) ||
-      /^#{1,6}\s+/.test(previous) ||
-      /^\|/.test(previous);
-
-    if (startsNewBlock) merged.push(line);
-    else merged[merged.length - 1] = `${previous} ${line}`;
-    return merged;
-  }, []);
 }
 
 function buildKnowledgeContentStats(content: string) {

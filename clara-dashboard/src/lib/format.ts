@@ -257,3 +257,8 @@ export function formatDayLabel(value: string, now: Date = new Date()): string {
 
   return new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "short" }).format(new Date(value));
 }
+
+/** Nilai uang dalam rupiah, mis. "Rp 1.250.000". */
+export function formatRupiah(value: number | null | undefined): string {
+  return `Rp ${(Number.isFinite(value) ? (value as number) : 0).toLocaleString("id-ID")}`;
+}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { HeadHome } from "@/components/dashboard/HeadHome";
 import { ManagerHome } from "@/components/dashboard/ManagerHome";
 import { SalesHome } from "@/components/dashboard/SalesHome";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
@@ -13,6 +14,8 @@ import { plainJargon } from "@/lib/vocab";
 import { canAccessQueueAndActionCenter } from "@/lib/roles";
 import type {
   ChatReviewCenterResponse,
+  OpsNotificationItem,
+  OpsNotificationResponse,
   CurrentUser,
   KpiCommandCenterResponse,
   ManagerInsightsResponse,
@@ -61,6 +64,7 @@ export default function DashboardHomePage() {
   const [inboxItems, setInboxItems] = useState<SalesInboxItem[]>([]);
   const [worklist, setWorklist] = useState<SalesWorklistResponse | null>(null);
   const [kpi, setKpi] = useState<KpiCommandCenterResponse | null>(null);
+  const [headAlerts, setHeadAlerts] = useState<OpsNotificationItem[]>([]);
   const [reviewQueue, setReviewQueue] = useState<ChatReviewCenterResponse | null>(null);
   const [managerInsights, setManagerInsights] =
     useState<ManagerInsightsResponse | null>(null);
@@ -124,11 +128,27 @@ export default function DashboardHomePage() {
           }
         }
 
-        if (me.role === "manager") {
+        if (me.role === "manager" || me.role === "head") {
           try {
             setReviewQueue(await apiFetch<ChatReviewCenterResponse>("/dashboard/sales/chat-review-center"));
           } catch {
             // Beranda tetap tampil dari data monitor tim kalau antrean review gagal dimuat.
+          }
+        }
+
+        if (me.role === "head") {
+          try {
+            const notifications = await apiFetch<OpsNotificationResponse>("/dashboard/notifications");
+            setHeadAlerts(
+              notifications.items.filter(
+                (item) =>
+                  Boolean(item.alert_type) &&
+                  (item.status === "active" || item.status === "acknowledged") &&
+                  (item.target_role === "head" || item.target_role === "all"),
+              ),
+            );
+          } catch {
+            // Peringatan hanya pelengkap Beranda.
           }
         }
 
@@ -309,7 +329,7 @@ export default function DashboardHomePage() {
           </section>
         )}
 
-        {currentUser && !isSalesWorkspace && !isManagerWorkspace && isLoading ? (
+        {currentUser && !isSalesWorkspace && !isManagerWorkspace && !isHeadWorkspace && isLoading ? (
           <div role="status" className="clara-empty-state text-sm text-clara-ink-2">
             Memuat ringkasan...
           </div>
@@ -324,6 +344,14 @@ export default function DashboardHomePage() {
           />
         ) : isManagerWorkspace ? (
           <ManagerHome queue={reviewQueue} insights={managerInsights} isLoading={isLoading} />
+        ) : isHeadWorkspace ? (
+          <HeadHome
+            queue={reviewQueue}
+            insights={managerInsights}
+            alerts={headAlerts}
+            kpi={kpi}
+            isLoading={isLoading}
+          />
         ) : !shouldRenderLeadershipWorkspace ? null : (
           <>
             <section

@@ -15,6 +15,8 @@ type Props = {
   finalReplyText?: string | null;
   hasBeenSent?: boolean;
   isStale?: boolean;
+  /** Hanya yang ikut mengoperasikan chat (Superadmin) yang menyalin dan menandai terkirim. Reviewer cukup memutuskan. */
+  canSend?: boolean;
   onUpdated: () => Promise<void>;
 };
 
@@ -30,6 +32,7 @@ export function ReplySuggestionActions({
   finalReplyText = null,
   hasBeenSent = false,
   isStale = false,
+  canSend = false,
   onUpdated,
 }: Props) {
   const [selectedText, setSelectedText] = useState(suggestedReplies[0]?.text ?? "");
@@ -86,7 +89,7 @@ export function ReplySuggestionActions({
             reviewer_name: "Sales Dashboard",
           },
         }),
-      "Draft belum bisa ditolak. Coba lagi.",
+      "Draf belum bisa ditolak. Coba lagi.",
       setIsSubmitting,
     );
   }
@@ -122,8 +125,8 @@ export function ReplySuggestionActions({
         </p>
         {isStale ? (
           <p role="alert" className="clara-alert clara-alert-warning mt-3">
-            Customer sudah membalas lagi. Jangan pakai draft lama untuk balasan berikutnya, susun
-            jawaban baru.
+            Customer sudah membalas lagi. Draf lama tidak cocok lagi untuk balasan berikutnya, Sales
+            perlu menyusun jawaban baru.
           </p>
         ) : null}
       </section>
@@ -133,10 +136,31 @@ export function ReplySuggestionActions({
   if (!isPending && !isApproved) {
     return (
       <section className="rounded-2xl border border-clara-line bg-clara-raised p-4">
-        <p className="text-sm font-semibold clara-text-primary">Draft ini sudah ditolak.</p>
+        <p className="text-sm font-semibold clara-text-primary">Draf ini sudah ditolak.</p>
         <p className="mt-1 text-sm leading-6 clara-text-secondary">
-          Pakai tombol &ldquo;Susun jawaban baru&rdquo; di atas supaya Clara membuat draft yang baru.
+          {canSend
+            ? "Pakai tombol \u201cSusun jawaban baru\u201d di atas supaya Clara membuat draf yang baru."
+            : "Sales perlu meminta Clara menyusun draf yang baru."}
         </p>
+      </section>
+    );
+  }
+
+  if (isApproved && !canSend) {
+    return (
+      <section className="space-y-4 rounded-2xl border border-clara-line bg-clara-raised p-5">
+        <div>
+          <h3 className="text-lg font-bold clara-text-primary">Jawaban sudah disetujui</h3>
+          <p className="mt-1 text-sm leading-6 clara-text-secondary">
+            Sekarang giliran Sales mengirimnya dari WhatsApp. Clara tidak mengirim pesan ke customer.
+          </p>
+        </div>
+        <div>
+          <p className="clara-label">Jawaban yang disetujui</p>
+          <p className="mt-2 whitespace-pre-wrap break-words rounded-2xl border border-clara-line-subtle bg-clara-sunken p-4 text-sm clara-text-primary [overflow-wrap:anywhere]">
+            {readyText}
+          </p>
+        </div>
       </section>
     );
   }
@@ -209,20 +233,21 @@ export function ReplySuggestionActions({
   return (
     <section className="space-y-5 rounded-2xl border border-clara-line bg-clara-raised p-5">
       <div>
-        <h3 className="text-lg font-bold clara-text-primary">Pilih jawaban untuk customer</h3>
+        <h3 className="text-lg font-bold clara-text-primary">Draf jawaban dari Clara</h3>
         <p className="mt-1 text-sm leading-6 clara-text-secondary">
-          Pilih salah satu draft, ubah kalau perlu, lalu pakai. Belum ada pesan yang terkirim ke customer.
+          Pilih draf yang paling pas, ubah kalau perlu, lalu setujui supaya Sales boleh memakainya. Tolak kalau
+          tidak pantas dikirim. Belum ada pesan yang terkirim ke customer.
         </p>
         {isStale ? (
           <div role="alert" className="clara-alert clara-alert-warning mt-4">
-            Draft ini dibuat sebelum chat terbaru masuk. Baca pesan terakhir customer dulu, lalu pertimbangkan
-            menyusun jawaban baru.
+            Draf ini dibuat sebelum chat terbaru masuk. Baca pesan terakhir customer dulu sebelum
+            memutuskan, mungkin Sales perlu menyusun jawaban baru.
           </div>
         ) : null}
       </div>
 
       <fieldset className="space-y-3">
-        <legend className="clara-label mb-3">Draft dari Clara</legend>
+        <legend className="clara-label mb-3">Pilihan draf</legend>
         {suggestedReplies.map((reply, index) => {
           const reasoning = meaningfulReasoning(reply.reasoning);
 
@@ -267,7 +292,7 @@ export function ReplySuggestionActions({
 
       <div>
         <label htmlFor="finalReply" className="clara-label">
-          Jawaban yang akan kamu pakai (boleh diubah)
+          Jawaban yang disetujui (boleh diubah)
         </label>
         <textarea
           id="finalReply"
@@ -281,7 +306,7 @@ export function ReplySuggestionActions({
       {showReject ? (
         <div>
           <label htmlFor="rejectReason" className="clara-label">
-            Kenapa draft ini kurang pas? (boleh dikosongkan)
+            Kenapa draf ini kurang pas? (boleh dikosongkan)
           </label>
           <input
             id="rejectReason"
@@ -306,7 +331,7 @@ export function ReplySuggestionActions({
           disabled={isBusy || finalText.trim().length === 0}
           className="clara-button clara-button-primary"
         >
-          {isSubmitting && !showReject ? "Menyimpan..." : "Pakai jawaban ini"}
+          {isSubmitting && !showReject ? "Menyimpan..." : "Setujui jawaban ini"}
         </button>
 
         {showReject ? (
@@ -316,7 +341,7 @@ export function ReplySuggestionActions({
             disabled={isBusy}
             className="clara-button clara-button-danger"
           >
-            {isSubmitting ? "Menyimpan..." : "Tolak draft ini"}
+            {isSubmitting ? "Menyimpan..." : "Tolak draf ini"}
           </button>
         ) : (
           <button
@@ -325,7 +350,7 @@ export function ReplySuggestionActions({
             disabled={isBusy}
             className="clara-button clara-button-ghost"
           >
-            Draft ini kurang pas
+            Draf ini kurang pas
           </button>
         )}
       </div>

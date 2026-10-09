@@ -346,7 +346,7 @@ export function ReviewerWorkspace(props: ReviewerWorkspaceProps) {
           >
             {(
               [
-                ["reply", "Jawaban Sales"],
+                ["reply", "Draf jawaban"],
                 ["feedback", "Masukan untuk Sales"],
                 ["knowledge", "Usulan knowledge"],
                 ["sent", `Riwayat kirim (${detail.sent_messages.length})`],
@@ -390,6 +390,7 @@ export function ReviewerWorkspace(props: ReviewerWorkspaceProps) {
                     (sent) => sent.reply_suggestion_id === suggestion.id,
                   )}
                   isStale={suggestionStale}
+                  canSend={canOperate}
                   onUpdated={onUpdated}
                 />
               ) : (

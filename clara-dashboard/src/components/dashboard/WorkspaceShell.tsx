@@ -84,7 +84,11 @@ type NavGroup = {
   hideDescriptions?: boolean;
 };
 
-function buildNavGroups(currentUser?: CurrentUser | null, reviewDecisionCount = 0): NavGroup[] {
+function buildNavGroups(
+  currentUser?: CurrentUser | null,
+  reviewDecisionCount = 0,
+  openAlertCount = 0,
+): NavGroup[] {
   const role = normalizeWorkspaceRole(currentUser?.role);
 
   if (!currentUser) {
@@ -192,6 +196,8 @@ function buildNavGroups(currentUser?: CurrentUser | null, reviewDecisionCount = 
   }
 
   if (role === "head") {
+    // Kerja harian dibuat pendek: hanya yang menunggu keputusan Head. Halaman pantau dikumpulkan di bawahnya,
+    // dan halaman pengetahuan serta pasar bukan kerja harian jadi deskripsinya disembunyikan.
     return [
       {
         title: NAV_GROUP_NAMES.daily,
@@ -201,23 +207,29 @@ function buildNavGroups(currentUser?: CurrentUser | null, reviewDecisionCount = 
             href: "/notifications",
             label: PAGE_NAMES.alertsTeam,
             icon: faTriangleExclamation,
-            description: "Sinyal follow-up tim yang perlu perhatian",
+            description: "Peringatan lintas tim yang perlu keputusanmu",
+            badge: openAlertCount,
           },
           {
             href: "/approvals",
             label: PAGE_NAMES.teamDirection,
             icon: faClipboardCheck,
-            description: "Keputusan dan arahan tindak lanjut tim",
+            description: "Kasus yang naik ke kamu",
+            badge: reviewDecisionCount,
           },
-          leads(PAGE_NAMES.leadsTeam, "Progres lead semua tim"),
           complaints,
         ],
       },
       {
         title: NAV_GROUP_NAMES.team,
-        items: [teamMonitor("Pantau progres, risiko, dan hambatan tim"), opsDashboard],
+        hideDescriptions: true,
+        items: [
+          teamMonitor("Pantau progres, risiko, dan hambatan tim"),
+          leads(PAGE_NAMES.leadsTeam, "Progres lead semua tim"),
+          opsDashboard,
+        ],
       },
-      { title: NAV_GROUP_NAMES.knowledge, items: [knowledge, marketing] },
+      { title: NAV_GROUP_NAMES.knowledge, hideDescriptions: true, items: [knowledge, marketing] },
     ];
   }
 
@@ -357,7 +369,8 @@ export function WorkspaceShell({
   const dashboardUser = useDashboardUser();
   const resolvedCurrentUser = currentUser ?? dashboardUser?.currentUser ?? null;
   const [reviewDecisionCount, setReviewDecisionCount] = useState(0);
-  const navGroups = buildNavGroups(resolvedCurrentUser, reviewDecisionCount);
+  const [openAlertCount, setOpenAlertCount] = useState(0);
+  const navGroups = buildNavGroups(resolvedCurrentUser, reviewDecisionCount, openAlertCount);
   const mobileMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileSidebarRef = useRef<HTMLElement>(null);
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
@@ -560,6 +573,17 @@ export function WorkspaceShell({
             2,
           ),
         );
+        // Angka di menu Alert Tim: peringatan lintas tim yang masih terbuka untuk Head.
+        setOpenAlertCount(
+          normalizedRole === "head"
+            ? response.items.filter(
+                (item) =>
+                  Boolean(item.alert_type) &&
+                  (item.status === "active" || item.status === "acknowledged") &&
+                  (item.target_role === "head" || item.target_role === "all"),
+              ).length
+            : 0,
+        );
       } catch {
         if (!isCancelled) {
           setGlobalNotifications([]);
@@ -572,11 +596,11 @@ export function WorkspaceShell({
     return () => {
       isCancelled = true;
     };
-  }, [resolvedCurrentUser, pathname]);
+  }, [resolvedCurrentUser, pathname, normalizedRole]);
 
-  // Angka di menu Review Sales: berapa kasus yang menunggu keputusan Manager.
+  // Angka di menu Review Sales (Manager) dan Arahan Tim (Head): berapa kasus yang menunggu keputusan.
   useEffect(() => {
-    if (normalizedRole !== "manager") {
+    if (normalizedRole !== "manager" && normalizedRole !== "head") {
       return;
     }
 
@@ -1015,7 +1039,7 @@ export function WorkspaceShell({
               </header>
             )}
 
-            {globalNotifications.length > 0 ? (
+            {globalNotifications.length > 0 && !(normalizedRole === "head" && pathname === "/workspace") ? (
               <div className="space-y-2" aria-label="Notifikasi penting">
                 {globalNotifications.map((notification) => (
                   <div

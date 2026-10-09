@@ -139,6 +139,10 @@ const JARGON_REPLACEMENTS: Array<[RegExp, string]> = [
     "Minta Clara membaca chat ini lagi, supaya langkah berikutnya dan jawabannya ikut diperbarui.",
   ],
   [/belum dibaca ulang oleh AI/gi, "belum dibaca ulang oleh Clara"],
+  // Teks rekomendasi KPI dari backend memakai istilah Inggris. Aturan ini harus lebih dulu dari "delivery" dan "overdue".
+  [/delivery rendah atau overdue tinggi/gi, "balasan terkirim sedikit atau banyak follow-up yang terlambat"],
+  [/\bhealth\b/gi, "kondisi"],
+  [/\borg ini\b/gi, "organisasi ini"],
   [/discipline log/gi, "catatan aktivitas harian"],
   [/next follow-up/gi, "follow-up berikutnya"],
   [/bottleneck/gi, "hambatan"],

@@ -10,7 +10,7 @@ import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { PAGE_NAMES } from "@/lib/labels";
-import { canAccessStrategicInsights, getRoleDisplayLabel } from "@/lib/roles";
+import { canAccessStrategicInsights, getRoleDisplayLabel, normalizeWorkspaceRole } from "@/lib/roles";
 import { ALERT_SEVERITY, ALERT_STATUS, describeSource, plainJargon } from "@/lib/vocab";
 import type {
   CurrentUser,
@@ -160,7 +160,13 @@ export default function KpiCommandCenterPage() {
 
   const summary = kpi?.summary;
   const liveAlerts = kpi?.alerts.slice(0, 3) ?? [];
-  const recommendations = kpi?.recommendations.slice(0, 3) ?? [];
+  // Rekomendasi dibuat untuk beberapa role. Head hanya perlu melihat yang memang untuk Head (atau untuk semua).
+  const viewerRole = normalizeWorkspaceRole(currentUser?.role);
+  const recommendations = (kpi?.recommendations ?? [])
+    .filter(
+      (item) => viewerRole === "superadmin" || ["all", viewerRole].includes(normalizeWorkspaceRole(item.owner_role)),
+    )
+    .slice(0, 3);
   const observations = kpi?.key_observations.slice(0, 3) ?? [];
   const salesRows = [...(kpi?.sales_performance ?? [])].sort(
     (a, b) => b.overdue_follow_ups - a.overdue_follow_ups || b.pipeline_value - a.pipeline_value,
@@ -188,8 +194,6 @@ export default function KpiCommandCenterPage() {
       currentUser={currentUser}
       title={PAGE_NAMES.opsDashboard}
       description="Gambaran kesehatan penjualan: lead, follow-up, dan nilai penjualan dari chat yang sudah masuk."
-      backHref="/dashboard"
-      backLabel="Kembali ke beranda"
       actions={
         <button
           type="button"
@@ -325,7 +329,9 @@ export default function KpiCommandCenterPage() {
                       <li key={`rec-${item.owner_role}-${item.title}`} className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4 sm:p-5">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="break-words text-base font-semibold clara-text-primary">{plainJargon(item.title)}</h3>
-                          <Tag tone="info">Untuk {getRoleDisplayLabel(item.owner_role)}</Tag>
+                          {normalizeWorkspaceRole(item.owner_role) !== viewerRole ? (
+                            <Tag tone="info">Untuk {getRoleDisplayLabel(item.owner_role)}</Tag>
+                          ) : null}
                         </div>
                         <p className="mt-2 text-sm leading-6 clara-text-secondary">{plainJargon(item.rationale)}</p>
                         <p className="mt-2 text-sm leading-6 clara-text-primary">

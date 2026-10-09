@@ -168,7 +168,9 @@ export default function ChatReviewCenterPage() {
         ? `${staleDecisionCount} sudah menunggu lebih dari 3 hari. Mulai dari yang paling atas.`
         : "Sales menunggu kamu menyetujui, menolak, atau mengarahkan balasan. Daftarnya sudah diurutkan dari yang paling mendesak."
       : waitingItems.length > 0
-        ? `${waitingItems.length} chat sedang menunggu Sales bertindak. Kamu cukup memantaunya.`
+        ? isHeadView
+          ? `${waitingItems.length} chat sedang ditangani manager dan Sales. Kamu cukup memantaunya.`
+          : `${waitingItems.length} chat sedang menunggu Sales bertindak. Kamu cukup memantaunya.`
         : isHeadView
           ? "Antrean arahan tim aman. Cek Monitor Tim kalau ingin melihat pola hambatan."
           : "Antrean review aman. Cek Monitor Tim untuk melihat progres Sales.";
@@ -256,7 +258,7 @@ export default function ChatReviewCenterPage() {
                 <FilterChip
                   active={group === "waiting"}
                   onClick={() => setChosenGroup("waiting")}
-                  label={`Menunggu Sales (${waitingItems.length})`}
+                  label={`${isHeadView ? "Ditangani tim" : "Menunggu Sales"} (${waitingItems.length})`}
                 />
                 <FilterChip
                   active={group === "all"}
@@ -367,7 +369,9 @@ export default function ChatReviewCenterPage() {
                     : group === "decide"
                       ? "Tidak ada yang menunggu keputusanmu"
                       : group === "waiting"
-                        ? "Tidak ada chat yang menunggu Sales"
+                        ? isHeadView
+                        ? "Tidak ada chat yang sedang ditangani tim"
+                        : "Tidak ada chat yang menunggu Sales"
                         : "Tidak ada kasus yang menunggu"
                 }
                 description={

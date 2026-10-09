@@ -60,8 +60,6 @@ export default function ComplaintsPage() {
       eyebrow={NAV_GROUP_NAMES.daily}
       title={PAGE_NAMES.complaints}
       description="Keluhan customer yang perlu ditinjau manusia. Yang tampil adalah ringkasan aman, bukan isi chat."
-      backHref="/dashboard"
-      backLabel="Kembali ke beranda"
     >
       <div className="space-y-4">
         {errorMessage ? (
