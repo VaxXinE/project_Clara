@@ -207,6 +207,19 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
     return undefined
   }
 
+  // ID pesan dari WhatsApp (opak, bukan isi chat). WhatsApp Web terbaru tidak lagi menaruh nomor di data-id,
+  // tapi ID tiap pesan tetap sama sebelum dan sesudah kontak disimpan, jadi dipakai untuk mengenali chat yang sama.
+  const getProviderMessageId = (container: HTMLElement) => {
+    const dataId =
+      container.getAttribute("data-id") ||
+      container.querySelector<HTMLElement>("[data-id]")?.getAttribute("data-id") ||
+      container.closest<HTMLElement>("[data-id]")?.getAttribute("data-id") ||
+      ""
+    const trimmed = dataId.trim()
+
+    return trimmed && trimmed.length <= 200 ? trimmed : undefined
+  }
+
   const getMessageDirection = (
     container: HTMLElement
   ): WhatsAppMessageDirection => {
@@ -422,6 +435,7 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
       }
 
       return {
+        providerMessageId: getProviderMessageId(container),
         authorName:
           parsedMeta.author ||
           (getMessageDirection(container) === "outgoing" ? "Anda" : chatTitle),
@@ -436,7 +450,14 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
         return null
       }
 
-      const { authorName, direction, parsedMessage, parsedMeta, text } = entry
+      const {
+        authorName,
+        direction,
+        parsedMessage,
+        parsedMeta,
+        providerMessageId,
+        text
+      } = entry
       const replyContextSenderName = parsedMessage.replyContextText
         ? direction === "outgoing"
           ? chatTitle
@@ -447,6 +468,7 @@ export const readWhatsAppFromPage = (): WhatsAppReadResponse => {
         author: authorName,
         direction,
         id: `${parsedMeta.timestampLabel}-${index}`,
+        providerMessageId,
         replyContextSenderName:
           parsedMessage.replyContextSenderName || replyContextSenderName,
         replyContextSenderType: parsedMessage.replyContextSenderType,

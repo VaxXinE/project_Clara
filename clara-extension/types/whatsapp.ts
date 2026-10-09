@@ -5,6 +5,8 @@ export interface WhatsAppMessage {
   author: string
   direction: WhatsAppMessageDirection
   text: string
+  /** ID pesan dari WhatsApp Web. Opak, dipakai backend untuk mengenali chat yang sama saat judulnya berubah. */
+  providerMessageId?: string
   replyContextSenderName?: string
   replyContextSenderType?: "incoming" | "outgoing" | "unknown"
   replyContextText?: string
