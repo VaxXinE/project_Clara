@@ -13,6 +13,7 @@ import {
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
+import { customerLabel } from "@/lib/customer";
 import { buildOpenChatLinkFor } from "@/lib/conversation";
 import {
   formatChannelLabel,
@@ -969,7 +970,7 @@ function LeadRow({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1">
           <h3 className="break-words text-base font-semibold clara-text-primary">
-            {lead.display_name}
+            {customerLabel(lead.display_name).text}
           </h3>
           <p className="mt-0.5 text-xs clara-text-muted">
             {formatChannelLabel(lead.source_channel)} · terakhir dihubungi{" "}
@@ -1154,7 +1155,7 @@ function LeadBoard({
                         href={`/crm/${lead.id}`}
                         className="block break-words text-sm font-semibold clara-text-primary hover:underline"
                       >
-                        {lead.display_name}
+                        {customerLabel(lead.display_name).text}
                       </Link>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         {lead.lead_temperature !== "unknown" ? (

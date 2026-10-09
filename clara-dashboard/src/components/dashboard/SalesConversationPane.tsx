@@ -10,6 +10,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 
 import { ChatAvatar } from "@/components/dashboard/ChatAvatar";
+import { customerLabel } from "@/lib/customer";
 import { ContactInfoPanel } from "@/components/dashboard/ContactInfoPanel";
 import { SalesReplyFlow } from "@/components/dashboard/SalesReplyFlow";
 import { Tag, ValueTag } from "@/components/dashboard/Tag";
@@ -131,10 +132,20 @@ export function SalesConversationPane({
                 title="Lihat info customer"
                 className="max-w-full truncate text-left hover:underline"
               >
-                {detail.title}
+                {customerLabel(detail.title).text}
               </button>
             </h1>
             <p className="truncate text-xs clara-text-muted">
+              {customerLabel(detail.title).isUnsavedNumber ? (
+                <button
+                  type="button"
+                  onClick={() => setShowInfo(true)}
+                  className="font-semibold text-clara-warning hover:underline"
+                >
+                  Beri nama{" "}
+                </button>
+              ) : null}
+              {customerLabel(detail.title).isUnsavedNumber ? "· " : ""}
               {provider === "manual" || provider === "unknown"
                 ? channelLabel
                 : `${channelLabel} · ${formatProviderLabel(provider)}`}{" "}
@@ -339,6 +350,8 @@ export function SalesConversationPane({
       {showInfo ? (
         <ContactInfoPanel
           title={detail.title}
+          conversationId={detail.conversation_id}
+          onRenamed={onUpdated}
           channelLabel={channelLabel}
           leadId={detail.lead_id ?? null}
           customerProfileId={detail.customer_profile_id ?? null}

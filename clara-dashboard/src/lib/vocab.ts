@@ -317,6 +317,7 @@ export const TASK_STATUS: VocabTable = {
 
 export const ACTIVITY_EVENT: VocabTable = {
   lead_created: { label: "Lead dibuat", tone: "neutral" },
+  customer_named: { label: "Nama customer diperbarui", tone: "neutral" },
   created: { label: "Dibuat", tone: "neutral" },
   stage_changed: { label: "Tahap berubah", tone: "info" },
   temperature_changed: { label: "Suhu berubah", tone: "info" },
@@ -656,6 +657,7 @@ const AUDIT_ACTION_TEXT: Record<string, string> = {
   "extension.reply.inserted": "Balasan dimasukkan ke kolom chat",
   "extension.manual_reply.sent_synced": "Balasan manual tersinkron dari ekstensi",
   "extension_build.upload": "Mengunggah berkas ekstensi baru",
+  "customer_name.update": "Memberi nama customer",
   "extension_build.download": "Mengunduh berkas ekstensi",
   "customer_profile.update": "Mengubah profil customer",
   "customer_profile.merge": "Menggabungkan profil customer",

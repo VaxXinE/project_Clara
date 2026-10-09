@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { ChatAvatar } from "@/components/dashboard/ChatAvatar";
+import { CustomerNameForm } from "@/components/dashboard/CustomerNameForm";
+import { customerLabel } from "@/lib/customer";
 import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { apiFetch } from "@/lib/api";
 import { formatClock, formatDayLabel, formatRelativeTime } from "@/lib/format";
@@ -25,6 +27,9 @@ function isPast(value: string): boolean {
 
 type Props = {
   title: string;
+  conversationId: string;
+  /** Dipanggil setelah nama customer disimpan, supaya halaman memuat ulang nama baru. */
+  onRenamed: () => Promise<void> | void;
   channelLabel: string;
   leadId: string | null;
   customerProfileId: string | null;
@@ -37,6 +42,8 @@ type Props = {
  */
 export function ContactInfoPanel({
   title,
+  conversationId,
+  onRenamed,
   channelLabel,
   leadId,
   customerProfileId,
@@ -149,7 +156,7 @@ export function ContactInfoPanel({
         <ChatAvatar title={title} size="lg" />
         <div className="min-w-0 flex-1">
           <h2 className="break-words text-base font-bold clara-text-primary">
-            {title}
+            {customerLabel(title).text}
           </h2>
           <p className="text-xs clara-text-muted">{channelLabel}</p>
         </div>
@@ -165,6 +172,8 @@ export function ContactInfoPanel({
       </div>
 
       <div className="space-y-5 p-4">
+        <CustomerNameForm conversationId={conversationId} currentName={title} onSaved={onRenamed} />
+
         {!leadId ? (
           <p className="text-sm leading-6 clara-text-secondary">
             Chat ini belum terhubung ke lead. Lead dibuat otomatis setelah Clara

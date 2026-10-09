@@ -8,6 +8,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/Sta
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
+import { customerLabel } from "@/lib/customer";
 import { formatRelativeTime } from "@/lib/format";
 import { isHeadRole, isManagerRole, normalizeWorkspaceRole } from "@/lib/roles";
 import type { CurrentUser, CustomerProfileListItem } from "@/types/dashboard";
@@ -165,7 +166,7 @@ export default function CustomerListPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <h2 className="min-w-0 break-words text-base font-semibold clara-text-primary">
-                            {customer.display_name}
+                            {customerLabel(customer.display_name).text}
                           </h2>
                           <Tag tone={customer.status === "active" ? "good" : "neutral"}>
                             {customer.status === "active" ? "Aktif" : "Tidak aktif"}

@@ -9,6 +9,7 @@ import { ErrorState, LoadingState } from "@/components/dashboard/StateViews";
 import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
+import { customerLabel } from "@/lib/customer";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { rememberFollowUpNotice } from "@/lib/follow-up-notice";
 import { QUICK_SCHEDULES } from "@/lib/schedule";
@@ -631,7 +632,7 @@ export default function LeadDetailPage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      title={lead?.display_name ?? "Detail lead"}
+      title={lead ? customerLabel(lead.display_name).text : "Detail lead"}
       description={
         isLeadershipWorkspace
           ? "Cek tahap, pemilik, dan jadwal follow-up lead ini, lalu putuskan apakah perlu arahan."
@@ -1126,7 +1127,7 @@ export default function LeadDetailPage() {
                               className="rounded-2xl border border-clara-line-subtle bg-clara-raised p-4"
                             >
                               <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="text-sm font-semibold clara-text-primary">{relatedLead.display_name}</h3>
+                                <h3 className="text-sm font-semibold clara-text-primary">{customerLabel(relatedLead.display_name).text}</h3>
                                 {relatedLead.lead_temperature !== "unknown" ? (
                                   <ValueTag table={TEMPERATURE} value={relatedLead.lead_temperature} />
                                 ) : null}

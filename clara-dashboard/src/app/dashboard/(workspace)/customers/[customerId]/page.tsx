@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/dashboard/Sta
 import { Tag, ValueTag } from "@/components/dashboard/Tag";
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { apiFetch } from "@/lib/api";
+import { customerLabel } from "@/lib/customer";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import { isHeadRole, isManagerRole, normalizeWorkspaceRole } from "@/lib/roles";
 import {
@@ -255,7 +256,7 @@ export default function CustomerProfilePage() {
   return (
     <WorkspaceShell
       currentUser={currentUser}
-      title={profile?.display_name ?? "Profil customer"}
+      title={profile ? customerLabel(profile.display_name).text : "Profil customer"}
       description={
         isSalesWorkspace
           ? "Semua tentang satu customer: lead, percakapan, dan datanya."
@@ -353,7 +354,7 @@ export default function CustomerProfilePage() {
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="break-words text-base font-semibold clara-text-primary">{lead.display_name}</h3>
+                            <h3 className="break-words text-base font-semibold clara-text-primary">{customerLabel(lead.display_name).text}</h3>
                             {index === 0 && sortedLeads.length > 1 ? <Tag tone="gold">Paling mendesak</Tag> : null}
                           </div>
                           <div className="mt-2 flex flex-wrap items-center gap-2">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ChatAvatar } from "@/components/dashboard/ChatAvatar";
+import { customerLabel } from "@/lib/customer";
 import { apiFetch } from "@/lib/api";
 import { formatChannelLabel, formatRelativeTime } from "@/lib/format";
 import { isSalesConversationMessage } from "@/lib/conversation";
@@ -439,7 +440,7 @@ function ChatRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <p className="truncate text-sm font-semibold clara-text-primary">
-            {item.title}
+            {customerLabel(item.title).text}
           </p>
           <p
             className={`shrink-0 text-xs ${unread ? "font-semibold text-clara-gold" : "clara-text-muted"}`}
@@ -462,6 +463,9 @@ function ChatRow({
             {" "}
             · {formatChannelLabel(item.source_channel)}
           </span>
+          {customerLabel(item.title).isUnsavedNumber ? (
+            <span className="text-clara-warning"> · Belum diberi nama</span>
+          ) : null}
         </p>
       </div>
       {unread ? (

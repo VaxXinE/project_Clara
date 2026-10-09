@@ -6,6 +6,7 @@ import Link from "next/link";
 import { FormEvent, Fragment, useEffect, useRef, useState } from "react";
 
 import { ChatAvatar } from "@/components/dashboard/ChatAvatar";
+import { customerLabel } from "@/lib/customer";
 import { ConversationAiActions } from "@/components/dashboard/ConversationAiActions";
 import { ReplySuggestionActions } from "@/components/dashboard/ReplySuggestionActions";
 import { ClaraReading } from "@/components/dashboard/SalesReplyFlow";
@@ -253,7 +254,10 @@ export function ReviewerWorkspace(props: ReviewerWorkspaceProps) {
           <ChatAvatar title={detail.title} size="lg" />
           <div className="min-w-0 flex-1">
             <h1 className="break-words text-lg font-bold clara-text-primary">
-              {detail.title}
+              {customerLabel(detail.title).text}
+              {customerLabel(detail.title).isUnsavedNumber ? (
+                <span className="ml-2 align-middle text-xs font-semibold text-clara-warning">Belum diberi nama</span>
+              ) : null}
             </h1>
             <p className="text-xs clara-text-muted">
               {provider === "manual" || provider === "unknown"

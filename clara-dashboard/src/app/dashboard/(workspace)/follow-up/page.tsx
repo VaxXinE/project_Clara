@@ -13,6 +13,7 @@ import {
 import { WorkspaceShell } from "@/components/dashboard/WorkspaceShell";
 import { PAGE_NAMES } from "@/lib/labels";
 import { apiFetch } from "@/lib/api";
+import { customerLabel } from "@/lib/customer";
 import { dayOffset, formatClock, formatDayLabel, formatRelativeTime } from "@/lib/format";
 import { takeFollowUpNotice } from "@/lib/follow-up-notice";
 import { QUICK_SCHEDULES } from "@/lib/schedule";
@@ -1053,7 +1054,7 @@ function UnscheduledSection({
             >
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="break-words text-sm font-semibold clara-text-primary">
-                  {lead.display_name}
+                  {customerLabel(lead.display_name).text}
                 </h3>
                 <ValueTag table={TEMPERATURE} value={lead.lead_temperature} />
                 {lead.current_stage !== "unknown" ? (
