@@ -36,6 +36,13 @@ class Message(Base):
         index=True,
     )
     fingerprint: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    # ID pesan dari platform (WhatsApp Web), nilai opak. Tidak berubah saat judul chat berubah, jadi dipakai
+    # untuk mengenali chat yang sama setelah nomor disimpan sebagai kontak.
+    provider_message_id: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+    )
     message_text: Mapped[str] = mapped_column(Text, nullable=False)
     reply_context_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     reply_context_sender_name: Mapped[str | None] = mapped_column(

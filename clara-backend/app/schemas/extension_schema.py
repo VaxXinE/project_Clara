@@ -39,6 +39,11 @@ class WhatsAppExtensionMessage(BaseModel):
         pattern="^(incoming|outgoing|unknown)$",
     )
     timestamp_label: str = Field(alias="timestampLabel", default="", max_length=100)
+    provider_message_id: str | None = Field(
+        alias="providerMessageId",
+        default=None,
+        max_length=255,
+    )
 
 
 class WhatsAppExtensionChatSnapshot(BaseModel):

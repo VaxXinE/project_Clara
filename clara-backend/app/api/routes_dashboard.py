@@ -12,6 +12,8 @@ from app.core.config import settings
 from app.models.user import User
 from app.db.session import get_db
 from app.schemas.dashboard_schema import (
+    CustomerNameUpdateRequest,
+    CustomerNameUpdateResponse,
     ChatReviewCenterResponse,
     ChatReviewCaseItem,
     ChatReviewCaseSuggestionResponse,
@@ -50,9 +52,13 @@ from app.schemas.dashboard_schema import (
 from app.schemas.channel_schema import ChannelOverviewResponse
 from app.services.audit_service import create_audit_log
 from app.services.access_control_service import (
+    can_access_conversation_in_scope,
     get_accessible_sales_user_ids,
     get_accessible_team_ids,
 )
+from app.services.customer_naming import looks_like_phone_number
+from app.services.lead_service import ensure_conversation_lead, rename_lead_customer
+from app.models.conversation import Conversation
 from app.services.chat_review_service import (
     ChatReviewError,
     add_chat_review_note,
@@ -808,6 +814,57 @@ def sales_conversation_detail(
         )
 
     return detail
+
+
+@router.patch(
+    "/sales/conversations/{conversation_id}/customer-name",
+    response_model=CustomerNameUpdateResponse,
+)
+def rename_conversation_customer(
+    conversation_id: UUID,
+    payload: CustomerNameUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("sales", "manager", "head", "superadmin")),
+):
+    """Beri nama customer, terutama untuk nomor yang belum disimpan. Nama dikunci dan tidak ditimpa sinkronisasi chat."""
+    conversation = db.get(Conversation, conversation_id)
+
+    if conversation is None or not can_access_conversation_in_scope(
+        db=db,
+        current_user=current_user,
+        conversation=conversation,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found.",
+        )
+
+    lead = ensure_conversation_lead(db=db, conversation=conversation)
+    previous_name = lead.display_name
+    rename_lead_customer(db=db, lead=lead, name=payload.name, actor=current_user)
+
+    create_audit_log(
+        db=db,
+        action="customer_name.update",
+        resource_type="lead",
+        resource_id=str(lead.id),
+        current_user=current_user,
+        request=request,
+        metadata={
+            "conversation_id": str(conversation_id),
+            "previous_was_phone_number": previous_name != lead.display_name
+            and looks_like_phone_number(previous_name),
+        },
+    )
+    db.commit()
+
+    return CustomerNameUpdateResponse(
+        conversation_id=conversation.id,
+        lead_id=lead.id,
+        customer_name=lead.display_name,
+        name_source=lead.name_source,
+    )
 
 
 @router.get("/marketing/insights-preview", response_model=MarketingInsightsPreview)

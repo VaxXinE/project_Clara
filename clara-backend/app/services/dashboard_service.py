@@ -120,6 +120,7 @@ from app.schemas.dashboard_schema import (
     WeeklyPerformanceSnapshotItem,
     HistoricalPerformanceSummary,
 )
+from app.services.customer_naming import conversation_display_title
 from app.services.access_control_service import (
     apply_sales_user_scope_filter,
     can_access_conversation_in_scope,
@@ -1335,7 +1336,7 @@ def build_chat_review_item(
             if conversation.lead is not None
             else conversation.title
         ),
-        conversation_title=conversation.title,
+        conversation_title=conversation_display_title(conversation),
         sales_user_id=conversation.sales_user_id,
         sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
         source_channel=normalize_source_channel(conversation.source),
@@ -1444,7 +1445,7 @@ def get_sales_inbox(
             SalesInboxItem(
                 conversation_id=conversation.id,
                 organization_id=conversation.organization_id,
-                title=conversation.title,
+                title=conversation_display_title(conversation),
                 source=conversation.source,
                 source_channel=normalize_source_channel(conversation.source),
                 source_label=build_source_label(conversation.source),
@@ -1550,7 +1551,7 @@ def get_sales_conversation_detail(
             if conversation.lead is not None
             else None
         ),
-        title=conversation.title,
+        title=conversation_display_title(conversation),
         source=conversation.source,
         source_channel=normalize_source_channel(conversation.source),
         source_label=build_source_label(conversation.source),
@@ -4569,7 +4570,7 @@ def get_manager_insights(
                 conversation_id=conversation.id,
                 lead_id=conversation.lead_id,
                 lead_name=lead_name,
-                conversation_title=conversation.title,
+                conversation_title=conversation_display_title(conversation),
                 sales_owner_name=conversation.sales_user.name if conversation.sales_user else None,
                 reviewer_user_name=review_case.reviewer_user.name if review_case.reviewer_user else None,
                 review_status=review_case.status,
@@ -4962,7 +4963,7 @@ def get_sales_performance_detail(
         conversation_items.append(
             SalesPerformanceConversationItem(
                 conversation_id=conversation.id,
-                conversation_title=conversation.title,
+                conversation_title=conversation_display_title(conversation),
                 ui_status=ui_status,
                 source_channel=normalize_source_channel(conversation.source),
                 risk_level=risk_level,
@@ -5300,7 +5301,7 @@ def get_sales_approval_queue(
                     if conversation.lead is not None
                     else conversation.title
                 ),
-                conversation_title=conversation.title,
+                conversation_title=conversation_display_title(conversation),
                 current_stage=conversation.current_stage,
                 lead_temperature=conversation.lead_temperature,
                 risk_level=latest_suggestion.risk_level,

@@ -15,6 +15,12 @@ from app.models.user import User
 from app.schemas.ai_extraction_schema import CustomerProfileAutofill
 from app.services.access_control_service import get_accessible_sales_user_ids
 from app.services.business_segmentation_service import normalize_account_category
+from app.services.customer_naming import (
+    PHONE_CANONICAL_PREFIX,
+    looks_like_phone_number,
+    normalize_phone_number,
+    phone_canonical_key,
+)
 from app.services.lead_activity_service import create_lead_activity_event
 from app.services.clara_process_state_service import (
     get_or_create_process_state,
@@ -262,7 +268,11 @@ def normalize_ai_display_name(value: str | None) -> str | None:
 
 def is_placeholder_profile_name(value: str | None) -> bool:
     normalized = (value or "").strip().lower()
-    return normalized in GENERIC_PROFILE_NAMES or normalized.startswith("unknown")
+    return (
+        normalized in GENERIC_PROFILE_NAMES
+        or normalized.startswith("unknown")
+        or looks_like_phone_number(normalized)
+    )
 
 
 def normalize_customer_temperature(value: str | None) -> str:
@@ -306,6 +316,8 @@ def compute_identity_metadata(
 ) -> tuple[float, str]:
     if canonical_key == "unknown-customer":
         return 0.35, "fallback_unknown"
+    if canonical_key.startswith(PHONE_CANONICAL_PREFIX):
+        return 0.95, "phone_number"
 
     token_count = len(canonical_key.split())
     if token_count >= 2 and display_name.strip() != canonical_key:
@@ -403,6 +415,16 @@ def resolve_customer_profile_name(
     return "Unknown Customer"
 
 
+def _is_identity_anchored(profile: CustomerProfile) -> bool:
+    """Profil yang identitasnya sudah tetap: dikunci lewat nomor telepon, atau namanya diisi manual.
+    Profil seperti ini tidak dicari ulang lewat nama, supaya customer tidak terbelah dua
+    saat namanya berubah dari nomor menjadi nama (diberi nama Sales, atau kontak disimpan di WhatsApp)."""
+    return (
+        (profile.canonical_key or "").startswith(PHONE_CANONICAL_PREFIX)
+        or profile.match_strategy == "manual_profile_update"
+    )
+
+
 def ensure_customer_profile_for_lead(
     db: Session,
     *,
@@ -410,21 +432,44 @@ def ensure_customer_profile_for_lead(
     preferred_name: str | None = None,
 ) -> CustomerProfile:
     display_name = resolve_customer_profile_name(lead=lead, preferred_name=preferred_name)
-    canonical_key = normalize_customer_identity_name(display_name)
+    # Nomor yang belum disimpan jadi telepon, dan dipakai sebagai kunci supaya "0821..." dan "+62821..."
+    # dikenali sebagai customer yang sama, juga setelah profilnya diberi nama.
+    phone = normalize_phone_number(display_name) if looks_like_phone_number(display_name) else None
+    canonical_key = (
+        phone_canonical_key(phone) if phone else normalize_customer_identity_name(display_name)
+    )
     identity_confidence, match_strategy = compute_identity_metadata(
         display_name=display_name,
         canonical_key=canonical_key,
     )
+    contact_fields_supported = customer_profile_contact_fields_supported(db)
 
-    existing_profile = db.scalars(
-        select(CustomerProfile)
-        .where(
-            CustomerProfile.organization_id == lead.organization_id,
-            CustomerProfile.canonical_key == canonical_key,
-            CustomerProfile.merged_into_profile_id.is_(None),
-        )
-        .options(load_only(*customer_profile_load_only_columns(db)))
-    ).first()
+    profile_statement = select(CustomerProfile).options(
+        load_only(*customer_profile_load_only_columns(db))
+    )
+    current_profile = lead.customer_profile if lead.customer_profile_id is not None else None
+    if (
+        current_profile is not None
+        and current_profile.merged_into_profile_id is None
+        and _is_identity_anchored(current_profile)
+    ):
+        existing_profile = current_profile
+    else:
+        existing_profile = db.scalars(
+            profile_statement.where(
+                CustomerProfile.organization_id == lead.organization_id,
+                CustomerProfile.canonical_key == canonical_key,
+                CustomerProfile.merged_into_profile_id.is_(None),
+            )
+        ).first()
+        if existing_profile is None and phone and contact_fields_supported:
+            existing_profile = db.scalars(
+                profile_statement.where(
+                    CustomerProfile.organization_id == lead.organization_id,
+                    CustomerProfile.phone == phone,
+                    CustomerProfile.merged_into_profile_id.is_(None),
+                )
+            ).first()
 
     if existing_profile is None:
         existing_profile = CustomerProfile(
@@ -439,6 +484,8 @@ def ensure_customer_profile_for_lead(
             match_strategy=match_strategy,
             last_contact_at=lead.last_contact_at,
         )
+        if phone and contact_fields_supported:
+            existing_profile.phone = phone
         db.add(existing_profile)
         db.flush([existing_profile])
     else:
@@ -450,17 +497,24 @@ def ensure_customer_profile_for_lead(
             or lead_last_contact > profile_last_contact
         ):
             existing_profile.last_contact_at = lead_last_contact
+        anchored = _is_identity_anchored(existing_profile)
+        name_is_manual = existing_profile.match_strategy == "manual_profile_update"
         if (
-            is_placeholder_profile_name(existing_profile.display_name)
+            not name_is_manual
             and not is_placeholder_profile_name(display_name)
+            and (
+                is_placeholder_profile_name(existing_profile.display_name)
+                or len(display_name.strip()) > len(existing_profile.display_name.strip())
+            )
         ):
             existing_profile.display_name = display_name
-            existing_profile.canonical_key = canonical_key
-        elif len(display_name.strip()) > len(existing_profile.display_name.strip()):
-            existing_profile.display_name = display_name
-            existing_profile.canonical_key = canonical_key
+            if not anchored:
+                existing_profile.canonical_key = canonical_key
+        if phone and contact_fields_supported and not existing_profile.phone:
+            existing_profile.phone = phone
         existing_profile.identity_confidence = max(existing_profile.identity_confidence, identity_confidence)
-        existing_profile.match_strategy = match_strategy
+        if not anchored:
+            existing_profile.match_strategy = match_strategy
         db.add(existing_profile)
         db.flush([existing_profile])
 
@@ -838,6 +892,27 @@ def update_customer_profile_for_user(
             if lead.assigned_user_id in accessible_user_ids
         ]
     )
+    if not is_placeholder_profile_name(normalized_name):
+        # Nama yang diisi manual dikunci di lead juga, supaya sinkronisasi chat tidak mengembalikannya ke nomor.
+        for lead in visible_leads:
+            if lead.display_name == normalized_name and lead.name_source == "manual":
+                continue
+            previous_name = lead.display_name
+            lead.display_name = normalized_name
+            lead.name_source = "manual"
+            db.add(lead)
+            if previous_name != normalized_name:
+                create_lead_activity_event(
+                    db=db,
+                    lead=lead,
+                    event_type="customer_named",
+                    title="Nama customer diperbarui",
+                    description="Nama customer diubah dari profil customer.",
+                    actor_user_id=current_user.id,
+                    from_value=previous_name,
+                    to_value=normalized_name,
+                )
+
     for lead in visible_leads:
         if lead.account_category == normalized_account_category:
             continue
@@ -883,9 +958,19 @@ def apply_ai_autofill_to_customer_profile(
     updated_fields: list[str] = []
 
     suggested_name = normalize_ai_display_name(autofill.display_name)
-    if suggested_name and is_placeholder_profile_name(profile.display_name):
+    if (
+        suggested_name
+        and not is_placeholder_profile_name(suggested_name)
+        and is_placeholder_profile_name(profile.display_name)
+        # Nomor yang belum diberi nama tidak diisi otomatis oleh AI. Nama dari isi chat hanya disarankan
+        # ke Sales, karena AI bisa salah menangkap nama.
+        and not looks_like_phone_number(profile.display_name)
+    ):
         profile.display_name = suggested_name
-        profile.canonical_key = normalize_customer_identity_name(suggested_name)
+        if not profile.canonical_key.startswith(PHONE_CANONICAL_PREFIX):
+            profile.canonical_key = normalize_customer_identity_name(suggested_name)
+        if lead.name_source != "manual":
+            lead.display_name = suggested_name
         updated_fields.append("nama")
 
     suggested_phone = normalize_ai_phone(autofill.phone)

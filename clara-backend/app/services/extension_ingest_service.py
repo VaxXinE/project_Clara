@@ -29,6 +29,7 @@ from app.schemas.extension_schema import (
     WhatsAppExtensionReplySuggestionItem,
 )
 from app.services.ai_extraction_service import analyze_conversation
+from app.services.customer_naming import looks_like_phone_number
 from app.services.lead_service import ensure_conversation_lead
 from app.services.clara_policy_enforcement_service import (
     ClaraEnforcementError,
@@ -69,6 +70,9 @@ TIME_ONLY_PATTERN = re.compile(
 FULL_LABEL_TIME_FIRST_PATTERN = re.compile(
     r"^(?P<time>\d{1,2}:\d{2}(?::\d{2})?\s?(?:AM|PM|am|pm)),\s*(?P<date>\d{1,2}/\d{1,2}/\d{2,4})$"
 )
+FULL_LABEL_TIME_FIRST_24H_PATTERN = re.compile(
+    r"^(?P<time>\d{1,2}[.:]\d{2}(?:[.:]\d{2})?),\s*(?P<date>\d{1,2}/\d{1,2}/\d{2,4})$"
+)
 FULL_LABEL_DATE_FIRST_PATTERN = re.compile(
     r"^(?P<date>\d{1,2}/\d{1,2}/\d{2,4}),\s*(?P<time>\d{1,2}[.:]\d{2}(?:[.:]\d{2})?)$"
 )
@@ -97,6 +101,7 @@ class NormalizedSnapshotMessage:
     reply_context_sender_type: str | None
     timestamp: datetime
     timestamp_label: str
+    provider_message_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -274,11 +279,81 @@ def parse_captured_at(captured_at: str) -> datetime:
     return parsed.astimezone(JAKARTA_TZ)
 
 
+LABEL_DATE_PATTERN = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{2,4})")
+
+
+def detect_label_date_order(
+    labels: list[str],
+    captured_at: datetime,
+) -> str | None:
+    """Urutan tanggal di label waktu WhatsApp Web: "dmy" (hari/bulan) atau "mdy" (bulan/hari). Mengikuti bahasa
+    WhatsApp Web milik Sales, jadi "10/9/2026" bisa 10 September atau 9 Oktober. Urutannya dibaca dari tanggal
+    yang tidak ambigu (ada angka di atas 12). Kalau semua ambigu, dipilih yang tidak jatuh di masa depan dan
+    paling dekat dengan waktu snapshot, karena chat yang sedang dibuka berisi pesan terbaru."""
+    pairs: list[tuple[int, int, int]] = []
+    for label in labels:
+        match = LABEL_DATE_PATTERN.search(label or "")
+        if match:
+            pairs.append((int(match.group(1)), int(match.group(2)), int(match.group(3))))
+
+    if not pairs:
+        return None
+
+    if any(first > 12 for first, _, _ in pairs) and not any(second > 12 for _, second, _ in pairs):
+        return "dmy"
+    if any(second > 12 for _, second, _ in pairs) and not any(first > 12 for first, _, _ in pairs):
+        return "mdy"
+    if all(first == second for first, second, _ in pairs):
+        return None
+
+    first, second, year = pairs[-1]
+    year = year + 2000 if year < 100 else year
+    best: tuple[float, str] | None = None
+    for order, day, month in (("dmy", first, second), ("mdy", second, first)):
+        try:
+            candidate = datetime(year, month, day, tzinfo=captured_at.tzinfo)
+        except ValueError:
+            continue
+        if candidate > captured_at + timedelta(days=1):
+            continue
+        distance = abs((captured_at - candidate).total_seconds())
+        if best is None or distance < best[0]:
+            best = (distance, order)
+
+    return best[1] if best else None
+
+
+def parse_label_datetime(date_text: str, time_text: str, order: str | None) -> datetime:
+    """Baca tanggal dan jam dari label WhatsApp Web dengan urutan tanggal yang sudah dideteksi. Tanpa urutan
+    (tidak ada petunjuk), dipakai aturan lama: jam 12 dianggap format AS (bulan/hari), jam 24 hari/bulan."""
+    if order is None:
+        return parse_whatsapp_datetime(date_text, time_text)
+
+    normalized_time = re.sub(r"\s+", " ", time_text.replace(".", ":").strip()).upper()
+    has_meridiem = normalized_time.endswith(("AM", "PM"))
+    day_month = "%m/%d" if order == "mdy" else "%d/%m"
+
+    for year_format in ("%Y", "%y"):
+        for seconds in ("", ":%S"):
+            time_format = f"%I:%M{seconds} %p" if has_meridiem else f"%H:%M{seconds}"
+            try:
+                parsed = datetime.strptime(
+                    f"{date_text.strip()} {normalized_time}",
+                    f"{day_month}/{year_format} {time_format}",
+                )
+            except ValueError:
+                continue
+            return parsed.replace(tzinfo=JAKARTA_TZ)
+
+    return parse_whatsapp_datetime(date_text, time_text)
+
+
 def parse_snapshot_message_timestamp(
     timestamp_label: str,
     captured_at: datetime,
     index: int,
     previous_timestamp: datetime | None,
+    date_order: str | None = None,
 ) -> datetime:
     normalized_label = timestamp_label.strip()
 
@@ -287,16 +362,26 @@ def parse_snapshot_message_timestamp(
     if normalized_label:
         time_first_match = FULL_LABEL_TIME_FIRST_PATTERN.match(normalized_label)
         if time_first_match:
-            parsed_timestamp = parse_whatsapp_datetime(
+            parsed_timestamp = parse_label_datetime(
                 time_first_match.group("date"),
                 time_first_match.group("time"),
+                date_order,
+            )
+
+        time_first_24h_match = FULL_LABEL_TIME_FIRST_24H_PATTERN.match(normalized_label)
+        if parsed_timestamp is None and time_first_24h_match:
+            parsed_timestamp = parse_label_datetime(
+                time_first_24h_match.group("date"),
+                time_first_24h_match.group("time"),
+                date_order,
             )
 
         date_first_match = FULL_LABEL_DATE_FIRST_PATTERN.match(normalized_label)
         if parsed_timestamp is None and date_first_match:
-            parsed_timestamp = parse_whatsapp_datetime(
+            parsed_timestamp = parse_label_datetime(
                 date_first_match.group("date"),
                 date_first_match.group("time"),
+                date_order,
             )
 
         time_only_match = TIME_ONLY_PATTERN.match(normalized_label)
@@ -332,6 +417,10 @@ def normalize_snapshot_messages(
     snapshot: WhatsAppExtensionChatSnapshot,
 ) -> list[NormalizedSnapshotMessage]:
     captured_at = parse_captured_at(snapshot.captured_at)
+    date_order = detect_label_date_order(
+        [message.timestamp_label for message in snapshot.messages],
+        captured_at,
+    )
     normalized_messages: list[NormalizedSnapshotMessage] = []
     previous_timestamp: datetime | None = None
 
@@ -341,6 +430,7 @@ def normalize_snapshot_messages(
             captured_at=captured_at,
             index=index,
             previous_timestamp=previous_timestamp,
+            date_order=date_order,
         )
         previous_timestamp = timestamp
 
@@ -386,6 +476,7 @@ def normalize_snapshot_messages(
                 ),
                 timestamp=timestamp,
                 timestamp_label=message.timestamp_label.strip(),
+                provider_message_id=(message.provider_message_id or "").strip() or None,
             )
         )
 
@@ -497,6 +588,105 @@ def ensure_aware_utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+MAX_PROVIDER_MESSAGE_IDS_PER_LOOKUP = 200
+
+
+def find_conversation_by_provider_message_ids(
+    db: Session,
+    *,
+    channel_context: ExtensionChannelContext,
+    current_user: User,
+    normalized_messages: list[NormalizedSnapshotMessage] | None,
+) -> Conversation | None:
+    """Chat yang sama dikenali dari ID pesan WhatsApp yang pernah tersimpan, apa pun judul chat sekarang.
+    ID pesan unik per pesan dan tidak berubah saat nomor disimpan sebagai kontak atau nama kontak diganti.
+    Hanya dipakai kalau semua ID yang cocok mengarah ke satu percakapan milik Sales yang sama."""
+    provider_ids = {
+        message.provider_message_id
+        for message in (normalized_messages or [])
+        if message.provider_message_id
+    }
+    if not provider_ids:
+        return None
+
+    conversation_ids = set(
+        db.scalars(
+            select(Message.conversation_id)
+            .join(Conversation, Conversation.id == Message.conversation_id)
+            .where(Message.provider_message_id.in_(list(provider_ids)[:MAX_PROVIDER_MESSAGE_IDS_PER_LOOKUP]))
+            .where(Conversation.organization_id == current_user.organization_id)
+            .where(Conversation.sales_user_id == current_user.id)
+            .where(Conversation.source == channel_context.source)
+            .distinct()
+        ).all()
+    )
+    if len(conversation_ids) != 1:
+        return None
+
+    return db.get(Conversation, next(iter(conversation_ids)))
+
+
+SAVED_CONTACT_MIN_COMMON_MESSAGES = 3
+SAVED_CONTACT_MIN_COMMON_RATIO = 0.8
+SAVED_CONTACT_MIN_COMMON_CHARS = 60
+
+
+def find_conversation_saved_as_contact(
+    db: Session,
+    *,
+    channel_context: ExtensionChannelContext,
+    current_user: User,
+    chat_title: str,
+    normalized_messages: list[NormalizedSnapshotMessage] | None,
+) -> Conversation | None:
+    """Chat dari nomor yang belum disimpan, lalu Sales menyimpan nomornya sebagai kontak. Judul chat berubah dari
+    nomor jadi nama. Kalau id percakapan dari WhatsApp tidak terbaca, chat itu akan terlihat baru. Chat lama dikenali
+    kembali hanya kalau buktinya kuat: judul lamanya nomor telepon, judul barunya bukan, milik Sales yang sama,
+    isi chat yang sama persis berurutan, dan hanya ada satu kandidat. Kalau ragu, dibiarkan jadi chat baru,
+    karena salah menggabungkan dua customer lebih merugikan daripada punya dua chat."""
+    if looks_like_phone_number(chat_title) or not normalized_messages:
+        return None
+
+    incoming = build_message_content_signature(normalized_messages)
+    if len(incoming) < SAVED_CONTACT_MIN_COMMON_MESSAGES:
+        return None
+
+    candidates = db.scalars(
+        select(Conversation)
+        .where(Conversation.organization_id == current_user.organization_id)
+        .where(Conversation.sales_user_id == current_user.id)
+        .where(Conversation.source == channel_context.source)
+        .options(selectinload(Conversation.messages))
+        .order_by(desc(Conversation.last_message_at))
+    ).all()
+
+    matches: list[Conversation] = []
+    for candidate in candidates:
+        if not looks_like_phone_number(candidate.title):
+            continue
+
+        persisted = build_message_content_signature(
+            sorted(
+                candidate.messages,
+                key=lambda message: (message.message_timestamp, message.created_at),
+            )
+        )
+        shorter_length = min(len(persisted), len(incoming))
+        if shorter_length < SAVED_CONTACT_MIN_COMMON_MESSAGES:
+            continue
+
+        longest = SequenceMatcher(a=persisted, b=incoming, autojunk=False).find_longest_match()
+        common = incoming[longest.b : longest.b + longest.size]
+        if (
+            longest.size >= SAVED_CONTACT_MIN_COMMON_MESSAGES
+            and longest.size / shorter_length >= SAVED_CONTACT_MIN_COMMON_RATIO
+            and sum(len(text) for _, text in common) >= SAVED_CONTACT_MIN_COMMON_CHARS
+        ):
+            matches.append(candidate)
+
+    return matches[0] if len(matches) == 1 else None
+
+
 def get_existing_extension_conversation(
     db: Session,
     *,
@@ -520,6 +710,15 @@ def get_existing_extension_conversation(
         if stable_conversation is not None:
             return stable_conversation
 
+        by_provider_ids = find_conversation_by_provider_message_ids(
+            db,
+            channel_context=channel_context,
+            current_user=current_user,
+            normalized_messages=normalized_messages,
+        )
+        if by_provider_ids is not None:
+            return by_provider_ids
+
         legacy_conversation = db.scalars(
             select(Conversation)
             .where(Conversation.organization_id == current_user.organization_id)
@@ -530,6 +729,15 @@ def get_existing_extension_conversation(
         ).first()
         if legacy_conversation is not None:
             return legacy_conversation
+
+    by_provider_ids = find_conversation_by_provider_message_ids(
+        db,
+        channel_context=channel_context,
+        current_user=current_user,
+        normalized_messages=normalized_messages,
+    )
+    if by_provider_ids is not None:
+        return by_provider_ids
 
     if transcript:
         matching_snapshot = db.scalars(
@@ -572,7 +780,17 @@ def get_existing_extension_conversation(
         .where(Conversation.title == chat_title.strip())
         .order_by(desc(Conversation.created_at))
     )
-    return db.scalars(statement).first()
+    same_title = db.scalars(statement).first()
+    if same_title is not None:
+        return same_title
+
+    return find_conversation_saved_as_contact(
+        db,
+        channel_context=channel_context,
+        current_user=current_user,
+        chat_title=chat_title,
+        normalized_messages=normalized_messages,
+    )
 
 
 def build_extension_message_key(
@@ -730,6 +948,7 @@ def sync_extension_messages(
     chat_title: str,
     normalized_messages: list[NormalizedSnapshotMessage],
     external_thread_id: str | None = None,
+    title_changed: bool = False,
 ) -> None:
     existing_messages = list(
         db.scalars(
@@ -741,7 +960,21 @@ def sync_extension_messages(
         for message in existing_messages
         if message.external_message_id
     }
-    for message in normalized_messages:
+    existing_by_provider_id = {
+        message.provider_message_id: message
+        for message in existing_messages
+        if message.provider_message_id
+    }
+    claimed_message_ids: set = set()
+    aligned_by_content = (
+        align_messages_by_content(
+            existing_messages=existing_messages,
+            incoming_messages=normalized_messages,
+        )
+        if title_changed
+        else {}
+    )
+    for message_index, message in enumerate(normalized_messages):
         external_message_id = build_extension_message_key(
             channel_context=channel_context,
             current_user=current_user,
@@ -751,11 +984,24 @@ def sync_extension_messages(
         )
         existing_message = existing_by_external_id.get(external_message_id)
 
+        if existing_message is None and message.provider_message_id:
+            existing_message = existing_by_provider_id.get(message.provider_message_id)
+
         if existing_message is None:
             existing_message = find_matching_synthetic_sales_message(
                 existing_messages=existing_messages,
                 incoming_message=message,
             )
+
+        if existing_message is None and title_changed:
+            # Kunci pesan diturunkan dari judul chat. Saat judul berubah (nomor disimpan jadi kontak),
+            # pesan yang sama dikenali dari isinya supaya tidak tersimpan dua kali.
+            candidate = aligned_by_content.get(message_index)
+            if candidate is not None and candidate.id not in claimed_message_ids:
+                existing_message = candidate
+
+        if existing_message is not None:
+            claimed_message_ids.add(existing_message.id)
 
         if existing_message is None:
             existing_message = Message(
@@ -763,6 +1009,7 @@ def sync_extension_messages(
                 channel=channel_context.storage_channel,
                 provider=channel_context.provider,
                 external_message_id=external_message_id,
+                provider_message_id=message.provider_message_id,
                 sender_name=message.author,
                 sender_type=message.sender_type,
                 message_text=message.text,
@@ -774,10 +1021,13 @@ def sync_extension_messages(
             db.add(existing_message)
             db.flush()
             existing_messages.append(existing_message)
+            claimed_message_ids.add(existing_message.id)
         else:
             existing_message.channel = channel_context.storage_channel
             existing_message.provider = channel_context.provider
             existing_message.external_message_id = external_message_id
+            if message.provider_message_id:
+                existing_message.provider_message_id = message.provider_message_id
             existing_message.sender_name = message.author
             existing_message.sender_type = message.sender_type
             existing_message.message_text = message.text
@@ -792,6 +1042,31 @@ def sync_extension_messages(
             db.add(existing_message)
 
         existing_by_external_id[external_message_id] = existing_message
+        if message.provider_message_id:
+            existing_by_provider_id[message.provider_message_id] = existing_message
+
+
+def align_messages_by_content(
+    *,
+    existing_messages: list[Message],
+    incoming_messages: list[NormalizedSnapshotMessage],
+) -> dict[int, Message]:
+    """Pasangkan pesan yang sudah tersimpan dengan pesan snapshot lewat isinya (pengirim dan teks), berurutan.
+    Dipakai saat judul chat berubah, karena kunci pesan diturunkan dari judul dan tidak lagi cocok."""
+    ordered_existing = sorted(
+        existing_messages,
+        key=lambda message: (message.message_timestamp, message.created_at),
+    )
+    existing_signature = build_message_content_signature(ordered_existing)
+    incoming_signature = build_message_content_signature(incoming_messages)
+
+    aligned: dict[int, Message] = {}
+    matcher = SequenceMatcher(a=existing_signature, b=incoming_signature, autojunk=False)
+    for block in matcher.get_matching_blocks():
+        for offset in range(block.size):
+            aligned[block.b + offset] = ordered_existing[block.a + offset]
+
+    return aligned
 
 
 def find_matching_synthetic_sales_message(
@@ -945,7 +1220,22 @@ def sync_extension_snapshot(
         db.add(conversation)
         db.flush()
 
-    if conversation is not None and (conversation.raw_text or "").strip() == transcript:
+    # Chat yang isinya tidak berubah dianggap duplikat. Kecuali tanggal tersimpannya jauh berbeda dari hasil baca
+    # sekarang (mis. tanggal yang dulu terbaca terbalik), supaya tanggal yang salah ikut diperbaiki.
+    stored_last_message_at = conversation.last_message_at if conversation is not None else None
+    timestamps_look_wrong = bool(
+        stored_last_message_at is not None
+        and abs(
+            stored_last_message_at.replace(tzinfo=None) - last_message_at.replace(tzinfo=None)
+        )
+        > timedelta(days=1)
+    )
+
+    if (
+        conversation is not None
+        and (conversation.raw_text or "").strip() == transcript
+        and not timestamps_look_wrong
+    ):
         if adopted_stable_identity:
             db.commit()
             db.refresh(conversation)
@@ -985,6 +1275,7 @@ def sync_extension_snapshot(
         db.add(conversation)
         db.flush()
         status_value = "created"
+        title_changed = False
     else:
         conversation.channel = channel_context.storage_channel
         conversation.provider = channel_context.provider
@@ -1000,6 +1291,7 @@ def sync_extension_snapshot(
             )
         if conversation.source == channel_context.source:
             conversation.status = "synced"
+        title_changed = conversation.title.strip() != snapshot.chat_title.strip()
         conversation.title = snapshot.chat_title.strip()
         conversation.raw_text = transcript
         conversation.started_at = started_at
@@ -1016,6 +1308,7 @@ def sync_extension_snapshot(
         chat_title=snapshot.chat_title,
         normalized_messages=normalized_messages,
         external_thread_id=external_thread_id,
+        title_changed=title_changed,
     )
 
     db.commit()

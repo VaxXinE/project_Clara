@@ -1165,3 +1165,14 @@ class OpsDatabaseOverviewResponse(BaseModel):
     recent_audit_logs: list[OpsAuditLogRow]
     recent_product_knowledge: list[OpsProductKnowledgeRow]
     recent_snapshots: list[OpsSnapshotRow]
+
+
+class CustomerNameUpdateRequest(BaseModel):
+    name: str = Field(max_length=120)
+
+
+class CustomerNameUpdateResponse(BaseModel):
+    conversation_id: UUID
+    lead_id: UUID
+    customer_name: str
+    name_source: str

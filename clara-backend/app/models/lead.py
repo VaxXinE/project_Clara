@@ -29,6 +29,14 @@ class Lead(Base):
     )
 
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # "auto": nama diturunkan dari chat dan boleh berubah saat sinkronisasi. "manual": Sales sudah memberi nama,
+    # jadi sinkronisasi tidak boleh menimpanya.
+    name_source: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="auto",
+        server_default="auto",
+    )
     source: Mapped[str] = mapped_column(String(50), nullable=False, default="unknown")
     account_category: Mapped[str] = mapped_column(
         String(20),

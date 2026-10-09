@@ -29,6 +29,7 @@ from app.services.lead_activity_service import (
     create_lead_activity_event,
     list_lead_activity_events,
 )
+from app.services.customer_naming import looks_like_phone_number
 from app.services.customer_profile_service import (
     is_placeholder_profile_name,
     customer_profile_contact_fields_supported,
@@ -135,6 +136,71 @@ def derive_lead_display_name(
     return "Unknown Customer"
 
 
+def resolve_synced_lead_name(*, lead: Lead, conversation: Conversation) -> str:
+    """Nama lead saat chat disinkronkan. Kalau dari chat hanya dapat nomor, pakai nama di profil customer
+    (mis. hasil isian otomatis Clara) supaya nama lead dan profil tidak berbeda."""
+    derived = derive_lead_display_name(conversation=conversation)
+    profile = lead.customer_profile
+
+    if (
+        looks_like_phone_number(derived)
+        and profile is not None
+        and not is_placeholder_profile_name(profile.display_name)
+    ):
+        return profile.display_name.strip()
+
+    return derived
+
+
+def rename_lead_customer(
+    db: Session,
+    *,
+    lead: Lead,
+    name: str,
+    actor: User,
+) -> Lead:
+    """Sales memberi nama customer. Nama dikunci (manual) dan ikut diterapkan ke profil customer,
+    sedangkan nomor tetap tersimpan sebagai telepon dan sebagai kunci pengenal."""
+    normalized_name = " ".join(name.split())
+
+    if len(normalized_name) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Nama customer minimal 2 karakter.",
+        )
+    if looks_like_phone_number(normalized_name):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Isi nama orangnya, bukan nomor telepon.",
+        )
+
+    previous_name = lead.display_name
+    lead.display_name = normalized_name
+    lead.name_source = "manual"
+    db.add(lead)
+
+    profile = lead.customer_profile
+    if profile is not None:
+        profile.display_name = normalized_name
+        profile.match_strategy = "manual_profile_update"
+        db.add(profile)
+
+    if previous_name != normalized_name:
+        create_lead_activity_event(
+            db=db,
+            lead=lead,
+            event_type="customer_named",
+            title="Nama customer diperbarui",
+            description="Sales memberi nama customer.",
+            actor_user_id=actor.id,
+            from_value=previous_name,
+            to_value=normalized_name,
+        )
+
+    db.flush()
+    return lead
+
+
 def ensure_conversation_lead(
     db: Session,
     *,
@@ -195,7 +261,8 @@ def sync_lead_from_conversation(
     lead = ensure_conversation_lead(db=db, conversation=conversation)
     lead.organization_id = conversation.organization_id
     lead.assigned_user_id = conversation.sales_user_id
-    lead.display_name = derive_lead_display_name(conversation=conversation)
+    if lead.name_source != "manual":
+        lead.display_name = resolve_synced_lead_name(lead=lead, conversation=conversation)
     lead.source = conversation.source
     if account_category is not None:
         next_account_category = normalize_account_category(account_category)
