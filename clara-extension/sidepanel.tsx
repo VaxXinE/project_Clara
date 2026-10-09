@@ -1138,6 +1138,7 @@ function ClaraSidePanel() {
     number | null
   >(null)
   const [replySuggestionId, setReplySuggestionId] = useState("")
+  const [draftActionMode, setDraftActionMode] = useState("")
   const [deliveryContext, setDeliveryContext] = useState<{
     activeChatFingerprint: string
     conversationId: string
@@ -1430,7 +1431,9 @@ function ClaraSidePanel() {
   }
 
   const ensureAuthenticated = async () => {
-    if (isAuthenticated) {
+    // Pakai ref, bukan state: interval auto-refresh menyimpan closure lama dan tidak boleh
+    // memicu pemeriksaan login (dan label "Memeriksa") setiap putaran.
+    if (authStatusRef.current === "authenticated") {
       return true
     }
 
@@ -1513,6 +1516,7 @@ function ClaraSidePanel() {
     setHasEditedSuggestion(false)
     setEditingSuggestionIndex(null)
     setReplySuggestionId("")
+    setDraftActionMode("")
     setDeliveryContext(null)
 
     try {
@@ -1541,7 +1545,7 @@ function ClaraSidePanel() {
       const message =
         err instanceof Error
           ? err.message
-          : "Terjadi kendala saat membaca chat WhatsApp Web."
+          : "Terjadi kendala saat membaca chat yang sedang terbuka."
 
       setChatData(null)
 
@@ -1597,6 +1601,7 @@ function ClaraSidePanel() {
   useEffect(() => {
     if (
       !isClaraWorkspace ||
+      !isAuthenticated ||
       hasAutoReadAttempted ||
       isLoading ||
       !isSupportedLiveSyncTabUrl(tabUrl)
@@ -1609,11 +1614,11 @@ function ClaraSidePanel() {
     handleReadChat().catch(() => {
       // Error state is already handled inside handleReadChat.
     })
-  }, [hasAutoReadAttempted, isClaraWorkspace, isLoading, tabUrl])
+  }, [hasAutoReadAttempted, isAuthenticated, isClaraWorkspace, isLoading, tabUrl])
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      if (!isClaraWorkspace) {
+      if (!isClaraWorkspace || authStatusRef.current !== "authenticated") {
         return
       }
 
@@ -1686,6 +1691,7 @@ function ClaraSidePanel() {
       setHasEditedSuggestion(false)
       setEditingSuggestionIndex(null)
       setReplySuggestionId(suggestionResult.replySuggestionId || "")
+      setDraftActionMode(suggestionResult.actionMode || "")
       setDeliveryContext(
         suggestionResult.activeChatFingerprint &&
           suggestionResult.conversationId &&
@@ -1718,6 +1724,7 @@ function ClaraSidePanel() {
       setHasEditedSuggestion(false)
       setEditingSuggestionIndex(null)
       setReplySuggestionId("")
+      setDraftActionMode("")
       setDeliveryContext(null)
       setError(message)
     } finally {
@@ -2167,15 +2174,29 @@ function ClaraSidePanel() {
   }
 
   const isSupportedTab = isSupportedLiveSyncTabUrl(tabUrl)
-  const activeChannelLabel = chatData
-    ? getChannelLabel(chatData.channel)
-    : isInstagramDmTabUrl(tabUrl)
-      ? "Instagram DM"
+  const activeChannel: "whatsapp" | "instagram" | "tiktok" | null =
+    chatData?.channel ||
+    (isInstagramDmTabUrl(tabUrl)
+      ? "instagram"
       : isTikTokMessagesTabUrl(tabUrl)
-        ? "TikTok DM"
+        ? "tiktok"
         : isWhatsAppTabUrl(tabUrl)
-          ? "WhatsApp Web"
-          : "Belum terdeteksi"
+          ? "whatsapp"
+          : null)
+  const activeChannelLabel = activeChannel
+    ? getChannelLabel(activeChannel)
+    : "Belum ada chat dibuka"
+  // Pembaca Instagram dan TikTok masih tahap uji coba (pembacaan lewat tampilan halaman).
+  const isExperimentalChannel =
+    activeChannel === "instagram" || activeChannel === "tiktok"
+  const sendTargetName =
+    activeChannel === "instagram"
+      ? "Instagram"
+      : activeChannel === "tiktok"
+        ? "TikTok"
+        : "WhatsApp"
+  const showTabGuide =
+    !isSupportedTab && !chatData && suggestions.length === 0
   const authStatusLabel =
     authStatus === "authenticated"
       ? "Terhubung"
@@ -2184,6 +2205,10 @@ function ClaraSidePanel() {
         : authStatus === "misconfigured"
           ? "Perlu pengaturan"
           : "Perlu login"
+  const accountLabel =
+    authStatus === "authenticated"
+      ? authUser?.name || authUser?.email || authStatusLabel
+      : authStatusLabel
   const chatReadTimeLabel = chatReadAt
     ? chatReadAt.toLocaleTimeString("id-ID", {
         hour: "2-digit",
@@ -2243,11 +2268,32 @@ function ClaraSidePanel() {
               </button>
             </div>
           ) : null}
-          <div className="clara-hero__footer">
-            <div className="clara-chip clara-chip--soft" role="status">
-              {authStatusLabel} · {activeChannelLabel}
+          <div className="clara-topbar">
+            <div className="clara-topbar__channel">
+              <span
+                aria-hidden="true"
+                className={`clara-channel-dot clara-channel-dot--${activeChannel || "none"}`}
+              />
+              <span className="clara-topbar__channel-name">
+                {activeChannelLabel}
+              </span>
+              {isExperimentalChannel ? (
+                <span
+                  className="clara-chip clara-chip--warn"
+                  title="Pembaca Instagram dan TikTok masih tahap uji coba. Cek hasil bacaannya.">
+                  Eksperimental
+                </span>
+              ) : null}
+            </div>
+            <div
+              className={`clara-chip ${isAuthenticated ? "clara-chip--soft" : "clara-chip--warn"}`}
+              role="status">
+              {accountLabel}
             </div>
           </div>
+          <p className="clara-topbar__note">
+            Browser Extension Reader · hanya membaca chat yang sedang terbuka
+          </p>
         </section>
 
         {shouldShowLoginGate ? (
@@ -2256,26 +2302,15 @@ function ClaraSidePanel() {
               <div>
                 <div className="clara-pane__eyebrow">Login Clara</div>
                 <div className="clara-pane__title">
-                  Login dashboard Clara dulu
+                  Login dulu di dashboard Clara
                 </div>
                 <p className="clara-pane__copy">
                   {authStatus === "misconfigured"
                     ? "Extension belum terhubung ke server Clara. Hubungi admin untuk memperbarui extension."
                     : authStatus === "checking"
-                      ? "Sedang memeriksa session login Clara."
-                      : "Seluruh fitur extension dikunci sampai kamu login di web Clara dengan akun yang benar."}
+                      ? "Sedang memeriksa login Clara..."
+                      : "Buka dashboard Clara dan login dengan akunmu. Panel ini aktif sendiri setelah login berhasil."}
                 </p>
-                <p className="clara-pane__copy">
-                  Setelah login berhasil, Clara Ops dan workspace ChatGPT baru
-                  bisa dipakai.
-                </p>
-              </div>
-
-              <div
-                aria-live="polite"
-                className="clara-chip clara-chip--warn"
-                role={authStatus === "misconfigured" ? "alert" : "status"}>
-                {authStatusLabel}
               </div>
             </div>
 
@@ -2421,7 +2456,42 @@ function ClaraSidePanel() {
           </section>
         ) : null}
 
-        {!isClaraWorkspace || shouldShowLoginGate ? null : (
+        {!isClaraWorkspace || shouldShowLoginGate ? null : showTabGuide ? (
+          <section className="clara-pane" aria-label="Mulai">
+            <div className="clara-pane__header">
+              <div>
+                <div className="clara-pane__eyebrow">Mulai</div>
+                <div className="clara-pane__title">
+                  Buka chat customer dulu
+                </div>
+              </div>
+            </div>
+            <p className="clara-pane__copy">
+              Pindah ke tab chat, lalu buka satu percakapan. Panel ini akan
+              membacanya dan menyiapkan draft jawaban.
+            </p>
+            <ul className="clara-guide">
+              <li>
+                <span className="clara-channel-dot clara-channel-dot--whatsapp" />
+                <strong>WhatsApp Web</strong>
+              </li>
+              <li>
+                <span className="clara-channel-dot clara-channel-dot--instagram" />
+                <strong>Instagram DM</strong>
+                <span className="clara-chip clara-chip--warn">Eksperimental</span>
+              </li>
+              <li>
+                <span className="clara-channel-dot clara-channel-dot--tiktok" />
+                <strong>TikTok Messages</strong>
+                <span className="clara-chip clara-chip--warn">Eksperimental</span>
+              </li>
+            </ul>
+            <p className="clara-draft__hint-text">
+              Clara hanya membaca chat yang sedang terbuka, bukan seluruh
+              inbox.
+            </p>
+          </section>
+        ) : (
           <>
             <section className="clara-actionbar" aria-label="Aksi utama">
               <p
@@ -2430,32 +2500,36 @@ function ClaraSidePanel() {
                 role="status">
                 {chatStatusText}
               </p>
-              <div className="clara-actionbar__buttons">
-                <button
-                  aria-busy={isSuggesting}
-                  className="clara-button clara-button--primary clara-button--block"
-                  disabled={
-                    isSuggesting || isLoading || isInsertingIndex !== null
-                  }
-                  onClick={handleSuggestReplies}
-                  type="button">
-                  {isSuggesting
-                    ? "Clara sedang menyusun..."
-                    : suggestions.length
-                      ? "Buat Ulang Jawaban"
-                      : "Buat Jawaban"}
-                </button>
-                <button
-                  aria-busy={isLoading}
-                  className="clara-button clara-button--ghost clara-button--block"
-                  disabled={
-                    isLoading || isSuggesting || isInsertingIndex !== null
-                  }
-                  onClick={handleReadChat}
-                  type="button">
-                  {isLoading ? "Membaca chat..." : "Baca Ulang Chat"}
-                </button>
-              </div>
+              <button
+                aria-busy={isSuggesting}
+                className="clara-button clara-button--primary clara-button--block"
+                disabled={
+                  isSuggesting ||
+                  isLoading ||
+                  isInsertingIndex !== null ||
+                  !isSupportedTab
+                }
+                onClick={handleSuggestReplies}
+                type="button">
+                {isSuggesting
+                  ? "Clara sedang menyusun..."
+                  : suggestions.length
+                    ? "Buat Ulang Jawaban"
+                    : "Buat Jawaban"}
+              </button>
+              <button
+                aria-busy={isLoading}
+                className="clara-linkbutton clara-linkbutton--center"
+                disabled={
+                  isLoading ||
+                  isSuggesting ||
+                  isInsertingIndex !== null ||
+                  !isSupportedTab
+                }
+                onClick={handleReadChat}
+                type="button">
+                {isLoading ? "Membaca chat..." : "Baca ulang chat"}
+              </button>
               {feedback ? (
                 <div
                   aria-live="polite"
@@ -2474,10 +2548,7 @@ function ClaraSidePanel() {
 
             <section className="clara-pane clara-pane--reply">
               <div className="clara-pane__header">
-                <div>
-                  <div className="clara-pane__eyebrow">Balasan AI</div>
-                  <div className="clara-pane__title">Draft jawaban</div>
-                </div>
+                <div className="clara-pane__title">Draft jawaban</div>
 
                 <div
                   aria-live="polite"
@@ -2489,6 +2560,12 @@ function ClaraSidePanel() {
 
               {primarySuggestion ? (
                 <>
+                  {draftActionMode === "escalate_to_human" ? (
+                    <div className="clara-note clara-note--warn" role="alert">
+                      Topik ini sensitif. Sebaiknya tanya manager dulu sebelum
+                      mengirim jawaban.
+                    </div>
+                  ) : null}
                   <div className="clara-draft-list">
                     <article className="clara-draft">
                       <div className="clara-draft__head">
@@ -2564,8 +2641,8 @@ function ClaraSidePanel() {
                             </button>
                           </div>
                           <p className="clara-draft__hint-text">
-                            Teks dimasukkan ke kolom balasan. Kamu cek dulu, lalu
-                            kirim sendiri di WhatsApp.
+                            Teks dimasukkan ke kolom balasan. Kamu cek dulu,
+                            lalu kirim sendiri di {sendTargetName}.
                           </p>
 
                           {isConfirmingSend ? (
@@ -2602,7 +2679,7 @@ function ClaraSidePanel() {
                                 </button>
                               </div>
                             </div>
-                          ) : (
+                          ) : draftActionMode === "escalate_to_human" ? null : (
                             <button
                               className="clara-linkbutton"
                               disabled={isInsertingIndex !== null}
@@ -2630,20 +2707,20 @@ function ClaraSidePanel() {
               )}
             </section>
 
-            <section className="clara-pane">
-              <div className="clara-pane__header">
-                <div>
-                  <div className="clara-pane__eyebrow">Chat Aktif</div>
-                  <div className="clara-pane__title">Chat yang terbaca</div>
-                </div>
-              </div>
-
-              {!isSupportedTab && !chatData && (
-                <div className="clara-note clara-note--warn" role="status">
-                  Buka percakapan di WhatsApp Web, Instagram DM, atau TikTok
-                  Messages, lalu klik Buat Jawaban.
-                </div>
-              )}
+            <details className="clara-pane clara-chatfold">
+              <summary className="clara-chatfold__summary">
+                <span className="clara-chatfold__heading">
+                  <span className="clara-pane__title">Chat yang terbaca</span>
+                  {latestMessage ? (
+                    <span className="clara-chatfold__latest">
+                      Terakhir: {latestMessage.text}
+                    </span>
+                  ) : null}
+                </span>
+                <span className="clara-chip clara-chip--soft">
+                  {chatData ? `${chatData.messages.length} pesan` : "Belum dibaca"}
+                </span>
+              </summary>
 
               {chatData ? (
                 <div className="clara-overview">
@@ -2661,26 +2738,16 @@ function ClaraSidePanel() {
                             getChannelLabel(chatData.channel)}
                         </div>
                       </div>
-                      <div className="clara-chip clara-chip--soft">
-                        {getChannelLabel(chatData.channel)} ·{" "}
-                        {chatData.messages.length} pesan
-                      </div>
                     </div>
-
-                    {latestMessage ? (
-                      <div className="clara-chat-latest">
-                        <strong>Pesan terbaru:</strong> {latestMessage.text}
-                      </div>
-                    ) : null}
 
                     <ol
                       aria-label="Pesan dalam percakapan aktif"
-                      className="clara-thread">
+                      className={`clara-thread ${chatData.channel && chatData.channel !== "whatsapp" ? "clara-thread--plain" : ""}`}>
                       {chatData.messages.length === 0 ? (
                         <li className="clara-empty">
                           Belum ada pesan teks yang terbaca. Pastikan chat
                           berisi teks (bukan hanya gambar atau stiker), lalu
-                          klik Baca Ulang Chat.
+                          klik Baca ulang chat.
                         </li>
                       ) : (
                         chatData.messages.map((message) => (
@@ -2731,13 +2798,12 @@ function ClaraSidePanel() {
                     Belum ada chat yang terbaca
                   </div>
                   <div className="clara-empty__meta">
-                    Klik <strong>Buat Jawaban</strong> atau{" "}
-                    <strong>Baca Ulang Chat</strong> di atas. Clara hanya
-                    membaca chat yang sedang terbuka, bukan seluruh inbox.
+                    Klik <strong>Buat Jawaban</strong>. Clara hanya membaca chat
+                    yang sedang terbuka, bukan seluruh inbox.
                   </div>
                 </div>
               )}
-            </section>
+            </details>
           </>
         )}
       </div>

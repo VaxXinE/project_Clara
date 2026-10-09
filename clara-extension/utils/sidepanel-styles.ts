@@ -1142,4 +1142,145 @@ export const panelCss = `
     box-shadow: none;
     padding: 0;
   }
+
+  .clara-topbar {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+  }
+
+  .clara-topbar__channel {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    min-width: 0;
+  }
+
+  .clara-topbar__channel-name {
+    color: #fff0c9;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.3;
+  }
+
+  .clara-topbar__note {
+    color: var(--clara-muted);
+    font-size: 11px;
+    line-height: 1.45;
+    margin: 6px 0 0;
+  }
+
+  .clara-channel-dot {
+    background: #6b5a35;
+    border-radius: 50%;
+    display: inline-block;
+    flex: none;
+    height: 9px;
+    width: 9px;
+  }
+
+  .clara-channel-dot--whatsapp {
+    background: #5fcf80;
+  }
+
+  .clara-channel-dot--instagram {
+    background: #e1749c;
+  }
+
+  .clara-channel-dot--tiktok {
+    background: #69c9d0;
+  }
+
+  .clara-guide {
+    display: grid;
+    gap: 8px;
+    list-style: none;
+    margin: 12px 0;
+    padding: 0;
+  }
+
+  .clara-guide li {
+    align-items: center;
+    background: rgba(255, 240, 201, 0.05);
+    border: 1px solid rgba(240, 203, 115, 0.12);
+    border-radius: 12px;
+    color: #fff0c9;
+    display: flex;
+    flex-wrap: wrap;
+    font-size: 13px;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .clara-linkbutton--center {
+    justify-self: center;
+    min-height: 36px;
+    text-align: center;
+  }
+
+  .clara-chatfold {
+    padding: 0;
+  }
+
+  .clara-chatfold > .clara-overview {
+    padding: 0 12px 12px;
+  }
+
+  .clara-chatfold > .clara-empty {
+    margin: 0 12px 12px;
+  }
+
+  .clara-chatfold__summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    list-style: none;
+    min-height: 44px;
+    padding: 12px;
+  }
+
+  .clara-chatfold__summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .clara-chatfold__summary::after {
+    color: var(--clara-muted);
+    content: "▾";
+    flex: none;
+    font-size: 12px;
+  }
+
+  .clara-chatfold[open] > .clara-chatfold__summary::after {
+    content: "▴";
+  }
+
+  .clara-chatfold__heading {
+    display: grid;
+    flex: 1;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .clara-chatfold__latest {
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    color: #d6bb84;
+    display: -webkit-box;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+
+  .clara-thread--plain {
+    background: #130d08;
+  }
 `
